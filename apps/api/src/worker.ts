@@ -1,0 +1,147 @@
+import 'dotenv/config';
+import { Worker } from 'bullmq';
+import {
+  redisConnectionOptions,
+  SSLRenewalJob,
+  sslRenewalQueue,
+  BillingSweepJob,
+  billingSweepQueue,
+  UptimeSweepJob,
+  uptimeSweepQueue,
+} from './lib/queue';
+import { executeSSLRenewalJob } from './jobs/ssl-renewal';
+import { runBillingChecks } from './lib/billing';
+import { runUptimeChecks } from './lib/uptimeMonitor';
+import { logger } from './lib/logger';
+
+// NOTE: The Gemini/Groq-based payment-verification worker has been removed.
+// Payments are reviewed and approved/declined by a human admin/dev only —
+// see routes/payments.ts POST /payments/:id/review. There is no AI/OCR
+// extraction step and no delayed auto-approval anywhere in this platform.
+// lib/verifyPayment.ts is kept in the repo for reference only and is not
+// imported by anything; do not re-wire it into this worker.
+
+// SSL Certificate Renewal Worker
+const sslRenewalWorker = new Worker<SSLRenewalJob>(
+  'ssl-renewal',
+  async (job) => {
+    logger.info({ jobId: job.id }, 'Starting SSL renewal job execution');
+    await executeSSLRenewalJob();
+  },
+  {
+    connection: redisConnectionOptions,
+    // Process one SSL renewal job at a time to avoid Cloudflare API rate limits
+    concurrency: 1,
+  }
+);
+
+sslRenewalWorker.on('completed', (job) => {
+  logger.info({ jobId: job.id }, 'SSL renewal job completed successfully');
+});
+
+sslRenewalWorker.on('failed', (job, err) => {
+  logger.error({ jobId: job?.id, err }, 'SSL renewal job failed - will retry in 24 hours');
+});
+
+logger.info('SSL renewal worker started');
+
+// Schedule SSL renewal job to run daily (every 24 hours)
+// Using repeatable job pattern with cron-like syntax
+(async () => {
+  try {
+    // Add repeating job that runs every 24 hours
+    await sslRenewalQueue.add(
+      'ssl-renewal-check',
+      {}, // No data required
+      {
+        repeat: {
+          pattern: '0 0 * * *', // Run at midnight every day (cron format)
+        },
+        jobId: 'ssl-renewal-daily', // Fixed job ID prevents duplicates
+      }
+    );
+
+    logger.info({
+      msg: 'SSL renewal job scheduled successfully',
+      schedule: 'Daily at midnight (00:00)',
+      pattern: '0 0 * * *',
+    });
+  } catch (error) {
+    logger.error({
+      msg: 'Failed to schedule SSL renewal job',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+})();
+
+// Billing past-due/cancel sweep worker (audit finding H6). Same
+// self-scheduling pattern as SSL renewal above -- routes/billing.ts's
+// POST /billing/run-checks (manual trigger, or external cron with
+// BILLING_CRON_SECRET) still works too; this just means the sweep no
+// longer depends on either of those being wired up externally.
+const billingSweepWorker = new Worker<BillingSweepJob>(
+  'billing-sweep',
+  async (job) => {
+    logger.info({ jobId: job.id }, 'Starting billing sweep job execution');
+    const result = await runBillingChecks();
+    logger.info({ jobId: job.id, ...result }, 'Billing sweep job completed');
+  },
+  { connection: redisConnectionOptions, concurrency: 1 }
+);
+
+billingSweepWorker.on('failed', (job, err) => {
+  logger.error({ jobId: job?.id, err }, 'Billing sweep job failed - will retry');
+});
+
+(async () => {
+  try {
+    await billingSweepQueue.add(
+      'billing-sweep-daily',
+      {},
+      {
+        repeat: { pattern: '0 1 * * *' }, // Daily at 01:00, after SSL renewal
+        jobId: 'billing-sweep-daily',
+      }
+    );
+    logger.info({ msg: 'Billing sweep job scheduled successfully', pattern: '0 1 * * *' });
+  } catch (error) {
+    logger.error({
+      msg: 'Failed to schedule billing sweep job',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+})();
+
+// Uptime monitoring sweep worker (audit finding H6). Runs far more
+// frequently than the daily jobs above since it's meant to catch
+// deployments going down promptly, not just once a day.
+const uptimeSweepWorker = new Worker<UptimeSweepJob>(
+  'uptime-sweep',
+  async (job) => {
+    await runUptimeChecks();
+  },
+  { connection: redisConnectionOptions, concurrency: 1 }
+);
+
+uptimeSweepWorker.on('failed', (job, err) => {
+  logger.error({ jobId: job?.id, err }, 'Uptime sweep job failed - will retry');
+});
+
+(async () => {
+  try {
+    await uptimeSweepQueue.add(
+      'uptime-sweep-recurring',
+      {},
+      {
+        repeat: { every: 5 * 60 * 1000 }, // Every 5 minutes
+        jobId: 'uptime-sweep-recurring',
+      }
+    );
+    logger.info({ msg: 'Uptime sweep job scheduled successfully', interval: '5 minutes' });
+  } catch (error) {
+    logger.error({
+      msg: 'Failed to schedule uptime sweep job',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+})();

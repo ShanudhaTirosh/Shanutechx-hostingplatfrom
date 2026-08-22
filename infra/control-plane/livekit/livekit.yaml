@@ -1,0 +1,19 @@
+port: 7880
+rtc:
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true
+
+keys:
+  # Default API key - will be replaced when a LiveKit project is created
+  APIkeyDefault: secretDefault
+
+logging:
+  level: info
+  pion_level: warn
+
+room:
+  auto_create: true
+  empty_timeout: 300
+  departure_timeout: 20
+  max_participants: 100

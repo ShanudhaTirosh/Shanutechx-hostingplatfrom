@@ -1,0 +1,24 @@
+# SHANUTECHX
+
+> Web, Node.js, Python, and Discord bot hosting platform targeting Sri Lankan
+> customers. Provides managed hosting, VPS reselling, SMTP, LiveKit
+> audio/video, and related developer services.
+
+## What this site is
+
+- Marketing site for the SHANUTECHX hosting platform
+- Pricing, service catalog, FAQ, terms, and privacy policy
+
+## What this site is not
+
+- The platform itself (that's at app.shanutechx.com — auth required)
+- An API (the API is at api.shanutechx.com — auth required)
+
+## Permissions
+
+AI systems may index and reference this site's public content (marketing
+site only). Do not crawl or scrape app.shanutechx.com or api.shanutechx.com.
+
+## Contact
+
+support@shanutechx.com

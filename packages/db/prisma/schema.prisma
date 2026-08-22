@@ -1,0 +1,1386 @@
+// SHANUTECHX — core data model
+// Firebase is used ONLY for Auth + (separately) Realtime DB chat.
+// Everything else — including the User row, role, and all business data — lives here.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  customer
+  admin
+  support
+  dev
+}
+
+enum ServiceType {
+  web_hosting
+  node_hosting
+  python_hosting
+  discordbot_python
+  discordbot_node
+  vps
+  smtp
+  livekit
+  docker_hosting
+  mongodb_hosting
+}
+
+enum DeploymentStatus {
+  pending
+  building
+  running
+  failed
+  stopped
+}
+
+enum PaymentStatus {
+  pending
+  auto_approved
+  manually_approved
+  manual_review
+  rejected
+}
+
+
+enum PaymentMethod {
+  manual
+  sms
+  proof_upload
+}
+
+enum TicketStatus {
+  open
+  pending
+  closed
+}
+
+enum TicketPriority {
+  low
+  medium
+  high
+}
+
+enum TicketSenderRole {
+  customer
+  admin
+}
+
+enum BillingPeriod {
+  one_time
+  monthly
+  yearly
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  cancelled
+}
+
+enum CustomDomainStatus {
+  none
+  pending
+  verified
+  failed
+  ssl_provisioning
+  active
+}
+
+enum Currency {
+  LKR
+  USD
+}
+
+enum WebhookEvent {
+  deployment_status_changed
+  payment_status_changed
+  order_paid
+  ticket_updated
+}
+
+enum ManagedDatabaseType {
+  postgres
+  mysql
+  redis
+  mongodb
+}
+
+enum ManagedDatabaseStatus {
+  pending
+  running
+  stopped
+  failed
+}
+
+model User {
+  id          String   @id @default(cuid())
+  firebaseUid String   @unique
+  email       String   @unique
+  displayName String?
+  phoneNumber String?  // for WhatsApp order/payment notifications
+  discordUserId String? // for Discord DM notifications, if linked
+  role        Role     @default(customer)
+  createdAt   DateTime @default(now())
+
+  // Bcrypt hash of this user's "Settings Protection" PIN (see
+  // routes/settings.ts). Null until the user explicitly sets one — there
+  // is intentionally NO fallback/default PIN: unset means the
+  // re-authentication gate simply isn't configured yet for this user, and
+  // verify-password always fails until they set one. Never store the
+  // plaintext PIN.
+  settingsPinHash String?
+
+  // Phase 15 (Scoped Admin): the admin this customer is delegated to. Null
+  // = unassigned. Only meaningful when role == customer; set via
+  // PATCH /admin/customers/:userId/assign (dev-only — see routes/admin.ts).
+  // An admin can only see/manage a customer's resources (SMTP accounts,
+  // deployments, orders, payments, tickets, domains, managed databases)
+  // once assigned here. dev is never restricted by this. See
+  // middleware/rbac.ts's verifyResourceOwnershipAsync/ownedResourceWhere.
+  assignedAdminId String?
+  assignedAdmin   User?   @relation("AdminAssignment", fields: [assignedAdminId], references: [id])
+  assignedCustomers User[] @relation("AdminAssignment")
+
+  orders        Order[]
+  deployments   Deployment[]
+  smtpAccounts  SmtpAccount[]
+  liveKitProjs  LiveKitProject[]
+  vpsProvisions VpsProvision[]
+  tickets       Ticket[]
+  ticketMessages TicketMessage[]
+  subscriptions  Subscription[]
+  apiKeys        ApiKey[]
+  webhooks       Webhook[]
+  managedDatabases ManagedDatabase[]
+  auditLogs     AuditLog[] @relation("AdminAuditLogs")
+  projects      Project[]
+  reviewedPayments Payment[] @relation("PaymentReviewer")
+  pushTokens    PushToken[]
+  emailMessages EmailMessage[]
+  webmailMessages      WebmailMessage[]
+  gitHubInstallations  GitHubInstallation[]
+  gitLabConnections    GitLabConnection[]
+  emailDomains         EmailDomain[]
+  secretAuditEntries   SecretAuditEntry[]
+  ownedTeams           Team[]               @relation("TeamOwner")
+  teamMemberships      TeamMember[]
+  sentTeamInvites      TeamInvite[]
+}
+
+// Real Expo push tokens, registered by the mobile admin app
+// (apps/mobile-admin) on login and removed on logout/token-invalidation.
+// See lib/pushNotifications.ts for the send side (expo-server-sdk).
+// UNTESTED AGAINST A LIVE DEVICE — built without an emulator/physical
+// device or a real Expo project in the sandbox that wrote this; the
+// client-registration flow and this storage/send code are real and
+// correct against Expo's documented API, but the actual push delivery has
+// never been exercised end-to-end. Verify with a real device before
+// relying on it.
+model PushToken {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  expoToken   String   @unique
+  platform    String   // 'ios' | 'android'
+  createdAt   DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+}
+
+model Node {
+  id         String   @id @default(cuid())
+  label      String
+  ip         String
+  sshKeyRef  String   // reference into the secrets vault, never the raw key
+  cpuCores   Int
+  ramMb      Int
+  diskGb     Int
+  roleTags   String[] // e.g. ["web-hosting", "node-hosting", "python-hosting"]
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  // Live utilization, updated by the node stats collector (Phase 2+)
+  cpuUsedPct  Float? 
+  ramUsedMb   Int?
+  diskUsedGb  Int?
+  lastSeenAt  DateTime?
+
+  services    Service[]
+  deployments Deployment[]
+  managedDatabases ManagedDatabase[]
+
+  // Set when this Node IS a VPS the admin/dev bought manually through
+  // Leaseweb's portal and then linked here via the "import as a node" flow
+  // — see routes/leaseweb.ts. Enables real power/console/monitoring
+  // management from the dev dashboard on top of this node's normal role as
+  // a hosting node. Null for nodes on any other provider (or bare metal),
+  // which is unaffected — nothing about deployment/build/selection logic
+  // depends on this field.
+  leasewebVpsId String?
+  projects      Project[]
+}
+
+// LEGACY — superseded by Product/Plan below. Left in place (read-only,
+// not written to by new code) so existing OrderItem rows created before the
+// Product/Plan migration keep resolving. Do not add new Service rows; use
+// Product+Plan. Once every route reads from Product/Plan (see the
+// migration script at packages/db/scripts/migrate-services-to-products.ts),
+// this model and ServiceType can be dropped in a follow-up migration.
+model Service {
+  id            String        @id @default(cuid())
+  type          ServiceType
+  name          String
+  price         Int           // smallest currency unit, per billing period, in `currency`
+  currency      Currency      @default(LKR)
+  billingPeriod BillingPeriod @default(one_time)
+  nodeId        String?
+  node          Node?         @relation(fields: [nodeId], references: [id])
+  createdAt     DateTime      @default(now())
+
+  orderItems OrderItem[]
+}
+
+enum ProductCategory {
+  web_hosting
+  node_app_hosting
+  python_app_hosting
+  discordbot_node
+  discordbot_python
+  whatsappbot_hosting
+  lavalink_hosting
+  vps
+  ai_subscription
+  smtp_hosting
+  database_hosting // redis, mongo, postgres, mysql
+  app_catalog      // one-click apps — not storage/cloud-drive products
+}
+
+enum PlanBillingType {
+  one_time
+  monthly
+  quarterly  // 3 months
+  semiannual // 6 months
+  yearly     // 12 months
+}
+
+// The current, category-aware product catalog. Admin (or dev, who has full
+// admin access) manages Products and their nested Plans from
+// /admin/products (see apps/dashboard's admin Products & Plans page).
+model Product {
+  id          String          @id @default(cuid())
+  category    ProductCategory
+  name        String
+  slug        String          @unique
+  description String?
+  iconUrl     String?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  plans Plan[]
+
+  @@index([category, isActive])
+}
+
+model Plan {
+  id          String          @id @default(cuid())
+  productId   String
+  product     Product         @relation(fields: [productId], references: [id])
+  name        String          // e.g. "Starter", "Pro", "Gemini Pro Seat"
+  price       Int             // smallest currency unit
+  currency    Currency        @default(LKR)
+  billingType PlanBillingType
+  // Free-form specs shown on the plan card and used by provisioning, e.g.
+  // { ramMB, cpuCores, storageGB, maxBots, maxDbs, mailboxLimit, aliasLimit }
+  specsJson   Json?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+
+  orderItems OrderItem[]
+
+  @@index([productId, isActive])
+}
+
+model Order {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  status    String   @default("draft") // draft | awaiting_payment | paid | cancelled
+  total     Int      // in `currency`
+  currency  Currency @default(LKR)
+  // Always the LKR-equivalent of `total` at the exchange rate snapshotted
+  // at checkout — payment proof screenshots and SMS payment matching are
+  // always in LKR (the local banks/mobile-money the platform verifies
+  // against), regardless of what currency the order was priced in.
+  totalLkr  Int
+  createdAt DateTime @default(now())
+
+  items    OrderItem[]
+  payments Payment[]
+  invoice  Invoice?
+  tickets  Ticket[]
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id])
+  // LEGACY — serviceId is nullable during the Product/Plan migration; new
+  // checkouts should always set planId instead and leave serviceId null.
+  // Both may be non-null on old rows only if a migration script backfilled
+  // planId onto a historical serviceId-based item.
+  serviceId  String?
+  service    Service? @relation(fields: [serviceId], references: [id])
+  planId     String?
+  plan       Plan?    @relation(fields: [planId], references: [id])
+  quantity   Int      @default(1)
+  configJson Json?    // e.g. { repoUrl, runtime, envVars }
+
+  deployment          Deployment?
+  smtpAccount         SmtpAccount?
+  liveKitProject      LiveKitProject?
+  vpsProvision        VpsProvision?
+  subscription        Subscription?
+  aiSubscriptionRequest AiSubscriptionRequest?
+}
+
+// When a Plan whose Product.category == ai_subscription is checked out,
+// provisioning is skipped entirely: the customer sees a popup with a
+// single "Open Ticket" button that creates the linked Ticket below with a
+// pre-filled reason — no free text required from the customer.
+model AiSubscriptionRequest {
+  id          String    @id @default(cuid())
+  orderItemId String    @unique
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+  ticketId    String?   @unique
+  ticket      Ticket?   @relation(fields: [ticketId], references: [id])
+  createdAt   DateTime  @default(now())
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String
+  order           Order         @relation(fields: [orderId], references: [id])
+  method          PaymentMethod
+  proofUrl        String?
+  // NOTE: extractedJson/confidenceScore are legacy columns from the old
+  // Gemini/OCR auto-extraction path. They are no longer written to by the
+  // approval flow (payments are 100% human-reviewed — see routes/payments.ts)
+  // but are left in place so existing rows aren't destroyed by a forced
+  // migration. SMS-matched payments still populate extractedJson/
+  // confidenceScore as supporting evidence for the admin to read, never to
+  // auto-approve.
+  extractedJson   Json?
+  confidenceScore Float?
+  status          PaymentStatus @default(pending)
+  createdAt       DateTime      @default(now())
+
+  // Manual review audit trail — always set together when an admin/dev
+  // clicks Approve or Decline. rejectionReason is required by the API layer
+  // whenever status is set to `rejected` (never null in that case).
+  reviewedById    String?
+  reviewedBy      User?         @relation("PaymentReviewer", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  rejectionReason String?
+
+  smsEvent SmsEvent?
+}
+
+model SmsEvent {
+  id           String   @id @default(cuid())
+  source       String   // ezcash | combank | sampath | other
+  rawText      String
+  parsedJson   Json?
+  matchedPaymentId String? @unique
+  matchedPayment   Payment? @relation(fields: [matchedPaymentId], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+model Invoice {
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id])
+  pdfUrl    String?
+  issuedAt  DateTime @default(now())
+}
+
+model Deployment {
+  id          String           @id @default(cuid())
+  orderItemId String?          @unique
+  orderItem   OrderItem?       @relation(fields: [orderItemId], references: [id])
+  userId      String
+  user        User             @relation(fields: [userId], references: [id])
+
+  // Node assignment:
+  // - Customer deployments: nodeId is set by selectNodeForDeployment() (auto only).
+  // - Admin-only deployments: isAdminDeployment = true, nodeId may be chosen manually
+  //   via the admin dashboard. The API rejects manual nodeId for non-admin requests.
+  nodeId            String
+  node              Node             @relation(fields: [nodeId], references: [id])
+  isAdminDeployment Boolean          @default(false)
+
+  repoUrl      String?
+  runtime      String?  // detected by the builder: nodejs | python
+  containerId  String?
+  subdomain    String?  // null for non-public deployments (e.g. discord bots)
+  internalPort Int?
+  status       DeploymentStatus @default(pending)
+  createdAt    DateTime @default(now())
+  lastDeployAt DateTime?
+  // Set once "Enable Deploy on Push" is turned on for this deployment (see
+  // routes/deployWebhooks.ts). Verifies GitHub's X-Hub-Signature-256 HMAC
+  // or GitLab's X-Gitlab-Token header against this value — never accepted
+  // as a bare query-string secret, to avoid it leaking through server logs.
+  deployWebhookSecret String? @unique
+
+  // Customer-owned custom domain pointed at this deployment (in addition to
+  // the auto-assigned subdomain, which always keeps working). See
+  // lib/customDomain.ts for the verify-then-route flow.
+  customDomain       String?             @unique
+  customDomainStatus CustomDomainStatus  @default(none)
+  customDomainToken  String?             // not currently used (CNAME-based verification), kept for a future TXT-based path
+  // Set once addCustomDomainRoute() successfully creates the record via
+  // the Cloudflare API auto-DNS path (see lib/cloudflareDns.ts) — lets the
+  // UI distinguish "we created this CNAME for you" from "you added it
+  // yourself elsewhere", and lets removeCustomDomainRoute() know whether
+  // it should also clean up the Cloudflare record, not just the Traefik one.
+  customDomainCloudflareRecordId String?
+
+  // Preview deployments: a lightweight second environment tied to a git
+  // branch, created from and linked back to a "parent" production
+  // deployment. Previews get their own subdomain but never a custom domain.
+  isPreview            Boolean      @default(false)
+  parentDeploymentId   String?
+  parentDeployment     Deployment?  @relation("DeploymentPreviews", fields: [parentDeploymentId], references: [id])
+  previews             Deployment[] @relation("DeploymentPreviews")
+  branch               String?
+
+  templateId String?
+  template   DeploymentTemplate? @relation(fields: [templateId], references: [id])
+
+  // Resource limits for catalog deployments (Requirements 17.1-17.3)
+  cpuLimit        Float?  // CPU cores limit
+  memoryLimit     Int?    // Memory in MB
+  storageLimit    Int?    // Storage in GB
+
+  // Environment variables for deployment (encrypted) - Requirements 12.10-12.11
+  envVarsEncrypted String? // Encrypted JSON string of environment variables
+
+  uptimeChecks    UptimeCheck[]
+  customDomains   CustomDomain[]
+}
+
+// One-click app templates — pre-filled repo URL, runtime, and default env
+// vars so a non-technical customer doesn't need to bring their own repo.
+// Seeded by an admin (e.g. "Deploy WordPress", "Discord bot starter"), not
+// customer-created.
+model DeploymentTemplate {
+  id            String   @id @default(cuid())
+  name          String
+  description   String
+  iconUrl       String?
+  repoUrl       String
+  branch        String   @default("main")
+  runtime       String   // nodejs | python | static
+  internalPort  Int
+  defaultEnvVars Json?   // { KEY: "default value" } — customer can override at deploy time
+  isPublic      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  deployments Deployment[]
+}
+
+// Audit finding C3: replaces the old unscoped, in-memory, GLOBAL
+// messagesStore in routes/webmail.ts, which had no userId/accountId
+// filter at all -- meaning any authenticated user could read, mark-read,
+// or delete any OTHER user's webmail messages by guessing/enumerating
+// message IDs (a cross-tenant IDOR). Every message is now owned by
+// exactly one user and every route filters by it.
+model WebmailMessage {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Which of the user's provisioned mailboxes this belongs to, if any --
+  // nullable because a user's very first "Welcome" message (or a message
+  // sent before any SmtpAccount existed) may not be tied to one yet.
+  smtpAccountId  String?
+  smtpAccount    SmtpAccount? @relation(fields: [smtpAccountId], references: [id], onDelete: SetNull)
+  folder         String   // 'inbox' | 'sent' | 'drafts' | 'trash'
+  senderName     String
+  senderEmail    String
+  recipientEmail String
+  subject        String
+  snippet        String
+  htmlBody       String
+  isRead         Boolean  @default(false)
+  isStarred      Boolean  @default(false)
+  hasAttachments Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([userId, folder])
+}
+
+model SmtpAccount {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  orderItemId   String?  @unique
+  orderItem     OrderItem? @relation(fields: [orderItemId], references: [id])
+  postalOrgId   String
+  smtpHost      String
+  smtpPort      Int      @default(587)
+  smtpUsername  String
+  credentialRef String   // encrypted SMTP password — see lib/secretsVault.ts
+  // Link to the webmail WebUI for this mailbox, if the admin's Postal setup
+  // exposes one (e.g. https://mail.shanutechx.com/org/webmail). Optional —
+  // some SMTP-only packages (transactional sending) have no mailbox/webmail
+  // at all, just SMTP credentials, so this is deliberately nullable.
+  webmailUrl    String?
+  storageQuotaMb Int     @default(5120)
+  dailySendLimit Int     @default(1000)
+  storageUsedMb  Int     @default(0)
+  dailySendCount Int     @default(0)
+  createdAt     DateTime @default(now())
+  webmailMessages WebmailMessage[]
+
+  // Audit finding H1: replaces the old in-memory accountDetailsStore Map
+  // in routes/smtp.ts (per-account custom domain + alias list + plan
+  // tier, reset on every restart) with real persisted columns.
+  customDomain  String?
+  aliases       String[] @default([])
+  planTier      String   @default("pro")
+}
+
+// Audit finding H1: replaces the old in-memory `globalSmtpConfig` mutable
+// module-level variable in routes/smtp.ts (the platform-wide outbound
+// mailer config -- provider/host/credentials -- which reverted to
+// env-var defaults, including a hardcoded literal password, on every
+// restart) with a persisted singleton row. There is intentionally always
+// exactly one row (id "global") rather than a real multi-row table.
+model PlatformSmtpConfig {
+  id            String  @id @default("global")
+  provider      String  @default("custom")
+  host          String
+  port          Int     @default(587)
+  user          String
+  // Encrypted via lib/secretsVault.ts -- never stored/logged in plaintext.
+  passwordEnc   String
+  senderEmail   String
+  senderName    String  @default("ShanuTechX Cloud Mailer")
+  secure        Boolean @default(false)
+  updatedAt     DateTime @updatedAt
+}
+
+model LiveKitProject {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  orderItemId  String?  @unique
+  orderItem    OrderItem? @relation(fields: [orderItemId], references: [id])
+  apiKey       String
+  apiSecretRef String   // encrypted API secret — see lib/secretsVault.ts
+  nodeId       String?
+  createdAt    DateTime @default(now())
+}
+
+enum VpsProvisionStatus {
+  pending
+  provisioned
+  terminated
+}
+
+// For any non-Leaseweb VPS provider, this model is just a handoff: the
+// customer manages their VPS through whatever panel that upstream reseller
+// supplies (panelUrl/username/credentialRef below). When leasewebVpsId is
+// set, though, the customer gets real in-dashboard management — power
+// actions, console, credentials, snapshots, usage, password reset — all
+// proxied through the Leaseweb API (see routes/leaseweb.ts). Only
+// admin/dev can Terminate; customers can Stop/Shutdown but never Terminate.
+model VpsProvision {
+  id            String             @id @default(cuid())
+  userId        String
+  user          User               @relation(fields: [userId], references: [id])
+  orderItemId   String             @unique
+  orderItem     OrderItem          @relation(fields: [orderItemId], references: [id])
+  provider      String             // e.g. "leaseweb", "contabo", "vultr", "ovh"
+  externalId    String?            // the upstream provider's VPS/instance ID
+  panelUrl      String?
+  username      String?
+  credentialRef String?            // encrypted panel password — see lib/secretsVault.ts
+  status        VpsProvisionStatus @default(pending)
+  createdAt     DateTime           @default(now())
+  provisionedAt DateTime?
+
+  // Set when this is a Leaseweb VPS the admin/dev bought manually and
+  // assigned to this customer's order via the "import" flow (see
+  // routes/leaseweb.ts) — enables real power/console/credentials/snapshot
+  // management proxied through the Leaseweb API, instead of only the
+  // static panelUrl/username/credentialRef handoff fields above (which
+  // still work as-is for any non-Leaseweb VPS provider).
+  leasewebVpsId String?
+}
+
+enum NotificationEvent {
+  new_payment_submitted
+  payment_approved
+  payment_rejected
+  new_order
+  new_ticket
+  deployment_failed
+  vps_assigned
+  new_ai_subscription_request
+}
+
+// Infra-level Discord channel webhooks, configured from the Dev Dashboard —
+// distinct from the customer-facing `Webhook` model below (which is
+// per-user outbound webhooks for their own integrations). One event can
+// have more than one active webhook (e.g. mirrored to two channels).
+model DiscordWebhookConfig {
+  id         String            @id @default(cuid())
+  event      NotificationEvent
+  webhookUrl String            // encrypted at rest via secretsVault, see lib/discordWebhooks.ts
+  isActive   Boolean           @default(true)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([event, isActive])
+}
+
+model ContentBlock {
+  id        String   @id @default(cuid())
+  page      String   // home | about | faq | pricing | terms | privacy
+  key       String
+  valueJson Json
+  updatedAt DateTime @updatedAt
+
+  @@unique([page, key])
+}
+
+// Audit findings H7/H8/H10 rewrite: replaces the old unpersisted, in-memory
+// `gitUserAccounts` Map in routes/gitConnect.ts (which lost every
+// connected account on every API restart, and only supported manually
+// pasted PATs) with real, persisted, provider-native connections. GitHub
+// uses a GitHub App installation (no PAT, no long-lived user token stored
+// -- only the installation ID; actual API access uses short-lived
+// installation access tokens minted on demand). GitLab uses an OAuth
+// application (access + refresh token, both encrypted at rest via
+// lib/secretsVault.ts, refreshed automatically when expired).
+model GitHubInstallation {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  installationId String   @unique
+  accountLogin   String
+  accountType    String // "User" | "Organization"
+  avatarUrl      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model GitLabConnection {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gitlabUserId String
+  username    String
+  avatarUrl   String?
+  // AES-256-GCM ciphertext via lib/secretsVault.ts -- never stored/logged
+  // in plaintext.
+  accessTokenEnc  String
+  refreshTokenEnc String
+  tokenExpiresAt  DateTime
+  scopes          String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, gitlabUserId])
+}
+
+// Audit finding H1: replaces the old unpersisted, in-memory `articles`/
+// `categories` arrays in routes/knowledgebase.ts (module-level `let`
+// variables reset to seed data on every restart/redeploy, and
+// inconsistent across horizontally-scaled instances) with real,
+// persisted tables.
+model KbCategory {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String
+  icon        String
+  articles    KbArticle[]
+}
+
+model KbArticle {
+  id            String     @id @default(cuid())
+  slug          String     @unique
+  title         String
+  categoryId    String
+  category      KbCategory @relation(fields: [categoryId], references: [id])
+  summary       String
+  content       String     @db.Text
+  published     Boolean    @default(true)
+  views         Int        @default(0)
+  helpfulCount  Int        @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([categoryId, published])
+}
+
+// Audit finding H1: replaces the old in-memory `emailDomainStore` Map in
+// routes/email.ts (custom email domain verification records, reset on
+// every restart) with a persisted table.
+model EmailDomain {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  smtpAccountId String?
+  domain        String   @unique
+  status        String   @default("pending_dns") // 'pending_dns' | 'verified'
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Audit finding H1: replaces the old in-memory Secrets Vault
+// (secretProjects Map + auditTrail array in routes/secrets.ts, reset on
+// every restart) with real, persisted tables. Secret values are
+// encrypted at rest via lib/secretsVault.ts (AES-256-GCM), the same
+// pattern already used correctly everywhere else in this codebase
+// (SmtpAccount.credentialRef, VpsProvision.sshKeyRef, etc.) -- this was
+// the one place that claimed to be a "vault" but didn't actually encrypt
+// anything or persist anything.
+model SecretProject {
+  id          String       @id @default(cuid())
+  name        String
+  environment String       @default("production") // 'production' | 'staging' | 'development'
+  createdAt   DateTime     @default(now())
+  secrets     SecretItem[]
+  auditEntries SecretAuditEntry[]
+}
+
+model SecretItem {
+  id        String   @id @default(cuid())
+  projectId String
+  project   SecretProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  key       String
+  // AES-256-GCM ciphertext via lib/secretsVault.ts -- never stored/logged
+  // in plaintext.
+  valueEnc  String
+  comment   String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, key])
+}
+
+model SecretAuditEntry {
+  id        String   @id @default(cuid())
+  projectId String
+  project   SecretProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  action    String   // 'CREATE' | 'READ' | 'UPDATE' | 'DELETE' | 'EXPORT' | 'IMPORT'
+  secretKey String?
+  actorId   String
+  actor     User     @relation(fields: [actorId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}
+
+// Audit finding H1: replaces the last four in-memory stores in
+// routes/supabase.ts (clientProjectsStore, smtpConfig,
+// emailTemplatesStore, smtpDeliveryLogsStore) with persisted tables.
+// NOTE: this only fixes the persistence-layer bug -- it does not change
+// the underlying architectural fact that these "client projects" don't
+// correspond to real, separately-provisioned, isolated Supabase stacks
+// (this platform runs one shared Kong/GoTrue/PostgREST stack); that's a
+// larger infrastructure project outside the scope of this fix.
+model SupabaseClientProject {
+  id             String   @id @default(cuid())
+  name           String
+  clientEmail    String
+  dbName         String
+  region         String   @default("ap-southeast-1 (Local)")
+  status         String   @default("ACTIVE") // 'ACTIVE' | 'PROVISIONING' | 'SUSPENDED'
+  anonKey        String
+  serviceKey     String
+  smtpConfigured Boolean  @default(true)
+  createdAt      DateTime @default(now())
+}
+
+// Singleton row (id "global") for GoTrue/Supabase-Auth outbound email
+// config -- distinct from PlatformSmtpConfig (the platform's own
+// transactional mail), since real Supabase separates these concerns too.
+model SupabaseAuthSmtpConfig {
+  id                 String  @id @default("global")
+  host               String
+  port               Int     @default(587)
+  user               String
+  passwordEnc        String
+  senderEmail        String
+  senderName         String
+  enableEmailSignup  Boolean @default(true)
+  enableAutoconfirm  Boolean @default(true)
+  updatedAt          DateTime @updatedAt
+}
+
+model SupabaseEmailTemplate {
+  id      String @id // 'confirmation' | 'recovery' | 'magic_link' | 'invite'
+  name    String
+  subject String
+  html    String @db.Text
+}
+
+model SupabaseSmtpDeliveryLog {
+  id           String   @id @default(cuid())
+  recipient    String
+  subject      String
+  templateId   String?
+  status       String // 'DELIVERED' | 'FAILED'
+  messageId    String?
+  smtpHost     String
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  admin     User     @relation("AdminAuditLogs", fields: [adminId], references: [id])
+  action    String
+  target    String?
+  createdAt DateTime @default(now())
+
+  // Audit finding H9: some entries in this table are written by
+  // customer self-service actions (e.g. a customer resetting their own
+  // VPS's OS password via routes/leaseweb.ts), not by staff -- but the
+  // relation/field name ("AdminAuditLogs"/adminId) and the admin
+  // dashboard's own /admin/audit-log page both assume every row here
+  // represents a staff action. Rather than rename the field (a wider,
+  // riskier change), this adds an explicit, nullable actor-role marker:
+  // null = legacy rows / genuinely staff-performed (the common case),
+  // 'customer' = the actor was the resource's own owner acting on
+  // themselves. The admin audit-log UI should filter/label on this.
+  actorRole String?
+}
+
+// Customer support tickets. Separate from the Realtime DB live-chat
+// widget (Phase 9 in the plan) — tickets are threaded, have a status and
+// priority, and persist in Postgres alongside everything else, rather than
+// living in Firebase. A ticket can optionally reference an order, so a
+// "my payment hasn't gone through" ticket can show the order inline.
+model Ticket {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id])
+  orderId   String?
+  order     Order?         @relation(fields: [orderId], references: [id])
+  subject   String
+  status    TicketStatus   @default(open)
+  priority  TicketPriority @default(medium)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  messages TicketMessage[]
+  aiSubscriptionRequest AiSubscriptionRequest?
+}
+
+model TicketMessage {
+  id         String            @id @default(cuid())
+  ticketId   String
+  ticket     Ticket            @relation(fields: [ticketId], references: [id])
+  senderId   String
+  sender     User              @relation(fields: [senderId], references: [id])
+  senderRole TicketSenderRole
+  body       String
+  createdAt  DateTime          @default(now())
+}
+
+// Tracks recurring services (monthly/yearly hosting plans, SMTP, LiveKit,
+// VPS, etc). Created the first time an order item with a recurring
+// Service.billingPeriod gets paid; renewed by buying the same service again
+// before (or shortly after) currentPeriodEnd — see lib/billing.ts for the
+// renewal-extends-from-the-later-of-now-or-expiry logic and the
+// past_due -> cancelled grace-period sweep.
+model Subscription {
+  id              String             @id @default(cuid())
+  userId          String
+  user            User               @relation(fields: [userId], references: [id])
+  orderItemId     String             @unique
+  orderItem       OrderItem          @relation(fields: [orderItemId], references: [id])
+  status          SubscriptionStatus @default(active)
+  currentPeriodEnd DateTime
+  createdAt       DateTime           @default(now())
+  pastDueAt       DateTime?
+  cancelledAt     DateTime?
+}
+
+// One row per periodic HTTP check against a deployment's public subdomain
+// or custom domain (see lib/uptimeMonitor.ts). Retained on a rolling basis
+// (pruned by the same cron that runs the checks) rather than forever —
+// this is a status indicator, not a permanent analytics log.
+model UptimeCheck {
+  id             String     @id @default(cuid())
+  deploymentId   String
+  deployment     Deployment @relation(fields: [deploymentId], references: [id])
+  checkedAt      DateTime   @default(now())
+  isUp           Boolean
+  responseTimeMs Int?
+  statusCode     Int?
+  errorMessage   String?
+
+  @@index([deploymentId, checkedAt])
+}
+
+// Platform-wide incidents (not per-deployment) for the public status page
+// — "API degraded", "Scheduled maintenance", etc. Manually posted by an
+// admin, not auto-generated from UptimeCheck data.
+model StatusIncident {
+  id         String    @id @default(cuid())
+  title      String
+  body       String
+  severity   String    @default("minor") // minor | major | critical
+  startedAt  DateTime  @default(now())
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+// Public developer API keys — an alternative to Firebase ID tokens for
+// customers who want to script deployments/orders instead of using the
+// dashboard. See middleware/apiKeyAuth.ts. Only the hash is stored; the
+// raw key is shown exactly once at creation time, the same UX pattern as
+// GitHub personal access tokens.
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  label      String
+  keyHash    String    @unique // SHA-256 of the raw key; raw key is never stored
+  keyPrefix  String    // first 8 chars, shown in the UI so a customer can tell keys apart without re-revealing them
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+}
+
+// Customer-configured outbound webhooks — notifies a customer's own system
+// when something changes (deployment status, payment status, etc.),
+// mirroring how notifyCustomer() works internally but exposed outward.
+// Payloads are HMAC-signed with `secret` so the customer's endpoint can
+// verify authenticity — see lib/webhooks.ts.
+model Webhook {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  url       String
+  event     WebhookEvent
+  secret    String       // encrypted at rest — see lib/secretsVault.ts. Raw value shown once at creation.
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+
+  deliveries WebhookDelivery[]
+}
+
+// Delivery attempt log — lets a customer see whether their webhook is actually firing and succeeding.
+model WebhookDelivery {
+  id           String       @id @default(cuid())
+  webhookId    String
+  webhook      Webhook      @relation(fields: [webhookId], references: [id])
+  event        WebhookEvent
+  payload      Json
+  statusCode   Int?
+  success      Boolean
+  errorMessage String?
+  attemptedAt  DateTime     @default(now())
+
+  @@index([webhookId, attemptedAt])
+}
+
+// A provisioned database instance (Postgres/MySQL/Redis), separate from a
+// customer's app deployment — same node-agent pattern as Deployment, but
+// runs its own container with no HTTP-facing route, just an internal
+// connection string handed back to the customer.
+model ManagedDatabase {
+  id            String                @id @default(cuid())
+  userId        String
+  user          User                  @relation(fields: [userId], references: [id])
+  nodeId        String
+  node          Node                  @relation(fields: [nodeId], references: [id])
+  type          ManagedDatabaseType
+  status        ManagedDatabaseStatus @default(pending)
+  containerId   String?
+  internalHost  String?               // container name, reachable only on the node's internal Docker network
+  internalPort  Int?
+  credentialRef String?               // encrypted password — see lib/secretsVault.ts
+  createdAt     DateTime              @default(now())
+}
+
+// Logs every Leaseweb API call this platform makes (minus secrets — never
+// logs the raw API key, and credential-fetch responses have their password
+// field redacted before being written here). Backs the dev-facing raw log
+// viewer for debugging management-call failures — see routes/leaseweb.ts.
+model LeasewebApiLog {
+  id           String   @id @default(cuid())
+  method       String
+  path         String
+  statusCode   Int?
+  requestBody  Json?
+  responseBody Json?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Project {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  name         String
+  nodeId       String
+  node         Node     @relation(fields: [nodeId], references: [id])
+  dbName       String
+  dbUsername   String
+  dbPassword   String   // encrypted
+  apiPort      Int?     // Port where this project's custom API lives
+  containerId  String?  // Container ID of the project API database/CRUD container
+  status       String   @default("pending") // pending | running | failed
+  // Set once a dev provisions object storage for this project (Dev
+  // Dashboard -> Projects -> Storage). Uses the platform's shared R2
+  // access key scoped by bucket name — see routes/projects.ts and
+  // lib/r2Storage.ts. Null until provisioned.
+  r2BucketName String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  authUsers    ProjectAuthUser[]
+  oauthConfigs ProjectOAuthConfig[]
+  magicLinks   ProjectMagicLink[]
+}
+
+// History log for runBackup() calls (manual "Run backup now" clicks and the
+// daily cron) — runBackup() itself is stateless, this just records outcomes
+// for the Dev Dashboard -> Backups history list.
+model BackupRun {
+  id          String   @id @default(cuid())
+  triggeredBy String   // 'manual:<userId>' or 'cron'
+  success     Boolean
+  r2Key       String?
+  sizeBytes   Int?
+  durationMs  Int?
+  error       String?
+  createdAt   DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Auth-as-a-Service (Supabase/Firebase-Auth-style), scoped per dev Project.
+// Lets a project built in the Dev Dashboard's Database Studio also get
+// email/password + magic-link + OAuth (Google/GitHub/Discord) auth for its
+// own end users, without standing up a separate auth provider. See
+// routes/projectAuth.ts.
+// ─────────────────────────────────────────────────────────────────────────
+
+model ProjectAuthUser {
+  id            String    @id @default(cuid())
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id])
+  email         String
+  // Null for a user who only ever signed in via OAuth or magic link and
+  // never set a password.
+  passwordHash  String?
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  lastLoginAt   DateTime?
+
+  oauthAccounts ProjectOAuthAccount[]
+
+  @@unique([projectId, email])
+}
+
+enum OAuthProvider {
+  google
+  github
+  discord
+}
+
+model ProjectOAuthAccount {
+  id             String          @id @default(cuid())
+  authUserId     String
+  authUser       ProjectAuthUser @relation(fields: [authUserId], references: [id])
+  provider       OAuthProvider
+  providerUserId String
+  createdAt      DateTime        @default(now())
+
+  @@unique([provider, providerUserId])
+}
+
+// Per-project OAuth app credentials, set by the project's dev in the Dev
+// Dashboard's Auth tab. clientSecret is encrypted at rest (see
+// lib/secretsVault.ts), same pattern as every other credential in this
+// schema.
+model ProjectOAuthConfig {
+  id           String        @id @default(cuid())
+  projectId    String
+  project      Project       @relation(fields: [projectId], references: [id])
+  provider     OAuthProvider
+  clientId     String
+  clientSecret String
+  redirectUri  String
+  createdAt    DateTime      @default(now())
+
+  @@unique([projectId, provider])
+}
+
+// Single-use, short-lived magic-link sign-in tokens. Only tokenHash is
+// stored — the raw token is only ever in the emailed URL and the
+// verification request, never persisted.
+model ProjectMagicLink {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id])
+  email     String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model NodeBootstrapLog {
+  id        String   @id @default(cuid())
+  nodeId    String
+  command   String
+  output    String
+  success   Boolean
+  createdAt DateTime @default(now())
+}
+
+// =====================================================================
+// CATALOG SYSTEM MODELS (Platform Admin & Catalog Management System)
+// =====================================================================
+
+// VPS plans for customer browsing and provisioning
+model VpsPlan {
+  id            String        @id @default(cuid())
+  provider      String        // e.g., "leaseweb"
+  name          String
+  bandwidth     String        // e.g., "1TB", "unlimited"
+  category      String        // e.g., "web_hosting", "app_server", "database_server", "storage_server"
+  cpuCores      Int
+  ramGb         Int
+  storageGb     Int
+  price         Int           // in smallest currency unit (cents)
+  currency      Currency      @default(LKR)
+  billingPeriod BillingPeriod @default(monthly)
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  // Link to Leaseweb product code for automated provisioning
+  leasewebProductCode String?
+}
+
+// Custom domain management with CNAME verification and SSL
+model CustomDomain {
+  id            String              @id @default(cuid())
+  deploymentId  String
+  deployment    Deployment          @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  domain        String              @unique
+  cnameTarget   String              // Platform-generated CNAME target
+  status        CustomDomainStatus  @default(pending)
+  sslCertId     String?             // Cloudflare certificate ID
+  verifiedAt    DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  
+  @@index([deploymentId])
+}
+
+// Status page configuration
+model StatusPageConfig {
+  id                String   @id @default(cuid())
+  platformName      String   @default("ShanuTechX Platform")
+  logoUrl           String?
+  uptimeKumaUrl     String?  // Uptime Kuma integration endpoint
+  showUptimeMetrics Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
+}
+
+enum IncidentSeverity {
+  informational
+  degraded_performance
+  partial_outage
+  full_outage
+}
+
+enum IncidentStatus {
+  investigating
+  identified
+  monitoring
+  resolved
+}
+
+// Incidents for the public status page
+model Incident {
+  id               String           @id @default(cuid())
+  title            String
+  description      String
+  severity         IncidentSeverity
+  affectedServices String[]         // Array of service identifiers
+  status           IncidentStatus   @default(investigating)
+  createdAt        DateTime         @default(now())
+  resolvedAt       DateTime?
+  resolution       String?
+  updates          IncidentUpdate[]
+}
+
+// Incident updates for status page
+model IncidentUpdate {
+  id          String   @id @default(cuid())
+  incidentId  String
+  incident    Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  description String
+  createdAt   DateTime @default(now())
+  
+  @@index([incidentId])
+}
+
+// Mail server accounts for mail server UI
+model MailAccount {
+  id        String   @id @default(cuid())
+  username  String
+  domain    String
+  quotaMb   Int      @default(1024)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([username, domain])
+}
+
+// Terms of service page content
+model TermsOfService {
+  id          String   @id @default(cuid())
+  content     String   @db.Text
+  lastUpdated DateTime @default(now())
+  contactInfo Json     // { email, phone, address }
+}
+
+// Privacy policy page content
+model PrivacyPolicy {
+  id          String   @id @default(cuid())
+  content     String   @db.Text
+  lastUpdated DateTime @default(now())
+  contactInfo Json     // { email, phone }
+}
+
+// Webmail messages
+model EmailMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  from      String
+  to        String
+  subject   String
+  body      String   @db.Text
+  folder    String   @default("inbox") // "inbox" | "sent"
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, folder])
+}
+
+// =====================================================================
+// CLIENT TEAM MANAGEMENT & GRANULAR PER-RESOURCE ACCESS CONTROL
+// =====================================================================
+
+enum TeamRole {
+  owner
+  admin
+  developer
+  billing
+  viewer
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  declined
+  expired
+}
+
+enum ResourceType {
+  deployment
+  managed_database
+  vps
+  smtp
+  livekit
+}
+
+enum ResourcePermissionLevel {
+  manage
+  view
+  none
+}
+
+model Team {
+  id        String       @id @default(cuid())
+  name      String
+  ownerId   String
+  owner     User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  members   TeamMember[]
+  invites   TeamInvite[]
+}
+
+model TeamMember {
+  id        String             @id @default(cuid())
+  teamId    String
+  team      Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      TeamRole           @default(developer)
+  createdAt DateTime           @default(now())
+
+  permissions ResourcePermission[]
+
+  @@unique([teamId, userId])
+}
+
+model TeamInvite {
+  id              String       @id @default(cuid())
+  teamId          String
+  team            Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  email           String
+  role            TeamRole     @default(developer)
+  token           String       @unique
+  invitedByUserId String
+  invitedByUser   User         @relation(fields: [invitedByUserId], references: [id], onDelete: Cascade)
+  status          InviteStatus @default(pending)
+  expiresAt       DateTime
+  createdAt       DateTime     @default(now())
+
+  @@index([token])
+  @@index([email])
+}
+
+model ResourcePermission {
+  id           String                  @id @default(cuid())
+  teamMemberId String
+  teamMember   TeamMember              @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+  resourceType ResourceType
+  resourceId   String
+  permission   ResourcePermissionLevel @default(manage)
+  createdAt    DateTime                @default(now())
+
+  @@unique([teamMemberId, resourceType, resourceId])
+}
+

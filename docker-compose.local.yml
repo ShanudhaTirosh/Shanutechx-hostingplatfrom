@@ -1,0 +1,435 @@
+version: "3.9"
+
+# Full Local Development Stack - All Services Included
+# This runs the complete ShanuTechX platform locally
+
+networks:
+  shanutechx-local:
+    driver: bridge
+    # Explicit name (not just the Compose service-level key) so
+    # docker/supabase/docker-compose.yml's `networks: default: name:
+    # shanutechx-local, external: true` reference resolves to this exact
+    # network -- without this, Compose would prefix the actual Docker
+    # network name with the project name (e.g. "shanutechx_shanutechx-local"),
+    # and the external reference in that other file wouldn't match it.
+    name: shanutechx-local
+
+volumes:
+  postgres-data:
+  redis-data:
+  shanutechx-workspaces:
+  shanutechx-uploads:
+  shanutechx-invoices:
+  # Added: object storage + self-hosted BaaS + mail stack, so a first-time
+  # `docker compose up -d` brings up EVERYTHING together, not just the
+  # ShanuTechX control-plane services. See the "Storage & Object Storage"
+  # and "Self-Hosted Supabase" / "Self-Hosted Mail (Postal)" sections
+  # below for what each of these backs.
+  minio-data:
+  postal-db-data:
+
+services:
+  # ========================================
+  # Infrastructure Services
+  # ========================================
+  
+  postgres:
+    image: postgres:16-alpine
+    container_name: shanutechx-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shanutechx
+      POSTGRES_PASSWORD: shanutechx_dev
+      POSTGRES_DB: shanutechx
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - shanutechx-local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shanutechx"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: shanutechx-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - shanutechx-local
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ========================================
+  # Object Storage (S3-compatible, self-hosted)
+  # ========================================
+  # Everything that needs durable object storage -- platform DB backups
+  # (lib/backup.ts), Supabase Storage buckets, and (if you enable it)
+  # per-project buckets (lib/r2Storage.ts) -- points at THIS by default,
+  # via R2_ENDPOINT/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY below on the api
+  # / worker / supabase-storage services. This is what makes storage
+  # "just work" the first time you run the whole stack, with zero external
+  # account needed.
+  #
+  # For production, you can swap this for real Cloudflare R2 (or any S3-
+  # compatible provider) with NO CODE CHANGES -- just override
+  # R2_ENDPOINT/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY in apps/api/.env to
+  # point at the real service instead of http://minio:9000, and do the
+  # same for the supabase-storage service below. The S3 client code
+  # (lib/r2Storage.ts, lib/backup.ts, and Supabase's storage-api) only
+  # ever talks to an S3-compatible endpoint -- it doesn't care whether
+  # that's MinIO, R2, or AWS S3 itself.
+  minio:
+    image: minio/minio:latest
+    container_name: shanutechx-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-shanutechx_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-CHANGE_ME_minio_root_pass}
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Web console
+    volumes:
+      - minio-data:/data
+    networks:
+      - shanutechx-local
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot init container: creates the buckets ShanuTechX and Supabase
+  # Storage expect to already exist, then exits. Runs every startup but is
+  # idempotent (`mc mb --ignore-existing`), so it's harmless on restarts.
+  minio-init:
+    image: minio/mc:latest
+    container_name: shanutechx-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        mc alias set local http://minio:9000
+        ${MINIO_ROOT_USER:-shanutechx_minio} ${MINIO_ROOT_PASSWORD:-CHANGE_ME_minio_root_pass} &&
+        mc mb --ignore-existing local/shanutechx-backups &&
+        mc mb --ignore-existing local/supabase-storage &&
+        echo 'MinIO buckets ready.'
+    networks:
+      - shanutechx-local
+
+  # ========================================
+  # Core Application Services
+  # ========================================
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: shanutechx-api
+    restart: unless-stopped
+    env_file: ./apps/api/.env
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://shanutechx:shanutechx_dev@postgres:5432/shanutechx?schema=public&connection_limit=20
+      - REDIS_URL=redis://redis:6379
+      # Storage: default to the self-hosted MinIO above so backups/uploads
+      # work out of the box on first run. Override in apps/api/.env to
+      # point at real Cloudflare R2 / AWS S3 in production instead -- these
+      # `environment:` entries win over .env for the same key under Docker
+      # Compose, so if you want a real provider, remove/comment these three
+      # lines here rather than only editing .env.
+      - R2_ENDPOINT=${R2_ENDPOINT:-http://minio:9000}
+      # NOTE: Docker Compose doesn't support nesting ${A:-${B:-c}}, so
+      # these two just default straight to MinIO's own default
+      # credentials (MINIO_ROOT_USER/MINIO_ROOT_PASSWORD above). If you
+      # change MINIO_ROOT_USER/MINIO_ROOT_PASSWORD in .env, change these
+      # two to match, or just set R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY in
+      # .env directly and they'll override MinIO's defaults here.
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-shanutechx_minio}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-CHANGE_ME_minio_root_pass}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-shanutechx-backups}
+      # Self-hosted Supabase stack (see the "Self-Hosted Supabase" section
+      # below) -- reachable at these in-network hostnames automatically,
+      # no manual URL configuration needed for a first run.
+      # Audit correction: an earlier pass of this fix inlined a SECOND,
+      # duplicate Supabase stack directly into this file -- that would
+      # have collided with the pre-existing docker/supabase/docker-compose.yml
+      # (already wired into docker/docker-compose.shanutechx.yml's unified
+      # `include:` orchestrator). Removed the duplicate; these now point at
+      # THAT stack's real service names/ports instead. Run the unified
+      # stack via `docker compose -f docker/docker-compose.shanutechx.yml
+      # up -d` (from the repo root) to bring this up together with
+      # everything else, or run `docker-compose.local.yml` alone if you
+      # don't need Supabase/Infisical for a given session.
+      - SUPABASE_KONG_URL=http://kong:8000
+      - SUPABASE_META_URL=http://meta:8080
+      - SUPABASE_STUDIO_URL=http://localhost:3003
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      # Self-hosted mail (see the "Self-Hosted Mail (Postal)" section
+      # below).
+      - POSTAL_API_URL=http://postal-web:5000
+      - POSTAL_API_KEY=${POSTAL_API_KEY}
+      - POSTAL_FROM_ADDRESS=${POSTAL_FROM_ADDRESS:-no-reply@shanutechx.local}
+    ports:
+      - "4000:4000"
+    volumes:
+      - shanutechx-uploads:/var/lib/shanutechx/uploads
+      - shanutechx-invoices:/var/lib/shanutechx/invoices
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - shanutechx-local
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4000/api/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: shanutechx-worker
+    restart: unless-stopped
+    command: ["node", "dist/worker.js"]
+    env_file: ./apps/api/.env
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://shanutechx:shanutechx_dev@postgres:5432/shanutechx?schema=public&connection_limit=20
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - shanutechx-uploads:/var/lib/shanutechx/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - shanutechx-local
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY:-}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID:-}
+    container_name: shanutechx-dashboard
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:4000
+    ports:
+      - "3000:3001"
+    networks:
+      - shanutechx-local
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        API_BASE_URL: http://localhost:4000
+        NEXT_PUBLIC_DASHBOARD_URL: http://localhost:3000
+    container_name: shanutechx-web
+    restart: unless-stopped
+    environment:
+      - API_BASE_URL=http://localhost:4000
+      - NEXT_PUBLIC_DASHBOARD_URL=http://localhost:3000
+    ports:
+      - "3001:3000"
+    networks:
+      - shanutechx-local
+
+  # ========================================
+  # Bot Services
+  # ========================================
+
+  whatsapp-bot:
+    build:
+      context: .
+      dockerfile: services/whatsapp-bot/Dockerfile
+    container_name: shanutechx-whatsapp
+    restart: unless-stopped
+    env_file: ./services/whatsapp-bot/.env
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./services/whatsapp-bot/auth:/repo/services/whatsapp-bot/auth
+    networks:
+      - shanutechx-local
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4100/internal/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  discord-bot:
+    build:
+      context: .
+      dockerfile: services/discord-bot/Dockerfile
+    container_name: shanutechx-discord
+    restart: unless-stopped
+    env_file: ./services/discord-bot/.env
+    environment:
+      - NODE_ENV=development
+    networks:
+      - shanutechx-local
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4200/internal/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # Node Agent & BuildKit (Optional)
+  # ========================================
+
+  buildkit:
+    image: moby/buildkit:latest
+    container_name: shanutechx-buildkit
+    privileged: true
+    restart: unless-stopped
+    networks:
+      - shanutechx-local
+
+  node-agent:
+    build:
+      context: .
+      dockerfile: services/node-agent/Dockerfile
+    container_name: shanutechx-node-agent
+    restart: unless-stopped
+    env_file: ./services/node-agent/.env
+    environment:
+      - NODE_ENV=development
+      - AGENT_PUBLIC_NETWORK=shanutechx-local
+      - BUILDKIT_HOST=docker-container://buildkit
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - shanutechx-workspaces:/var/lib/shanutechx/workspaces
+    ports:
+      - "5000:5000"
+    depends_on:
+      - buildkit
+    networks:
+      - shanutechx-local
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5000/agent/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # Self-Hosted Mail (Postal) -- Business Email / SMTP module
+  # ========================================
+  # Postal's official multi-process image, split into its normal
+  # web/smtp/worker roles sharing one MariaDB. This is intentionally NOT
+  # wired to S3 -- Postal stores messages in MariaDB by design, which is
+  # its own supported, durable storage (backed by the postal-db-data
+  # volume above), not local container disk that would be lost on
+  # replacement.
+  #
+  # ONE-TIME SETUP before first `docker compose up -d`:
+  #   1. Point a real DNS A record + reverse DNS (PTR) at this server's
+  #      public IP for your mail domain -- this is inherent to running a
+  #      mail server and can't be automated away.
+  #   2. After first boot: `docker compose exec postal-web postal initialize`
+  #      then `docker compose exec postal-web postal make-user` to create
+  #      the Postal admin, then log into Postal's own web UI
+  #      (http://localhost:5010) to create an Organization + Mail Server
+  #      and generate the API key.
+  #   3. Put that API key in apps/api/.env as POSTAL_API_KEY, restart api.
+
+  postal-db:
+    image: mariadb:11
+    container_name: shanutechx-postal-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${POSTAL_DB_ROOT_PASSWORD:-CHANGE_ME_postal_db_root_pass}
+    volumes:
+      - postal-db-data:/var/lib/mysql
+    networks:
+      - shanutechx-local
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postal-web:
+    image: ghcr.io/postalserver/postal:latest
+    container_name: shanutechx-postal-web
+    restart: unless-stopped
+    command: ["postal", "web-server"]
+    depends_on:
+      postal-db:
+        condition: service_healthy
+    # NOTE: Postal reads its config from the mounted postal.yml below, not
+    # from container env vars -- there's no env_file here on purpose.
+    # POSTAL_DB_ROOT_PASSWORD (used by postal-db above) and every other
+    # ${VAR} in this compose file are resolved from the repo-ROOT .env
+    # file (copy .env.example -> .env at the repo root) -- that's Docker
+    # Compose's own variable-substitution mechanism, separate from each
+    # service's env_file:.
+    volumes:
+      - ./infra/postal/postal.yml:/config/postal.yml:ro
+      - ./infra/postal/signing.key:/config/signing.key:ro
+    ports:
+      - "5010:5000" # Postal's own web UI + REST API
+    networks:
+      - shanutechx-local
+
+  postal-smtp:
+    image: ghcr.io/postalserver/postal:latest
+    container_name: shanutechx-postal-smtp
+    restart: unless-stopped
+    command: ["postal", "smtp-server"]
+    depends_on:
+      postal-db:
+        condition: service_healthy
+    volumes:
+      - ./infra/postal/postal.yml:/config/postal.yml:ro
+      - ./infra/postal/signing.key:/config/signing.key:ro
+    ports:
+      - "25:25"
+      - "587:587"
+    networks:
+      - shanutechx-local
+
+  postal-worker:
+    image: ghcr.io/postalserver/postal:latest
+    container_name: shanutechx-postal-worker
+    restart: unless-stopped
+    command: ["postal", "worker"]
+    depends_on:
+      postal-db:
+        condition: service_healthy
+    volumes:
+      - ./infra/postal/postal.yml:/config/postal.yml:ro
+      - ./infra/postal/signing.key:/config/signing.key:ro
+    networks:
+      - shanutechx-local

@@ -1,0 +1,676 @@
+require('dotenv/config');
+const crypto = require('crypto');
+const express = require('express');
+const pino = require('pino');
+const { prepareWorkspace } = require('./repo');
+const { buildImage } = require('./build');
+const { runContainer, stopAndRemove, stopContainer, getLogs, streamLogs, startContainer, restartContainer, listContainers, getContainerMetrics } = require('./docker');
+const { collectStats } = require('./stats');
+const { addKey } = require('./livekit');
+const { addDomainRoute, removeDomainRoute } = require('./customDomain');
+const { provisionDatabase } = require('./managedDb');
+const { listDir, readFile, writeFile, writeBinaryFile, extractArchive, makeDir, remove: fsRemove, rename } = require('./filesystem');
+const { provisionProject, deprovisionProject, execSql, listTables } = require('./projects');
+
+const PORT = process.env.AGENT_PORT || 5000;
+const AGENT_SECRET = process.env.NODE_AGENT_SECRET;
+const ROOT_DOMAIN = process.env.ROOT_DOMAIN;
+// Audit finding H2: this previously always bound to all interfaces
+// (app.listen(PORT, ...) with no host), which directly contradicted the
+// comment below saying this service must never be exposed publicly.
+// Binding was silently 0.0.0.0 by default with nothing in code enforcing
+// otherwise. This keeps 0.0.0.0 as the default (so existing deployments
+// that rely on control-plane-to-node communication over a real network
+// keep working) but makes it configurable, and adds an optional IP
+// allowlist (AGENT_ALLOWED_IPS) as a real enforced control rather than
+// just a comment -- set it to your control plane's IP/CIDR in production.
+const BIND_HOST = process.env.AGENT_BIND_HOST || '0.0.0.0';
+const ALLOWED_IPS = (process.env.AGENT_ALLOWED_IPS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  ...(process.env.NODE_ENV !== 'production'
+    ? { transport: { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:standard', ignore: 'pid,hostname' } } }
+    : {}),
+});
+
+if (!AGENT_SECRET) {
+  logger.fatal('Missing NODE_AGENT_SECRET in env. Refusing to start.');
+  process.exit(1);
+}
+
+const app = express();
+app.use(express.json());
+
+// Liveness — Docker HEALTHCHECK target. Registered before the auth
+// middleware so Docker's healthcheck doesn't need the shared secret.
+app.get('/agent/health', (_req, res) => {
+  res.json({ ok: true, service: 'shanutechx-node-agent', ts: new Date().toISOString() });
+});
+
+// This service must NEVER be exposed publicly — bind it to a private
+// interface/VPN/overlay network, and rely on this shared secret as a second
+// layer of defense, not the only one. See BIND_HOST below and the
+// deployment docs for enforcing that at the network level too.
+app.use((req, res, next) => {
+  if (ALLOWED_IPS.length > 0) {
+    const remoteIp = (req.headers['x-forwarded-for']?.toString().split(',')[0].trim()) || req.socket.remoteAddress;
+    if (!ALLOWED_IPS.includes(remoteIp)) {
+      logger.warn({ remoteIp }, 'node-agent: rejected request from IP not in AGENT_ALLOWED_IPS');
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+  }
+  // Timing-safe comparison (audit finding H4). HMAC both sides first so
+  // this works safely even when the submitted header is a different
+  // length than the real secret (timingSafeEqual requires equal-length
+  // buffers).
+  const submitted = req.headers['x-agent-secret'];
+  const key = 'shanutechx-node-agent-gate';
+  const isValid =
+    typeof submitted === 'string' &&
+    crypto.timingSafeEqual(
+      crypto.createHmac('sha256', key).update(submitted).digest(),
+      crypto.createHmac('sha256', key).update(AGENT_SECRET).digest()
+    );
+  if (!isValid) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+});
+
+app.get('/agent/stats', async (_req, res) => {
+  try {
+    const stats = await collectStats();
+    res.json(stats);
+  } catch (err) {
+    logger.error({ err }, 'Failed to collect stats');
+    res.status(500).json({ error: 'Failed to collect stats' });
+  }
+});
+
+// ── Container management (Dev Dashboard -> Containers) ─────────────────────
+// Sees every container on this node, not just ones this agent deployed —
+// deliberately broad, since the point of this page is "what's actually
+// running here", including anything deployed by hand.
+
+app.get('/agent/containers', async (_req, res) => {
+  try {
+    const containers = await listContainers();
+    res.json({ containers });
+  } catch (err) {
+    logger.error({ err }, 'Failed to list containers');
+    res.status(500).json({ error: 'Failed to list containers' });
+  }
+});
+
+app.post('/agent/containers/:containerId/start', async (req, res) => {
+  try {
+    await startContainer(req.params.containerId);
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, 'Failed to start container');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/containers/:containerId/stop', async (req, res) => {
+  try {
+    await stopContainer(req.params.containerId);
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, 'Failed to stop container');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/containers/:containerId/restart', async (req, res) => {
+  try {
+    await restartContainer(req.params.containerId);
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, 'Failed to restart container');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/agent/containers/:containerId/logs', async (req, res) => {
+  try {
+    const tail = req.query.tail ? parseInt(req.query.tail, 10) : 200;
+    const logs = await getLogs(req.params.containerId, tail);
+    res.json({ logs });
+  } catch (err) {
+    logger.error({ err }, 'Failed to fetch container logs');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Build and run a deployment. Body:
+ *   { deploymentId, repoUrl, branch?, subdomain?, internalPort, envVars? }
+ * `subdomain` is omitted for non-public services (e.g. Discord bots).
+ */
+app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
+  const { deploymentId } = req.params;
+  const { repoUrl, branch, subdomain, internalPort, envVars } = req.body || {};
+
+  if (!repoUrl || !internalPort) {
+    return res.status(400).json({ error: 'repoUrl and internalPort are required' });
+  }
+
+  res.setHeader('Content-Type', 'application/x-ndjson');
+
+  const emit = (event) => res.write(JSON.stringify(event) + '\n');
+
+  try {
+    logger.info({ deploymentId, repoUrl }, 'Starting build');
+    emit({ phase: 'fetch', message: 'Fetching repository...' });
+    const workspaceDir = await prepareWorkspace(deploymentId, repoUrl, branch || 'main');
+
+    emit({ phase: 'build', message: 'Building with Railpack...' });
+    const imageTag = `shanutechx/${deploymentId}:latest`;
+    await buildImage({
+      workspaceDir,
+      imageTag,
+      envVars,
+      onData: (chunk) => emit({ phase: 'build', log: chunk.toString() }),
+    });
+
+    emit({ phase: 'run', message: 'Starting container...' });
+    const { containerId, containerName } = await runContainer({
+      deploymentId,
+      imageTag,
+      internalPort,
+      subdomain,
+      rootDomain: ROOT_DOMAIN,
+      envVars,
+    });
+
+    logger.info({ deploymentId, containerId, subdomain }, 'Deployment complete');
+    emit({ phase: 'done', containerId, containerName });
+    res.end();
+  } catch (err) {
+    logger.error({ deploymentId, err }, 'Build/run failed');
+    emit({ phase: 'error', message: err.message, stderr: err.stderr });
+    res.end();
+  }
+});
+
+app.get('/agent/deployments/:containerId/logs', async (req, res) => {
+  try {
+    const logs = await getLogs(req.params.containerId, Number(req.query.tail) || 200);
+    res.json({ logs });
+  } catch (err) {
+    logger.error({ containerId: req.params.containerId, err }, 'Failed to fetch logs');
+    res.status(500).json({ error: 'Failed to fetch logs' });
+  }
+});
+
+/**
+ * GET /agent/deployments/:containerId/metrics
+ * Audit finding C6: this route did not exist at all -- apps/api's
+ * getResourceUsage() called it and always got a 404, so the deployment
+ * detail page's live resource-usage panel was silently empty. Backed by
+ * docker.js's getContainerMetrics (docker stats + inspect).
+ */
+app.get('/agent/deployments/:containerId/metrics', async (req, res) => {
+  try {
+    const metrics = await getContainerMetrics(req.params.containerId);
+    res.json(metrics);
+  } catch (err) {
+    logger.error({ containerId: req.params.containerId, err }, 'Failed to fetch container metrics');
+    res.status(500).json({ error: 'Failed to fetch container metrics' });
+  }
+});
+
+/**
+ * GET /agent/deployments/:containerId/logs/stream
+ * Streams container logs in real-time using Server-Sent Events (SSE).
+ * Returns stdout and stderr with timestamps as they arrive from Docker.
+ */
+app.get('/agent/deployments/:containerId/logs/stream', async (req, res) => {
+  const { containerId } = req.params;
+  
+  // Set up SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  // CORS headers for browser clients
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+  
+  // Send initial connection confirmation
+  res.write('data: {"type":"connected","message":"Log stream connected"}\n\n');
+  
+  let logStream;
+  
+  try {
+    logStream = await streamLogs(containerId);
+    
+    logStream.on('data', (chunk) => {
+      // Each chunk is plain text log data (already demultiplexed)
+      // Split by newlines and send each line as a separate SSE event
+      const lines = chunk.toString('utf-8').split('\n');
+      for (const line of lines) {
+        if (line.trim()) {
+          // Send as SSE event with JSON data
+          const event = {
+            type: 'log',
+            data: line,
+            timestamp: new Date().toISOString()
+          };
+          res.write(`data: ${JSON.stringify(event)}\n\n`);
+        }
+      }
+    });
+    
+    logStream.on('end', () => {
+      res.write('data: {"type":"end","message":"Log stream ended"}\n\n');
+      res.end();
+    });
+    
+    logStream.on('error', (err) => {
+      logger.error({ containerId, err }, 'Error streaming logs');
+      res.write(`data: ${JSON.stringify({type:"error",message:"Stream error"})}\n\n`);
+      res.end();
+    });
+    
+  } catch (err) {
+    logger.error({ containerId, err }, 'Failed to start log stream');
+    res.write(`data: ${JSON.stringify({type:"error",message:"Failed to start log stream"})}\n\n`);
+    res.end();
+    return;
+  }
+  
+  // Handle client disconnect
+  req.on('close', () => {
+    logger.info({ containerId }, 'Client disconnected from log stream');
+    if (logStream) {
+      logStream.destroy();
+    }
+  });
+});
+
+app.post('/agent/deployments/:containerId/stop', async (req, res) => {
+  try {
+    await stopAndRemove(req.params.containerId);
+    logger.info({ containerId: req.params.containerId }, 'Container stopped');
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ containerId: req.params.containerId, err }, 'Failed to stop container');
+    res.status(500).json({ error: 'Failed to stop container' });
+  }
+});
+
+app.post('/agent/deployments/:containerId/start', async (req, res) => {
+  try {
+    await startContainer(req.params.containerId);
+    logger.info({ containerId: req.params.containerId }, 'Container started');
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ containerId: req.params.containerId, err }, 'Failed to start container');
+    res.status(500).json({ error: 'Failed to start container' });
+  }
+});
+
+app.post('/agent/deployments/:containerId/restart', async (req, res) => {
+  try {
+    await restartContainer(req.params.containerId);
+    logger.info({ containerId: req.params.containerId }, 'Container restarted');
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ containerId: req.params.containerId, err }, 'Failed to restart container');
+    res.status(500).json({ error: 'Failed to restart container' });
+  }
+});
+
+/** Adds a new LiveKit key/secret to this node's LiveKit instance and restarts it. */
+app.post('/agent/livekit/keys', async (req, res) => {
+  const { apiKey, apiSecret } = req.body || {};
+  if (!apiKey || !apiSecret) {
+    return res.status(400).json({ error: 'apiKey and apiSecret are required' });
+  }
+
+  try {
+    await addKey(apiKey, apiSecret);
+    logger.info({ apiKey }, 'LiveKit key registered');
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ apiKey, err }, 'Failed to add LiveKit key');
+    res.status(500).json({ error: 'Failed to add LiveKit key' });
+  }
+});
+
+app.post('/agent/deployments/:deploymentId/domains', async (req, res) => {
+  const { domain, internalPort, rootDomain } = req.body || {};
+  if (!domain || !internalPort) {
+    return res.status(400).json({ error: 'domain and internalPort are required' });
+  }
+
+  try {
+    await addDomainRoute(req.params.deploymentId, domain, internalPort, rootDomain);
+    logger.info({ deploymentId: req.params.deploymentId, domain }, 'Custom domain route added');
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ deploymentId: req.params.deploymentId, domain, err }, 'Failed to add custom domain route');
+    res.status(500).json({ error: 'Failed to add custom domain route' });
+  }
+});
+
+app.delete('/agent/deployments/:deploymentId/domains/:domain', async (req, res) => {
+  try {
+    await removeDomainRoute(req.params.deploymentId, req.params.domain);
+    logger.info({ deploymentId: req.params.deploymentId, domain: req.params.domain }, 'Custom domain route removed');
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ deploymentId: req.params.deploymentId, domain: req.params.domain, err }, 'Failed to remove custom domain route');
+    res.status(500).json({ error: 'Failed to remove custom domain route' });
+  }
+});
+
+app.post('/agent/managed-databases', async (req, res) => {
+  const { databaseId, type, password } = req.body || {};
+  if (!databaseId || !type || !password) {
+    return res.status(400).json({ error: 'databaseId, type, and password are required' });
+  }
+
+  try {
+    const result = await provisionDatabase({ databaseId, type, password });
+    logger.info({ databaseId, type, containerId: result.containerId }, 'Managed database provisioned');
+    res.status(201).json(result);
+  } catch (err) {
+    logger.error({ databaseId, type, err }, 'Failed to provision managed database');
+    res.status(500).json({ error: 'Failed to provision managed database' });
+  }
+});
+
+// ── Filesystem routes (browser File Manager / IDE) ───────────────────────────
+
+app.get('/agent/fs/:deploymentId/list', async (req, res) => {
+  try {
+    const items = await listDir(req.params.deploymentId, req.query.path || '');
+    res.json({ items });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+app.get('/agent/fs/:deploymentId/read', async (req, res) => {
+  try {
+    const content = await readFile(req.params.deploymentId, req.query.path || '');
+    res.json({ content });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+app.put('/agent/fs/:deploymentId/write', async (req, res) => {
+  const { path: filePath, content } = req.body || {};
+  if (!filePath || content === undefined) {
+    return res.status(400).json({ error: 'path and content are required' });
+  }
+  try {
+    await writeFile(req.params.deploymentId, filePath, content);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/fs/:deploymentId/mkdir', async (req, res) => {
+  const { path: dirPath } = req.body || {};
+  if (!dirPath) return res.status(400).json({ error: 'path is required' });
+  try {
+    await makeDir(req.params.deploymentId, dirPath);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+app.delete('/agent/fs/:deploymentId/delete', async (req, res) => {
+  const { path: filePath } = req.body || {};
+  if (!filePath) return res.status(400).json({ error: 'path is required' });
+  try {
+    await fsRemove(req.params.deploymentId, filePath);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/fs/:deploymentId/rename', async (req, res) => {
+  const { from, to } = req.body || {};
+  if (!from || !to) return res.status(400).json({ error: 'from and to are required' });
+  try {
+    await rename(req.params.deploymentId, from, to);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/fs/:deploymentId/upload-binary', async (req, res) => {
+  const { path: filePath, base64Content } = req.body || {};
+  if (!filePath || !base64Content) return res.status(400).json({ error: 'path and base64Content are required' });
+  try {
+    await writeBinaryFile(req.params.deploymentId, filePath, base64Content);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/fs/:deploymentId/extract', async (req, res) => {
+  const { path: archivePath } = req.body || {};
+  if (!archivePath) return res.status(400).json({ error: 'path is required' });
+  try {
+    await extractArchive(req.params.deploymentId, archivePath);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+// ── Projects routes (Supabase-like DB project provisioning) ──────────────────
+
+app.post('/agent/projects', async (req, res) => {
+  const { projectId, dbName, dbUsername, password } = req.body || {};
+  if (!projectId || !dbName || !dbUsername || !password) {
+    return res.status(400).json({ error: 'projectId, dbName, dbUsername, and password are required' });
+  }
+  try {
+    const result = await provisionProject({ projectId, dbName, dbUsername, password });
+    logger.info({ projectId, dbName }, 'Project provisioned');
+    res.status(201).json(result);
+  } catch (err) {
+    logger.error({ projectId, err }, 'Failed to provision project');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/agent/projects/:projectId', async (req, res) => {
+  const { dbName, dbUsername } = req.body || {};
+  try {
+    await deprovisionProject({ projectId: req.params.projectId, dbName, dbUsername });
+    logger.info({ projectId: req.params.projectId }, 'Project deprovisioned');
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ projectId: req.params.projectId, err }, 'Failed to deprovision project');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/projects/:projectId/sql', async (req, res) => {
+  const { sql, dbName } = req.body || {};
+  if (!sql || !dbName) return res.status(400).json({ error: 'sql and dbName are required' });
+  try {
+    const result = await execSql({ projectId: req.params.projectId, dbName, sql });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/agent/projects/:projectId/tables', async (req, res) => {
+  const { dbName } = req.query;
+  if (!dbName) return res.status(400).json({ error: 'dbName query param required' });
+  try {
+    const tables = await listTables({ dbName });
+    res.json({ tables });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/agent/projects/:projectId/tables/:table/rows', async (req, res) => {
+  const { dbName, page = '1', limit = '50' } = req.query;
+  if (!dbName) return res.status(400).json({ error: 'dbName required' });
+  const offset = (parseInt(page) - 1) * parseInt(limit);
+  try {
+    const result = await execSql({
+      projectId: req.params.projectId,
+      dbName,
+      sql: `SELECT * FROM "${req.params.table}" LIMIT ${parseInt(limit)} OFFSET ${offset};`,
+    });
+    const countResult = await execSql({
+      projectId: req.params.projectId,
+      dbName,
+      sql: `SELECT COUNT(*) AS total FROM "${req.params.table}";`,
+    });
+    const total = parseInt(countResult.rows[0]?.total ?? '0', 10);
+    res.json({ rows: result.rows, total });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ── Docker Compose template deployments ──────────────────────────────────────
+
+const os = require('os');
+const { randomBytes } = require('crypto');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
+
+const COMPOSE_DIR = process.env.COMPOSE_DATA_DIR || '/srv/compose';
+
+/** Auto-generate values for SERVICE_PASSWORD_* / SERVICE_USER_* / SERVICE_URL_* placeholders. */
+function resolveEnvVars(yamlContent, userEnvVars = {}) {
+  const autoEnv = { ...userEnvVars };
+
+  // SERVICE_PASSWORD_<NAME> → random 24-char hex
+  const pwMatches = yamlContent.matchAll(/SERVICE_PASSWORD_([A-Z0-9_]+)/g);
+  for (const m of pwMatches) {
+    const key = `SERVICE_PASSWORD_${m[1]}`;
+    if (!autoEnv[key]) autoEnv[key] = randomBytes(16).toString('hex');
+  }
+
+  // SERVICE_USER_<NAME> → sensible default username
+  const userMatches = yamlContent.matchAll(/SERVICE_USER_([A-Z0-9_]+)/g);
+  for (const m of userMatches) {
+    const key = `SERVICE_USER_${m[1]}`;
+    if (!autoEnv[key]) autoEnv[key] = m[1].toLowerCase();
+  }
+
+  return autoEnv;
+}
+
+/**
+ * POST /agent/compose/up
+ * Body: { composeYaml: string, projectName: string, envVars?: Record<string,string> }
+ * Writes the YAML to disk, then runs `docker compose up -d`.
+ */
+app.post('/agent/compose/up', async (req, res) => {
+  const { composeYaml, projectName, envVars } = req.body || {};
+  if (!composeYaml || !projectName) {
+    return res.status(400).json({ error: 'composeYaml and projectName are required' });
+  }
+
+  const safeProject = projectName.replace(/[^a-z0-9-]/gi, '-').toLowerCase().slice(0, 60);
+  const projectDir = `${COMPOSE_DIR}/${safeProject}`;
+
+  try {
+    // Create project directory
+    await execFileAsync('mkdir', ['-p', projectDir]);
+
+    // Write env vars with auto-generated secrets
+    const resolvedEnv = resolveEnvVars(composeYaml, envVars || {});
+    const envFileContent = Object.entries(resolvedEnv)
+      .map(([k, v]) => `${k}=${v}`)
+      .join('\n');
+
+    const fs = require('fs');
+    fs.writeFileSync(`${projectDir}/docker-compose.yml`, composeYaml, 'utf8');
+    if (envFileContent) fs.writeFileSync(`${projectDir}/.env`, envFileContent, 'utf8');
+
+    // Pull images first (so we can give a better error), then bring up
+    await execFileAsync('docker', ['compose', '-p', safeProject, '-f', `${projectDir}/docker-compose.yml`, '--env-file', `${projectDir}/.env`, 'pull', '--quiet'], { cwd: projectDir });
+    const { stdout, stderr } = await execFileAsync('docker', ['compose', '-p', safeProject, '-f', `${projectDir}/docker-compose.yml`, '--env-file', `${projectDir}/.env`, 'up', '-d', '--remove-orphans'], { cwd: projectDir });
+
+    logger.info({ safeProject }, 'Compose stack started');
+    res.status(201).json({
+      ok: true,
+      project: safeProject,
+      env: Object.fromEntries(Object.entries(resolvedEnv).filter(([k]) => k.startsWith('SERVICE_PASSWORD_') || k.startsWith('SERVICE_USER_'))),
+      stdout,
+      stderr,
+    });
+  } catch (err) {
+    logger.error({ safeProject, err }, 'Failed to start compose stack');
+    res.status(500).json({ error: err.stderr || err.message });
+  }
+});
+
+/**
+ * DELETE /agent/compose/:project
+ * Tears down a compose project (docker compose down -v).
+ */
+app.delete('/agent/compose/:project', async (req, res) => {
+  const safeProject = req.params.project.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+  const projectDir = `${COMPOSE_DIR}/${safeProject}`;
+
+  try {
+    await execFileAsync('docker', ['compose', '-p', safeProject, '-f', `${projectDir}/docker-compose.yml`, 'down', '-v', '--remove-orphans']);
+    require('fs').rmSync(projectDir, { recursive: true, force: true });
+    logger.info({ safeProject }, 'Compose stack torn down');
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ safeProject, err }, 'Failed to tear down compose stack');
+    res.status(500).json({ error: err.stderr || err.message });
+  }
+});
+
+/**
+ * GET /agent/compose/:project/logs
+ * Returns logs for a compose project.
+ */
+app.get('/agent/compose/:project/logs', async (req, res) => {
+  const safeProject = req.params.project.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+  const projectDir = `${COMPOSE_DIR}/${safeProject}`;
+  const tail = req.query.tail || '200';
+
+  try {
+    const { stdout } = await execFileAsync('docker', ['compose', '-p', safeProject, '-f', `${projectDir}/docker-compose.yml`, 'logs', '--no-color', '--tail', tail]);
+    res.json({ logs: stdout });
+  } catch (err) {
+    res.status(500).json({ error: err.stderr || err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.listen(PORT, BIND_HOST, () => {
+  logger.info({ port: PORT, host: BIND_HOST }, 'node-agent listening');
+  if (BIND_HOST === '0.0.0.0' && ALLOWED_IPS.length === 0) {
+    logger.warn(
+      'node-agent is bound to all interfaces with no AGENT_ALLOWED_IPS configured. ' +
+        'This service must not be reachable from the public internet -- set AGENT_BIND_HOST ' +
+        'to a private-network address, and/or set AGENT_ALLOWED_IPS to your control plane\'s IP(s), ' +
+        'and firewall this port at the OS/cloud level.'
+    );
+  }
+});
+

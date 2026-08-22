@@ -1,0 +1,32 @@
+# Traefik dynamic middleware definitions for ShanuTechX Control Plane
+
+http:
+  middlewares:
+    # Security Headers Middleware
+    security-headers:
+      headers:
+        frameDeny: true
+        sslRedirect: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        customFrameOptionsValue: SAMEORIGIN
+        contentSecurityPolicy: "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: wss:;"
+
+    # Rate Limiting Middleware (100 requests / min average, burst 50)
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+
+    # Compression Middleware
+    gzip-compress:
+      compress: {}
+
+    # Strict HTTPS Redirect
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true

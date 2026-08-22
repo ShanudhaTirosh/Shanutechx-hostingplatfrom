@@ -1,0 +1,33 @@
+{
+  "rules": {
+    "chats": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('staff').child(auth.uid).exists())",
+        ".write": "auth != null && (auth.uid === $uid || root.child('staff').child(auth.uid).exists())",
+        "messages": {
+          "$messageId": {
+            ".validate": "newData.hasChildren(['senderId', 'senderRole', 'text', 'timestamp']) && newData.child('senderId').val() === auth.uid",
+            "text": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length < 4000"
+            },
+            "senderRole": {
+              ".validate": "newData.val() === 'customer' || newData.val() === 'staff'"
+            }
+          }
+        }
+      }
+    },
+
+    "chatIndex": {
+      ".read": "auth != null && root.child('staff').child(auth.uid).exists()",
+      "$uid": {
+        ".write": "auth != null && (auth.uid === $uid || root.child('staff').child(auth.uid).exists())"
+      }
+    },
+
+    "staff": {
+      ".read": "auth != null",
+      ".write": false
+    }
+  }
+}

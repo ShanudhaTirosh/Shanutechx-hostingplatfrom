@@ -1,0 +1,17 @@
+{
+  "name": "@shanutechx/node-agent",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "dockerode": "^4.0.2",
+    "express": "^4.19.2",
+    "dotenv": "^16.4.5",
+    "systeminformation": "^5.23.5",
+    "js-yaml": "^4.1.0",
+    "pino": "^9.5.0"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "name": "@shanutechx/auth",
+  "version": "1.0.0",
+  "description": "Auth helpers for the ShanuTechX platform — login, token storage, JWT refresh",
+  "keywords": ["shanutechx", "auth", "sdk"],
+  "license": "MIT",
+  "author": "ShanuTechX",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shanutechx/shanutechx.git",
+    "directory": "packages/auth"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@shanutechx/client": "workspace:*",
+    "@shanutechx/types": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "*",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

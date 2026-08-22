@@ -1,0 +1,652 @@
+# Every `build.context` below is the REPO ROOT (../..), not the service's
+# own directory — required so npm workspaces can resolve the @shanutechx/db
+# dependency during the API's build. See each Dockerfile's top comment.
+
+networks:
+  shanutechx-internal:
+    driver: bridge
+  shanutechx-public:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  traefik-certs:
+  shanutechx-workspaces:
+  shanutechx-uploads:
+  shanutechx-invoices:
+  livekit-config:
+  # Object storage + self-hosted BaaS + mail stack, brought up together
+  # with the rest of the control plane. See the service blocks below.
+  minio-data:
+  supabase-db-data:
+  supabase-kong-config:
+  postal-db-data:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: shanutechx-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shanutechx
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: shanutechx
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [shanutechx-internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shanutechx"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks: [shanutechx-internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  traefik:
+    image: traefik:v2.11
+    restart: unless-stopped
+    command:
+      - --log.level=DEBUG
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.endpoint=unix:///var/run/docker.sock
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/certs/acme.json
+      # REST API for the Dev Dashboard's Reverse Proxy page
+      # (apps/api/src/routes/traefikStatus.ts). Deliberately NOT
+      # api.insecure — the :8080 API port is only ever reached by the `api`
+      # container over shanutechx-internal, never published to the host or
+      # attached to shanutechx-public, so it's never reachable from the
+      # public internet regardless of this flag.
+      - --api=true
+      - --api.dashboard=false
+    environment:
+      - DOCKER_API_VERSION=1.43
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certs:/certs
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+    networks: [shanutechx-public, shanutechx-internal]
+
+  # ── Object Storage (S3-compatible, self-hosted) ──────────────────────────
+  # Everything needing durable object storage (DB backups — lib/backup.ts,
+  # Supabase Storage buckets, per-project buckets — lib/r2Storage.ts)
+  # points here by default via R2_ENDPOINT/R2_ACCESS_KEY_ID/
+  # R2_SECRET_ACCESS_KEY in apps/api/.env. Swap for real Cloudflare R2 in
+  # production by changing those three values to point at R2 instead — no
+  # code change needed, the S3-compatible client doesn't care which
+  # provider it's talking to. Internal-only: no Traefik labels, not on
+  # shanutechx-public — nothing needs to reach this directly from the
+  # internet, only the other containers on shanutechx-internal do.
+  minio:
+    image: minio/minio:latest
+    container_name: shanutechx-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    networks: [shanutechx-internal]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: shanutechx-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
+        mc mb --ignore-existing local/shanutechx-backups &&
+        mc mb --ignore-existing local/supabase-storage &&
+        echo 'MinIO buckets ready.'
+    networks: [shanutechx-internal]
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file: ../../apps/api/.env
+    environment:
+      # These four override whatever's in apps/api/.env, pointing the API
+      # at the in-stack MinIO/Supabase/Postal services by their Docker
+      # network hostnames. Comment these out (and set the real values in
+      # apps/api/.env instead) if you're using external R2/Supabase/Postal
+      # instead of the self-hosted versions in this compose file.
+      - R2_ENDPOINT=http://minio:9000
+      - R2_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - R2_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - R2_BUCKET_NAME=shanutechx-backups
+      - SUPABASE_KONG_URL=http://supabase-kong:8000
+      - SUPABASE_META_URL=http://supabase-meta:8080
+      - SUPABASE_STUDIO_URL=https://studio.${ROOT_DOMAIN}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - POSTAL_API_URL=http://postal-web:5000
+      - POSTAL_API_KEY=${POSTAL_API_KEY}
+      - POSTAL_FROM_ADDRESS=${POSTAL_FROM_ADDRESS:-no-reply@${ROOT_DOMAIN}}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - shanutechx-uploads:/var/lib/shanutechx/uploads
+      - shanutechx-invoices:/var/lib/shanutechx/invoices
+    networks: [shanutechx-internal, shanutechx-public]
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4000/api/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=control-plane_shanutechx-public
+      - traefik.http.routers.api.rule=Host(`api.${ROOT_DOMAIN}`)
+      - traefik.http.routers.api.entrypoints=websecure
+      - traefik.http.routers.api.tls.certresolver=le
+      - traefik.http.services.api.loadbalancer.server.port=4000
+
+  # Same image as `api`, different entry point — consumes the payment
+  # verification queue (BullMQ/Redis) so a slow or rate-limited Gemini call
+  # never blocks an actual HTTP request.
+  worker:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    command: ["node", "dist/worker.js"]
+    env_file: ../../apps/api/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - shanutechx-uploads:/var/lib/shanutechx/uploads
+    networks: [shanutechx-internal]
+    # No healthcheck - worker is a background process with no HTTP endpoint
+    # No Traefik labels, no public network — this process only consumes a
+    # queue, it never needs to be reachable.
+
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+      args:
+        API_BASE_URL: ${API_BASE_URL:-https://api.shanutechx.com}
+        NEXT_PUBLIC_DASHBOARD_URL: ${NEXT_PUBLIC_DASHBOARD_URL:-https://app.shanutechx.com}
+    restart: unless-stopped
+    environment:
+      - API_BASE_URL=https://api.shanutechx.com
+      - NEXT_PUBLIC_DASHBOARD_URL=https://app.shanutechx.com
+    networks: [shanutechx-public]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=control-plane_shanutechx-public
+      - traefik.http.routers.web.rule=Host(`${ROOT_DOMAIN}`)
+      - traefik.http.routers.web.entrypoints=websecure
+      - traefik.http.routers.web.tls.certresolver=le
+      - traefik.http.services.web.loadbalancer.server.port=3000
+
+  dashboard:
+    build:
+      context: ../..
+      dockerfile: apps/dashboard/Dockerfile
+      # NEXT_PUBLIC_* vars are inlined at build time, not read from env_file
+      # at runtime — they must come from this repo's infra/control-plane/.env
+      # (not apps/dashboard/.env) so `docker compose build` can see them.
+      args:
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+    restart: unless-stopped
+    networks: [shanutechx-public]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=control-plane_shanutechx-public
+      - traefik.http.routers.dashboard.rule=Host(`app.${ROOT_DOMAIN}`)
+      - traefik.http.routers.dashboard.entrypoints=websecure
+      - traefik.http.routers.dashboard.tls.certresolver=le
+      - traefik.http.services.dashboard.loadbalancer.server.port=3001
+
+  whatsapp-bot:
+    build:
+      context: ../..
+      dockerfile: services/whatsapp-bot/Dockerfile
+    restart: unless-stopped
+    env_file: ../../services/whatsapp-bot/.env
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ../../services/whatsapp-bot/auth:/repo/services/whatsapp-bot/auth
+    networks: [shanutechx-internal]
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4100/internal/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # Intentionally NOT on shanutechx-public and no Traefik labels — this
+    # service must never be reachable from the internet, only from `api`.
+
+  discord-bot:
+    build:
+      context: ../..
+      dockerfile: services/discord-bot/Dockerfile
+    restart: unless-stopped
+    env_file: ../../services/discord-bot/.env
+    environment:
+      - NODE_ENV=production
+    networks: [shanutechx-internal]
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4200/internal/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # Same deal as whatsapp-bot: internal only, no Traefik labels.
+
+  # Optional: only run this if the control-plane VPS is ALSO registered as a
+  # hosting Node in the database. A separate, pure-hosting VPS uses
+  # infra/node-stack/ instead, which runs its own standalone Traefik +
+  # node-agent pair (you can't have two Traefik instances on one machine
+  # both binding :80/:443).
+  # Railpack (replaces Nixpacks — see services/node-agent/src/build.js)
+  # builds through BuildKit rather than bundling its own build mechanism, so
+  # this sibling container is required for `railpack build` to work at all.
+  # node-agent reaches it via the mounted docker.sock using the
+  # docker-container:// connection scheme, not over the network — that's
+  # why this has no ports/networks of its own.
+  buildkit:
+    image: moby/buildkit:latest
+    container_name: buildkit
+    privileged: true
+    restart: unless-stopped
+
+  node-agent:
+    build:
+      context: ../..
+      dockerfile: services/node-agent/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+      - ../../services/node-agent/.env
+    environment:
+      - NODE_ENV=production
+      - AGENT_PUBLIC_NETWORK=control-plane_shanutechx-public
+      - BUILDKIT_HOST=docker-container://buildkit
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - shanutechx-workspaces:/var/lib/shanutechx/workspaces
+      - livekit-config:/etc/livekit
+    networks: [shanutechx-internal, shanutechx-public]
+    depends_on: [buildkit]
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5000/agent/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # No Traefik labels — this is an internal control surface the API calls
+    # directly by node IP, never something a browser hits.
+
+  # Optional: only needed if this node is tagged "livekit" in the Node table.
+  # node-agent (above) writes new keys into the shared livekit-config volume
+  # and restarts this container by name when a new LiveKit project is
+  # provisioned — see services/node-agent/src/livekit.js.
+  livekit-server:
+    image: livekit/livekit-server:latest
+    container_name: livekit-server
+    restart: unless-stopped
+    command: ["--config", "/etc/livekit/livekit.yaml"]
+    volumes:
+      - livekit-config:/etc/livekit
+    networks: [shanutechx-public]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=control-plane_shanutechx-public
+      - traefik.http.routers.livekit.rule=Host(`livekit.${ROOT_DOMAIN}`)
+      - traefik.http.routers.livekit.entrypoints=websecure
+      - traefik.http.routers.livekit.tls.certresolver=le
+      - traefik.http.services.livekit.loadbalancer.server.port=7880
+
+  # Customer deployments (built by node-agent above) join shanutechx-public
+  # with their own Traefik labels generated at container-create time, e.g.:
+  #   traefik.http.routers.<deployment-id>.rule=Host(`<subdomain>.${ROOT_DOMAIN}`)
+  # They never publish a host port — Traefik reaches them over the Docker
+  # network by container name/port, which is what makes per-client port
+  # conflicts a non-issue.
+
+  # ── Self-Hosted Supabase (Managed Backend-as-a-Service module) ──────────
+  # ONE-TIME SETUP before first `docker compose up -d`, from infra/control-plane/:
+  #   1. cd ../.. && node infra/supabase/generate-keys.js
+  #   2. Copy the printed JWT_SECRET / SUPABASE_ANON_KEY /
+  #      SUPABASE_SERVICE_ROLE_KEY into infra/control-plane/.env
+  # Kong's declarative routing config is generated automatically at
+  # startup (supabase-kong-config below) from infra/supabase/kong.yml.
+  # Only Kong (the API gateway, at supabase.${ROOT_DOMAIN}) and Studio
+  # (studio.${ROOT_DOMAIN}) are public — every other Supabase service is
+  # internal-only, reached through Kong's routing, same as how customer
+  # deployments are never reachable except through Traefik.
+
+  supabase-db:
+    image: supabase/postgres:15.8.1.085
+    container_name: shanutechx-supabase-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${SUPABASE_DB_PASSWORD}
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: 3600
+    volumes:
+      - supabase-db-data:/var/lib/postgresql/data
+    networks: [shanutechx-internal]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  supabase-auth:
+    image: supabase/gotrue:v2.174.0
+    container_name: shanutechx-supabase-auth
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: https://supabase.${ROOT_DOMAIN}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${SUPABASE_DB_PASSWORD}@supabase-db:5432/postgres
+      GOTRUE_SITE_URL: https://app.${ROOT_DOMAIN}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_DISABLE_SIGNUP: "false"
+      # First-boot defaults only — once the stack is up, set real outbound
+      # mail settings through the dashboard's Supabase panel (SMTP
+      # Settings), which persists to Postgres and takes over from these.
+      GOTRUE_SMTP_HOST: postal-web
+      GOTRUE_SMTP_PORT: 25
+      GOTRUE_SMTP_SENDER_NAME: ShanuTechX
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+    networks: [shanutechx-internal]
+
+  supabase-rest:
+    image: postgrest/postgrest:v12.2.8
+    container_name: shanutechx-supabase-rest
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${SUPABASE_DB_PASSWORD}@supabase-db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    networks: [shanutechx-internal]
+
+  supabase-realtime:
+    image: supabase/realtime:v2.34.47
+    container_name: shanutechx-supabase-realtime
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      DB_HOST: supabase-db
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
+      DB_NAME: postgres
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+      DB_ENC_KEY: supabaserealtime
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${SUPABASE_REALTIME_SECRET}
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+    networks: [shanutechx-internal]
+
+  supabase-storage:
+    image: supabase/storage-api:v1.11.13
+    container_name: shanutechx-supabase-storage
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+      supabase-rest:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    environment:
+      ANON_KEY: ${SUPABASE_ANON_KEY}
+      SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://supabase-rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${SUPABASE_DB_PASSWORD}@supabase-db:5432/postgres
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: s3
+      GLOBAL_S3_BUCKET: supabase-storage
+      GLOBAL_S3_ENDPOINT: http://minio:9000
+      GLOBAL_S3_FORCE_PATH_STYLE: "true"
+      REGION: auto
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      TENANT_ID: shanutechx
+      IMGPROXY_URL: http://supabase-imgproxy:5001
+    networks: [shanutechx-internal]
+
+  supabase-imgproxy:
+    image: darthsim/imgproxy:v3.27
+    container_name: shanutechx-supabase-imgproxy
+    restart: unless-stopped
+    environment:
+      IMGPROXY_BIND: ":5001"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+      IMGPROXY_USE_ETAG: "true"
+    networks: [shanutechx-internal]
+
+  supabase-meta:
+    image: supabase/postgres-meta:v0.87.1
+    container_name: shanutechx-supabase-meta
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: supabase-db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: supabase_admin
+      PG_META_DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
+    networks: [shanutechx-internal]
+
+  supabase-kong-config:
+    image: supabase/kong:2.8.1
+    container_name: shanutechx-supabase-kong-config
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        apk add --no-cache gettext > /dev/null 2>&1 || true &&
+        envsubst < /kong-src/kong.yml > /kong-out/kong.yml &&
+        echo 'Kong config generated.'
+    environment:
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    volumes:
+      - ../supabase:/kong-src:ro
+      - supabase-kong-config:/kong-out
+    networks: [shanutechx-internal]
+
+  supabase-kong:
+    image: supabase/kong:2.8.1
+    container_name: shanutechx-supabase-kong
+    restart: unless-stopped
+    depends_on:
+      supabase-kong-config:
+        condition: service_completed_successfully
+      supabase-auth:
+        condition: service_started
+      supabase-rest:
+        condition: service_started
+      supabase-storage:
+        condition: service_started
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong-out/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl
+    volumes:
+      - supabase-kong-config:/kong-out:ro
+    networks: [shanutechx-internal, shanutechx-public]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=control-plane_shanutechx-public
+      - traefik.http.routers.supabase-kong.rule=Host(`supabase.${ROOT_DOMAIN}`)
+      - traefik.http.routers.supabase-kong.entrypoints=websecure
+      - traefik.http.routers.supabase-kong.tls.certresolver=le
+      - traefik.http.services.supabase-kong.loadbalancer.server.port=8000
+
+  supabase-studio:
+    image: supabase/studio:2026.04.27-sha-5f60601
+    container_name: shanutechx-supabase-studio
+    restart: unless-stopped
+    depends_on: [supabase-kong]
+    environment:
+      STUDIO_PG_META_URL: http://supabase-meta:8080
+      POSTGRES_PASSWORD: ${SUPABASE_DB_PASSWORD}
+      DEFAULT_ORGANIZATION_NAME: ShanuTechX
+      DEFAULT_PROJECT_NAME: ShanuTechX Platform
+      SUPABASE_URL: http://supabase-kong:8000
+      SUPABASE_PUBLIC_URL: https://supabase.${ROOT_DOMAIN}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    networks: [shanutechx-public]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=control-plane_shanutechx-public
+      - traefik.http.routers.supabase-studio.rule=Host(`studio.${ROOT_DOMAIN}`)
+      - traefik.http.routers.supabase-studio.entrypoints=websecure
+      - traefik.http.routers.supabase-studio.tls.certresolver=le
+      - traefik.http.services.supabase-studio.loadbalancer.server.port=3000
+
+  # ── Self-Hosted Mail (Postal) — Business Email / SMTP module ─────────────
+  # Stores messages in MariaDB (postal-db-data volume), not S3 — that's
+  # Postal's own supported, durable design, not local container disk.
+  #
+  # ONE-TIME SETUP (can't be automated — inherent to running a real mail
+  # server):
+  #   1. openssl genrsa -out infra/postal/signing.key 2048
+  #   2. Real DNS: A/AAAA + reverse-DNS(PTR) for mail.${ROOT_DOMAIN} ->
+  #      this server's public IP, plus SPF/DKIM/DMARC once Postal gives
+  #      you the DKIM key after step 3.
+  #   3. After first `docker compose up -d`:
+  #        docker compose exec postal-web postal initialize
+  #        docker compose exec postal-web postal make-user
+  #      Then create an Organization + Mail Server in Postal's own UI at
+  #      postal.${ROOT_DOMAIN}, and put its API key in apps/api/.env as
+  #      POSTAL_API_KEY, then `docker compose restart api`.
+  # Only postal-web is public (its own admin UI + REST API, which the
+  # platform API calls). postal-smtp needs ports 25/587 published
+  # directly (Traefik doesn't proxy raw SMTP), not routed through Traefik.
+
+  postal-db:
+    image: mariadb:11
+    container_name: shanutechx-postal-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${POSTAL_DB_ROOT_PASSWORD}
+    volumes:
+      - postal-db-data:/var/lib/mysql
+    networks: [shanutechx-internal]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postal-web:
+    image: ghcr.io/postalserver/postal:latest
+    container_name: shanutechx-postal-web
+    restart: unless-stopped
+    command: ["postal", "web-server"]
+    depends_on:
+      postal-db:
+        condition: service_healthy
+    volumes:
+      - ../postal/postal.yml:/config/postal.yml:ro
+      - ../postal/signing.key:/config/signing.key:ro
+    networks: [shanutechx-internal, shanutechx-public]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=control-plane_shanutechx-public
+      - traefik.http.routers.postal-web.rule=Host(`postal.${ROOT_DOMAIN}`)
+      - traefik.http.routers.postal-web.entrypoints=websecure
+      - traefik.http.routers.postal-web.tls.certresolver=le
+      - traefik.http.services.postal-web.loadbalancer.server.port=5000
+
+  postal-smtp:
+    image: ghcr.io/postalserver/postal:latest
+    container_name: shanutechx-postal-smtp
+    restart: unless-stopped
+    command: ["postal", "smtp-server"]
+    depends_on:
+      postal-db:
+        condition: service_healthy
+    volumes:
+      - ../postal/postal.yml:/config/postal.yml:ro
+      - ../postal/signing.key:/config/signing.key:ro
+    # Raw SMTP isn't HTTP -- Traefik can't proxy it (without its separate
+    # TCP-router feature, not configured here), so these ports are
+    # published directly to the host instead.
+    ports:
+      - "25:25"
+      - "587:587"
+    networks: [shanutechx-internal]
+
+  postal-worker:
+    image: ghcr.io/postalserver/postal:latest
+    container_name: shanutechx-postal-worker
+    restart: unless-stopped
+    command: ["postal", "worker"]
+    depends_on:
+      postal-db:
+        condition: service_healthy
+    volumes:
+      - ../postal/postal.yml:/config/postal.yml:ro
+      - ../postal/signing.key:/config/signing.key:ro
+    networks: [shanutechx-internal]

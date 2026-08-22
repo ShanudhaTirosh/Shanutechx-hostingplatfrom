@@ -1,0 +1,69 @@
+# Observability stack — Prometheus (metrics) + Grafana (dashboards) +
+# Loki + Promtail (logs). Separate, optional compose file so it can be
+# brought up independently of the core control-plane services:
+#
+#   docker compose -f docker-compose.yml -f observability/docker-compose.observability.yml up -d
+
+networks:
+  shanutechx-internal:
+    external: true
+    name: control-plane_shanutechx-internal
+  shanutechx-public:
+    external: true
+    name: control-plane_shanutechx-public
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    restart: unless-stopped
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    networks: [shanutechx-internal]
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks: [shanutechx-internal, shanutechx-public]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=control-plane_shanutechx-public
+      - traefik.http.routers.grafana.rule=Host(`grafana.${ROOT_DOMAIN}`)
+      - traefik.http.routers.grafana.entrypoints=websecure
+      - traefik.http.routers.grafana.tls.certresolver=le
+      - traefik.http.services.grafana.loadbalancer.server.port=3000
+
+  loki:
+    image: grafana/loki:3.1.0
+    restart: unless-stopped
+    volumes:
+      - ./observability/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks: [shanutechx-internal]
+
+  promtail:
+    image: grafana/promtail:3.1.0
+    restart: unless-stopped
+    volumes:
+      - ./observability/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks: [shanutechx-internal]
+    depends_on: [loki]

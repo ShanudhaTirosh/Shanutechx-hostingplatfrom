@@ -1,0 +1,107 @@
+version: "3.9"
+
+# Deploy this compose file on every additional VPS that hosts customer
+# deployments but is NOT the control-plane machine (which already runs its
+# own Traefik — see infra/control-plane/docker-compose.yml). After bringing
+# this up, register the node in the admin dashboard with this VPS's IP so
+# selectNodeForDeployment() can start assigning deployments to it.
+
+networks:
+  shanutechx-public:
+    driver: bridge
+  shanutechx-internal:
+    driver: bridge
+
+volumes:
+  traefik-certs:
+  shanutechx-workspaces:
+  livekit-config:
+
+services:
+  traefik:
+    image: traefik:v3.1
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/certs/acme.json
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certs:/certs
+    networks: [shanutechx-public]
+
+  buildkit:
+    image: moby/buildkit:latest
+    container_name: buildkit
+    privileged: true
+    restart: unless-stopped
+
+  node-agent:
+    build:
+      context: ../..
+      dockerfile: services/node-agent/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - AGENT_PUBLIC_NETWORK=shanutechx-public
+      - BUILDKIT_HOST=docker-container://buildkit
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - shanutechx-workspaces:/var/lib/shanutechx/workspaces
+      - livekit-config:/etc/livekit
+    networks: [shanutechx-public, shanutechx-internal]
+    depends_on: [buildkit]
+
+  # Hardware Telemetry Exporter for Prometheus
+  node-exporter:
+    image: prom/node-exporter:v1.8.1
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks: [shanutechx-internal]
+
+  # Container Metrics Exporter for Prometheus
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks: [shanutechx-internal]
+
+  livekit-server:
+    image: livekit/livekit-server:latest
+    container_name: livekit-server
+    restart: unless-stopped
+    command: ["--config", "/etc/livekit/livekit.yaml"]
+    volumes:
+      - livekit-config:/etc/livekit
+    networks: [shanutechx-public]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.livekit.rule=Host(`livekit.${ROOT_DOMAIN}`)
+      - traefik.http.routers.livekit.entrypoints=websecure
+      - traefik.http.routers.livekit.tls.certresolver=le
+      - traefik.http.services.livekit.loadbalancer.server.port=7880

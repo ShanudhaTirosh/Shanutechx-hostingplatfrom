@@ -1,0 +1,305 @@
+# Supabase Self-Hosted Stack for ShanuTechX Platform
+# Non-conflicting port bindings:
+# Kong HTTP: 8001, Studio: 3003, Postgres: 5435, Supavisor: 6543
+#
+# FIXES APPLIED (this file previously shipped with these unfixed):
+#   - `db` and `storage` had NO persistent volumes at all -- every
+#     restart/recreate silently wiped all Supabase data (users, tables,
+#     files). Added supabase-db-data / supabase-storage-data below.
+#   - `storage` used STORAGE_BACKEND: file (container-local disk, same
+#     data-loss problem as above) instead of the S3-compatible MinIO this
+#     platform already runs for everything else. Switched to `s3`.
+#   - KONG_DECLARATIVE_CONFIG pointed at /usr/local/kong/kong.yml, but no
+#     such file was ever mounted anywhere in this repo -- Kong would fail
+#     to start (or start with zero routes). Added kong.yml.template +
+#     the kong-config service below that generates the real file at
+#     startup, same pattern Supabase's own official compose setup uses.
+#   - .env.example shipped Supabase's own well-known, publicly-documented
+#     DEMO anon/service_role JWT keys (the ones with "iss": "supabase-demo"
+#     used in thousands of tutorials) as the actual example values, next
+#     to an equally-generic default JWT_SECRET -- meaning anyone who
+#     didn't realize they needed to change these would be running with a
+#     completely public, forgeable auth token. Fixed .env.example to
+#     require real generated values (see infra/supabase/generate-keys.js).
+#
+# NETWORKING: this file is meant to run together with the rest of the
+# platform via `docker compose -f docker/docker-compose.shanutechx.yml up
+# -d` from the repo root (which includes this file alongside
+# docker-compose.local.yml) -- it is not designed to run fully standalone
+# anymore, now that `storage` depends on the MinIO service defined in
+# docker-compose.local.yml. It joins that file's `shanutechx-local`
+# network as an external network (see `networks:` at the bottom) rather
+# than its own isolated one, so `api`/`worker` (in docker-compose.local.yml)
+# and this stack's services can reach each other by plain service name.
+
+services:
+  studio:
+    container_name: supabase-studio
+    image: supabase/studio:2026.08.03-sha-022b374
+    restart: unless-stopped
+    ports:
+      - "3003:3000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://localhost:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})\""
+        ]
+      timeout: 10s
+      interval: 5s
+      retries: 3
+      start_period: 20s
+    environment:
+      HOSTNAME: "0.0.0.0"
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_HOST: ${POSTGRES_HOST:-db}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}
+      POSTGRES_USER_READ_WRITE: postgres
+      PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY:-shanutechx_pg_meta_crypto_key_32_chars_min}
+      PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS:-public,graphql_public}
+      PGRST_DB_MAX_ROWS: ${PGRST_DB_MAX_ROWS:-1000}
+      PGRST_DB_EXTRA_SEARCH_PATH: ${PGRST_DB_EXTRA_SEARCH_PATH:-public}
+      DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION:-ShanuTechX}
+      DEFAULT_PROJECT_NAME: ${STUDIO_DEFAULT_PROJECT:-Production Platform}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8001}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      ENABLED_FEATURES_LOGS_ALL: "false"
+
+  # Fixed: KONG_DECLARATIVE_CONFIG below pointed at a file
+  # (/usr/local/kong/kong.yml) that was never mounted anywhere in this
+  # repo -- Kong had no routes configured. This generates the real file
+  # (substituting ANON_KEY/SERVICE_ROLE_KEY into kong.yml.template) into a
+  # shared volume before `kong` starts.
+  kong-config:
+    container_name: supabase-kong-config
+    image: kong/kong:3.9.3
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        apk add --no-cache gettext > /dev/null 2>&1 || true &&
+        ANON_KEY=${ANON_KEY} SUPABASE_ANON_KEY=${ANON_KEY} SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY} envsubst < /kong-src/kong.yml.template > /kong-out/kong.yml &&
+        echo 'Kong config generated.'
+    volumes:
+      - ./kong.yml.template:/kong-src/kong.yml.template:ro
+      - supabase-kong-config:/kong-out
+
+  kong:
+    container_name: supabase-kong
+    image: kong/kong:3.9.3
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      kong-config:
+        condition: service_completed_successfully
+      studio:
+        condition: service_healthy
+    ports:
+      - ${KONG_HTTP_PORT:-8001}:8000/tcp
+      - ${KONG_HTTPS_PORT:-8444}:8443/tcp
+    volumes:
+      - supabase-kong-config:/usr/local/kong:ro
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
+      KONG_ROUTER_FLAVOR: expressions
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_DNS_NOT_FOUND_TTL: 1
+      KONG_DNS_VALID_TTL: 5
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth,request-termination,ip-restriction,post-function
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:-supabase}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-shanutechx_admin_pass}
+
+  auth:
+    container_name: supabase-auth
+    image: supabase/gotrue:v2.189.0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${API_EXTERNAL_URL:-http://localhost:8001/auth/v1}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
+      GOTRUE_SITE_URL: ${SITE_URL:-http://localhost:3000}
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: ${JWT_EXPIRY:-3600}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${ENABLE_EMAIL_SIGNUP:-true}
+      GOTRUE_MAILER_AUTOCONFIRM: ${ENABLE_EMAIL_AUTOCONFIRM:-true}
+
+  rest:
+    container_name: supabase-rest
+    image: postgrest/postgrest:v14.12
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "postgrest", "--ready" ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
+      PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS:-public,graphql_public}
+      PGRST_DB_MAX_ROWS: ${PGRST_DB_MAX_ROWS:-1000}
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+
+  realtime:
+    container_name: realtime-dev.supabase-realtime
+    image: supabase/realtime:v2.102.3
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      DB_HOST: ${POSTGRES_HOST:-db}
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}
+      DB_NAME: ${POSTGRES_DB:-postgres}
+      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
+      DB_ENC_KEY: ${REALTIME_DB_ENC_KEY:-supabaserealtime}
+      API_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-shanutechx_secret_key_base_64chars_long_key_string}
+      METRICS_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      APP_NAME: realtime
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+
+  storage:
+    container_name: supabase-storage
+    image: supabase/storage-api:v1.60.4
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://rest:3000
+      AUTH_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
+      STORAGE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8001}
+      FILE_SIZE_LIMIT: 52428800
+      # Fixed: was STORAGE_BACKEND: file (container-local disk -- lost on
+      # every recreate). Points at the same MinIO instance
+      # docker-compose.local.yml's `api` service uses for backups, so
+      # Supabase Storage files are durable across restarts/replacement.
+      STORAGE_BACKEND: s3
+      GLOBAL_S3_BUCKET: supabase-storage
+      GLOBAL_S3_ENDPOINT: http://minio:9000
+      GLOBAL_S3_FORCE_PATH_STYLE: "true"
+      REGION: auto
+      # Must match MINIO_ROOT_USER / MINIO_ROOT_PASSWORD in the repo-root
+      # .env (docker-compose.local.yml's minio service) -- see this
+      # file's own .env.example for why these can't just be inherited
+      # automatically.
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-shanutechx_minio}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-CHANGE_ME_minio_root_pass}
+      TENANT_ID: ${STORAGE_TENANT_ID:-shanutechx}
+
+  meta:
+    container_name: supabase-meta
+    image: supabase/postgres-meta:v0.96.6
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: ${POSTGRES_HOST:-db}
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: ${POSTGRES_DB:-postgres}
+      PG_META_DB_USER: postgres
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}
+      CRYPTO_KEY: ${PG_META_CRYPTO_KEY:-shanutechx_pg_meta_crypto_key_32_chars_min}
+
+  functions:
+    container_name: supabase-edge-functions
+    image: supabase/edge-runtime:v1.74.0
+    restart: unless-stopped
+    depends_on:
+      kong:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8001}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
+      VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT:-false}"
+
+  db:
+    container_name: supabase-db
+    image: supabase/postgres:17.6.1.136
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5435}:5432"
+    volumes:
+      - supabase-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: 5432
+      POSTGRES_PORT: 5432
+      PGPASSWORD: ${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}
+      PGDATABASE: ${POSTGRES_DB:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      JWT_EXP: ${JWT_EXPIRY:-3600}
+
+volumes:
+  supabase-db-data:
+  supabase-kong-config:
+
+networks:
+  # Fixed: was its own fully-isolated network (shanutechx-supabase-net),
+  # which meant nothing outside this file could reach these services by
+  # name even when run together via docker/docker-compose.shanutechx.yml.
+  # Joins docker-compose.local.yml's network instead (created there;
+  # `external: true` here because THIS file doesn't own it) so `api`/
+  # `worker` and this stack's services can reach each other directly.
+  default:
+    name: shanutechx-local
+    external: true

@@ -1,0 +1,26 @@
+# slogan: Production Lavalink v4 audio server with YouTube, Spotify (LavaSrc), and LavaSearch plugins pre-installed.
+# category: gaming
+# tags: lavalink, discord, bot, audio, music, spotify, youtube
+# logo: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/discord.svg
+# port: 2333
+
+services:
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4-alpine
+    ports:
+      - "2333:2333"
+    environment:
+      - LAVALINK_SERVER_PASSWORD=${LAVALINK_PASSWORD:?LAVALINK_PASSWORD must be set}
+      - SERVER_PORT=2333
+      - OPUS_ENCODING=true
+    volumes:
+      - lavalink_config:/opt/Lavalink/application.yml
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:2333/version"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  lavalink_config:

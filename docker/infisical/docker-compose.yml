@@ -1,0 +1,64 @@
+version: "3.9"
+
+name: shanutechx-infisical
+
+services:
+  # Fixed: this and the redis service below were previously named `db`/
+  # `redis` -- both names collide with services in docker/supabase/
+  # docker-compose.yml (`db`) and docker-compose.local.yml (`redis`).
+  # docker/docker-compose.shanutechx.yml's `include:` merges services by
+  # name across all three files, so with the original names, whichever
+  # file was included last would silently OVERRIDE the earlier
+  # same-named service instead of running alongside it -- e.g. Infisical's
+  # Postgres would have replaced Supabase's entirely, breaking Supabase
+  # auth/storage, and Infisical's Redis would have replaced ShanuTechX's
+  # own Redis, breaking BullMQ/session cache. Renamed to be collision-safe
+  # in the unified stack.
+  infisical-db:
+    image: postgres:14-alpine
+    container_name: infisical-db
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    volumes:
+      - infisical-postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: infisical_dev_secret
+      POSTGRES_USER: infisical
+      POSTGRES_DB: infisical
+
+  infisical-redis:
+    image: redis:7-alpine
+    container_name: infisical-redis
+    restart: unless-stopped
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - "6380:6379"
+    volumes:
+      - infisical-redis-data:/data
+
+  backend:
+    container_name: infisical-api
+    image: infisical/infisical:latest
+    restart: unless-stopped
+    depends_on:
+      - infisical-db
+      - infisical-redis
+    ports:
+      - "4004:4000"
+    environment:
+      - NODE_ENV=development
+      - DB_CONNECTION_URI=postgres://infisical:infisical_dev_secret@infisical-db:5432/infisical?sslmode=disable
+      - REDIS_URL=redis://infisical-redis:6379
+      - ENCRYPTION_KEY=63757061725f7365637265745f6b65795f33325f63686172735f6d696e696d756d
+      - AUTH_SECRET=shanutechx_infisical_auth_secret_token_32chars
+      - TELEMETRY_ENABLED=false
+
+volumes:
+  infisical-postgres-data:
+  infisical-redis-data:
+
+networks:
+  default:
+    name: shanutechx-infisical-net

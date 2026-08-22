@@ -1,0 +1,805 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import PasswordLockGuard from '@/components/PasswordLockGuard';
+import {
+  Card,
+  Button,
+  Badge,
+  Spinner,
+  EmptyState,
+  ErrorBanner,
+  Input,
+  PageHeader,
+  useToast,
+  Modal,
+  Tabs,
+} from '@/components/ui';
+import { api } from '@/lib/api';
+
+export const dynamic = 'force-dynamic';
+
+type NotificationEvent =
+  | 'new_payment_submitted'
+  | 'payment_approved'
+  | 'payment_rejected'
+  | 'new_order'
+  | 'new_ticket'
+  | 'deployment_failed'
+  | 'vps_assigned'
+  | 'new_ai_subscription_request';
+
+const EVENTS: { value: NotificationEvent; label: string; description: string }[] = [
+  { value: 'new_payment_submitted', label: 'New payment submitted', description: 'A customer uploaded a payment proof — needs manual review.' },
+  { value: 'payment_approved', label: 'Payment approved', description: 'An admin/dev approved a payment.' },
+  { value: 'payment_rejected', label: 'Payment declined', description: 'An admin/dev declined a payment (with reason).' },
+  { value: 'new_order', label: 'New order', description: 'A customer placed an order (free or awaiting payment).' },
+  { value: 'new_ticket', label: 'New ticket', description: 'A support ticket was opened.' },
+  { value: 'deployment_failed', label: 'Deployment failed', description: 'A customer or dev deployment failed to build/start.' },
+  { value: 'vps_assigned', label: 'VPS assigned / terminated', description: 'A VPS was assigned to a customer, or terminated.' },
+  { value: 'new_ai_subscription_request', label: 'New AI subscription request', description: 'A customer opened an AI subscription activation ticket.' },
+];
+
+interface WebhookConfig {
+  id: string;
+  event: NotificationEvent;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface BackupRun {
+  id: string;
+  triggeredBy: string;
+  success: boolean;
+  r2Key: string | null;
+  sizeBytes: number | null;
+  durationMs: number | null;
+  error: string | null;
+  createdAt: string;
+}
+
+function formatBytes(bytes: number | null): string {
+  if (bytes === null) return '—';
+  const mb = bytes / (1024 * 1024);
+  return mb >= 1 ? `${mb.toFixed(1)} MB` : `${(bytes / 1024).toFixed(0)} KB`;
+}
+
+// ── Tab 1: Discord Webhooks Component ──
+function DiscordWebhooksTab() {
+  const [configs, setConfigs] = useState<WebhookConfig[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<NotificationEvent>('new_payment_submitted');
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+
+  function load() {
+    api.discordWebhooks
+      .list()
+      .then((data) => setConfigs(data.configs as WebhookConfig[]))
+      .catch((err) => setError(err.message));
+  }
+
+  useEffect(load, []);
+
+  async function handleTest() {
+    if (!webhookUrl.trim()) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const result = await api.discordWebhooks.test(webhookUrl.trim());
+      setTestResult(result.ok ? '✅ Test message sent — check your Discord channel.' : `❌ Failed (HTTP ${result.status ?? '?'})`);
+    } catch (err: any) {
+      setTestResult(`❌ ${err.message}`);
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function handleSave() {
+    if (!webhookUrl.trim()) return;
+    setBusy(true);
+    try {
+      await api.discordWebhooks.create(selectedEvent, webhookUrl.trim());
+      toast('Webhook configured', 'success');
+      setAddModalOpen(false);
+      setWebhookUrl('');
+      setTestResult(null);
+      load();
+    } catch (err: any) {
+      toast(err.message || 'Failed to save webhook', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleToggle(config: WebhookConfig) {
+    try {
+      await api.discordWebhooks.toggle(config.id, !config.isActive);
+      load();
+    } catch (err: any) {
+      toast(err.message, 'error');
+    }
+  }
+
+  async function handleDelete(config: WebhookConfig) {
+    try {
+      await api.discordWebhooks.delete(config.id);
+      toast('Webhook removed', 'success');
+      load();
+    } catch (err: any) {
+      toast(err.message, 'error');
+    }
+  }
+
+  const configuredEvents = new Set(configs?.map((c) => c.event));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary">Discord Webhook Alerts</h3>
+          <p className="text-xs text-text-muted">Configure Discord notifications for payments, tickets, VPS, and system events.</p>
+        </div>
+        <Button size="sm" onClick={() => setAddModalOpen(true)}>+ Add Webhook</Button>
+      </div>
+
+      {error && <ErrorBanner message={error} />}
+      {configs === null && <Spinner label="Loading webhooks..." />}
+      {configs?.length === 0 && (
+        <EmptyState message="No Discord webhooks configured yet." />
+      )}
+
+      <div className="space-y-2">
+        {EVENTS.map((eventDef) => {
+          const config = configs?.find((c) => c.event === eventDef.value);
+          return (
+            <Card key={eventDef.value} className="border border-white/[0.06] flex items-center justify-between p-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-text-primary">{eventDef.label}</p>
+                  {config ? (
+                    <Badge status={config.isActive ? 'running' : 'stopped'} />
+                  ) : (
+                    <span className="text-[10px] text-text-faint uppercase tracking-wide">Not configured</span>
+                  )}
+                </div>
+                <p className="text-xs text-text-muted">{eventDef.description}</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                {config ? (
+                  <>
+                    <Button size="sm" variant="secondary" onClick={() => handleToggle(config)}>
+                      {config.isActive ? 'Disable' : 'Enable'}
+                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => handleDelete(config)}>Remove</Button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setSelectedEvent(eventDef.value);
+                      setAddModalOpen(true);
+                    }}
+                  >
+                    Configure
+                  </Button>
+                )}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)} title="Configure Discord Webhook">
+        <div className="space-y-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-muted">Event</label>
+            <select
+              value={selectedEvent}
+              onChange={(e) => setSelectedEvent(e.target.value as NotificationEvent)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none text-text-primary"
+            >
+              {EVENTS.map((e) => (
+                <option key={e.value} value={e.value} className="bg-bg text-text-primary" disabled={configuredEvents.has(e.value)}>
+                  {e.label}{configuredEvents.has(e.value) ? ' (already configured)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Input
+            label="Discord Webhook URL"
+            placeholder="https://discord.com/api/webhooks/..."
+            value={webhookUrl}
+            onChange={(e) => { setWebhookUrl(e.target.value); setTestResult(null); }}
+          />
+
+          <div className="flex items-center gap-3">
+            <Button type="button" variant="secondary" size="sm" onClick={handleTest} loading={testing} disabled={!webhookUrl.trim()}>
+              Send Test
+            </Button>
+            {testResult && <span className="text-xs text-text-muted">{testResult}</span>}
+          </div>
+
+          <div className="flex gap-3 justify-end pt-2">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setAddModalOpen(false)}>Cancel</Button>
+            <Button type="button" variant="primary" size="sm" onClick={handleSave} loading={busy} disabled={!webhookUrl.trim()}>
+              Save Webhook
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ── Tab 2: Database Backups Component ──
+function DatabaseBackupsTab() {
+  const [runs, setRuns] = useState<BackupRun[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const { toast } = useToast();
+
+  function load() {
+    api.backups
+      .history()
+      .then((data) => setRuns(data.runs))
+      .catch((err) => setError(err.message));
+  }
+
+  useEffect(load, []);
+
+  async function handleRunNow() {
+    setRunning(true);
+    try {
+      const result = await api.backups.run();
+      toast(`Backup complete — ${formatBytes(result.sizeBytes)} uploaded to ${result.key}.`, 'success');
+      load();
+    } catch (err: any) {
+      toast(err.message || 'Backup failed', 'error');
+      load();
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary">Platform Database Backups</h3>
+          <p className="text-xs text-text-muted">Postgres database snapshots synced to Cloudflare R2 (even/odd day retention).</p>
+        </div>
+        <Button onClick={handleRunNow} loading={running} size="sm">Run Backup Now</Button>
+      </div>
+
+      {error && <ErrorBanner message={error} />}
+      {runs === null && <Spinner label="Loading backup history..." />}
+      {runs?.length === 0 && (
+        <EmptyState message="No backups have run yet." />
+      )}
+
+      <div className="space-y-2">
+        {runs?.map((run) => (
+          <Card key={run.id} className="border border-white/[0.06] flex items-center justify-between p-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <Badge status={run.success ? 'running' : 'failed'} />
+                <span className="text-xs text-text-muted">
+                  {run.triggeredBy === 'cron' ? 'Scheduled (cron)' : 'Manual trigger'}
+                </span>
+              </div>
+              <p className="text-xs text-text-faint">
+                {new Date(run.createdAt).toLocaleString()}
+                {run.r2Key && <span className="font-mono ml-2 text-text-primary">{run.r2Key}</span>}
+              </p>
+              {run.error && <p className="text-xs text-red-400 mt-1">{run.error}</p>}
+            </div>
+            <div className="text-right text-xs text-text-muted shrink-0 ml-4">
+              <p>{formatBytes(run.sizeBytes)}</p>
+              <p>{run.durationMs ? `${(run.durationMs / 1000).toFixed(1)}s` : '—'}</p>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Tab 3: API Configurations Component ──
+function ApiConfigsTab() {
+  const [configs, setConfigs] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.settings
+      .getConfigs()
+      .then((data) => setConfigs(data.configs))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <Spinner label="Checking system API integrations..." />;
+
+  const INTEGRATIONS = [
+    {
+      name: 'Leaseweb VPS API',
+      status: configs?.leasewebApi?.configured ? 'Configured' : 'Not Configured',
+      color: configs?.leasewebApi?.configured ? 'emerald' : 'white',
+      hint: 'Required for provisioning and power-cycling Leaseweb VPS instances.',
+    },
+    {
+      name: 'Global SMTP / Mail Server',
+      status: configs?.smtpServer?.configured ? 'Configured' : 'Not Configured',
+      color: configs?.smtpServer?.configured ? 'emerald' : 'white',
+      hint: 'Required for automated transactional emails and customer webmail inboxes.',
+    },
+    {
+      name: 'Cloudflare R2 Object Storage',
+      status: configs?.r2Storage?.configured ? 'Configured' : 'Not Configured',
+      color: configs?.r2Storage?.configured ? 'emerald' : 'white',
+      hint: 'Required for automated database backups and project file uploads.',
+    },
+    {
+      name: 'Discord Notification Gateway',
+      status: configs?.discordWebhooks?.configured ? `${configs.discordWebhooks.count} Webhooks` : 'Not Configured',
+      color: configs?.discordWebhooks?.configured ? 'emerald' : 'white',
+      hint: 'Sends live events and alert notifications to Discord channels.',
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold text-text-primary">System Integration Configs</h3>
+        <p className="text-xs text-text-muted">Overview of platform environment credentials and external integrations.</p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        {INTEGRATIONS.map((item) => (
+          <Card key={item.name} className="border border-white/[0.06]">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-semibold text-sm text-text-primary">{item.name}</h4>
+              <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${item.color === 'emerald' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-text-muted'}`}>
+                {item.status}
+              </span>
+            </div>
+            <p className="text-xs text-text-muted leading-relaxed">{item.hint}</p>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Tab 4: Security PIN Settings Component ──
+function SecurityPinTab() {
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  async function handleUpdatePin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!currentPin || !newPin || !confirmPin) {
+      setError('Please fill in all fields');
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setError('New PINs do not match');
+      return;
+    }
+    if (newPin.length < 4) {
+      setError('New PIN must be at least 4 characters long');
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+
+    try {
+      const res = await api.settings.changePin(currentPin, newPin);
+      if (res.ok) {
+        toast('Settings security PIN updated!', 'success');
+        setCurrentPin('');
+        setNewPin('');
+        setConfirmPin('');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to update PIN');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="max-w-lg border border-white/[0.06] p-6 space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold text-text-primary">Change Settings Security PIN</h3>
+        <p className="text-xs text-text-muted mt-0.5">
+          Update the security PIN required to unlock protected system settings.
+        </p>
+      </div>
+
+      {error && <ErrorBanner message={error} />}
+
+      <form onSubmit={handleUpdatePin} className="space-y-4">
+        <Input
+          type="password"
+          label="Current Password or PIN"
+          placeholder="Enter current PIN..."
+          value={currentPin}
+          onChange={(e) => { setCurrentPin(e.target.value); setError(null); }}
+        />
+
+        <Input
+          type="password"
+          label="New Security PIN"
+          placeholder="Enter new 4+ character PIN..."
+          value={newPin}
+          onChange={(e) => { setNewPin(e.target.value); setError(null); }}
+        />
+
+        <Input
+          type="password"
+          label="Confirm New Security PIN"
+          placeholder="Re-enter new PIN..."
+          value={confirmPin}
+          onChange={(e) => { setConfirmPin(e.target.value); setError(null); }}
+        />
+
+        <div className="pt-2">
+          <Button type="submit" variant="primary" size="sm" loading={busy}>
+            Update Security PIN
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+// ── Tab 5: Client Team & Granular RBAC Component ──
+function ClientTeamTab() {
+  const [teamsData, setTeamsData] = useState<{ ownedTeams: any[]; joinedTeams: any[] } | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [teamDetail, setTeamDetail] = useState<{ team: any; myRole: string; resources: any } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [newTeamName, setNewTeamName] = useState('');
+  const [creatingTeam, setCreatingTeam] = useState(false);
+
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'admin' | 'developer' | 'billing' | 'viewer'>('developer');
+  const [generatedInviteLink, setGeneratedInviteLink] = useState<string | null>(null);
+  const [inviting, setInviting] = useState(false);
+
+  const { toast } = useToast();
+
+  function loadTeams() {
+    api.teams
+      .list()
+      .then((data) => {
+        setTeamsData(data);
+        if (data.ownedTeams.length > 0 && !selectedTeamId) {
+          setSelectedTeamId(data.ownedTeams[0].id);
+        } else if (data.joinedTeams.length > 0 && !selectedTeamId) {
+          setSelectedTeamId(data.joinedTeams[0].id);
+        }
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(loadTeams, []);
+
+  useEffect(() => {
+    if (!selectedTeamId) return;
+    api.teams
+      .get(selectedTeamId)
+      .then((d) => setTeamDetail(d))
+      .catch((err) => toast(err.message, 'error'));
+  }, [selectedTeamId]);
+
+  async function handleCreateTeam(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newTeamName.trim()) return;
+    setCreatingTeam(true);
+    try {
+      const res = await api.teams.create(newTeamName.trim());
+      toast(`Team workspace "${newTeamName}" created!`, 'success');
+      setNewTeamName('');
+      setSelectedTeamId(res.team.id);
+      loadTeams();
+    } catch (err: any) {
+      toast(err.message || 'Failed to create team', 'error');
+    } finally {
+      setCreatingTeam(false);
+    }
+  }
+
+  async function handleSendInvite(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedTeamId || !inviteEmail.trim()) return;
+    setInviting(true);
+    try {
+      const res = await api.teams.invite(selectedTeamId, {
+        email: inviteEmail.trim(),
+        role: inviteRole,
+      });
+      toast(`Invite token created for ${inviteEmail}`, 'success');
+      setGeneratedInviteLink(res.inviteLink);
+      setInviteEmail('');
+      if (selectedTeamId) api.teams.get(selectedTeamId).then(setTeamDetail);
+    } catch (err: any) {
+      toast(err.message || 'Failed to send invite', 'error');
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function handleRemoveMember(memberId: string) {
+    if (!selectedTeamId) return;
+    if (!window.confirm('Are you sure you want to remove this team member?')) return;
+    try {
+      await api.teams.removeMember(selectedTeamId, memberId);
+      toast('Team member removed', 'success');
+      api.teams.get(selectedTeamId).then(setTeamDetail);
+    } catch (err: any) {
+      toast(err.message, 'error');
+    }
+  }
+
+  if (loading) return <Spinner label="Loading team workspaces..." />;
+
+  const allTeams = [...(teamsData?.ownedTeams || []), ...(teamsData?.joinedTeams || [])];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary">Team Management &amp; Role-Based Access Control (RBAC)</h3>
+          <p className="text-xs text-text-muted">Invite team members to manage deployments, databases, VPS, and SMTP servers with granular permissions.</p>
+        </div>
+
+        {allTeams.length > 0 && (
+          <Button size="sm" onClick={() => setInviteModalOpen(true)}>+ Invite Team Member</Button>
+        )}
+      </div>
+
+      {error && <ErrorBanner message={error} />}
+
+      {/* Create Team Form if no team */}
+      {allTeams.length === 0 ? (
+        <Card className="border border-white/10 p-6 space-y-4 max-w-lg">
+          <h4 className="font-bold text-sm text-white">Create Your First Team Workspace</h4>
+          <form onSubmit={handleCreateTeam} className="space-y-3">
+            <Input
+              label="Team Name"
+              placeholder="e.g. Acme Corp Infrastructure"
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+            />
+            <Button type="submit" size="sm" loading={creatingTeam}>Create Team Workspace</Button>
+          </form>
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          {/* Team Switcher Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {allTeams.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setSelectedTeamId(t.id)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+                  selectedTeamId === t.id
+                    ? 'bg-indigo-600 text-white shadow-glow-violet'
+                    : 'glass text-text-muted hover:text-white'
+                }`}
+              >
+                👥 {t.name}
+              </button>
+            ))}
+          </div>
+
+          {teamDetail && (
+            <div className="space-y-6">
+              {/* Active Members Table */}
+              <Card className="border border-white/[0.06] p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+                  <div>
+                    <h4 className="font-bold text-sm text-white">Team Members ({teamDetail.team.members.length})</h4>
+                    <p className="text-xs text-text-muted">Users who have access to manage this team's purchased services.</p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300">
+                    My Role: {teamDetail.myRole}
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {teamDetail.team.members.map((m: any) => (
+                    <div key={m.id} className="flex items-center justify-between bg-white/[0.02] border border-white/[0.06] rounded-xl p-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-indigo-600/30 text-indigo-300 font-bold flex items-center justify-center text-xs">
+                          {m.user.displayName ? m.user.displayName[0] : m.user.email[0]}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-white">{m.user.displayName || m.user.email}</p>
+                          <p className="text-[11px] text-text-muted font-mono">{m.user.email}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/10 text-white">
+                          {m.role}
+                        </span>
+
+                        {teamDetail.myRole === 'owner' && m.role !== 'owner' && (
+                          <button
+                            onClick={() => handleRemoveMember(m.id)}
+                            className="text-xs text-red-400 hover:underline"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {/* Pending Invitations */}
+              {teamDetail.team.invites && teamDetail.team.invites.length > 0 && (
+                <Card className="border border-white/[0.06] p-5 space-y-3">
+                  <h4 className="font-bold text-sm text-white">Pending Invitations ({teamDetail.team.invites.length})</h4>
+                  <div className="space-y-2">
+                    {teamDetail.team.invites.map((inv: any) => (
+                      <div key={inv.id} className="flex items-center justify-between text-xs p-3 glass rounded-xl border border-white/[0.06]">
+                        <div>
+                          <span className="font-bold text-white font-mono">{inv.email}</span>
+                          <span className="text-text-muted ml-2">Role: {inv.role}</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300">
+                          {inv.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Purchased Services Scope */}
+              <Card className="border border-white/[0.06] p-5 space-y-3">
+                <h4 className="font-bold text-sm text-white">Team Purchased Services</h4>
+                <div className="grid md:grid-cols-4 gap-3 text-xs">
+                  <div className="glass p-3 rounded-xl">
+                    <span className="text-text-muted block text-[11px]">Deployments</span>
+                    <span className="font-bold text-white text-base">{teamDetail.resources.deployments.length}</span>
+                  </div>
+                  <div className="glass p-3 rounded-xl">
+                    <span className="text-text-muted block text-[11px]">Managed Databases</span>
+                    <span className="font-bold text-white text-base">{teamDetail.resources.databases.length}</span>
+                  </div>
+                  <div className="glass p-3 rounded-xl">
+                    <span className="text-text-muted block text-[11px]">VPS Servers</span>
+                    <span className="font-bold text-white text-base">{teamDetail.resources.vpsInstances.length}</span>
+                  </div>
+                  <div className="glass p-3 rounded-xl">
+                    <span className="text-text-muted block text-[11px]">SMTP Mailboxes</span>
+                    <span className="font-bold text-white text-base">{teamDetail.resources.smtpAccounts.length}</span>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Invite Member Modal */}
+      {inviteModalOpen && (
+        <Modal open={inviteModalOpen} onClose={() => { setInviteModalOpen(false); setGeneratedInviteLink(null); }} title="Invite Team Member">
+          <form onSubmit={handleSendInvite} className="space-y-4">
+            <Input
+              label="Recipient Email Address"
+              placeholder="colleague@domain.com"
+              type="email"
+              required
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+            />
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-text-muted">Assigned Team Role</label>
+              <select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as any)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none text-white"
+              >
+                <option value="admin" className="bg-bg">Admin — Full manage access to all team resources</option>
+                <option value="developer" className="bg-bg">Developer — Deploy apps, manage DBs and containers</option>
+                <option value="billing" className="bg-bg">Billing — Manage invoices and subscriptions</option>
+                <option value="viewer" className="bg-bg">Viewer — Read-only access to metrics and logs</option>
+              </select>
+            </div>
+
+            {generatedInviteLink && (
+              <div className="bg-black/50 border border-emerald-500/30 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-bold text-emerald-400">✅ Invitation Created!</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={generatedInviteLink}
+                    className="flex-1 bg-black text-[11px] font-mono text-text-muted p-1.5 rounded border border-white/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedInviteLink);
+                      toast('Invitation link copied!', 'success');
+                    }}
+                    className="px-2.5 py-1 bg-emerald-600 text-white rounded text-xs font-bold shrink-0"
+                  >
+                    Copy Link
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 justify-end pt-2 border-t border-white/10">
+              <Button type="button" variant="ghost" size="sm" onClick={() => { setInviteModalOpen(false); setGeneratedInviteLink(null); }}>
+                Close
+              </Button>
+              <Button type="submit" size="sm" loading={inviting}>Generate Invite Token</Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ── Main Page Component ──
+export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState('webhooks');
+
+  return (
+    <PasswordLockGuard
+      title="Protected Settings Vault"
+      description="System settings (Discord Webhooks, Database Backups, API Configs, Client Team RBAC, Security PIN) are password protected."
+    >
+      <div className="space-y-6 animate-fade-in max-w-4xl">
+        <PageHeader
+          title="System Settings"
+          description="Manage sensitive system alerts, client team invitations, automated database backups, API configurations, and security credentials."
+        />
+
+        <Tabs
+          tabs={[
+            { label: '👥 Team & RBAC', value: 'team' },
+            { label: '🔔 Discord Webhooks', value: 'webhooks' },
+            { label: '💾 Database Backups', value: 'backups' },
+            { label: '🔌 API Configs', value: 'configs' },
+            { label: '🔒 Security PIN', value: 'pin' },
+          ]}
+          active={activeTab}
+          onChange={setActiveTab}
+        />
+
+        {activeTab === 'team' && <ClientTeamTab />}
+        {activeTab === 'webhooks' && <DiscordWebhooksTab />}
+        {activeTab === 'backups' && <DatabaseBackupsTab />}
+        {activeTab === 'configs' && <ApiConfigsTab />}
+        {activeTab === 'pin' && <SecurityPinTab />}
+      </div>
+    </PasswordLockGuard>
+  );
+}

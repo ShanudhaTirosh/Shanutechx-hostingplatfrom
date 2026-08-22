@@ -1,0 +1,72 @@
+import { Router } from 'express';
+import { mkdir, writeFile, readFile } from 'fs/promises';
+import path from 'path';
+import { prisma } from '../lib/prisma';
+import { requireAuth, AuthedRequest } from '../middleware/auth';
+import { canAccessResource } from '../middleware/rbac';
+import { generateInvoicePdf } from '../lib/invoicePdf';
+
+export const invoicesRouter = Router();
+
+invoicesRouter.use(requireAuth);
+
+const INVOICES_DIR = process.env.INVOICES_DIR || '/var/lib/shanutechx/invoices';
+
+async function loadOwnedOrderWithItems(req: AuthedRequest, orderId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: { include: { service: true, plan: { include: { product: true } } } }, user: true, invoice: true },
+  });
+  if (!order) return null;
+  // Phase 15: was `role !== 'admin' && order.userId !== req.user!.id`, which
+  // actually locked dev out of every invoice too (dev !== 'admin'). Now
+  // dev always passes, admin only passes for an assigned customer's order.
+  if (!(await canAccessResource(order.userId, req))) return null;
+  return order;
+}
+
+/**
+ * Generates the invoice PDF for a paid order on first request and caches it
+ * to disk; subsequent requests just re-serve the same file. Only orders with
+ * status "paid" get an invoice — an unpaid order has nothing to invoice yet.
+ */
+invoicesRouter.get('/orders/:orderId/invoice', async (req: AuthedRequest, res) => {
+  const order = await loadOwnedOrderWithItems(req, req.params.orderId);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (order.status !== 'paid') {
+    return res.status(409).json({ error: 'Order is not paid yet' });
+  }
+
+  let invoice = order.invoice;
+
+  if (!invoice) {
+    const pdfBytes = await generateInvoicePdf({
+      invoiceId: order.id,
+      issuedAt: new Date(),
+      customerEmail: order.user.email,
+      items: order.items.map((item: any) => {
+        const name = item.service ? item.service.name : item.plan ? `${item.plan.product?.name} — ${item.plan.name}` : 'Unknown Product';
+        const unitPrice = item.service ? item.service.price : item.plan ? item.plan.price : 0;
+        return {
+          name,
+          quantity: item.quantity,
+          unitPrice,
+        };
+      }),
+      total: order.total,
+    });
+
+    await mkdir(INVOICES_DIR, { recursive: true });
+    const filePath = path.join(INVOICES_DIR, `${order.id}.pdf`);
+    await writeFile(filePath, pdfBytes);
+
+    invoice = await prisma.invoice.create({
+      data: { orderId: order.id, pdfUrl: filePath },
+    });
+  }
+
+  const pdfBytes = await readFile(invoice.pdfUrl!);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="invoice-${order.id}.pdf"`);
+  res.send(Buffer.from(pdfBytes));
+});

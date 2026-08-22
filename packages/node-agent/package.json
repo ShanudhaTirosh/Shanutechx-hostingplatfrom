@@ -1,0 +1,43 @@
+{
+  "name": "@shanutechx/node-agent-client",
+  "version": "1.0.0",
+  "description": "Direct Node Agent client SDK for internal or advanced self-hosted integration",
+  "keywords": ["shanutechx", "node-agent", "sdk"],
+  "license": "MIT",
+  "author": "ShanuTechX",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shanutechx/shanutechx.git",
+    "directory": "packages/node-agent"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@shanutechx/types": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "*",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

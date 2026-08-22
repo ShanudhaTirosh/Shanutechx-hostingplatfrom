@@ -1,0 +1,48 @@
+# slogan: Workflow automation tool for technical people.
+# category: productivity
+# tags: n8n, automation, workflow, postgresql, low-code
+# logo: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/n8n.svg
+# port: 5678
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_POSTGRESDB_USER:-n8n}
+      POSTGRES_PASSWORD: ${DB_POSTGRESDB_PASSWORD:?DB_POSTGRESDB_PASSWORD must be set}
+      POSTGRES_DB: ${DB_POSTGRESDB_DATABASE:-n8n_db}
+    volumes:
+      - n8n_postgres_storage:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U ${DB_POSTGRESDB_USER:-n8n}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - NODE_ENV=production
+      - WEBHOOK_URL=https://${N8N_HOST:-localhost}/
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${DB_POSTGRESDB_DATABASE:-n8n_db}
+      - DB_POSTGRESDB_USER=${DB_POSTGRESDB_USER:-n8n}
+      - DB_POSTGRESDB_PASSWORD=${DB_POSTGRESDB_PASSWORD:?DB_POSTGRESDB_PASSWORD must be set}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+
+volumes:
+  n8n_postgres_storage:
+  n8n_data:

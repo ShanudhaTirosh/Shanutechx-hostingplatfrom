@@ -1,0 +1,27 @@
+# slogan: Real-time audio and video WebRTC server for apps.
+# category: communication
+# tags: livekit, webrtc, video, audio, streaming, voice
+# logo: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/livekit.svg
+# port: 7880
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save 60 1
+    restart: always
+
+  livekit:
+    image: livekit/livekit-server:v1.7
+    command: --config /etc/livekit.yaml
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    environment:
+      - LIVEKIT_KEYS=${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}:${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}
+    depends_on:
+      - redis
+    restart: always
+
+volumes:
+  livekit_data:

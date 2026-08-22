@@ -1,0 +1,134 @@
+{
+  "title": "ShanuTechX Overview",
+  "uid": "shanutechx-overview",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "15s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "HTTP Requests / sec",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(shanutechx_http_requests_total[5m])) by (status_code)",
+          "legendFormat": "HTTP {{status_code}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "p95 Request Latency",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(shanutechx_http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Error Rate (5xx)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(shanutechx_http_requests_total{status_code=~\"5..\"}[5m])) / sum(rate(shanutechx_http_requests_total[5m])) * 100",
+          "legendFormat": "Error Rate %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Active Deployments",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 8 },
+      "targets": [{ "expr": "shanutechx_active_deployments" }]
+    },
+    {
+      "id": 5,
+      "title": "Nodes Online",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 8 },
+      "targets": [{ "expr": "shanutechx_nodes_online" }],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Pending Payment Reviews",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 8 },
+      "targets": [{ "expr": "shanutechx_pending_payment_reviews" }]
+    },
+    {
+      "id": 7,
+      "title": "Open Tickets",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 8 },
+      "targets": [{ "expr": "shanutechx_open_tickets" }]
+    },
+    {
+      "id": 8,
+      "title": "API Process Memory (RSS)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 14 },
+      "targets": [{ "expr": "process_resident_memory_bytes{job=\"shanutechx-api\"}" }],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "id": 9,
+      "title": "API CPU Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 14 },
+      "targets": [{ "expr": "rate(process_cpu_seconds_total{job=\"shanutechx-api\"}[1m]) * 100" }],
+      "fieldConfig": { "defaults": { "unit": "percent" } }
+    },
+    {
+      "id": 10,
+      "title": "Database Connection Pool Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 14 },
+      "targets": [{ "expr": "shanutechx_db_pool_active_connections" }]
+    },
+    {
+      "id": 11,
+      "title": "Recent System Logs (Loki)",
+      "type": "logs",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 22 },
+      "targets": [
+        {
+          "expr": "{container=~\"shanutechx.*\"}",
+          "datasource": { "type": "loki", "uid": "Loki" }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,316 @@
+export interface ApiUser {
+  id: string;
+  email: string;
+  role: 'customer' | 'admin' | 'support' | 'dev';
+  displayName?: string | null;
+  phoneNumber?: string | null;
+  discordUserId?: string | null;
+}
+
+export type ServiceType =
+  | 'web_hosting'
+  | 'node_hosting'
+  | 'python_hosting'
+  | 'discordbot_python'
+  | 'discordbot_node'
+  | 'vps'
+  | 'smtp'
+  | 'livekit'
+  | 'docker_hosting'
+  | 'mongodb_hosting';
+
+export interface Service {
+  id: string;
+  type: ServiceType;
+  name: string;
+  price: number; // smallest currency unit
+  currency: 'LKR' | 'USD' | 'EUR'; // Service currency
+  nodeId: string | null;
+}
+
+export type ProductCategory =
+  | 'web_hosting'
+  | 'node_app_hosting'
+  | 'python_app_hosting'
+  | 'discordbot_node'
+  | 'discordbot_python'
+  | 'whatsappbot_hosting'
+  | 'lavalink_hosting'
+  | 'vps'
+  | 'ai_subscription'
+  | 'smtp_hosting'
+  | 'database_hosting'
+  | 'app_catalog';
+
+export type PlanBillingType = 'one_time' | 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
+
+export interface Plan {
+  id: string;
+  productId: string;
+  name: string;
+  price: number; // smallest currency unit
+  currency: 'LKR' | 'USD' | 'EUR';
+  billingType: PlanBillingType;
+  specsJson: Record<string, unknown> | null;
+  isActive: boolean;
+  product?: Product;
+}
+
+export interface Product {
+  id: string;
+  category: ProductCategory;
+  name: string;
+  slug: string;
+  description: string | null;
+  iconUrl: string | null;
+  isActive: boolean;
+  plans: Plan[];
+}
+
+export interface OrderItem {
+  id: string;
+  orderId: string;
+  serviceId: string | null;
+  service: Service | null;
+  planId: string | null;
+  plan: Plan | null;
+  quantity: number;
+  configJson?: Record<string, any> | null;
+}
+
+export interface Order {
+  id: string;
+  userId: string;
+  status: 'draft' | 'awaiting_payment' | 'paid' | 'cancelled';
+  total: number;
+  createdAt: string;
+  items?: OrderItem[];
+  payments?: Payment[];
+}
+
+export type PaymentStatus = 'pending' | 'auto_approved' | 'manually_approved' | 'manual_review' | 'rejected';
+
+export interface Payment {
+  id: string;
+  orderId: string;
+  method: 'manual' | 'sms' | 'proof_upload';
+  confidenceScore: number | null;
+  status: PaymentStatus;
+  createdAt: string;
+  order?: Order & { user?: ApiUser };
+}
+
+export type DeploymentStatus = 'pending' | 'building' | 'running' | 'failed' | 'stopped';
+
+export type CustomDomainStatus = 'pending' | 'verified' | 'failed' | 'ssl_provisioning' | 'active';
+
+export interface CustomDomain {
+  id: string;
+  domain: string;
+  cnameTarget: string;
+  status: CustomDomainStatus;
+  sslCertId: string | null;
+  verifiedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Deployment {
+  id: string;
+  repoUrl: string | null;
+  subdomain: string | null;
+  status: DeploymentStatus;
+  containerId: string | null;
+  createdAt: string;
+  node?: { label: string };
+  customDomain?: string | null;
+  customDomainStatus?: 'none' | 'pending' | 'verified' | 'failed';
+  customDomains?: CustomDomain[];
+}
+
+export interface Node {
+  id: string;
+  label: string;
+  ip: string;
+  cpuCores: number;
+  ramMb: number;
+  diskGb: number;
+  roleTags: string[];
+  isActive: boolean;
+  cpuUsedPct: number | null;
+  ramUsedMb: number | null;
+  diskUsedGb: number | null;
+  lastSeenAt: string | null;
+}
+
+export interface BuildEvent {
+  phase: 'fetch' | 'build' | 'run' | 'done' | 'complete' | 'error';
+  message?: string;
+  log?: string;
+  containerId?: string;
+  deploymentId?: string;
+  subdomain?: string;
+}
+
+export interface SmtpAccount {
+  id: string;
+  userId: string;
+  postalOrgId: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUsername: string;
+  webmailUrl: string | null;
+  createdAt: string;
+}
+
+export interface LiveKitProject {
+  id: string;
+  userId: string;
+  apiKey: string;
+  nodeId: string | null;
+  createdAt: string;
+}
+
+export type VpsProvisionStatus = 'pending' | 'provisioned' | 'terminated';
+
+export interface VpsProvision {
+  id: string;
+  userId: string;
+  orderItemId: string;
+  provider: string;
+  externalId: string | null;
+  panelUrl: string | null;
+  username: string | null;
+  status: VpsProvisionStatus;
+  createdAt: string;
+  leasewebVpsId: string | null;
+}
+
+export type TicketStatus = 'open' | 'pending' | 'closed';
+export type TicketPriority = 'low' | 'medium' | 'high';
+
+export interface TicketMessage {
+  id: string;
+  ticketId: string;
+  senderId: string;
+  senderRole: 'customer' | 'admin';
+  body: string;
+  createdAt: string;
+  sender?: ApiUser;
+}
+
+export interface Ticket {
+  id: string;
+  userId: string;
+  orderId: string | null;
+  subject: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  createdAt: string;
+  updatedAt: string;
+  user?: ApiUser;
+  messages?: TicketMessage[];
+  _count?: { messages: number };
+}
+
+export interface Customer {
+  id: string;
+  email: string;
+  displayName: string | null;
+  firebaseUid: string;
+  phoneNumber: string | null;
+  discordUserId: string | null;
+  createdAt: string;
+  orderCount: number;
+  totalSpent: number;
+}
+
+export type SubscriptionStatus = 'active' | 'past_due' | 'cancelled';
+
+export interface Subscription {
+  id: string;
+  userId: string;
+  orderItemId: string;
+  status: SubscriptionStatus;
+  currentPeriodEnd: string;
+  createdAt: string;
+  pastDueAt: string | null;
+  cancelledAt: string | null;
+  orderItem?: { service: Service | null; plan?: (Plan & { product?: Product }) | null };
+  user?: ApiUser;
+}
+
+// ── Projects (Supabase clone) ────────────────────────────────────────────────
+
+export type ProjectStatus = 'pending' | 'running' | 'failed';
+
+export interface Project {
+  id: string;
+  userId: string;
+  name: string;
+  nodeId: string;
+  dbName: string;
+  dbUsername: string;
+  dbPassword: string;        // only revealed on single-project GET
+  apiPort: number | null;
+  containerId: string | null;
+  status: ProjectStatus;
+  r2BucketName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: Pick<ApiUser, 'id' | 'email' | 'displayName'>;
+  node?: { id: string; label: string; ip: string };
+}
+
+export interface TableColumn {
+  name: string;
+  type: string;
+  nullable: boolean;
+  isPrimaryKey: boolean;
+}
+
+export interface ProjectTable {
+  name: string;
+  columns: TableColumn[];
+  rowCount: number;
+}
+
+export interface SqlResult {
+  rows: Record<string, unknown>[];
+  fields: { name: string; dataTypeID: number }[];
+  rowCount: number;
+}
+
+export interface CatalogTemplate {
+  slug: string;
+  filename: string;
+  name: string;
+  slogan: string;
+  documentation: string;
+  category: string;
+  tags: string[];
+  logo: string;
+  port: number | null;
+}
+
+export type VpsPlanCategory = 'web_hosting' | 'app_server' | 'database_server' | 'storage_server';
+export type Currency = 'LKR' | 'USD';
+export type BillingPeriod = 'one_time' | 'monthly' | 'yearly';
+
+export interface VpsPlan {
+  id: string;
+  provider: string;
+  name: string;
+  bandwidth: string;
+  category: VpsPlanCategory;
+  cpuCores: number;
+  ramGb: number;
+  storageGb: number;
+  price: number;
+  currency: Currency;
+  billingPeriod: BillingPeriod;
+  isActive: boolean;
+  leasewebProductCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

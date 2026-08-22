@@ -1,0 +1,32 @@
+{
+  "name": "shanutechx",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "!apps/mobile-admin",
+    "packages/*",
+    "services/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:dashboard": "npm run dev --workspace=apps/dashboard",
+    "dev:whatsapp": "npm run dev --workspace=services/whatsapp-bot",
+    "dev:discord": "npm run dev --workspace=services/discord-bot",
+    "dev:node-agent": "npm run dev --workspace=services/node-agent",
+    "db:generate": "npm run generate --workspace=packages/db",
+    "db:migrate": "npm run migrate --workspace=packages/db",
+    "db:migrate:deploy": "npm run migrate:deploy --workspace=packages/db",
+    "dev:worker": "npm run dev:worker --workspace=apps/api",
+    "test:unit": "tsx --test tests/unit/*.test.ts",
+    "build:sdk": "npm run build --workspace=packages/types --workspace=packages/client --workspace=packages/auth --workspace=packages/deployments --workspace=packages/catalog --workspace=packages/node-agent",
+    "publish:sdk": "changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^3.0.0",
+    "fast-check": "^4.9.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.0"
+  }
+}

@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ─── Base ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+}
+
+html, body {
+  background-color: #0a0a14;
+  color: #f5f5f7;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+/* ─── Glass Utilities ────────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-capsule {
+  background: rgba(10, 10, 20, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 9999px;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ─── Typography ─────────────────────────────────────────── */
+.text-gradient {
+  background-image: linear-gradient(135deg, #7c3aed 0%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.text-gradient-warm {
+  background-image: linear-gradient(135deg, #a855f7 0%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ─── Glow Effects ───────────────────────────────────────── */
+.glow-violet {
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.3), 0 0 60px rgba(124, 58, 237, 0.1);
+}
+.glow-teal {
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.3), 0 0 60px rgba(34, 211, 238, 0.1);
+}
+.glow-text-violet {
+  text-shadow: 0 0 20px rgba(124, 58, 237, 0.6);
+}
+
+/* ─── Keyframe Animations ────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes orb-pulse {
+  0%, 100% { opacity: 0.18; transform: scale(1); }
+  50%       { opacity: 0.28; transform: scale(1.06); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(124, 58, 237, 0.3); }
+  50%       { box-shadow: 0 0 40px rgba(124, 58, 237, 0.5), 0 0 80px rgba(34, 211, 238, 0.2); }
+}
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes accordion-open {
+  from { max-height: 0; opacity: 0; }
+  to   { max-height: 500px; opacity: 1; }
+}
+
+/* ─── Animation Classes ──────────────────────────────────── */
+.animate-fade-in    { animation: fade-in  0.5s ease both; }
+.animate-slide-up   { animation: slide-up 0.6s ease both; }
+.animate-slide-down { animation: slide-down 0.4s ease both; }
+.animate-scale-in   { animation: scale-in 0.4s ease both; }
+.animate-float      { animation: float 4s ease-in-out infinite; }
+.animate-glow-pulse { animation: glow-pulse 2.5s ease-in-out infinite; }
+.animate-spin-slow  { animation: spin-slow 8s linear infinite; }
+.animate-orb-pulse  { animation: orb-pulse 6s ease-in-out infinite; }
+
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+
+/* ─── Shimmer Button ──────────────────────────────────────── */
+.btn-shimmer {
+  background: linear-gradient(135deg, #7c3aed 0%, #0ea5e9 50%, #7c3aed 100%);
+  background-size: 200% auto;
+  animation: shimmer 3s linear infinite;
+  transition: opacity 0.2s;
+}
+.btn-shimmer:hover { opacity: 0.88; }
+
+/* ─── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+/* ─── Dot Grid Pattern ───────────────────────────────────── */
+.dot-pattern {
+  background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+}

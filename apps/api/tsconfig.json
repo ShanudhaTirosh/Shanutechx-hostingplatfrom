@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "ignoreDeprecations": "5.0",
+    "lib": ["ES2022"],
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": false
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts", "node_modules"]
+}
+

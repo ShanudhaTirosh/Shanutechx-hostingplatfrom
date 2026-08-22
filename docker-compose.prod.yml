@@ -1,0 +1,224 @@
+version: "3.9"
+
+# Production Infrastructure Stack - ShanuTechX Platform
+# Complete production Compose orchestrator with Traefik 3.x reverse proxy,
+# Let's Encrypt SSL, Supabase Studio, API, Dashboard, Marketing, and Node Agent.
+
+networks:
+  shanutechx-prod:
+    driver: bridge
+    name: shanutechx-prod
+
+volumes:
+  postgres-prod-data:
+  redis-prod-data:
+  traefik-certificates:
+  shanutechx-prod-workspaces:
+  shanutechx-prod-uploads:
+  minio-prod-data:
+
+services:
+  # ========================================
+  # Traefik 3.x Reverse Proxy & Let's Encrypt SSL
+  # ========================================
+  traefik:
+    image: traefik:v3.0
+    container_name: shanutechx-traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@shanutechx.com}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # Traefik Dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certificates:/letsencrypt
+    networks:
+      - shanutechx-prod
+
+  # ========================================
+  # Core Database & Cache
+  # ========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: shanutechx-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-shanutechx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME_secure_postgres_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-shanutechx}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-prod-data:/var/lib/postgresql/data
+    networks:
+      - shanutechx-prod
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shanutechx}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: shanutechx-redis-prod
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-prod-data:/data
+    networks:
+      - shanutechx-prod
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ========================================
+  # Object Storage (R2 / MinIO S3-Compatible)
+  # ========================================
+  minio:
+    image: minio/minio:latest
+    container_name: shanutechx-minio-prod
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-shanutechx_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-CHANGE_ME_minio_root_pass}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-prod-data:/data
+    networks:
+      - shanutechx-prod
+
+  # ========================================
+  # Self-Hosted Supabase Studio
+  # ========================================
+  supabase-studio:
+    image: supabase/studio:20240415-4e782e2
+    container_name: shanutechx-supabase-studio
+    restart: unless-stopped
+    environment:
+      STUDIO_PG_META_URL: http://postgres:5432
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME_secure_postgres_pass}
+      DEFAULT_ORGANIZATION: "ShanuTechX Cloud"
+      DEFAULT_PROJECT: "Main Production Project"
+      SUPABASE_URL: http://localhost:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}
+    ports:
+      - "3003:3000"
+    networks:
+      - shanutechx-prod
+
+  # ========================================
+  # Platform Core API Backend
+  # ========================================
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: shanutechx-api-prod
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-shanutechx}:${POSTGRES_PASSWORD:-CHANGE_ME_secure_postgres_pass}@postgres:5432/${POSTGRES_DB:-shanutechx}?schema=public
+      - REDIS_URL=redis://redis:6379
+      - R2_ENDPOINT=${R2_ENDPOINT:-http://minio:9000}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-shanutechx_minio}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-CHANGE_ME_minio_root_pass}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-shanutechx-backups}
+    ports:
+      - "4000:4000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.${ROOT_DOMAIN:-shanutechx.com}`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.api.loadbalancer.server.port=4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - shanutechx-prod
+
+  # ========================================
+  # Control Panel Dashboard Studio
+  # ========================================
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: https://api.${ROOT_DOMAIN:-shanutechx.com}
+    container_name: shanutechx-dashboard-prod
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`dashboard.${ROOT_DOMAIN:-shanutechx.com}`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.services.dashboard.loadbalancer.server.port=3001"
+    networks:
+      - shanutechx-prod
+
+  # ========================================
+  # Marketing & Documentation Web Site
+  # ========================================
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        API_BASE_URL: https://api.${ROOT_DOMAIN:-shanutechx.com}
+        NEXT_PUBLIC_DASHBOARD_URL: https://dashboard.${ROOT_DOMAIN:-shanutechx.com}
+    container_name: shanutechx-web-prod
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.web.rule=Host(`${ROOT_DOMAIN:-shanutechx.com}`)"
+      - "traefik.http.routers.web.entrypoints=websecure"
+      - "traefik.http.routers.web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.web.loadbalancer.server.port=3000"
+    networks:
+      - shanutechx-prod
+
+  # ========================================
+  # Node Agent & Container Runtime
+  # ========================================
+  node-agent:
+    build:
+      context: .
+      dockerfile: services/node-agent/Dockerfile
+    container_name: shanutechx-node-agent-prod
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - AGENT_PUBLIC_NETWORK=shanutechx-prod
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - shanutechx-prod-workspaces:/var/lib/shanutechx/workspaces
+    ports:
+      - "5000:5000"
+    networks:
+      - shanutechx-prod

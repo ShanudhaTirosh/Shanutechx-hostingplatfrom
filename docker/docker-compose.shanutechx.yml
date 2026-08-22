@@ -1,0 +1,7 @@
+# ShanuTechX Unified Platform Orchestrator
+# Combines Core ShanuTechX App + Supabase Stack + Infisical Stack
+
+include:
+  - path: ../docker-compose.local.yml
+  - path: ./supabase/docker-compose.yml
+  - path: ./infisical/docker-compose.yml

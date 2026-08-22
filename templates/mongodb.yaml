@@ -1,0 +1,26 @@
+# slogan: NoSQL document database designed for modern applications.
+# category: database
+# tags: mongodb, database, nosql, mongo, document
+# logo: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/mongodb.svg
+# port: 27017
+
+services:
+  mongodb:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:?MONGO_INITDB_ROOT_PASSWORD must be set}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-app_db}
+    volumes:
+      - mongodb_data:/data/db
+    restart: always
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongodb_data:

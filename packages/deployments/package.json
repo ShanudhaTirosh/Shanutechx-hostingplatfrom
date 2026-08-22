@@ -1,0 +1,44 @@
+{
+  "name": "@shanutechx/deployments",
+  "version": "1.0.0",
+  "description": "Deployment builder, log stream watcher, env manager, and webhook helpers for ShanuTechX",
+  "keywords": ["shanutechx", "deployments", "sdk"],
+  "license": "MIT",
+  "author": "ShanuTechX",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shanutechx/shanutechx.git",
+    "directory": "packages/deployments"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@shanutechx/client": "workspace:*",
+    "@shanutechx/types": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "*",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

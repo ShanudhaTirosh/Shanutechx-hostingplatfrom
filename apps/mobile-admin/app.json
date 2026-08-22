@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "ShanuTechX Admin",
+    "slug": "shanutechx-admin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#08070c",
+    "splash": {
+      "backgroundColor": "#08070c"
+    },
+    "ios": {
+      "bundleIdentifier": "com.shanutechx.admin",
+      "backgroundColor": "#08070c",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.shanutechx.admin",
+      "backgroundColor": "#08070c",
+      "permissions": ["NOTIFICATIONS"]
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#7C3AED"
+        }
+      ]
+    ],
+    "projectId": "c49bd60d-8872-42fa-8bda-af59a43d634a",
+    "extra": {
+      "apiBaseUrl": "https://api.shanutechx.com",
+      "firebaseApiKey": "REPLACE_WITH_REAL_FIREBASE_API_KEY",
+      "firebaseAuthDomain": "REPLACE_WITH_REAL_AUTH_DOMAIN",
+      "firebaseProjectId": "REPLACE_WITH_REAL_PROJECT_ID",
+      "firebaseStorageBucket": "",
+      "firebaseSenderId": "",
+      "firebaseAppId": "REPLACE_WITH_REAL_APP_ID",
+      "eas": {
+        "projectId": "c49bd60d-8872-42fa-8bda-af59a43d634a"
+      }
+    }
+  }
+}

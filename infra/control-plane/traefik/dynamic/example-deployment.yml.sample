@@ -1,0 +1,36 @@
+# ==============================================================================
+# ShanuTechX Platform — Traefik Dynamic Configuration Sample
+#
+# Traefik monitors the `/etc/traefik/dynamic` directory (`--providers.file.watch=true`)
+# and automatically applies any YAML routing rules written here in real-time
+# without requiring a container restart.
+#
+# When a customer binds a custom domain or deploys a new app, the Node Agent
+# generates a file like this (`custom-{deploymentId}-{domain}.yml`).
+# ==============================================================================
+
+http:
+  routers:
+    # Customer Deployment Router
+    deploy-alice-blog:
+      rule: "Host(`alice-blog.shanutechx.com`) || Host(`alice.com`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        - security-headers@file
+        - rate-limit@file
+        - gzip-compress@file
+      tls:
+        certResolver: le
+      service: deploy-alice-blog-service
+
+  services:
+    # Customer Deployment LoadBalancer Target
+    deploy-alice-blog-service:
+      loadBalancer:
+        servers:
+          - url: "http://deploy-alice-blog:3000"
+        healthCheck:
+          path: /
+          interval: 10s
+          timeout: 3s

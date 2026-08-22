@@ -1,0 +1,59 @@
+import type { Metadata } from 'next';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'SHANUTECHX Dashboard',
+  description: 'Manage your hosting, deployments, and invoices.',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-icon.png',
+  },
+  manifest: '/manifest.json',
+  themeColor: '#7c3aed',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+  },
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://api.shanutechx.com" />
+        <link rel="dns-prefetch" href="https://api.shanutechx.com" />
+      </head>
+      <body suppressHydrationWarning>
+        {children}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('error', function(e) {
+                var msg = e && e.message ? e.message : '';
+                if (msg.indexOf('Loading chunk') !== -1 || msg.indexOf('MIME type') !== -1) {
+                  if (!window.sessionStorage.getItem('chunk_reload')) {
+                    window.sessionStorage.setItem('chunk_reload', '1');
+                    window.location.reload();
+                  }
+                }
+              });
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').then(
+                    function(registration) {
+                      console.log('ServiceWorker registration successful');
+                    },
+                    function(err) {
+                      console.log('ServiceWorker registration failed: ', err);
+                    }
+                  );
+                });
+              }
+            `,
+          }}
+        />
+      </body>
+    </html>
+  );
+}

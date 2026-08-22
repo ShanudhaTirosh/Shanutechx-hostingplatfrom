@@ -1,0 +1,37 @@
+{
+  "name": "@shanutechx/types",
+  "version": "1.0.0",
+  "description": "Shared TypeScript types and enums for the ShanuTechX platform SDK",
+  "keywords": ["shanutechx", "types", "sdk"],
+  "license": "MIT",
+  "author": "ShanuTechX",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shanutechx/shanutechx.git",
+    "directory": "packages/types"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsup": "*",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@shanutechx/db",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "generate": "prisma generate",
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:services-to-products": "tsx scripts/migrate-services-to-products.ts",
+    "seed:dev-owner": "tsx scripts/seed-dev-owner.ts",
+    "studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.0"
+  }
+}
