@@ -555,6 +555,7 @@ model SmtpAccount {
   customDomain  String?
   aliases       String[] @default([])
   planTier      String   @default("pro")
+  allowedAdminIds String[] @default([]) // Dev-assigned admin user IDs allowed to read/write/send via this mailbox
 }
 
 // Audit finding H1: replaces the old in-memory `globalSmtpConfig` mutable

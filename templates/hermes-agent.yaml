@@ -1,0 +1,39 @@
+# slogan: Autonomous AI agent framework with web UI, vector memory store, and tool execution engine
+# documentation: https://docs.shanutechx.com/templates/hermes-agent
+# category: ai
+# tags: ai,agent,hermes,llm,python,langchain
+# logo: https://raw.githubusercontent.com/walkxlk/assets/main/hermes-agent.png
+# port: 8080
+
+version: '3.8'
+
+services:
+  hermes-agent:
+    image: hermesagent/hermes-agent:latest
+    container_name: ${HERMES_CONTAINER_NAME:-hermes-agent}
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - PORT=8080
+      - NODE_ENV=production
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - HERMES_SECRET_KEY=${HERMES_SECRET_KEY:?HERMES_SECRET_KEY is required}
+      - REDIS_URL=redis://hermes-redis:6379
+      - VECTOR_STORE_URL=http://hermes-vector:6333
+    depends_on:
+      - hermes-redis
+      - hermes-vector
+
+  hermes-redis:
+    image: redis:7-alpine
+    container_name: ${HERMES_CONTAINER_NAME:-hermes}-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  hermes-vector:
+    image: qdrant/qdrant:latest
+    container_name: ${HERMES_CONTAINER_NAME:-hermes}-vector
+    restart: unless-stopped
+    ports:
+      - "6333:6333"

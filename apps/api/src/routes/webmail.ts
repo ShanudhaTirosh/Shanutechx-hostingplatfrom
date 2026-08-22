@@ -7,61 +7,101 @@ import { sendSmtpEmail } from '../lib/smtpDispatcher';
 import { logger } from '../lib/logger';
 import { env } from '../env';
 
-/**
- * Self-hosted webmail inbox. Rewritten (audit finding C3) from a single,
- * unscoped, in-memory store shared by every user on the platform (a
- * cross-tenant IDOR: any authenticated user could read/modify/delete any
- * other user's messages) into a real Prisma-backed table where every
- * route filters by the authenticated user's own ID.
- *
- * Also fixes M4/M5 in the same pass: outbound sends now go through the
- * user's actual provisioned SmtpAccount credentials (the same
- * encryptSecret/decryptSecret pattern already used correctly elsewhere
- * in routes/smtp.ts and routes/email.ts) instead of falling back to
- * undocumented, unconfigured SMTP_HOST/SMTP_USER/SMTP_PASS env vars with
- * a hardcoded literal password fallback.
- */
-
 export const webmailRouter = Router();
 
 webmailRouter.use(requireAuth);
 
 const FOLDERS = ['inbox', 'sent', 'drafts', 'trash'] as const;
 
-// 1. Get list of messages (own mailbox only)
+/**
+ * Helper to check if the authenticated user has access to a given SmtpAccount.
+ * Access is granted if:
+ *  1. User is a 'dev'
+ *  2. User is the account owner (userId === req.user.id)
+ *  3. User is an admin listed in account.allowedAdminIds (dev-delegated access)
+ */
+async function canAccessMailbox(account: any, userId: string, userRole?: string): Promise<boolean> {
+  if (!account) return false;
+  if (userRole === 'dev') return true;
+  if (account.userId === userId) return true;
+  if (Array.isArray(account.allowedAdminIds) && account.allowedAdminIds.includes(userId)) return true;
+  return false;
+}
+
+// 1. Get list of messages (own or dev-delegated mailboxes)
 webmailRouter.get('/webmail/messages', async (req: AuthedRequest, res: Response) => {
   const folder = (req.query.folder as string) || 'inbox';
   const search = (req.query.search as string) || '';
+  const smtpAccountId = req.query.smtpAccountId as string | undefined;
   const userId = req.user!.id;
+  const role = req.user!.role;
 
-  const where: any = { userId, folder };
+  // Find all mailboxes accessible to this user
+  let accessibleAccounts: any[] = [];
+  if (role === 'dev') {
+    accessibleAccounts = await prisma.smtpAccount.findMany({ select: { id: true, userId: true } });
+  } else {
+    accessibleAccounts = await prisma.smtpAccount.findMany({
+      where: {
+        OR: [{ userId }, { allowedAdminIds: { has: userId } }],
+      },
+      select: { id: true, userId: true },
+    });
+  }
+
+  const accessibleAccountIds = accessibleAccounts.map((a) => a.id);
+  const accessibleOwnerUserIds = [...new Set(accessibleAccounts.map((a) => a.userId))];
+
+  const where: any = {
+    folder,
+    OR: [
+      { userId: { in: accessibleOwnerUserIds } },
+      { smtpAccountId: { in: accessibleAccountIds } },
+    ],
+  };
+
+  if (smtpAccountId) {
+    where.smtpAccountId = smtpAccountId;
+  }
+
   if (search) {
-    where.OR = [
-      { subject: { contains: search, mode: 'insensitive' } },
-      { senderName: { contains: search, mode: 'insensitive' } },
-      { senderEmail: { contains: search, mode: 'insensitive' } },
-      { snippet: { contains: search, mode: 'insensitive' } },
+    where.AND = [
+      {
+        OR: [
+          { subject: { contains: search, mode: 'insensitive' } },
+          { senderName: { contains: search, mode: 'insensitive' } },
+          { senderEmail: { contains: search, mode: 'insensitive' } },
+          { snippet: { contains: search, mode: 'insensitive' } },
+        ],
+      },
     ];
   }
 
   const [messages, unreadCount] = await Promise.all([
     prisma.webmailMessage.findMany({ where, orderBy: { createdAt: 'desc' } }),
-    prisma.webmailMessage.count({ where: { userId, folder: 'inbox', isRead: false } }),
+    prisma.webmailMessage.count({ where: { ...where, folder: 'inbox', isRead: false } }),
   ]);
 
   res.json({ messages, unreadCount, total: messages.length });
 });
 
-// 2. Get single message details (own mailbox only)
+// 2. Get single message details (own or delegated mailbox)
 webmailRouter.get('/webmail/messages/:id', async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   const userId = req.user!.id;
+  const role = req.user!.role;
 
-  // Scoped lookup: a message belonging to another user simply doesn't
-  // match this query, so it 404s rather than leaking its existence or
-  // content (audit finding C3).
-  const msg = await prisma.webmailMessage.findFirst({ where: { id, userId } });
+  const msg = await prisma.webmailMessage.findUnique({ where: { id } });
   if (!msg) return res.status(404).json({ error: 'Message not found' });
+
+  if (msg.smtpAccountId) {
+    const account = await prisma.smtpAccount.findUnique({ where: { id: msg.smtpAccountId } });
+    if (!(await canAccessMailbox(account, userId, role))) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+  } else if (msg.userId !== userId && role !== 'dev') {
+    return res.status(404).json({ error: 'Message not found' });
+  }
 
   if (!msg.isRead) {
     await prisma.webmailMessage.update({ where: { id }, data: { isRead: true } });
@@ -75,26 +115,32 @@ const sendSchema = z.object({
   recipientEmail: z.string().email(),
   subject: z.string().min(1),
   htmlBody: z.string().min(1),
-  // Which of the user's mailboxes to send from, if they have more than
-  // one. Defaults to their first/only provisioned mailbox.
   smtpAccountId: z.string().optional(),
 });
 
-// 3. Send outbound email (Gmail-style compose)
+// 3. Send outbound email (own or delegated mailbox)
 webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) => {
   const parsed = sendSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const { recipientEmail, subject, htmlBody, smtpAccountId } = parsed.data;
   const userId = req.user!.id;
+  const role = req.user!.role;
 
-  const account = smtpAccountId
-    ? await prisma.smtpAccount.findFirst({ where: { id: smtpAccountId, userId } })
-    : await prisma.smtpAccount.findFirst({ where: { userId }, orderBy: { createdAt: 'asc' } });
+  let account: any = null;
 
-  if (!account) {
+  if (smtpAccountId) {
+    account = await prisma.smtpAccount.findUnique({ where: { id: smtpAccountId } });
+  } else {
+    account = await prisma.smtpAccount.findFirst({
+      where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  if (!account || !(await canAccessMailbox(account, userId, role))) {
     return res.status(400).json({
-      error: 'No mailbox is provisioned for your account yet. Order an email hosting plan first.',
+      error: 'No accessible mailbox provisioned for sending. Contact dev administrator for mailbox access.',
     });
   }
 
@@ -103,7 +149,7 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
 
   const message = await prisma.webmailMessage.create({
     data: {
-      userId,
+      userId: account.userId, // Record under mailbox owner
       smtpAccountId: account.id,
       folder: 'sent',
       senderName,
@@ -118,22 +164,14 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
     },
   });
 
-  // Actually attempt delivery through the user's own real mailbox
-  // credentials -- previously this used undocumented global env vars
-  // with a hardcoded fallback password, which meant delivery silently
-  // failed in most deployments while still reporting success to the UI.
   try {
     const password = decryptSecret(account.credentialRef, env.secretsEncryptionKey);
     const sendResult = await sendSmtpEmail(
       { host: account.smtpHost, port: account.smtpPort, user: account.smtpUsername, pass: password },
       { from: `"${senderName}" <${senderEmail}>`, to: recipientEmail, subject, html: htmlBody }
     );
-    logger.info({ recipientEmail, messageId: sendResult.messageId }, 'Webmail message delivered');
+    logger.info({ recipientEmail, messageId: sendResult.messageId, senderUserId: userId }, 'Delegated webmail message delivered');
   } catch (err: any) {
-    // Delivery failure no longer silently disappears into a background
-    // promise -- the send is awaited and a failure is surfaced to the
-    // caller, while the drafted/composed message is still saved so the
-    // user doesn't lose their work.
     logger.error({ err: err.message, recipientEmail }, 'Webmail SMTP delivery failed');
     return res.status(502).json({
       error: 'Message was saved, but delivery failed: ' + (err.message || 'SMTP error'),
@@ -150,27 +188,43 @@ const patchSchema = z.object({
   folder: z.enum(FOLDERS).optional(),
 });
 
-// 4. Mark read / unread / starred / move folder (own mailbox only)
+// 4. Mark read / unread / starred / move folder (own or delegated mailbox)
 webmailRouter.patch('/webmail/messages/:id', async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   const userId = req.user!.id;
+  const role = req.user!.role;
   const parsed = patchSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const existing = await prisma.webmailMessage.findFirst({ where: { id, userId } });
+  const existing = await prisma.webmailMessage.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Message not found' });
+
+  if (existing.smtpAccountId) {
+    const account = await prisma.smtpAccount.findUnique({ where: { id: existing.smtpAccountId } });
+    if (!(await canAccessMailbox(account, userId, role))) return res.status(404).json({ error: 'Message not found' });
+  } else if (existing.userId !== userId && role !== 'dev') {
+    return res.status(404).json({ error: 'Message not found' });
+  }
 
   const message = await prisma.webmailMessage.update({ where: { id }, data: parsed.data });
   res.json({ message });
 });
 
-// 5. Delete message (move to trash, or permanently delete from trash) — own mailbox only
+// 5. Delete message — own or delegated mailbox
 webmailRouter.delete('/webmail/messages/:id', async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   const userId = req.user!.id;
+  const role = req.user!.role;
 
-  const existing = await prisma.webmailMessage.findFirst({ where: { id, userId } });
+  const existing = await prisma.webmailMessage.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Message not found' });
+
+  if (existing.smtpAccountId) {
+    const account = await prisma.smtpAccount.findUnique({ where: { id: existing.smtpAccountId } });
+    if (!(await canAccessMailbox(account, userId, role))) return res.status(404).json({ error: 'Message not found' });
+  } else if (existing.userId !== userId && role !== 'dev') {
+    return res.status(404).json({ error: 'Message not found' });
+  }
 
   if (existing.folder === 'trash') {
     await prisma.webmailMessage.delete({ where: { id } });
@@ -179,4 +233,52 @@ webmailRouter.delete('/webmail/messages/:id', async (req: AuthedRequest, res: Re
   }
 
   res.json({ ok: true, deletedId: id });
+});
+
+// 6. Dev Delegation Management Endpoint: Grant admin access to email account
+webmailRouter.post('/webmail/delegations', async (req: AuthedRequest, res: Response) => {
+  if (req.user?.role !== 'dev') {
+    return res.status(403).json({ error: 'Only dev users can delegate mailbox access to admin staff.' });
+  }
+
+  const { smtpAccountId, adminUserId } = req.body || {};
+  if (!smtpAccountId || !adminUserId) {
+    return res.status(400).json({ error: 'smtpAccountId and adminUserId are required' });
+  }
+
+  const account = await prisma.smtpAccount.findUnique({ where: { id: smtpAccountId } });
+  if (!account) return res.status(404).json({ error: 'SmtpAccount not found' });
+
+  const adminUser = await prisma.user.findUnique({ where: { id: adminUserId } });
+  if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'support')) {
+    return res.status(400).json({ error: 'Target user must be an admin or support staff member.' });
+  }
+
+  const currentAllowed = account.allowedAdminIds || [];
+  if (!currentAllowed.includes(adminUserId)) {
+    const updated = await prisma.smtpAccount.update({
+      where: { id: smtpAccountId },
+      data: { allowedAdminIds: { push: adminUserId } },
+    });
+    return res.json({ ok: true, message: `Access granted to admin ${adminUser.email}`, account: updated });
+  }
+
+  res.json({ ok: true, message: `Admin ${adminUser.email} already has access`, account });
+});
+
+// 7. Get Delegated Mailbox List for Admin & Dev Users
+webmailRouter.get('/webmail/delegations', async (req: AuthedRequest, res: Response) => {
+  const userId = req.user!.id;
+  const isDev = req.user?.role === 'dev';
+
+  const accounts = isDev
+    ? await prisma.smtpAccount.findMany({
+        select: { id: true, smtpUsername: true, customDomain: true, allowedAdminIds: true, userId: true, user: { select: { email: true } } },
+      })
+    : await prisma.smtpAccount.findMany({
+        where: { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+        select: { id: true, smtpUsername: true, customDomain: true, allowedAdminIds: true, userId: true, user: { select: { email: true } } },
+      });
+
+  res.json({ accounts });
 });

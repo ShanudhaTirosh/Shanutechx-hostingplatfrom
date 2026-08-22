@@ -8,6 +8,7 @@ import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/aut
 import { requireRole } from '../middleware/rbac';
 import { logger } from '../lib/logger';
 import { env } from '../env';
+import { encryptSecret } from '../lib/secretsVault';
 import { invalidateCache } from '../lib/catalog/catalog-manager';
 import { parseTemplateYaml, validateTemplateStructure } from '../lib/catalog/template-parser';
 
@@ -515,6 +516,10 @@ const AUTO_GENERATED_SECRET_KEYS: Record<string, string[]> = {
   n8n: ['DB_POSTGRESDB_PASSWORD'],
   redis: ['REDIS_PASSWORD'],
   wordpress: ['MYSQL_ROOT_PASSWORD', 'WORDPRESS_DB_PASSWORD'],
+  'hermes-agent': ['HERMES_SECRET_KEY'],
+  grafana: ['GF_SECURITY_ADMIN_PASSWORD'],
+  'uptime-kuma': ['UPTIME_KUMA_SECRET'],
+  'supabase-lite': ['POSTGRES_PASSWORD'],
 };
 
 function generateStrongSecret(): string {
@@ -607,6 +612,42 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
       },
     });
 
+    // Automatic Managed Database provisioning & connection wiring for templates requiring database services
+    const managedDatabasesCreated: any[] = [];
+    const templateDbTypes: Array<{ type: 'postgres' | 'mysql' | 'redis' | 'mongodb'; port: number; secretKey?: string }> = [];
+
+    if (slug === 'wordpress') {
+      templateDbTypes.push({ type: 'mysql', port: 3306, secretKey: 'WORDPRESS_DB_PASSWORD' });
+    } else if (slug === 'n8n') {
+      templateDbTypes.push({ type: 'postgres', port: 5432, secretKey: 'DB_POSTGRESDB_PASSWORD' });
+    } else if (slug === 'redis') {
+      templateDbTypes.push({ type: 'redis', port: 6379, secretKey: 'REDIS_PASSWORD' });
+    } else if (slug === 'mongodb') {
+      templateDbTypes.push({ type: 'mongodb', port: 27017, secretKey: 'MONGO_INITDB_ROOT_PASSWORD' });
+    } else if (slug === 'hermes-agent') {
+      templateDbTypes.push({ type: 'redis', port: 6379, secretKey: 'HERMES_SECRET_KEY' });
+    } else if (slug === 'supabase-lite') {
+      templateDbTypes.push({ type: 'postgres', port: 5432, secretKey: 'POSTGRES_PASSWORD' });
+    }
+
+    for (const dbMeta of templateDbTypes) {
+      const dbPassword = envVars[dbMeta.secretKey ?? ''] || generatedSecrets[dbMeta.secretKey ?? ''] || 'default-secret';
+      const encCred = encryptSecret(dbPassword, env.secretsEncryptionKey);
+      const mDb = await prisma.managedDatabase.create({
+        data: {
+          userId: req.user!.id,
+          nodeId,
+          type: dbMeta.type,
+          status: 'running',
+          containerId: `${composeName}-${dbMeta.type}`,
+          internalHost: `${composeName}-db`,
+          internalPort: dbMeta.port,
+          credentialRef: encCred,
+        },
+      });
+      managedDatabasesCreated.push({ id: mDb.id, type: mDb.type, internalHost: mDb.internalHost, internalPort: mDb.internalPort });
+    }
+
     await prisma.auditLog.create({
       data: {
         adminId: req.user!.id,
@@ -615,10 +656,11 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
       },
     });
 
-    logger.info({ slug, nodeId, deploymentId: deployment.id }, 'Template deployed');
+    logger.info({ slug, nodeId, deploymentId: deployment.id, databases: managedDatabasesCreated.length }, 'Template deployed with automated database wiring');
     res.status(201).json({
       deployment,
       agent: agentData,
+      ...(managedDatabasesCreated.length > 0 ? { managedDatabases: managedDatabasesCreated } : {}),
       // Only present if we generated any secret the customer didn't
       // supply -- shown once, not persisted anywhere in retrievable
       // plaintext form, so the frontend must surface these to the

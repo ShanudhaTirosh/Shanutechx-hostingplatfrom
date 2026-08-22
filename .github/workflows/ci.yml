@@ -1,0 +1,54 @@
+name: ShanuTechX Enterprise CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-build:
+    name: Build & Test Workspace
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client (v5.22.0)
+        run: npm run db:generate
+
+      - name: Run Unit Test Suite
+        run: npm run test:unit
+
+      - name: Build Developer SDK (@shanutechx/client)
+        run: npm run build --workspace=packages/client
+
+      - name: Build Core REST API (apps/api)
+        run: npm run build --workspace=apps/api
+
+      - name: Build Web Marketing & Docs (apps/web)
+        run: npm run build --workspace=apps/web
+        env:
+          API_BASE_URL: https://api.shanutechx.com
+          NEXT_PUBLIC_DASHBOARD_URL: https://dashboard.shanutechx.com
+
+      - name: Build Dashboard Control Panel (apps/dashboard)
+        run: npm run build --workspace=apps/dashboard
+        env:
+          NEXT_PUBLIC_API_BASE_URL: https://api.shanutechx.com
+
+      - name: Typecheck Expo Mobile Admin App (apps/mobile-admin)
+        run: |
+          cd apps/mobile-admin
+          npm ci
+          npx tsc --noEmit

@@ -1,0 +1,21 @@
+# slogan: A fancy self-hosted monitoring tool and public status page engine
+# documentation: https://docs.shanutechx.com/templates/uptime-kuma
+# category: analytics
+# tags: uptime,monitoring,kuma,status-page,metrics
+# logo: https://raw.githubusercontent.com/walkxlk/assets/main/uptime-kuma.png
+# port: 3001
+
+version: '3.8'
+
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: ${UPTIME_KUMA_CONTAINER_NAME:-uptime-kuma}
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3001}:3001"
+    volumes:
+      - kuma-data:/app/data
+
+volumes:
+  kuma-data:

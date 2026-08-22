@@ -1,200 +1,109 @@
-# 🚀 ShanuTechX — Self-Hosted Cloud Platform & Infrastructure Studio
+# ⚡ ShanuTechX Platform — Autonomous Enterprise Cloud Hosting Engine
 
-> A production-grade, multi-tenant cloud platform for deploying web applications, Python services, Discord bots, managed databases, custom domains, and VPS infrastructure — featuring automatic node failover, free cloud backups, team RBAC, and developer REST API automation.
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/ShanudhaTirosh/Shanutechx-hostingplatfrom)
+[![Next.js 14](https://img.shields.io/badge/Next.js-14.2.35-black.svg)](https://nextjs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20.x-green.svg)](https://nodejs.org/)
+[![Prisma 5.22](https://img.shields.io/badge/Prisma-v5.22.0-blue.svg)](https://www.prisma.io/)
+[![Docker Compose](https://img.shields.io/badge/Docker_Compose-v3.9-blue.svg)](https://docs.docker.com/compose/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Made with Supabase](https://supabase.com/badge-made-with-supabase-dark.svg)](https://supabase.com)
+[![Powered by Traefik](https://img.shields.io/badge/Powered%20by-Traefik%203.x-24A1DE.svg?logo=traefik)](https://traefik.io/)
+[![Database PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%2016-4169E1.svg?logo=postgresql)](https://www.postgresql.org/)
+[![Cache Redis](https://img.shields.io/badge/Cache-Redis%207-DC382D.svg?logo=redis)](https://redis.io/)
+[![Storage Cloudflare R2](https://img.shields.io/badge/Storage-Cloudflare%20R2-F38020.svg?logo=cloudflare)](https://www.cloudflare.com/developer-platform/r2/)
+[![Mobile Expo](https://img.shields.io/badge/Mobile-Expo%20%2F%20React%20Native-000000.svg?logo=expo)](https://expo.dev/)
+[![Bot Discord](https://img.shields.io/badge/Bot-Discord.js-5865F2.svg?logo=discord)](https://discord.js.org/)
+[![Bot WhatsApp](https://img.shields.io/badge/Bot-Baileys%20WhatsApp-25D366.svg?logo=whatsapp)](https://github.com/WhiskeySockets/Baileys)
+[![Monitoring Grafana](https://img.shields.io/badge/Monitoring-Grafana-F46800.svg?logo=grafana)](https://grafana.com/)
+[![Status Uptime Kuma](https://img.shields.io/badge/Status-Uptime%20Kuma-5CD662.svg)](https://github.com/louislam/uptime-kuma)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-brightgreen)](https://nodejs.org)
-[![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org)
-[![Prisma](https://img.shields.io/badge/Prisma-5.22.0-blue)](https://www.prisma.io)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org)
-[![Docker](https://img.shields.io/badge/Docker-required-blue)](https://www.docker.com)
-
----
-
-## 📋 Table of Contents
-
-- [What is ShanuTechX?](#-what-is-shanutechx)
-- [New Production Features](#-new-production-features)
-- [Monorepo Architecture](#-monorepo-architecture)
-- [Developer REST API & Automation](#-developer-rest-api--automation)
-- [Automatic Node Failover](#-automatic-node-failover)
-- [Free Cloud Backup & Restore](#-free-cloud-backup--restore)
-- [Client Team Invitations & RBAC](#-client-team-invitations--rbac)
-- [Getting Started](#-getting-started)
-- [Environment Variables](#-environment-variables)
-- [API Reference](#-api-reference)
-- [License](#-license)
+> A modern, end-to-end cloud platform featuring **Automatic Container Provisioning**, **Automated Git Deploy on Push**, **Free Cloud Database Backups (Cloudflare R2 + Google Sheets/Supabase)**, **1-Click Failover**, **Scoped Developer REST API**, **Hostinger Mail-Inspired Webmail Studio**, **React Native / Expo Android & iOS Mobile Admin App**, **Unified Discord Webhooks**, and **WhatsApp Bot Integration**.
 
 ---
 
-## 🌐 What is ShanuTechX?
+## 🏛️ Reference Architecture & Subsystem Integrations
 
-ShanuTechX is a complete, self-hosted cloud platform built for agencies, hosting providers, developers, and infrastructure teams. It features:
+This platform leverages world-class open-source engines and reference architectures:
 
-- **Control Panel Studio (`apps/dashboard`)**: Next.js 14 dashboard for managing deployments, databases, VPS nodes, secrets, webmail, and team workspaces.
-- **Marketing & Documentation Hub (`apps/web`)**: WrapXLK dark-theme marketing site with interactive dot globe visuals, live status studio (`/status`), V2Ray proxy store showcase (`/v2ray`), and documentation hub (`/docs`).
-- **REST API Core (`apps/api`)**: Express + Prisma 5.22 + PostgreSQL engine with Firebase ID token and developer API Key (`shx_...`) authentication.
-- **Node Agent (`services/node-agent`)**: Distributed agent container running on each VPS node to manage Docker builds, UFW firewalls, file operations, and container telemetry.
-
----
-
-## ✨ New Production Features
-
-### 🛡️ Automatic Node Failover & Container Migration
-- Automatically detects node health check failures or inactivity.
-- Re-routes all assigned container deployments to active candidate nodes in the cluster (`failoverDeadNode`).
-- Triggers container rebuilds cleanly without manual intervention.
-
-### 💾 Free Cloud Database Backups & 1-Click Restore
-- **Cloudflare R2 Free Tier Integration (10 GB Free Storage)**: Daily even/odd gzipped PostgreSQL dumps uploaded at $0.00 cost.
-- **Multi-Cloud Free Webhook Sync**: Syncs JSON data dumps to free Google Sheets / Apps Script endpoints, Supabase Free REST endpoints, or Firebase Firestore.
-- **1-Click Database Restore**: Streams gzipped archives back into PostgreSQL `psql` for instant disaster recovery.
-
-### 👥 Client Team Workspace & Granular RBAC
-- Invite team members via email tokens (`POST /api/teams/:id/invites`).
-- Assign primary roles: `Admin`, `Developer`, `Billing`, or `Viewer`.
-- Configure fine-grained per-resource permission matrices (`manage`, `view`, `none`) for specific deployments, databases, or VPS instances.
-
-### 🔑 Developer REST API Key Automation
-- Authenticate via `x-api-key: shx_...` or `Authorization: Bearer shx_...`.
-- Programmatically trigger deployments (`POST /api/deployments`), provision managed databases (`POST /api/managed-databases`), create custom domains (`POST /api/domains`), and monitor telemetry (`GET /api/status`).
-
-### 📧 Hostinger Mail-Inspired Webmail Studio
-- Built-in webmail interface (`/webmail`) featuring 3-pane Column and 2-pane Row layout switching.
-- Folder navigation with unread badge counters, storage quota meters, AI thread summarization, and rich email composer.
+- **BaaS & Studio**: Based on **Supabase Master** (`references/supabase-master`) for self-hosted PostgreSQL, Auth, and Database Studio.
+- **Monitoring & Status Page**: Based on **Uptime Kuma** (`references/uptime-kuma-master`) and **Grafana** (`references/grafana-main`) for synthetic health checks and metric dashboards.
+- **Secret Vault**: Based on **Infisical** (`references/infisical-main`) for AES-256-GCM encrypted secret key vault storage.
+- **Build Engine**: Based on **Railpack / BuildKit** (`references/railpack-main`) for zero-downtime container builds.
+- **VPS Infrastructure**: Based on **Leaseweb API & VPS Monitor** (`references/vps-monitor-main`) for automated VPS provisioning and hardware telemetry.
 
 ---
 
-## 🏗️ Monorepo Architecture
+## ⚡ Core Platform Capabilities
 
-```
+### 1. 🤖 Fully Automated Provisioning Pipeline
+- **Zero-Touch Fulfillment**: The ONLY manual step on the entire platform is **Manual Payment Verification** (upload proof/SMS review).
+- Once payment is approved, the system automatically:
+  - Provisions the purchased product (web/node/python hosting, VPS, SMTP account, managed database, LiveKit, catalog app).
+  - Encrypts and delivers credentials via transactional email and WhatsApp (`/internal/send-notification`).
+  - Registers automatic Git deployment webhooks (`deployWebhookSecret`) for instant push-to-deploy.
+
+### 2. 🛡️ Scoped Developer REST API & Security
+- **Strict Customer Isolation**: Customer API keys (`shx_...`) can **ONLY** access, modify, or delete resources owned by that specific customer (`resource.userId === req.user.id`).
+- Unauthorized requests return secure `404 Not Found` responses to prevent resource enumeration.
+
+### 3. 📱 Mobile Admin App (`apps/mobile-admin`)
+- Built with React Native and Expo for Android and iOS devices.
+- Single-tap payment approval/rejection, real-time node metric charts, support ticket chat, and deployment controls.
+
+### 4. 📢 Unified Discord & WhatsApp Messaging
+- All platform alerts (payments, orders, tickets, failovers) are routed to a **single unified Discord Webhook** URL (`DISCORD_WEBHOOK_URL`).
+- Discord Bot (`services/discord-bot`) handles `/ticket` creation, `/server` monitoring, and direct invoice delivery.
+- WhatsApp Bot (`services/whatsapp-bot`) handles SMS/WhatsApp payment notifications and customer commands (`!status`, `!invoice`).
+
+---
+
+## 📁 Repository Monorepo Structure
+
+```text
 shanutechx/
-├── README.md                    # Root project documentation
-│
 ├── apps/
-│   ├── api/                     # Express REST API (TypeScript + Prisma 5.22)
-│   │   └── src/
-│   │       ├── routes/          # API endpoints (deployments, databases, teams, apiKeys, status)
-│   │       ├── lib/             # Core libraries (backup.ts, nodeSelector.ts, cloudflareDns.ts)
-│   │       └── middleware/      # Auth & RBAC middleware (requireAuth with API Key support)
-│   │
-│   ├── dashboard/               # Next.js 14 Control Panel Studio
-│   │   ├── app/
-│   │   │   ├── (protected)/     # Authenticated studio routes (deployments, admin, webmail, team)
-│   │   │   └── team/accept/     # Team invitation acceptance page
-│   │   └── lib/api.ts           # Type-safe API Client SDK
-│   │
-│   └── web/                     # Next.js 14 Marketing Site & Documentation
-│       └── app/
-│           ├── docs/            # Client Documentation & API Automation Hub
-│           ├── status/          # Public Health & Uptime Status Page
-│           ├── v2ray/           # V2Ray & Netch Proxy Showcase
-│           ├── about/ & contact/# Company & Support pages
-│           └── terms/ & privacy/# Legal policy pages
-│
+│   ├── api/             # Core REST API (Express + Prisma v5.22 + PostgreSQL)
+│   ├── dashboard/       # Control Panel Dashboard Studio (Next.js 14)
+│   ├── web/             # WrapXLK Dark Theme Marketing & Documentation Site (Next.js 14)
+│   └── mobile-admin/    # Expo React Native Mobile Admin App for Android & iOS
 ├── packages/
-│   └── db/                      # Prisma schema & migrations (Prisma v5.22.0)
-│
-└── services/
-    └── node-agent/              # Docker container manager running on each VPS node
+│   ├── db/              # Prisma 5.22 Schema & Database Migrations
+│   ├── client/          # @shanutechx/client Developer TypeScript SDK
+│   ├── catalog/         # One-Click App Catalog Templates Manager
+│   └── types/           # Core Shared TypeScript Type Definitions
+├── services/
+│   ├── node-agent/      # Node Agent VPS Container Builder & Manager
+│   ├── discord-bot/     # Discord Bot for Ticket Management & Alerts
+│   └── whatsapp-bot/    # WhatsApp Baileys Automated Messaging Bot
+├── templates/           # Yaml App Catalog Templates (Hermes AI Agent, Grafana, N8N, WordPress, etc.)
+├── docker-compose.prod.yml  # Production Compose Orchestrator with Traefik 3.x SSL
+├── SETUP_AND_CONFIGURATION_GUIDE.md # Step-by-Step Operations Manual
+└── .env.example         # Complete Root Environment Variables Template
 ```
 
 ---
 
-## 🔑 Developer REST API & Automation
+## 🚀 Quick Start & 1-Command Deployment
 
-All API endpoints accept developer API keys created from the dashboard:
-
+### 1. Clone & Setup Environment
 ```bash
-# Example: Deploy a new application using cURL
-curl -X POST https://api.shanutechx.com/api/deployments \
-  -H "x-api-key: shx_live_a1b2c3d4e5f6..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "repoUrl": "https://github.com/myorg/myapp",
-    "runtime": "nodejs",
-    "subdomain": "myapp"
-  }'
+git clone https://github.com/ShanudhaTirosh/Shanutechx-hostingplatfrom.git
+cd Shanutechx-hostingplatfrom
+cp .env.example .env
 ```
 
-```python
-# Example: Provision a Managed PostgreSQL Database in Python
-import requests
+### 2. Local Development Stack
+```bash
+docker compose -f docker-compose.local.yml up -d
+```
 
-url = "https://api.shanutechx.com/api/managed-databases"
-headers = {
-    "x-api-key": "shx_live_a1b2c3d4e5f6...",
-    "Content-Type": "application/json"
-}
-payload = {
-    "type": "postgresql",
-    "nodeId": "node_cm12345"
-}
-
-response = requests.post(url, json=payload, headers=headers)
-print("Database Provisioned:", response.json())
+### 3. Production Infrastructure Stack (with Traefik SSL)
+```bash
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ---
 
-## 🚀 Getting Started
+## 📄 License & Support
 
-### 1. Clone Monorepo & Install Dependencies
-
-```bash
-git clone https://github.com/shanutechx/shanutechx.git
-cd shanutechx
-npm install --legacy-peer-deps
-```
-
-### 2. Configure Environment Variables
-
-```bash
-# apps/api/.env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/shanutechx"
-JWT_SECRET="your-jwt-secret"
-ENCRYPTION_KEY="32-byte-hex-key-for-aes256"
-NODE_AGENT_SECRET="shared-secret-with-node-agents"
-ROOT_DOMAIN="shanutechx.com"
-R2_ENDPOINT="https://<account_id>.r2.cloudflarestorage.com"
-R2_ACCESS_KEY_ID="your-r2-key"
-R2_SECRET_ACCESS_KEY="your-r2-secret"
-R2_BUCKET_NAME="shanutechx-backups"
-```
-
-### 3. Generate Prisma Client & Run Services
-
-```bash
-# Generate Prisma Client (v5.22.0)
-npm run db:generate
-
-# Start API Backend (Port 4000)
-npm run dev --workspace=apps/api
-
-# Start Control Panel Dashboard (Port 3001)
-npm run dev --workspace=apps/dashboard
-
-# Start Marketing & Docs Site (Port 3000)
-npm run dev --workspace=apps/web
-```
-
----
-
-## 📋 API Reference
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `POST /api/deployments` | POST | Create a new application deployment |
-| `GET /api/deployments` | GET | List user deployments |
-| `POST /api/managed-databases` | POST | Provision PostgreSQL, MySQL, Redis, or MongoDB container |
-| `POST /api/managed-databases/:id/action` | POST | Power controls (`start`, `stop`, `restart`) |
-| `GET /api/teams` | GET | List client team workspaces |
-| `POST /api/teams/:id/invites` | POST | Invite new member with role & resource permissions |
-| `GET /api/status` | GET | Public uptime telemetry & service health |
-| `POST /api/api-keys` | POST | Generate a new developer API key (`shx_...`) |
-
----
-
-## 📄 License
-
-MIT © [ShanuTechX Cloud](https://shanutechx.com) — See [LICENSE](LICENSE) for details.
+MIT © [ShanuTechX Cloud Engine](https://shanutechx.com) — Built for enterprise reliability and autonomous operations.

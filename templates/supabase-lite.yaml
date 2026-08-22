@@ -1,0 +1,31 @@
+# slogan: Open source Firebase alternative with PostgreSQL, Auth, and Storage
+# documentation: https://docs.shanutechx.com/templates/supabase-lite
+# category: database
+# tags: database,supabase,postgres,baas,auth,storage
+# logo: https://raw.githubusercontent.com/walkxlk/assets/main/supabase.png
+# port: 8000
+
+version: '3.8'
+
+services:
+  supabase-db:
+    image: supabase/postgres:15.1.0.147
+    container_name: ${CONTAINER_NAME:-supabase}-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - POSTGRES_DB=postgres
+
+  supabase-studio:
+    image: supabase/studio:20240415-4e782e2
+    container_name: ${CONTAINER_NAME:-supabase}-studio
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:3000"
+    environment:
+      - STUDIO_PG_META_URL=http://supabase-db:5432
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    depends_on:
+      - supabase-db
