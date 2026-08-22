@@ -1,0 +1,11 @@
+﻿2026-08-22T11:52:46.0764012Z ##[group]Run npm ci
+2026-08-22T11:52:46.0764315Z [36;1mnpm ci[0m
+2026-08-22T11:52:46.0807969Z shell: /usr/bin/bash -e {0}
+2026-08-22T11:52:46.0808241Z env:
+2026-08-22T11:52:46.0808495Z   NPM_CONFIG_USERCONFIG: /home/runner/work/_temp/.npmrc
+2026-08-22T11:52:46.0809244Z   NODE_AUTH_TOKEN: XXXXX-XXXXX-XXXXX-XXXXX
+2026-08-22T11:52:46.0809551Z ##[endgroup]
+2026-08-22T11:52:47.0953423Z npm error code EUNSUPPORTEDPROTOCOL
+2026-08-22T11:52:47.0970515Z npm error Unsupported URL Type "workspace:": workspace:*
+2026-08-22T11:52:47.0975395Z npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-08-22T11_52_46_155Z-debug-0.log
+2026-08-22T11:52:47.1052511Z ##[error]Process completed with exit code 1.

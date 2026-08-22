@@ -1,0 +1,162 @@
+﻿2026-08-22T11:52:36.9442015Z Current runner version: '2.336.0'
+2026-08-22T11:52:36.9525640Z ##[group]Runner Image Provisioner
+2026-08-22T11:52:36.9527040Z Hosted Compute Agent
+2026-08-22T11:52:36.9528305Z Version: 20260729.566
+2026-08-22T11:52:36.9529901Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-22T11:52:36.9531407Z Build Date: 2026-07-29T19:17:02Z
+2026-08-22T11:52:36.9532732Z Worker ID: {9921e138-679f-48d3-8273-9e9b5d55d41e}
+2026-08-22T11:52:36.9534088Z Azure Region: westus3
+2026-08-22T11:52:36.9535165Z ##[endgroup]
+2026-08-22T11:52:36.9537515Z ##[group]Operating System
+2026-08-22T11:52:36.9538535Z Ubuntu
+2026-08-22T11:52:36.9560160Z 24.04.4
+2026-08-22T11:52:36.9561128Z LTS
+2026-08-22T11:52:36.9562286Z ##[endgroup]
+2026-08-22T11:52:36.9563333Z ##[group]Runner Image
+2026-08-22T11:52:36.9564394Z Image: ubuntu-24.04
+2026-08-22T11:52:36.9565559Z Version: 20260816.277.1
+2026-08-22T11:52:36.9567650Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260816.277/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-22T11:52:36.9571499Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260816.277
+2026-08-22T11:52:36.9573270Z ##[endgroup]
+2026-08-22T11:52:36.9574992Z ##[group]GITHUB_TOKEN Permissions
+2026-08-22T11:52:36.9577365Z Contents: write
+2026-08-22T11:52:36.9578101Z Metadata: read
+2026-08-22T11:52:36.9579296Z Packages: write
+2026-08-22T11:52:36.9580608Z PullRequests: write
+2026-08-22T11:52:36.9581736Z ##[endgroup]
+2026-08-22T11:52:36.9585070Z Secret source: Actions
+2026-08-22T11:52:36.9587503Z Prepare workflow directory
+2026-08-22T11:52:36.9930459Z Prepare all required actions
+2026-08-22T11:52:36.9977139Z Getting action download info
+2026-08-22T11:52:37.3002210Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-08-22T11:52:37.4341670Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-08-22T11:52:37.5323627Z Download action repository 'changesets/action@v1' (SHA:a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d)
+2026-08-22T11:52:38.1794884Z Complete job name: Build & Publish @shanutechx/* SDK
+2026-08-22T11:52:38.2604164Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-22T11:52:38.2613539Z ##[group]Run actions/checkout@v4
+2026-08-22T11:52:38.2614347Z with:
+2026-08-22T11:52:38.2614819Z   fetch-depth: 0
+2026-08-22T11:52:38.2615429Z   repository: ShanudhaTirosh/Shanutechx-hostingplatfrom
+2026-08-22T11:52:38.2619798Z   token: ***
+2026-08-22T11:52:38.2620287Z   ssh-strict: true
+2026-08-22T11:52:38.2620762Z   ssh-user: git
+2026-08-22T11:52:38.2621258Z   persist-credentials: true
+2026-08-22T11:52:38.2621800Z   clean: true
+2026-08-22T11:52:38.2622289Z   sparse-checkout-cone-mode: true
+2026-08-22T11:52:38.2622861Z   fetch-tags: false
+2026-08-22T11:52:38.2623380Z   show-progress: true
+2026-08-22T11:52:38.2623883Z   lfs: false
+2026-08-22T11:52:38.2624397Z   submodules: false
+2026-08-22T11:52:38.2624941Z   set-safe-directory: true
+2026-08-22T11:52:38.2625497Z   allow-unsafe-pr-checkout: false
+2026-08-22T11:52:38.2626373Z ##[endgroup]
+2026-08-22T11:52:38.3852880Z Syncing repository: ShanudhaTirosh/Shanutechx-hostingplatfrom
+2026-08-22T11:52:38.3858387Z ##[group]Getting Git version info
+2026-08-22T11:52:38.3860989Z Working directory is '/home/runner/work/Shanutechx-hostingplatfrom/Shanutechx-hostingplatfrom'
+2026-08-22T11:52:38.3863810Z [command]/usr/bin/git version
+2026-08-22T11:52:38.3922876Z git version 2.55.0
+2026-08-22T11:52:38.3992448Z ##[endgroup]
+2026-08-22T11:52:38.4004584Z Temporarily overriding HOME='/home/runner/work/_temp/59ee9191-0f1a-4852-bb93-8cc73dc1efb3' before making global git config changes
+2026-08-22T11:52:38.4007714Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-22T11:52:38.4011737Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Shanutechx-hostingplatfrom/Shanutechx-hostingplatfrom
+2026-08-22T11:52:38.4090753Z Deleting the contents of '/home/runner/work/Shanutechx-hostingplatfrom/Shanutechx-hostingplatfrom'
+2026-08-22T11:52:38.4092886Z ##[group]Initializing the repository
+2026-08-22T11:52:38.4094302Z [command]/usr/bin/git init /home/runner/work/Shanutechx-hostingplatfrom/Shanutechx-hostingplatfrom
+2026-08-22T11:52:38.4229819Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-08-22T11:52:38.4256133Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-08-22T11:52:38.4263726Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-08-22T11:52:38.4265775Z hint: call:
+2026-08-22T11:52:38.4290343Z hint:
+2026-08-22T11:52:38.4309975Z hint: 	git config --global init.defaultBranch <name>
+2026-08-22T11:52:38.4328147Z hint:
+2026-08-22T11:52:38.4329984Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-08-22T11:52:38.4350418Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-08-22T11:52:38.4357198Z hint:
+2026-08-22T11:52:38.4377057Z hint: 	git branch -m <name>
+2026-08-22T11:52:38.4383947Z hint:
+2026-08-22T11:52:38.4385702Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-08-22T11:52:38.4410533Z Initialized empty Git repository in /home/runner/work/Shanutechx-hostingplatfrom/Shanutechx-hostingplatfrom/.git/
+2026-08-22T11:52:38.4427617Z [command]/usr/bin/git remote add origin https://github.com/ShanudhaTirosh/Shanutechx-hostingplatfrom
+2026-08-22T11:52:38.4441029Z ##[endgroup]
+2026-08-22T11:52:38.4442666Z ##[group]Disabling automatic garbage collection
+2026-08-22T11:52:38.4444083Z [command]/usr/bin/git config --local gc.auto 0
+2026-08-22T11:52:38.4447486Z ##[endgroup]
+2026-08-22T11:52:38.4449261Z ##[group]Setting up auth
+2026-08-22T11:52:38.4450917Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-22T11:52:38.4456988Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-22T11:52:38.4960813Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-22T11:52:38.4993487Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-22T11:52:38.5342679Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-22T11:52:38.5395125Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-22T11:52:38.5644232Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-08-22T11:52:38.5689137Z ##[endgroup]
+2026-08-22T11:52:38.5692426Z ##[group]Fetching the repository
+2026-08-22T11:52:38.5703441Z [command]/usr/bin/git -c protocol.version=2 fetch --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+2026-08-22T11:52:39.9733348Z From https://github.com/ShanudhaTirosh/Shanutechx-hostingplatfrom
+2026-08-22T11:52:39.9735745Z  * [new branch]      main       -> origin/main
+2026-08-22T11:52:39.9748561Z [command]/usr/bin/git branch --list --remote origin/main
+2026-08-22T11:52:39.9780815Z   origin/main
+2026-08-22T11:52:39.9790718Z [command]/usr/bin/git rev-parse refs/remotes/origin/main
+2026-08-22T11:52:39.9819520Z 4a793eb11c8bf3a116564cf1947ee4cf56c925ab
+2026-08-22T11:52:39.9825113Z ##[endgroup]
+2026-08-22T11:52:39.9826441Z ##[group]Determining the checkout info
+2026-08-22T11:52:39.9827966Z ##[endgroup]
+2026-08-22T11:52:39.9832842Z [command]/usr/bin/git sparse-checkout disable
+2026-08-22T11:52:39.9904486Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-08-22T11:52:39.9931015Z ##[group]Checking out the ref
+2026-08-22T11:52:39.9934839Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-08-22T11:52:40.0607715Z Switched to a new branch 'main'
+2026-08-22T11:52:40.0614921Z branch 'main' set up to track 'origin/main'.
+2026-08-22T11:52:40.0629255Z ##[endgroup]
+2026-08-22T11:52:40.0677391Z [command]/usr/bin/git log -1 --format=%H
+2026-08-22T11:52:40.0708639Z 4a793eb11c8bf3a116564cf1947ee4cf56c925ab
+2026-08-22T11:52:40.0988363Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-22T11:52:40.0990706Z ##[group]Run actions/setup-node@v4
+2026-08-22T11:52:40.0991030Z with:
+2026-08-22T11:52:40.0991303Z   node-version: 20
+2026-08-22T11:52:40.0991615Z   registry-url: https://npm.pkg.github.com
+2026-08-22T11:52:40.0991958Z   scope: @shanutechx
+2026-08-22T11:52:40.0992226Z   always-auth: false
+2026-08-22T11:52:40.0992503Z   check-latest: false
+2026-08-22T11:52:40.0995033Z   token: ***
+2026-08-22T11:52:40.0995295Z ##[endgroup]
+2026-08-22T11:52:40.2573730Z Attempting to download 20...
+2026-08-22T11:52:40.2655684Z (node:2094) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-08-22T11:52:40.2657666Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-08-22T11:52:41.2762206Z Acquiring 20.20.2 - x64 from https://github.com/actions/node-versions/releases/download/20.20.2-23521894959/node-20.20.2-linux-x64.tar.gz
+2026-08-22T11:52:41.8941790Z Extracting ...
+2026-08-22T11:52:41.9086886Z [command]/usr/bin/tar xz --strip 1 --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/7dfd2a9c-2e66-406c-9d64-dfee67f81da8 -f /home/runner/work/_temp/c064bd48-af96-44ca-8177-7461c7289de1
+2026-08-22T11:52:43.0524279Z Adding to the cache ...
+2026-08-22T11:52:45.7779774Z ##[group]Environment details
+2026-08-22T11:52:46.0571289Z node: v20.20.2
+2026-08-22T11:52:46.0572058Z npm: 10.8.2
+2026-08-22T11:52:46.0572633Z yarn: 1.22.22
+2026-08-22T11:52:46.0573566Z ##[endgroup]
+2026-08-22T11:52:46.0764026Z ##[group]Run npm ci
+2026-08-22T11:52:46.0764318Z [36;1mnpm ci[0m
+2026-08-22T11:52:46.0807980Z shell: /usr/bin/bash -e {0}
+2026-08-22T11:52:46.0808244Z env:
+2026-08-22T11:52:46.0808498Z   NPM_CONFIG_USERCONFIG: /home/runner/work/_temp/.npmrc
+2026-08-22T11:52:46.0809257Z   NODE_AUTH_TOKEN: XXXXX-XXXXX-XXXXX-XXXXX
+2026-08-22T11:52:46.0809554Z ##[endgroup]
+2026-08-22T11:52:47.0953459Z npm error code EUNSUPPORTEDPROTOCOL
+2026-08-22T11:52:47.0970531Z npm error Unsupported URL Type "workspace:": workspace:*
+2026-08-22T11:52:47.0975410Z npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-08-22T11_52_46_155Z-debug-0.log
+2026-08-22T11:52:47.1052524Z ##[error]Process completed with exit code 1.
+2026-08-22T11:52:47.1204164Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-22T11:52:47.1205406Z Post job cleanup.
+2026-08-22T11:52:47.2162053Z [command]/usr/bin/git version
+2026-08-22T11:52:47.2227365Z git version 2.55.0
+2026-08-22T11:52:47.2284509Z Temporarily overriding HOME='/home/runner/work/_temp/1c2eecb5-815b-43f8-892a-68c7df609bab' before making global git config changes
+2026-08-22T11:52:47.2287035Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-22T11:52:47.2289383Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Shanutechx-hostingplatfrom/Shanutechx-hostingplatfrom
+2026-08-22T11:52:47.2334497Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-22T11:52:47.2413375Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-22T11:52:47.2770360Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-22T11:52:47.3955814Z http.https://github.com/.extraheader
+2026-08-22T11:52:47.3967706Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-08-22T11:52:47.6479809Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-22T11:52:47.6758108Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-22T11:52:47.6798373Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-22T11:52:47.7323302Z Cleaning up orphan processes
+2026-08-22T11:52:47.7600858Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
