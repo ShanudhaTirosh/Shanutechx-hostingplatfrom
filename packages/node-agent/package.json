@@ -31,7 +31,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@shanutechx/types": "workspace:*"
+    "@shanutechx/types": "*"
   },
   "devDependencies": {
     "tsup": "*",

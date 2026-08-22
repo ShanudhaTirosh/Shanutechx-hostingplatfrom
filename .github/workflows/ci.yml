@@ -10,6 +10,11 @@ jobs:
   test-and-build:
     name: Build & Test Workspace
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "postgresql://shanutechx:SecurePass@localhost:5432/shanutechx?schema=public"
+      JWT_SECRET: "ci-dummy-jwt-secret-key-minimum-32-chars-long"
+      ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      SKIP_ENV_VALIDATION: "true"
 
     steps:
       - name: Checkout Source Code
