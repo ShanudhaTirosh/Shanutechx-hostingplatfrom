@@ -38,10 +38,31 @@ async function resolveNodeAccess(req: AuthedRequest, nodeId: string) {
   if (provision) {
     const allowed = await canAccessResource(provision.userId, req);
     if (!allowed) return null;
+
+    let ip: string | null = null;
+    if (provision.leasewebVpsId) {
+      try {
+        const { getVps } = await import('../lib/leasewebClient');
+        const vps = await getVps(provision.leasewebVpsId);
+        ip = vps.ips?.[0]?.ip || null;
+      } catch (err) {
+        logger.warn({ err, provisionId: provision.id }, 'Failed to fetch VPS IP from Leaseweb');
+      }
+    } else if (provision.panelUrl) {
+      try {
+        const url = new URL(provision.panelUrl);
+        ip = url.hostname;
+      } catch (_) {}
+    }
+
+    if (!ip || ip === '127.0.0.1' || ip === 'localhost') {
+      return null; // Refuse invalid or loopback IP fallback
+    }
+
     return {
       id: provision.id,
       label: `vps-${provision.externalId || provision.id.slice(0, 8)}`,
-      ip: provision.externalId || '127.0.0.1',
+      ip,
     };
   }
 

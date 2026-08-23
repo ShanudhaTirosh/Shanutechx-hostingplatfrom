@@ -212,4 +212,47 @@ function parseCsvLine(line) {
   return result;
 }
 
-module.exports = { provisionProject, deprovisionProject, execSql, listTables };
+async function insertRow({ projectId, dbName, tableName, row }) {
+  if (projectId) validateIdentifier(projectId, 'projectId');
+  validateIdentifier(dbName, 'dbName');
+  validateIdentifier(tableName, 'tableName');
+  const keys = Object.keys(row).filter((k) => k !== 'dbName');
+  keys.forEach((k) => validateIdentifier(k, 'columnName'));
+  const cols = keys.map((k) => `"${k}"`).join(', ');
+  const vals = keys.map((k) => quoteSqlLiteral(row[k])).join(', ');
+  const sql = `INSERT INTO "${tableName}" (${cols}) VALUES (${vals}) RETURNING *;`;
+  return execSql({ projectId, dbName, sql });
+}
+
+async function updateRow({ projectId, dbName, tableName, pkColumn = 'id', pkValue, row }) {
+  if (projectId) validateIdentifier(projectId, 'projectId');
+  validateIdentifier(dbName, 'dbName');
+  validateIdentifier(tableName, 'tableName');
+  validateIdentifier(pkColumn, 'pkColumn');
+  const keys = Object.keys(row).filter((k) => k !== 'dbName');
+  keys.forEach((k) => validateIdentifier(k, 'columnName'));
+  const setClauses = keys.map((k) => `"${k}" = ${quoteSqlLiteral(row[k])}`).join(', ');
+  const sql = `UPDATE "${tableName}" SET ${setClauses} WHERE "${pkColumn}" = ${quoteSqlLiteral(pkValue)} RETURNING *;`;
+  return execSql({ projectId, dbName, sql });
+}
+
+async function deleteRow({ projectId, dbName, tableName, pkColumn = 'id', pkValue }) {
+  if (projectId) validateIdentifier(projectId, 'projectId');
+  validateIdentifier(dbName, 'dbName');
+  validateIdentifier(tableName, 'tableName');
+  validateIdentifier(pkColumn, 'pkColumn');
+  const sql = `DELETE FROM "${tableName}" WHERE "${pkColumn}" = ${quoteSqlLiteral(pkValue)};`;
+  return execSql({ projectId, dbName, sql });
+}
+
+module.exports = {
+  provisionProject,
+  deprovisionProject,
+  execSql,
+  listTables,
+  validateIdentifier,
+  insertRow,
+  updateRow,
+  deleteRow,
+};
+

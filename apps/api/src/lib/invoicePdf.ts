@@ -23,7 +23,7 @@ function formatMoney(amountInSmallestUnit: number, currencyLabel: string): strin
 export async function generateInvoicePdf(data: InvoiceData): Promise<Uint8Array> {
   const currencyLabel = data.currencyLabel ?? 'LKR';
   const doc = await PDFDocument.create();
-  const page = doc.addPage([595, 842]); // A4
+  let page = doc.addPage([595, 842]); // A4
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
 
@@ -62,12 +62,28 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Uint8Array>
 
   y -= 20;
   for (const item of data.items) {
+    if (y < 80) {
+      page = doc.addPage([595, 842]);
+      y = 800;
+      page.drawText('Item', { x: colItem, y, size: 11, font: bold });
+      page.drawText('Qty', { x: colQty, y, size: 11, font: bold });
+      page.drawText('Price', { x: colPrice, y, size: 11, font: bold });
+      page.drawText('Subtotal', { x: colSubtotal, y, size: 11, font: bold });
+      y -= 8;
+      page.drawLine({ start: { x: margin, y }, end: { x: 545, y }, thickness: 1, color: rgb(0.85, 0.85, 0.85) });
+      y -= 20;
+    }
     const subtotal = item.unitPrice * item.quantity;
     page.drawText(item.name, { x: colItem, y, size: 10, font });
     page.drawText(String(item.quantity), { x: colQty, y, size: 10, font });
     page.drawText(formatMoney(item.unitPrice, currencyLabel), { x: colPrice, y, size: 10, font });
     page.drawText(formatMoney(subtotal, currencyLabel), { x: colSubtotal, y, size: 10, font });
     y -= 18;
+  }
+
+  if (y < 80) {
+    page = doc.addPage([595, 842]);
+    y = 800;
   }
 
   y -= 12;

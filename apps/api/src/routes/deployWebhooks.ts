@@ -135,6 +135,11 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
   const ref = typeof req.body?.ref === 'string' ? req.body.ref : undefined; // e.g. "refs/heads/main"
   const pushedBranch = ref?.replace('refs/heads/', '');
 
+  if (deployment.branch && pushedBranch && pushedBranch !== deployment.branch) {
+    logger.info({ deploymentId: deployment.id, trackedBranch: deployment.branch, pushedBranch }, 'Ignoring webhook push to untracked branch');
+    return res.status(200).json({ accepted: false, reason: `Ignored push to branch '${pushedBranch}'; deployment tracks '${deployment.branch}'` });
+  }
+
   // Ack immediately — GitHub/GitLab expect a fast 2xx and will retry/flag
   // the webhook as failing if the build (which can take a while) blocks
   // the response.

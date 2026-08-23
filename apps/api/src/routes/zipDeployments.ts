@@ -8,6 +8,9 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { pushWorkspaceToShadowRepo } from '../lib/shadowBackup';
 import { env } from '../env';
 
+import { generateSubdomain } from '../lib/subdomain';
+import { selectNodeForDeployment } from '../lib/nodeSelector';
+
 export const uploadDeploymentsRouter = Router();
 
 uploadDeploymentsRouter.use(requireAuth);
@@ -35,18 +38,14 @@ uploadDeploymentsRouter.post('/deployments/upload', upload.array('files', 50), a
     return res.status(400).json({ error: 'No files uploaded. Please upload a zip archive or project files.' });
   }
 
-  const preferredName = (req.body.preferredName || `upload-app-${Date.now()}`).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const nodeId = req.body.nodeId;
+  const preferredName = req.body.preferredName || `upload-app-${Date.now()}`;
+  const subdomain = await generateSubdomain(preferredName);
 
   try {
-    const node = nodeId
-      ? await prisma.node.findUnique({ where: { id: nodeId } })
-      : await prisma.node.findFirst({ where: { isActive: true } });
-
-    if (!node) return res.status(400).json({ error: 'No active deployment node available' });
+    const node = await selectNodeForDeployment({ requiredTag: 'web-hosting' });
 
     // Key storage path
-    const storageKey = `source-uploads/${req.user!.id}/${preferredName}-${Date.now()}.zip`;
+    const storageKey = `source-uploads/${req.user!.id}/${subdomain}-${Date.now()}.zip`;
     const client = getR2Client();
 
     if (!client) {
@@ -68,7 +67,7 @@ uploadDeploymentsRouter.post('/deployments/upload', upload.array('files', 50), a
       await Promise.all(
         files.map((file, idx) => {
           const filePath = file.originalname || `file-${idx}`;
-          const itemKey = `source-uploads/${req.user!.id}/${preferredName}-${Date.now()}/${filePath}`;
+          const itemKey = `source-uploads/${req.user!.id}/${subdomain}-${Date.now()}/${filePath}`;
           return client.send(
             new PutObjectCommand({
               Bucket: env.r2BucketName,
@@ -84,7 +83,7 @@ uploadDeploymentsRouter.post('/deployments/upload', upload.array('files', 50), a
     const deployment = await prisma.deployment.create({
       data: {
         userId: req.user!.id,
-        subdomain: preferredName,
+        subdomain,
         repoUrl: `zip://${storageKey}`,
         branch: 'main',
         nodeId: node.id,

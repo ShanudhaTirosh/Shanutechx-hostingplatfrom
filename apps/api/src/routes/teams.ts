@@ -114,12 +114,23 @@ teamsRouter.get('/teams/:id', async (req: AuthedRequest, res) => {
   }
 
   // Fetch resources owned by team owner (deployments, databases, VPS, SMTP)
-  const [deployments, databases, vpsInstances, smtpAccounts] = await Promise.all([
+  let [deployments, databases, vpsInstances, smtpAccounts] = await Promise.all([
     prisma.deployment.findMany({ where: { userId: team.ownerId }, select: { id: true, subdomain: true, status: true } }),
     prisma.managedDatabase.findMany({ where: { userId: team.ownerId }, select: { id: true, type: true, status: true, internalHost: true } }),
     prisma.vpsProvision.findMany({ where: { userId: team.ownerId }, select: { id: true, status: true, provider: true } }),
     prisma.smtpAccount.findMany({ where: { userId: team.ownerId }, select: { id: true, smtpHost: true, smtpUsername: true } }),
   ]);
+
+  // Filter resources based on granular resource permissions for non-owner members
+  const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
+  if (!isOwner && !isStaff && myMembership?.permissions && myMembership.permissions.length > 0) {
+    const perms = myMembership.permissions;
+    const allowed = (type: string, id: string) => perms.some((p: any) => p.resourceType === type && p.resourceId === id && p.permission !== 'none');
+    deployments = deployments.filter((d: any) => allowed('deployment', d.id));
+    databases = databases.filter((d: any) => allowed('managed_database', d.id));
+    vpsInstances = vpsInstances.filter((v: any) => allowed('vps', v.id));
+    smtpAccounts = smtpAccounts.filter((s: any) => allowed('smtp', s.id));
+  }
 
   res.json({
     team,

@@ -262,7 +262,7 @@ export async function ownedResourceWhere(
   }
   if (req.user?.role === 'admin') {
     const assigned = await prisma.user?.findMany({
-      where: { assignedAdminId: req.user.id },
+      where: { OR: [{ assignedAdminId: req.user.id }, { assignedAdminId: null }] },
       select: { id: true },
     });
     return { [userIdField]: { in: assigned ? assigned.map((u: { id: string }) => u.id) : [] } };

@@ -130,12 +130,22 @@ export async function sendSmtpReleaseEmail(details: SmtpReleaseDetails): Promise
   `;
 
   try {
+    const smtpHost = process.env.SMTP_HOST || 'mail.shanutechx.com';
+    const smtpPort = Number(process.env.SMTP_PORT) || 587;
+    const smtpUser = process.env.SMTP_USER || 'no-reply@shanutechx.com';
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (!smtpPass) {
+      logger.warn({ recipient: details.clientEmail }, 'SMTP_PASS env var is not set. Cannot dispatch release email.');
+      return;
+    }
+
     await sendSmtpEmail(
       {
-        host: process.env.SMTP_HOST || 'mail.shanutechx.com',
-        port: Number(process.env.SMTP_PORT) || 587,
-        user: process.env.SMTP_USER || 'no-reply@shanutechx.com',
-        pass: process.env.SMTP_PASS || 'smtp_pass',
+        host: smtpHost,
+        port: smtpPort,
+        user: smtpUser,
+        pass: smtpPass,
       },
       {
         from: `"ShanuTechX Provisioner" <${process.env.SMTP_USER || 'no-reply@shanutechx.com'}>`,

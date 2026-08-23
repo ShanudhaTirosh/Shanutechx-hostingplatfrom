@@ -39,40 +39,46 @@ paymentsRouter.post(
   '/orders/:orderId/payments/proof',
   paymentUploadLimiter,
   idempotent,
-  async (req: AuthedRequest, res, next) => {
-  uploadPaymentProof(req, res, async (uploadErr) => {
-    if (uploadErr) {
-      return res.status(400).json({ error: uploadErr.message });
+  async (req: AuthedRequest, res) => {
+    const { orderId } = req.params;
+    if (!orderId || typeof orderId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(orderId)) {
+      return res.status(400).json({ error: 'Invalid orderId format' });
     }
 
-    const order = await loadOwnedOrder(req, req.params.orderId);
+    const order = await loadOwnedOrder(req, orderId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-    const payment = await prisma.payment.create({
-      data: {
-        orderId: order.id,
-        method: 'proof_upload',
-        proofUrl: req.file.path,
-        status: 'manual_review',
-      },
-    });
+    uploadPaymentProof(req, res, async (uploadErr) => {
+      if (uploadErr) {
+        return res.status(400).json({ error: uploadErr.message });
+      }
 
-    void notifyAdmins(
-      `New payment proof uploaded for order ${order.id}. Awaiting manual admin review.`
-    );
-    void notifyDiscordChannel('new_payment_submitted', {
-      'Order': order.id,
-      'Customer': order.user.email,
-      'Amount (LKR)': order.totalLkr,
-      'Proof': payment.proofUrl ?? '(none)',
-    });
+      if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-    res.status(202).json({
-      payment,
-      reasons: ['Proof received — submitted for manual admin review. An admin will approve or decline it shortly.'],
+      const payment = await prisma.payment.create({
+        data: {
+          orderId: order.id,
+          method: 'proof_upload',
+          proofUrl: req.file.path,
+          status: 'manual_review',
+        },
+      });
+
+      void notifyAdmins(
+        `New payment proof uploaded for order ${order.id}. Awaiting manual admin review.`
+      );
+      void notifyDiscordChannel('new_payment_submitted', {
+        'Order': order.id,
+        'Customer': order.user.email,
+        'Amount (LKR)': order.totalLkr,
+        'Proof': payment.proofUrl ?? '(none)',
+      });
+
+      res.status(202).json({
+        payment,
+        reasons: ['Proof received — submitted for manual admin review. An admin will approve or decline it shortly.'],
+      });
     });
-  });
   }
 );
 

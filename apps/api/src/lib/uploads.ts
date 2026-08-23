@@ -13,8 +13,9 @@ const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024; // 8MB — plenty for a screenshot
 
 const storage = multer.diskStorage({
   destination: async (req, _file, cb) => {
-    const orderId = req.params.orderId;
-    const dir = path.join(UPLOADS_DIR, 'payments', orderId);
+    const rawOrderId = req.params.orderId || 'default';
+    const safeOrderId = path.basename(rawOrderId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const dir = path.join(UPLOADS_DIR, 'payments', safeOrderId);
     await mkdir(dir, { recursive: true });
     cb(null, dir);
   },

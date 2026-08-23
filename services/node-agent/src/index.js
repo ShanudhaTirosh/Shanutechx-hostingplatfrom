@@ -1,4 +1,5 @@
-require('dotenv/config');
+const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const express = require('express');
 const pino = require('pino');
@@ -10,7 +11,8 @@ const { addKey } = require('./livekit');
 const { addDomainRoute, removeDomainRoute } = require('./customDomain');
 const { provisionDatabase } = require('./managedDb');
 const { listDir, readFile, writeFile, writeBinaryFile, extractArchive, makeDir, remove: fsRemove, rename } = require('./filesystem');
-const { provisionProject, deprovisionProject, execSql, listTables } = require('./projects');
+const { provisionProject, deprovisionProject, execSql, listTables, validateIdentifier, insertRow, updateRow, deleteRow } = require('./projects');
+
 const cockpit = require('./cockpit');
 
 const PORT = process.env.AGENT_PORT || 5000;
@@ -165,7 +167,7 @@ app.get('/agent/containers/:containerId/logs', async (req, res) => {
  */
 app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
   const { deploymentId } = req.params;
-  const { repoUrl, branch, subdomain, internalPort, envVars } = req.body || {};
+  const { repoUrl, branch, subdomain, internalPort, envVars, cpuLimit, memoryLimit, backupRepoUrl, routingMode, publishedPort } = req.body || {};
 
   if (!repoUrl || !internalPort) {
     return res.status(400).json({ error: 'repoUrl and internalPort are required' });
@@ -178,7 +180,7 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
   try {
     logger.info({ deploymentId, repoUrl }, 'Starting build');
     emit({ phase: 'fetch', message: 'Fetching repository...' });
-    const workspaceDir = await prepareWorkspace(deploymentId, repoUrl, branch || 'main');
+    const workspaceDir = await prepareWorkspace(deploymentId, repoUrl, branch || 'main', backupRepoUrl);
 
     emit({ phase: 'build', message: 'Building with Railpack...' });
     const imageTag = `shanutechx/${deploymentId}:latest`;
@@ -197,6 +199,10 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
       subdomain,
       rootDomain: ROOT_DOMAIN,
       envVars,
+      cpuLimit: cpuLimit ?? 1,
+      memLimitMb: memoryLimit ?? 512,
+      routingMode: routingMode || 'proxied',
+      publishedPort: publishedPort ?? null,
     });
 
     logger.info({ deploymentId, containerId, subdomain }, 'Deployment complete');
@@ -306,7 +312,7 @@ app.get('/agent/deployments/:containerId/logs/stream', async (req, res) => {
 
 app.post('/agent/deployments/:containerId/stop', async (req, res) => {
   try {
-    await stopAndRemove(req.params.containerId);
+    await stopContainer(req.params.containerId);
     logger.info({ containerId: req.params.containerId }, 'Container stopped');
     res.json({ ok: true });
   } catch (err) {
@@ -314,6 +320,7 @@ app.post('/agent/deployments/:containerId/stop', async (req, res) => {
     res.status(500).json({ error: 'Failed to stop container' });
   }
 });
+
 
 app.post('/agent/deployments/:containerId/start', async (req, res) => {
   try {
@@ -720,6 +727,7 @@ app.get('/agent/projects/:projectId/tables/:table/rows', async (req, res) => {
   if (!dbName) return res.status(400).json({ error: 'dbName required' });
   const offset = (parseInt(page) - 1) * parseInt(limit);
   try {
+    validateIdentifier(req.params.table, 'tableName');
     const result = await execSql({
       projectId: req.params.projectId,
       dbName,
@@ -736,6 +744,58 @@ app.get('/agent/projects/:projectId/tables/:table/rows', async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
+
+app.post('/agent/projects/:projectId/tables/:table/rows', async (req, res) => {
+  const { dbName, ...row } = req.body || {};
+  if (!dbName) return res.status(400).json({ error: 'dbName required' });
+  try {
+    const result = await insertRow({
+      projectId: req.params.projectId,
+      dbName,
+      tableName: req.params.table,
+      row,
+    });
+    res.status(201).json({ row: result.rows[0] });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.patch('/agent/projects/:projectId/tables/:table/rows/:pk', async (req, res) => {
+  const { dbName, pkColumn = 'id', ...row } = req.body || {};
+  if (!dbName) return res.status(400).json({ error: 'dbName required' });
+  try {
+    const result = await updateRow({
+      projectId: req.params.projectId,
+      dbName,
+      tableName: req.params.table,
+      pkColumn,
+      pkValue: req.params.pk,
+      row,
+    });
+    res.json({ row: result.rows[0] });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/agent/projects/:projectId/tables/:table/rows/:pk', async (req, res) => {
+  const { dbName, pkColumn = 'id' } = req.query || req.body || {};
+  if (!dbName) return res.status(400).json({ error: 'dbName required' });
+  try {
+    await deleteRow({
+      projectId: req.params.projectId,
+      dbName,
+      tableName: req.params.table,
+      pkColumn,
+      pkValue: req.params.pk,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 
 // ── Docker Compose template deployments ──────────────────────────────────────
 

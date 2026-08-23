@@ -109,11 +109,8 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
         let connectOpts: any = { host: ip, port: 22, readyTimeout: 15_000 };
 
         if (sshKeyRef.startsWith('ssh://')) {
-          // Format: ssh://username@host:port — password was used at provision time
-          // The sshKeyRef is used as username only here; password SSH requires
-          // re-prompting (not supported in this flow). Use key auth.
-          connectOpts.username = sshKeyRef.replace('ssh://', '').split('@')[0] || 'root';
-          connectOpts.username = connectOpts.username || 'root';
+          fail('This node was registered using password authentication without a stored private key. Browser SSH terminal requires an SSH private key reference.');
+          return;
         } else {
           // Encrypted private key stored in vault
           try {

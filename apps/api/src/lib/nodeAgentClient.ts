@@ -23,6 +23,7 @@ export interface BuildAndRunParams {
   cpuLimit?: number;      // CPU cores limit (0.1-16)
   memoryLimit?: number;   // Memory in MB (64-32768)
   storageLimit?: number;  // Storage in GB (1-500)
+  backupRepoUrl?: string;
 }
 
 export interface BuildEvent {

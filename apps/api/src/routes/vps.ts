@@ -98,6 +98,10 @@ vpsRouter.delete('/vps-provisions/:id', async (req: AuthedRequest, res) => {
     return res.status(404).json({ error: 'Not found' });
   }
 
+  if (provision.status !== 'terminated') {
+    return res.status(409).json({ error: 'Cannot delete an active VPS provision. It must be terminated first.' });
+  }
+
   await prisma.vpsProvision.delete({ where: { id: provision.id } });
 
   await prisma.auditLog.create({

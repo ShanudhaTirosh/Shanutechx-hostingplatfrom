@@ -8,7 +8,7 @@ import { NodeSelectionError } from '../lib/nodeSelector';
 import { fetchLogs, stopDeployment, startDeployment, restartDeployment, buildAndRun, addCustomDomainRoute, removeCustomDomainRoute, getResourceUsage, ResourceMetrics } from '../lib/nodeAgentClient';
 import { parsePagination } from '../lib/pagination';
 import { verifyCnameTarget } from '../lib/customDomain';
-import { createSubdomainRecord } from '../lib/cloudflare';
+import { createSubdomainRecord, deleteSubdomainRecord } from '../lib/cloudflare';
 import { createCnameViaCloudflare, deleteCnameViaCloudflare } from '../lib/cloudflareDns';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { deleteShadowRepo } from '../lib/shadowBackup';
@@ -409,9 +409,14 @@ deploymentsRouter.post('/deployments/:id/start', async (req: AuthedRequest, res)
     });
     res.json({ ok: true, status: 'running' });
   } catch (err) {
-    res.status(502).json({ error: 'Failed to start deployment on node' });
+    await prisma.deployment.update({
+      where: { id: deployment.id },
+      data: { status: 'failed' },
+    });
+    res.status(502).json({ error: 'Failed to start deployment on node. The container may have been removed — please redeploy.' });
   }
 });
+
 
 deploymentsRouter.delete('/deployments/:id', async (req: AuthedRequest, res) => {
   const deployment = await loadOwnedDeployment(req, req.params.id);
@@ -630,11 +635,15 @@ deploymentsRouter.patch('/deployments/:id/subdomain', async (req: AuthedRequest,
     return res.status(409).json({ error: validation.error ?? 'Invalid subdomain' });
   }
 
+  const oldSubdomain = deployment.subdomain;
   const newSubdomain = validation.formatted;
 
-  // Point Cloudflare DNS to node IP for the new subdomain
+  // Point Cloudflare DNS to node IP for the new subdomain and clean up old DNS
   try {
     await createSubdomainRecord(newSubdomain, deployment.node.ip);
+    if (oldSubdomain && oldSubdomain !== newSubdomain) {
+      void deleteSubdomainRecord(oldSubdomain);
+    }
   } catch (err) {
     logger.warn({ deploymentId: deployment.id, err }, 'Failed to create Cloudflare DNS record for new subdomain');
   }
@@ -654,6 +663,7 @@ deploymentsRouter.patch('/deployments/:id/subdomain', async (req: AuthedRequest,
           repoUrl: deployment.repoUrl,
           subdomain: newSubdomain,
           internalPort: deployment.internalPort,
+          backupRepoUrl: deployment.backupRepoFullName ?? undefined,
         },
         () => {}
       );
@@ -664,6 +674,7 @@ deploymentsRouter.patch('/deployments/:id/subdomain', async (req: AuthedRequest,
 
   res.json({ ok: true, subdomain: newSubdomain, url: `https://${newSubdomain}.${env.rootDomain}` });
 });
+
 
 /**
  * Rebuilds an EXISTING deployment in place — same node, same subdomain, no
@@ -694,6 +705,7 @@ deploymentsRouter.post('/deployments/:id/redeploy', async (req: AuthedRequest, r
         branch: parsed.data.branch,
         subdomain: deployment.subdomain ?? undefined,
         internalPort: deployment.internalPort,
+        backupRepoUrl: deployment.backupRepoFullName ?? undefined,
       },
       (event) => res.write(JSON.stringify(event) + '\n')
     );
@@ -717,6 +729,7 @@ deploymentsRouter.post('/deployments/:id/redeploy', async (req: AuthedRequest, r
     res.end();
   }
 });
+
 
 const createPreviewSchema = z.object({
   branch: z.string().regex(/^[a-zA-Z0-9_\-\/\.]+$/, 'Invalid branch name').max(100).min(1),
@@ -825,11 +838,16 @@ deploymentsRouter.patch('/deployments/:id/limits', async (req: AuthedRequest, re
           cpuLimit: updated.cpuLimit ?? undefined,
           memoryLimit: updated.memoryLimit ?? undefined,
           storageLimit: updated.storageLimit ?? undefined,
+          backupRepoUrl: deployment.backupRepoFullName ?? undefined,
         },
         (event) => res.write(JSON.stringify(event) + '\n')
       );
 
       if (result.phase === 'error') {
+        await prisma.deployment.update({
+          where: { id: deployment.id },
+          data: { status: 'failed' },
+        });
         res.write(JSON.stringify({ phase: 'error', message: 'Failed to restart with new limits' }) + '\n');
         return res.end();
       }
@@ -850,6 +868,10 @@ deploymentsRouter.patch('/deployments/:id/limits', async (req: AuthedRequest, re
       }) + '\n');
       res.end();
     } catch (err) {
+      await prisma.deployment.update({
+        where: { id: deployment.id },
+        data: { status: 'failed' },
+      });
       res.write(JSON.stringify({ phase: 'error', message: 'Failed to restart deployment with new limits' }) + '\n');
       res.end();
     }
@@ -929,6 +951,7 @@ deploymentsRouter.patch('/deployments/:id/env', async (req: AuthedRequest, res) 
           cpuLimit: deployment.cpuLimit ?? undefined,
           memoryLimit: deployment.memoryLimit ?? undefined,
           storageLimit: deployment.storageLimit ?? undefined,
+          backupRepoUrl: deployment.backupRepoFullName ?? undefined,
         },
         (event) => res.write(JSON.stringify(event) + '\n')
       );

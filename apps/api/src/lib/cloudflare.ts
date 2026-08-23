@@ -60,3 +60,21 @@ export async function deleteDnsRecord(recordId: string) {
     );
   }
 }
+
+export async function deleteSubdomainRecord(subdomain: string) {
+  try {
+    const listRes = await fetch(
+      `${CF_API_BASE}/zones/${env.cloudflareZoneId}/dns_records?name=${encodeURIComponent(`${subdomain}.${env.rootDomain}`)}`,
+      { headers: headers() }
+    );
+    const listData = (await listRes.json()) as { success: boolean; result: Array<{ id: string }> };
+    if (listData.success && listData.result.length > 0) {
+      for (const rec of listData.result) {
+        await deleteDnsRecord(rec.id).catch(() => {});
+      }
+    }
+  } catch (_) {
+    // best-effort
+  }
+}
+

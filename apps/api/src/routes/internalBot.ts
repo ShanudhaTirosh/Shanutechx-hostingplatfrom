@@ -40,7 +40,6 @@ internalBotRouter.get('/internal/customer-summary', async (req: Request, res: Re
       OR: [
         { phoneNumber: phone },
         { phoneNumber: `+${phone}` },
-        { phoneNumber: { contains: phone } },
       ],
     },
   });

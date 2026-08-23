@@ -91,7 +91,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
       if (!existingAccount) {
         try {
           const tier = getTierFromPlanName(item.plan?.name || 'Starter Mail');
-          const autoPassword = `Smtp_${Math.random().toString(36).slice(2, 10)}!2026`;
+          const autoPassword = `Smtp_${crypto.randomBytes(12).toString('base64url')}`;
           const username = `mail_${order.user.id.slice(0, 8)}`;
           const smtpHost = `mail.${env.rootDomain}`;
           const webmailUrl = process.env.WEBMAIL_URL || (process.env.NODE_ENV === 'production' ? `https://mail.${env.rootDomain}` : 'http://localhost:3001/email');
@@ -182,32 +182,38 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
         else if (productName.includes('redis')) dbType = 'redis';
         else if (productName.includes('mongo')) dbType = 'mongodb';
 
-        const node = await prisma.node.findFirst();
-        if (node) {
-          const rawPassword = crypto.randomBytes(16).toString('hex');
-          const credentialRef = encryptSecret(rawPassword, env.secretsEncryptionKey);
+        const existingDb = await prisma.managedDatabase.findFirst({
+          where: { userId: order.userId, type: dbType, createdAt: { gte: order.createdAt } },
+        });
 
-          const db = await prisma.managedDatabase.create({
-            data: { userId: order.userId, nodeId: node.id, type: dbType, status: 'pending', credentialRef },
-          });
+        if (!existingDb) {
+          const node = await selectNodeForDeployment({ requiredTag: 'node-hosting', isAdminDeployment: true }).catch(() => prisma.node.findFirst({ where: { isActive: true } }));
+          if (node) {
+            const rawPassword = crypto.randomBytes(16).toString('hex');
+            const credentialRef = encryptSecret(rawPassword, env.secretsEncryptionKey);
 
-          void provisionDatabaseContainer(node, { databaseId: db.id, type: dbType, password: rawPassword })
-            .then(async (result) => {
-              await prisma.managedDatabase.update({
-                where: { id: db.id },
-                data: {
-                  status: 'running',
-                  containerId: result.containerId,
-                  internalHost: result.containerName,
-                  internalPort: result.internalPort,
-                },
-              });
-            })
-            .catch(async () => {
-              await prisma.managedDatabase.update({ where: { id: db.id }, data: { status: 'failed' } });
+            const db = await prisma.managedDatabase.create({
+              data: { userId: order.userId, nodeId: node.id, type: dbType, status: 'pending', credentialRef },
             });
 
-          fulfilledItems.push(`Managed ${dbType.toUpperCase()} Database`);
+            void provisionDatabaseContainer(node, { databaseId: db.id, type: dbType, password: rawPassword })
+              .then(async (result) => {
+                await prisma.managedDatabase.update({
+                  where: { id: db.id },
+                  data: {
+                    status: 'running',
+                    containerId: result.containerId,
+                    internalHost: result.containerName,
+                    internalPort: result.internalPort,
+                  },
+                });
+              })
+              .catch(async () => {
+                await prisma.managedDatabase.update({ where: { id: db.id }, data: { status: 'failed' } });
+              });
+
+            fulfilledItems.push(`Managed ${dbType.toUpperCase()} Database`);
+          }
         }
       } catch (err) {
         logger.error({ orderId: order.id, err }, 'Failed to auto-provision Managed Database');
