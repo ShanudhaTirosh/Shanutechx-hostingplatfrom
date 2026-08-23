@@ -6,6 +6,7 @@ import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { logger } from '../lib/logger';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { pushWorkspaceToShadowRepo } from '../lib/shadowBackup';
+import { env } from '../env';
 
 export const uploadDeploymentsRouter = Router();
 
