@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '@/lib/AuthContext';
+import { api } from '@/lib/api';
 import { Button } from '@/components/Button';
 import { GlassCard } from '@/components/GlassCard';
 import { colors, fontFamily, radius } from '@/theme/tokens';
@@ -26,9 +27,11 @@ export function LoginScreen() {
     setLoading(true);
     try {
       await signIn(email.trim(), password);
-      // Staff-only app — bounce non-staff accounts back out immediately.
-      // (apiUser refresh happens inside AuthContext's onAuthStateChanged;
-      // a short guard here covers the case where it resolves after signIn.)
+      const { user } = await api.auth.me();
+      if (user.role === 'customer') {
+        setError('Staff access only. Customers please log in via the web dashboard.');
+        return;
+      }
       navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (err: any) {
       setError(mapFirebaseError(err.code) ?? err.message ?? 'Failed to sign in.');

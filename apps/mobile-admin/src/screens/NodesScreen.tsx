@@ -5,6 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
+  Pressable,
+  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,7 +31,7 @@ function UsageBar({ pct, color }: { pct: number | null; color: string }) {
   );
 }
 
-function NodeCard({ node }: { node: Node }) {
+function NodeCard({ node, onToggleActive }: { node: Node; onToggleActive: (node: Node) => void }) {
   const s = statusStyle(node.status);
   return (
     <GlassCard style={styles.nodeCard}>
@@ -52,12 +54,12 @@ function NodeCard({ node }: { node: Node }) {
         <GaugeRow label="Disk" pct={node.diskUsedPct} color={colors.success} suffix={node.totalDiskGb ? `/ ${node.totalDiskGb} GB` : undefined} />
       </View>
 
-      {/* Footer meta */}
+      {/* Footer meta & Staff Action */}
       <View style={styles.footerMeta}>
         <Text style={styles.metaText}>🚀 {node.deploymentCount} deployment{node.deploymentCount !== 1 ? 's' : ''}</Text>
-        <Text style={styles.metaText}>
-          Registered {new Date(node.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-        </Text>
+        <Pressable onPress={() => onToggleActive(node)} style={styles.actionBtn}>
+          <Text style={styles.actionBtnText}>{node.status === 'online' ? 'Pause Node' : 'Activate Node'}</Text>
+        </Pressable>
       </View>
     </GlassCard>
   );
@@ -109,6 +111,28 @@ export function NodesScreen() {
     setRefreshing(false);
   }
 
+  async function handleToggleActive(target: Node) {
+    const nextStatus = target.status === 'online' ? false : true;
+    Alert.alert(
+      `${nextStatus ? 'Activate' : 'Pause'} Node`,
+      `Are you sure you want to set node "${target.label}" to ${nextStatus ? 'Active' : 'Paused'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            try {
+              await api.nodes.toggleActive(target.id, nextStatus);
+              load();
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to update node status');
+            }
+          },
+        },
+      ]
+    );
+  }
+
   const online = nodes.filter((n) => n.status === 'online').length;
   const degraded = nodes.filter((n) => n.status === 'degraded').length;
   const offline = nodes.filter((n) => n.status === 'offline').length;
@@ -142,7 +166,7 @@ export function NodesScreen() {
       )}
 
       {nodes.map((node) => (
-        <NodeCard key={node.id} node={node} />
+        <NodeCard key={node.id} node={node} onToggleActive={handleToggleActive} />
       ))}
     </ScrollView>
   );
@@ -199,7 +223,9 @@ const styles = StyleSheet.create({
   },
   barFill: { height: '100%', borderRadius: 3 },
   gaugePct: { fontFamily: 'monospace', fontSize: 11, color: colors.onSurfaceVariant, width: 70, textAlign: 'right' },
-  footerMeta: { flexDirection: 'row', justifyContent: 'space-between' },
+  footerMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   metaText: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted },
+  actionBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(207,188,255,0.15)', borderWidth: 1, borderColor: 'rgba(207,188,255,0.25)' },
+  actionBtnText: { fontFamily: fontFamily.bodyMedium, fontSize: 11, color: colors.primary },
   muted: { fontFamily: fontFamily.body, color: colors.muted, fontSize: 13 },
 });

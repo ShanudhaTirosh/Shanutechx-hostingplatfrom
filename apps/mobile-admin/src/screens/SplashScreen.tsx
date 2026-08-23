@@ -23,16 +23,20 @@ export function SplashScreen() {
   useEffect(() => {
     if (loading) return;
     const timer = setTimeout(() => {
-      // apiUser may still be fetching when loading=false; only check firebaseUser
-      // here. The MainTabNavigator screens each handle the case where apiUser is null.
       if (firebaseUser) {
-        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+        // Staff-only check: if user is signed in with a customer-role account,
+        // redirect to Login page with error rather than opening staff console
+        if (apiUser && apiUser.role === 'customer') {
+          navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+        } else {
+          navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+        }
       } else {
         navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
       }
     }, 900);
     return () => clearTimeout(timer);
-  }, [loading, firebaseUser]);
+  }, [loading, firebaseUser, apiUser]);
 
   return (
     <LinearGradient colors={[colors.bgBase, '#14101f', colors.bgBase]} style={styles.container}>

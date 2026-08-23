@@ -27,19 +27,25 @@ export function DeploymentDetailScreen() {
   const { params } = useRoute<Route>();
   const insets = useSafeAreaInsets();
   const [deployment, setDeployment] = useState<Deployment | null>(null);
-  const [logs, setLogs] = useState<DeploymentLog[]>([]);
+  const [logsText, setLogsText] = useState<string>('');
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<'restart' | 'stop' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [{ deployment: dep }, { logs: logList }] = await Promise.all([
+      const [{ deployment: dep }, { logs: logData }] = await Promise.all([
         api.deployments.get(params.deploymentId),
         api.deployments.logs(params.deploymentId, 50),
       ]);
       setDeployment(dep);
-      setLogs(logList);
+      if (typeof logData === 'string') {
+        setLogsText(logData);
+      } else if (Array.isArray(logData)) {
+        setLogsText(logData.map((l) => `[${l.level.toUpperCase()}] ${l.message}`).join('\n'));
+      } else {
+        setLogsText('');
+      }
       setError(null);
     } catch (err: any) {
       setError(err.message);
@@ -169,20 +175,11 @@ export function DeploymentDetailScreen() {
 
           {/* Logs */}
           <Text style={styles.sectionTitle}>Recent Logs</Text>
-          <GlassCard style={styles.logsCard}>
-            {logs.length === 0 ? (
+          <GlassCard style={{ padding: 14 }}>
+            {!logsText ? (
               <Text style={styles.muted}>No recent log entries.</Text>
             ) : (
-              logs.map((log) => (
-                <View key={log.id} style={styles.logRow}>
-                  <Text style={[styles.logLevel, { color: LOG_COLORS[log.level] ?? colors.muted }]}>
-                    {log.level.toUpperCase().padEnd(5)}
-                  </Text>
-                  <Text style={styles.logMsg} numberOfLines={3}>
-                    {log.message}
-                  </Text>
-                </View>
-              ))
+              <Text style={styles.logText}>{logsText}</Text>
             )}
           </GlassCard>
         </>
@@ -231,6 +228,7 @@ const styles = StyleSheet.create({
   infoLabel: { fontFamily: fontFamily.bodyMedium, fontSize: 13, color: colors.muted },
   infoValue: { fontFamily: fontFamily.body, fontSize: 13, color: colors.onSurface, marginLeft: 12, flexShrink: 1, textAlign: 'right' },
   logsCard: { padding: 0 },
+  logText: { fontFamily: 'monospace', fontSize: 11, color: colors.onSurfaceVariant, lineHeight: 16 },
   logRow: {
     flexDirection: 'row',
     paddingVertical: 6,

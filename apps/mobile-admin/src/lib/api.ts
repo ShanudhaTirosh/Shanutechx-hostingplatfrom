@@ -267,7 +267,7 @@ export const api = {
       }).then((r) => asJson<{ deployment: Deployment }>(r)),
     logs: (id: string, tail?: number) =>
       apiFetch(`/api/deployments/${id}/logs${tail ? `?tail=${tail}` : ''}`).then((r) =>
-        asJson<{ logs: DeploymentLog[] }>(r)
+        asJson<{ logs: string | DeploymentLog[] }>(r)
       ),
   },
 
@@ -276,6 +276,10 @@ export const api = {
       apiFetch('/api/nodes').then((r) => asJson<{ nodes: Node[] }>(r)),
     get: (id: string) =>
       apiFetch(`/api/nodes/${id}`).then((r) => asJson<{ node: Node }>(r)),
+    toggleActive: (id: string, isActive: boolean) =>
+      apiFetch(`/api/nodes/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }).then((r) => asJson<{ node: Node }>(r)),
+    cockpitMonitoring: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/monitoring`).then((r) => asJson<any>(r)),
   },
 
   databases: {

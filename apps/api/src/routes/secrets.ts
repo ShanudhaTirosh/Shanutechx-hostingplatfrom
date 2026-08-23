@@ -210,9 +210,9 @@ secretsRouter.get('/secrets/audit', requireAuth, requireAdminOrDev, async (_req:
     auditLogs: entries.map((e: any) => ({
       id: e.id,
       projectId: e.projectId,
-      projectName: e.project.name,
+      projectName: e.project?.name ?? 'Deleted Project',
       action: e.action,
-      actorEmail: e.actor.email,
+      actorEmail: e.actor?.email ?? 'System/Deleted',
       timestamp: e.createdAt.toISOString(),
     })),
   });

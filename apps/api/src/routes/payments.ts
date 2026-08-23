@@ -10,6 +10,7 @@ import { parsePagination } from '../lib/pagination';
 import { paymentUploadLimiter } from '../middleware/rateLimit';
 import { activateSubscriptionsForOrder } from '../lib/billing';
 import { idempotent } from '../middleware/idempotent';
+import { logger } from '../lib/logger';
 
 import { env } from '../env';
 import { encryptSecret } from '../lib/secretsVault';
@@ -120,19 +121,25 @@ paymentsRouter.post('/payments/:id/review', requireAdmin, async (req: AuthedRequ
 
   const newStatus = parsed.data.approve ? 'manually_approved' : 'rejected';
 
-  const updated = await prisma.payment.update({
-    where: { id: payment.id },
-    data: {
-      status: newStatus,
-      reviewedById: req.user!.id,
-      reviewedAt: new Date(),
-      rejectionReason: parsed.data.approve ? null : parsed.data.reason,
-    },
+  const updated = await prisma.$transaction(async (tx) => {
+    const updatedPayment = await tx.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: newStatus,
+        reviewedById: req.user!.id,
+        reviewedAt: new Date(),
+        rejectionReason: parsed.data.approve ? null : parsed.data.reason,
+      },
+    });
+
+    if (parsed.data.approve) {
+      await tx.order.update({ where: { id: payment.orderId }, data: { status: 'paid' } });
+    }
+
+    return updatedPayment;
   });
 
   if (parsed.data.approve) {
-    await prisma.order.update({ where: { id: payment.orderId }, data: { status: 'paid' } });
-
     // Check if renewal
     const orderWithItems = await prisma.order.findUnique({
       where: { id: payment.orderId },
@@ -161,8 +168,12 @@ paymentsRouter.post('/payments/:id/review', requireAdmin, async (req: AuthedRequ
       await activateSubscriptionsForOrder(payment.orderId);
     }
 
-    // Run automated fulfillment pipeline for non-VPS items & Discord alerts for VPS
-    await fulfillOrder(payment.orderId);
+    // Run automated fulfillment pipeline safely
+    try {
+      await fulfillOrder(payment.orderId);
+    } catch (fulfillErr: any) {
+      logger.error({ fulfillErr, orderId: payment.orderId }, 'Order fulfillment error after approval');
+    }
 
     void notifyCustomer(
       payment.order.user,

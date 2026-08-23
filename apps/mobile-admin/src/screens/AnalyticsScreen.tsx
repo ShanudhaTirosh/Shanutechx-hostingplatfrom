@@ -87,7 +87,7 @@ export function AnalyticsScreen() {
       </GlassCard>
 
       <Text style={styles.sectionTitle}>Top services by orders</Text>
-      {summary?.topServicesByOrderCount.length === 0 || !summary ? (
+      {!summary?.topServicesByOrderCount?.length ? (
         <GlassCard><Text style={styles.muted}>No order data yet.</Text></GlassCard>
       ) : (
         summary.topServicesByOrderCount.map((s) => (

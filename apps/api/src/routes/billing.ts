@@ -5,6 +5,7 @@ import { env } from '../env';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { ownedResourceWhere } from '../middleware/rbac';
 import { runBillingChecks } from '../lib/billing';
+import { convertToLkr, Currency } from '../lib/currency';
 import { notifyAdmins } from '../lib/notifications';
 import { notifyDiscordChannel } from '../lib/discordWebhooks';
 
@@ -80,7 +81,8 @@ billingRouter.post('/subscriptions/:id/renew', requireAuth, async (req: AuthedRe
 
   // Determine renewal amount from original plan price
   const planPrice = subscription.orderItem.plan?.price ?? 0;
-  const currency = subscription.orderItem.plan?.currency ?? 'LKR';
+  const currency = (subscription.orderItem.plan?.currency ?? 'LKR') as Currency;
+  const totalLkr = convertToLkr(planPrice, currency);
 
   // Create a renewal Order
   const renewalOrder = await prisma.order.create({
@@ -89,7 +91,7 @@ billingRouter.post('/subscriptions/:id/renew', requireAuth, async (req: AuthedRe
       status: 'awaiting_payment',
       total: planPrice,
       currency,
-      totalLkr: planPrice, // currency conversion can be added here if needed
+      totalLkr,
       items: {
         create: {
           planId: subscription.orderItem.planId,

@@ -218,13 +218,13 @@ ordersRouter.post('/cart/checkout', idempotent, async (req: AuthedRequest, res) 
 
     await activateSubscriptionsForOrder(order.id);
     await fulfillOrder(order.id);
-    void fireWebhook(req.user!.id, 'order_paid', { orderId: order.id, total, currency });
-    void notifyDiscordChannel('new_order', { 'Order': order.id, 'Customer': req.user!.email, 'Total': `${total} ${currency}`, 'Status': 'paid (free)' });
+    void fireWebhook(req.user!.id, 'order_paid', { orderId: order.id, total, currency: currency ?? 'LKR' });
+    void notifyDiscordChannel('new_order', { 'Order': order.id, 'Customer': req.user!.email, 'Total': `${total} ${currency ?? 'LKR'}`, 'Status': 'paid (free)' });
 
     return res.json({
       order: updated,
       total,
-      currency,
+      currency: currency ?? 'LKR',
       free: true,
       aiSubscriptionItems: aiSubscriptionItems.map((i: { id: string; plan: { name: string } | null }) => ({ id: i.id, planName: i.plan!.name })),
     });
@@ -235,7 +235,7 @@ ordersRouter.post('/cart/checkout', idempotent, async (req: AuthedRequest, res) 
     data: { status: 'awaiting_payment' },
   });
 
-  void notifyDiscordChannel('new_order', { 'Order': order.id, 'Customer': req.user!.email, 'Total': `${total} ${currency}`, 'Status': 'awaiting payment' });
+  void notifyDiscordChannel('new_order', { 'Order': order.id, 'Customer': req.user!.email, 'Total': `${total} ${currency ?? 'LKR'}`, 'Status': 'awaiting payment' });
 
   res.json({
     order: updated,

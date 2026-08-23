@@ -39,7 +39,7 @@ invoicesRouter.get('/orders/:orderId/invoice', async (req: AuthedRequest, res) =
 
   let invoice = order.invoice;
 
-  if (!invoice) {
+  if (!invoice || !invoice.pdfUrl) {
     const pdfBytes = await generateInvoicePdf({
       invoiceId: order.id,
       issuedAt: new Date(),
@@ -60,8 +60,10 @@ invoicesRouter.get('/orders/:orderId/invoice', async (req: AuthedRequest, res) =
     const filePath = path.join(INVOICES_DIR, `${order.id}.pdf`);
     await writeFile(filePath, pdfBytes);
 
-    invoice = await prisma.invoice.create({
-      data: { orderId: order.id, pdfUrl: filePath },
+    invoice = await prisma.invoice.upsert({
+      where: { orderId: order.id },
+      create: { orderId: order.id, pdfUrl: filePath },
+      update: { pdfUrl: filePath },
     });
   }
 
