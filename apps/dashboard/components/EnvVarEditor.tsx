@@ -12,6 +12,8 @@ interface EnvVarEditorProps {
   onSaved: () => void;
 }
 
+import { parseEnvText } from '@/lib/envParser';
+
 export function EnvVarEditor({ deploymentId, initialEnvVars, deploymentStatus, onClose, onSaved }: EnvVarEditorProps) {
   const [envVars, setEnvVars] = useState<Array<{ key: string; value: string; id: string }>>(
     Object.entries(initialEnvVars).map(([key, value], idx) => ({
@@ -23,6 +25,8 @@ export function EnvVarEditor({ deploymentId, initialEnvVars, deploymentStatus, o
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState<string[]>([]);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const { toast } = useToast();
 
   function addVariable() {
@@ -35,6 +39,55 @@ export function EnvVarEditor({ deploymentId, initialEnvVars, deploymentStatus, o
 
   function removeVariable(id: string) {
     setEnvVars(envVars.filter(v => v.id !== id));
+  }
+
+  function handleFileRead(file: File) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      if (!content) return;
+
+      const parsed = parseEnvText(content);
+      if (parsed.length === 0) {
+        toast('No valid KEY=VALUE pairs found in file', 'error');
+        return;
+      }
+
+      const existingKeys = new Set(envVars.map(v => v.key.trim()));
+      let newCount = 0;
+      let overwriteCount = 0;
+
+      const updated = [...envVars];
+      for (const item of parsed) {
+        if (existingKeys.has(item.key)) {
+          overwriteCount++;
+          const idx = updated.findIndex(v => v.key.trim() === item.key);
+          if (idx >= 0) updated[idx] = { ...updated[idx], value: item.value };
+        } else {
+          newCount++;
+          updated.push({ key: item.key, value: item.value, id: `imported-${Date.now()}-${item.key}` });
+        }
+      }
+
+      setEnvVars(updated);
+      setImportSummary(`✨ Imported ${parsed.length} variables: ${newCount} new, ${overwriteCount} will overwrite existing values.`);
+      toast(`Parsed ${parsed.length} environment variables`, 'success');
+    };
+    reader.readAsText(file);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileRead(e.dataTransfer.files[0]);
+    }
+  }
+
+  function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFileRead(e.target.files[0]);
+    }
   }
 
   function handleSave() {
@@ -110,11 +163,47 @@ export function EnvVarEditor({ deploymentId, initialEnvVars, deploymentStatus, o
                   : ' Changes will apply when the deployment starts.'}
               </p>
 
+              {/* Drag and Drop .env Dropzone */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                className={`p-4 rounded-2xl border-2 border-dashed transition-all text-center space-y-1 ${
+                  isDragging ? 'border-accent-violet bg-accent-violet/10' : 'border-white/15 bg-white/[0.02] hover:border-white/30'
+                }`}
+              >
+                <p className="text-xs font-semibold text-text-primary">
+                  📂 Drag &amp; Drop <code className="text-indigo-400 font-mono">.env</code> file here or click to browse
+                </p>
+                <p className="text-[11px] text-text-muted">Supports .env, .env.local, .env.production or text files</p>
+                <input
+                  type="file"
+                  accept=".env,.env.local,.env.production,.txt"
+                  onChange={handleFileInputChange}
+                  className="hidden"
+                  id="env-file-input"
+                />
+                <label
+                  htmlFor="env-file-input"
+                  className="inline-block mt-1 px-3 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-medium cursor-pointer transition-all"
+                >
+                  Choose File
+                </label>
+              </div>
+
+              {/* Diff Preview Summary Banner */}
+              {importSummary && (
+                <div className="p-3 bg-indigo-600/20 border border-indigo-500/30 rounded-xl text-xs text-indigo-300 font-medium flex items-center justify-between">
+                  <span>{importSummary}</span>
+                  <button onClick={() => setImportSummary(null)} className="text-indigo-400 hover:text-white">✕</button>
+                </div>
+              )}
+
               {/* Environment Variables List */}
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {envVars.length === 0 ? (
                   <div className="text-center py-8 text-text-muted text-sm">
-                    No environment variables. Click "Add Variable" to add one.
+                    No environment variables. Click "Add Variable" or drop a .env file above.
                   </div>
                 ) : (
                   envVars.map((envVar) => (

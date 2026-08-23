@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { parseEnvText } from '@/lib/envParser';
 
 interface EnvImporterProps {
   onImport: (parsed: Array<{ key: string; value: string }>) => void;
@@ -8,32 +9,6 @@ interface EnvImporterProps {
 
 export function EnvImporter({ onImport }: EnvImporterProps) {
   const [text, setText] = useState('');
-
-  const parseEnvText = (raw: string) => {
-    const lines = raw.split('\n');
-    const result: Array<{ key: string; value: string }> = [];
-
-    for (const line of lines) {
-      let trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      if (trimmed.startsWith('export ')) {
-        trimmed = trimmed.slice(7).trim();
-      }
-      const eqIdx = trimmed.indexOf('=');
-      if (eqIdx > 0) {
-        const key = trimmed.slice(0, eqIdx).trim();
-        let value = trimmed.slice(eqIdx + 1).trim();
-        if (
-          (value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))
-        ) {
-          value = value.slice(1, -1);
-        }
-        result.push({ key, value });
-      }
-    }
-    return result;
-  };
 
   const handleApply = () => {
     const parsed = parseEnvText(text);

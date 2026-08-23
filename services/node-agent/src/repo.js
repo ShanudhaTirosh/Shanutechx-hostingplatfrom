@@ -26,11 +26,20 @@ function run(cmd, args, opts = {}) {
 async function prepareWorkspace(deploymentId, repoUrl, branch = 'main') {
   const dir = path.join(WORKSPACES_DIR, deploymentId);
 
-  if (fs.existsSync(dir)) {
-    await run('git', ['fetch', '--depth', '1', 'origin', branch], { cwd: dir });
-    await run('git', ['reset', '--hard', `origin/${branch}`], { cwd: dir });
-  } else {
+  if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
+  }
+
+  // Handle uploaded zip/folder archive sources
+  if (repoUrl && (repoUrl.startsWith('zip://') || repoUrl.startsWith('upload://'))) {
+    // Workspace directory populated from uploaded source payload
+    return dir;
+  }
+
+  if (fs.existsSync(path.join(dir, '.git'))) {
+    await run('git', ['fetch', '--depth', '1', 'origin', branch], { cwd: dir }).catch(() => {});
+    await run('git', ['reset', '--hard', `origin/${branch}`], { cwd: dir }).catch(() => {});
+  } else {
     await run('git', ['clone', '--depth', '1', '--branch', branch, repoUrl, dir]);
   }
 
