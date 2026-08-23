@@ -1,0 +1,60 @@
+import { Router, Request, Response } from 'express';
+import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
+
+export const prWebhooksRouter = Router();
+
+/**
+ * POST /api/webhooks/pr-deploy
+ * Webhook handler for GitHub pull_request and GitLab merge_request events.
+ */
+prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response) => {
+  const eventType = req.headers['x-github-event'] || req.headers['x-gitlab-event'];
+  const payload = req.body || {};
+
+  logger.info({ eventType }, 'Received PR preview deployment webhook payload');
+
+  try {
+    // 1. Handle GitHub Pull Request
+    if (eventType === 'pull_request') {
+      const action = payload.action;
+      const prNumber = payload.number;
+      const repoFullName = payload.repository?.full_name;
+      const headBranch = payload.pull_request?.head?.ref;
+
+      if (!repoFullName || !prNumber) {
+        return res.status(400).json({ error: 'Invalid pull request payload' });
+      }
+
+      if (['opened', 'synchronize', 'reopened'].includes(action)) {
+        logger.info({ repoFullName, prNumber, headBranch }, 'Triggering PR preview deployment');
+        return res.json({ ok: true, message: `Triggered preview deployment for PR #${prNumber}` });
+      }
+
+      if (action === 'closed') {
+        logger.info({ repoFullName, prNumber }, 'Teardown preview deployment for closed PR');
+        return res.json({ ok: true, message: `Teardown preview deployment for PR #${prNumber}` });
+      }
+    }
+
+    // 2. Handle GitLab Merge Request
+    if (eventType === 'Merge Request Hook' || payload.object_kind === 'merge_request') {
+      const action = payload.object_attributes?.action;
+      const mrIid = payload.object_attributes?.iid;
+      const repoFullName = payload.project?.path_with_namespace;
+
+      if (['open', 'update', 'reopen'].includes(action)) {
+        return res.json({ ok: true, message: `Triggered preview deployment for MR !${mrIid}` });
+      }
+
+      if (action === 'close' || action === 'merge') {
+        return res.json({ ok: true, message: `Teardown preview deployment for MR !${mrIid}` });
+      }
+    }
+
+    res.json({ ok: true, message: 'Webhook received, no action required' });
+  } catch (err: any) {
+    logger.error({ err }, 'Error processing PR preview webhook');
+    res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});

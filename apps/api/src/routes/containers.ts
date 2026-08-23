@@ -62,3 +62,53 @@ containersRouter.get('/nodes/:nodeId/containers/:containerId/logs', async (req: 
     res.status(502).json({ error: err.message });
   }
 });
+
+/**
+ * POST /nodes/:nodeId/containers/:containerId/exec-ticket
+ * Issues a ticket token for live WebSocket terminal docker exec session.
+ */
+containersRouter.post('/nodes/:nodeId/containers/:containerId/exec-ticket', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+
+  const { issueContainerExecTicket } = await import('../lib/containerExecGateway');
+  const ticketInfo = issueContainerExecTicket(node.id, req.params.containerId, req.user!.id);
+  res.json(ticketInfo);
+});
+
+/**
+ * GET /nodes/:nodeId/containers/:containerId/stats
+ * Fetches real-time memory, CPU, and network stats for a container via node-agent.
+ */
+containersRouter.get('/nodes/:nodeId/containers/:containerId/stats', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+
+  try {
+    const { getResourceUsage } = await import('../lib/nodeAgentClient');
+    const metrics = await getResourceUsage(node, req.params.containerId);
+    res.json({ containerId: req.params.containerId, ...metrics });
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to fetch container metrics from node' });
+  }
+});
+
+/**
+ * DELETE /nodes/:nodeId/containers/:containerId
+ * Removes/destroys a container from node.
+ */
+containersRouter.delete('/nodes/:nodeId/containers/:containerId', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+
+  try {
+    await containerAction(node, req.params.containerId, 'stop');
+    await prisma.auditLog.create({
+      data: { adminId: req.user!.id, action: 'container.remove', target: req.params.containerId },
+    });
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(502).json({ error: err.message });
+  }
+});
+

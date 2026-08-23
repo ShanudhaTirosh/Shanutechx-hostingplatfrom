@@ -71,7 +71,7 @@ export const githubProvider: GitProviderAdapter = {
 
   async listConnectedAccounts(userId: string): Promise<ConnectedAccountSummary[]> {
     const rows = await prisma.gitHubInstallation.findMany({ where: { userId }, orderBy: { updatedAt: 'desc' } });
-    return rows.map((r) => ({
+    return rows.map((r: any) => ({
       id: r.id,
       provider: 'github' as const,
       accountLabel: r.accountLogin,

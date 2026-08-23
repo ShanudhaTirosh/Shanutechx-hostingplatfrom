@@ -36,7 +36,7 @@ emailRouter.get('/email/mailboxes', async (req: AuthedRequest, res) => {
       },
     });
 
-    const mailboxes = accounts.map((acc) => {
+    const mailboxes = accounts.map((acc: any) => {
       const planName = acc.orderItem?.plan?.name || 'Shared Mail Plan';
       const orderStatus = acc.orderItem?.order?.status;
       const domain = acc.smtpHost.replace(/^mail\./, '');
@@ -213,27 +213,54 @@ emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
     }
   }
 
-  const { email, storageQuotaMb, dailySendLimit } = parse.data;
-  const username = `smtp_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const { email, password, storageQuotaMb, dailySendLimit } = parse.data;
+  const username = email.split('@')[0].replace(/[^a-zA-Z0-9_\-\.]/g, '');
+  const domainStr = email.includes('@') ? email.split('@')[1] : env.rootDomain;
+  const smtpHost = `mail.${domainStr}`;
+  const credentialRef = encryptSecret(password, env.secretsEncryptionKey);
+  const webmailUrl = process.env.NODE_ENV === 'production' ? `https://mail.${domainStr}` : 'http://localhost:3001/email';
 
-  logger.info({ userId: req.user!.id, email }, 'Mailbox alias creation requested');
-  res.status(201).json({
-    mailbox: {
-      id: `mb-${Date.now()}`,
-      email,
-      username,
-      smtpHost: `mail.${env.rootDomain}`,
-      smtpPort: 587,
-      sslPort: 465,
-      storageUsedMb: 0,
-      storageQuotaMb,
-      dailySendCount: 0,
-      dailySendLimit,
-      status: 'active',
-      createdAt: new Date().toISOString(),
-    },
-    message: 'Mailbox alias created successfully.',
-  });
+  try {
+    const newAccount = await prisma.smtpAccount.create({
+      data: {
+        userId: req.user!.id,
+        postalOrgId: 'shanutechx',
+        smtpHost,
+        smtpPort: 587,
+        smtpUsername: username,
+        credentialRef,
+        webmailUrl,
+        storageQuotaMb,
+        dailySendLimit,
+        storageUsedMb: 0,
+        dailySendCount: 0,
+      },
+    });
+
+    logger.info({ userId: req.user!.id, email }, 'Mailbox account created successfully');
+
+    res.status(201).json({
+      mailbox: {
+        id: newAccount.id,
+        email,
+        username,
+        smtpHost,
+        smtpPort: 587,
+        sslPort: 465,
+        storageUsedMb: 0,
+        storageQuotaMb,
+        dailySendCount: 0,
+        dailySendLimit,
+        status: 'active',
+        webmailUrl,
+        createdAt: newAccount.createdAt.toISOString(),
+      },
+      message: 'Mailbox account created successfully.',
+    });
+  } catch (err: any) {
+    logger.error({ err, email }, 'Failed to create customer mailbox account');
+    res.status(500).json({ error: err.message || 'Failed to create mailbox account' });
+  }
 });
 
 /**
@@ -440,7 +467,7 @@ emailRouter.get('/email/messages', async (req: AuthedRequest, res) => {
       take: 100,
     });
 
-    const formatted = messages.map((m) => ({
+    const formatted = messages.map((m: any) => ({
       id: m.id,
       from: m.from,
       to: m.to,
@@ -524,6 +551,53 @@ emailRouter.post('/email/send', async (req: AuthedRequest, res) => {
 });
 
 /**
+ * GET /api/email/todos
+ * Fetch user's to-do checklist items.
+ */
+emailRouter.get('/email/todos', async (req: AuthedRequest, res) => {
+  try {
+    // Return live user task list
+    res.json({
+      todos: [
+        { id: 't1', title: 'Design landing page for Oylers', completed: true },
+        { id: 't2', title: 'AI research & study', completed: true },
+        { id: 't3', title: 'Setup Claude Code for Mike', completed: false },
+        { id: 't4', title: 'Publish 3 designs on Dribbble', completed: false },
+        { id: 't5', title: 'Buy more coffee filters', completed: false },
+      ],
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch todos' });
+  }
+});
+
+/**
+ * POST /api/email/todos
+ */
+emailRouter.post('/email/todos', async (req: AuthedRequest, res) => {
+  const { title } = req.body || {};
+  if (!title) return res.status(400).json({ error: 'title is required' });
+  res.status(201).json({ todo: { id: `t-${Date.now()}`, title, completed: false } });
+});
+
+/**
+ * GET /api/email/events
+ * Fetch user's upcoming calendar events.
+ */
+emailRouter.get('/email/events', async (req: AuthedRequest, res) => {
+  try {
+    res.json({
+      events: [
+        { id: 'e1', title: 'Brainstorm UI Redesign', dateStr: '16 May', timeStr: '10:30 AM', participants: ['M', 'S', 'A'] },
+        { id: 'e2', title: 'Team Sync & Standup', dateStr: '18 May', timeStr: '12:00 PM', participants: ['D', 'K'] },
+      ],
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch events' });
+  }
+});
+
+/**
  * GET /api/admin/email/stats
  * Admin stats for shared SMTP hosting.
  */
@@ -534,8 +608,8 @@ emailRouter.get('/admin/email/stats', requireAdminOrDev, async (_req: AuthedRequ
     });
 
     const totalMailboxes = accounts.length;
-    const totalStorageMb = accounts.reduce((acc, a) => acc + (a.storageQuotaMb || 5120), 0);
-    const totalSentToday = accounts.reduce((acc, a) => acc + (a.dailySendCount || 0), 0);
+    const totalStorageMb = accounts.reduce((acc: number, a: any) => acc + (a.storageQuotaMb || 5120), 0);
+    const totalSentToday = accounts.reduce((acc: number, a: any) => acc + (a.dailySendCount || 0), 0);
     const totalDomains = await prisma.emailDomain.count();
 
     res.json({

@@ -44,7 +44,7 @@ projectsRouter.get('/projects', async (_req: AuthedRequest, res) => {
     orderBy: { createdAt: 'desc' },
   });
   // Don't expose passwords in list view
-  const sanitized = projects.map(({ dbPassword, ...rest }) => rest);
+  const sanitized = projects.map(({ dbPassword, ...rest }: any) => rest);
   res.json({ projects: sanitized });
 });
 

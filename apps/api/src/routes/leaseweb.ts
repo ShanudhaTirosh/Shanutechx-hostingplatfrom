@@ -665,7 +665,7 @@ leasewebRouter.post('/leaseweb/products/:code/add-to-cart', async (req: AuthedRe
       include: { service: true },
     });
 
-    const total = items.reduce((sum, i) => sum + (i.service ? i.service.price : 0) * i.quantity, 0);
+    const total = items.reduce((sum: number, i: any) => sum + (i.service ? i.service.price : 0) * i.quantity, 0);
     const totalLkr = convertToLkr(total, service!.currency);
     await prisma.order.update({
       where: { id: order.id },

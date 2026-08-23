@@ -33,7 +33,7 @@ async function buildLocalFallbackRouters() {
     select: { id: true, subdomain: true, customDomain: true, internalPort: true, status: true },
   });
 
-  return deployments.map((dep) => {
+  return deployments.map((dep: any) => {
     const name = dep.customDomain || dep.subdomain || dep.id;
     const domain = `${name}.${env.rootDomain}`;
     return {
@@ -88,7 +88,7 @@ traefikStatusRouter.get('/traefik/services', async (_req: AuthedRequest, res) =>
     const deployments = await prisma.deployment.findMany({
       select: { id: true, subdomain: true, customDomain: true, internalPort: true, status: true },
     });
-    const services = deployments.map((dep) => ({
+    const services = deployments.map((dep: any) => ({
       loadBalancer: {
         servers: [{ url: `http://localhost:${dep.internalPort}` }],
         passHostHeader: true,

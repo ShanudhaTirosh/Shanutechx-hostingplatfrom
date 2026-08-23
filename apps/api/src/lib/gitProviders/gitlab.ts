@@ -79,7 +79,7 @@ export const gitlabProvider: GitProviderAdapter = {
 
   async listConnectedAccounts(userId: string): Promise<ConnectedAccountSummary[]> {
     const rows = await prisma.gitLabConnection.findMany({ where: { userId }, orderBy: { updatedAt: 'desc' } });
-    return rows.map((r) => ({
+    return rows.map((r: any) => ({
       id: r.id,
       provider: 'gitlab' as const,
       accountLabel: r.username,

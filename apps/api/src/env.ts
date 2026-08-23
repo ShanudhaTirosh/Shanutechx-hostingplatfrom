@@ -76,4 +76,11 @@ export const env = {
   // application. Defaults to the platform API's own callback path.
   gitlabRedirectUri:
     process.env.GITLAB_REDIRECT_URI ?? `https://api.${process.env.ROOT_DOMAIN ?? 'shanutechx.com'}/api/git/gitlab/callback`,
+
+  // Bitbucket & Gitea Git Providers
+  bitbucketKey: process.env.BITBUCKET_KEY ?? '',
+  bitbucketSecret: process.env.BITBUCKET_SECRET ?? '',
+  giteaBaseUrl: process.env.GITEA_BASE_URL ?? '',
+  giteaClientId: process.env.GITEA_CLIENT_ID ?? '',
+  giteaRedirectUri: process.env.GITEA_REDIRECT_URI ?? '',
 };

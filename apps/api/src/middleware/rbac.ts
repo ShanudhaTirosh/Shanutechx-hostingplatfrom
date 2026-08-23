@@ -138,11 +138,11 @@ export function verifyResourceOwnership(
 export async function canAccessResource(resourceOwnerId: string, req: AuthedRequest): Promise<boolean> {
   if (req.user?.role === 'dev') return true;
   if (req.user?.role === 'admin') {
-    const owner = await prisma.user.findUnique({
+    const owner = await prisma.user?.findUnique({
       where: { id: resourceOwnerId },
       select: { assignedAdminId: true },
     });
-    return owner?.assignedAdminId === req.user.id;
+    return owner?.assignedAdminId === req.user.id || owner?.assignedAdminId == null;
   }
   return req.user?.id === resourceOwnerId;
 }
@@ -180,11 +180,11 @@ export async function verifyResourceOwnershipAsync(
  */
 async function assignedOrUnassignedCustomerIds(req: AuthedRequest): Promise<string[] | null> {
   if (req.user?.role !== 'admin') return null; // caller decides what null means for non-admin
-  const visible = await prisma.user.findMany({
+  const visible = await prisma.user?.findMany({
     where: { OR: [{ assignedAdminId: req.user.id }, { assignedAdminId: null }] },
     select: { id: true },
   });
-  return visible.map((u) => u.id);
+  return visible ? visible.map((u: { id: string }) => u.id) : [];
 }
 
 /**
@@ -211,7 +211,7 @@ export async function ticketVisibilityWhere(req: AuthedRequest): Promise<Record<
 export async function canSeeTicket(ticketOwnerId: string, req: AuthedRequest): Promise<boolean> {
   if (req.user?.role === 'dev' || req.user?.role === 'support') return true;
   if (req.user?.role === 'admin') {
-    const owner = await prisma.user.findUnique({ where: { id: ticketOwnerId }, select: { assignedAdminId: true } });
+    const owner = await prisma.user?.findUnique({ where: { id: ticketOwnerId }, select: { assignedAdminId: true } });
     return owner?.assignedAdminId === req.user.id || owner?.assignedAdminId == null;
   }
   return req.user?.id === ticketOwnerId;
@@ -235,7 +235,7 @@ export async function paymentReviewVisibilityWhere(req: AuthedRequest): Promise<
 export async function canReviewPayment(orderOwnerId: string, req: AuthedRequest): Promise<boolean> {
   if (req.user?.role === 'dev') return true;
   if (req.user?.role === 'admin') {
-    const owner = await prisma.user.findUnique({ where: { id: orderOwnerId }, select: { assignedAdminId: true } });
+    const owner = await prisma.user?.findUnique({ where: { id: orderOwnerId }, select: { assignedAdminId: true } });
     return owner?.assignedAdminId === req.user.id || owner?.assignedAdminId == null;
   }
   return false;
@@ -258,11 +258,11 @@ export async function ownedResourceWhere(
     return {};
   }
   if (req.user?.role === 'admin') {
-    const assigned = await prisma.user.findMany({
+    const assigned = await prisma.user?.findMany({
       where: { assignedAdminId: req.user.id },
       select: { id: true },
     });
-    return { [userIdField]: { in: assigned.map((u) => u.id) } };
+    return { [userIdField]: { in: assigned ? assigned.map((u: { id: string }) => u.id) : [] } };
   }
   return { [userIdField]: req.user?.id };
 }

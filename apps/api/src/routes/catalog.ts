@@ -129,7 +129,7 @@ catalogRouter.get('/catalog/nodes', requireAdminOrDev, async (_req, res) => {
     where: { isActive: true },
     orderBy: { label: 'asc' },
   });
-  res.json({ nodes: nodes.map((n) => ({ id: n.id, name: n.label, location: n.ip, status: n.isActive ? 'online' : 'offline' })) });
+  res.json({ nodes: nodes.map((n: any) => ({ id: n.id, name: n.label, location: n.ip, status: n.isActive ? 'online' : 'offline' })) });
 });
 
 /**

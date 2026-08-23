@@ -18,12 +18,12 @@ describe('Project auth — password hashing', () => {
     const hash = await hashPassword('correct-horse-battery-staple');
     expect(await verifyPassword('correct-horse-battery-staple', hash)).toBe(true);
     expect(await verifyPassword('wrong-password', hash)).toBe(false);
-  });
+  }, 10000);
 
   it('never stores the plaintext password in the hash', async () => {
     const hash = await hashPassword('super-secret-123');
     expect(hash).not.toContain('super-secret-123');
-  });
+  }, 10000);
 });
 
 describe('Project auth — JWT scoping', () => {

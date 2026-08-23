@@ -207,3 +207,42 @@ managedDatabasesRouter.delete('/managed-databases/:id', async (req: AuthedReques
     res.status(500).json({ error: err.message || 'Failed to delete database record' });
   }
 });
+
+/**
+ * POST /api/managed-databases/:id/backups
+ * Triggers a manual or scheduled S3/R2 backup of this managed database instance.
+ */
+managedDatabasesRouter.post('/managed-databases/:id/backups', async (req: AuthedRequest, res) => {
+  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+
+  try {
+    const { createManagedDatabaseBackup } = await import('../lib/managedDbBackup');
+    const result = await createManagedDatabaseBackup(db.id);
+    res.status(201).json({ ok: true, backup: result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to create backup' });
+  }
+});
+
+/**
+ * POST /api/managed-databases/:id/restore
+ * Restores a managed database from a specified backup key.
+ */
+managedDatabasesRouter.post('/managed-databases/:id/restore', async (req: AuthedRequest, res) => {
+  const { backupKey } = req.body || {};
+  if (!backupKey) return res.status(400).json({ error: 'backupKey is required' });
+
+  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+
+  try {
+    const { restoreManagedDatabaseBackup } = await import('../lib/managedDbBackup');
+    const result = await restoreManagedDatabaseBackup(db.id, backupKey);
+    res.json({ ok: true, restore: result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to restore database backup' });
+  }
+});

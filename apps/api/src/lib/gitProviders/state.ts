@@ -17,7 +17,7 @@ import { env } from '../../env';
 
 interface StatePayload {
   userId: string;
-  provider: 'github' | 'gitlab';
+  provider: 'github' | 'gitlab' | 'bitbucket' | 'gitea';
   nonce: string;
   iat: number;
 }
@@ -26,7 +26,7 @@ function b64url(input: Buffer | string): string {
   return Buffer.from(input).toString('base64url');
 }
 
-export function createState(userId: string, provider: 'github' | 'gitlab'): string {
+export function createState(userId: string, provider: 'github' | 'gitlab' | 'bitbucket' | 'gitea'): string {
   const payload: StatePayload = {
     userId,
     provider,
@@ -45,7 +45,7 @@ const STATE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes — just long enough for th
  * invalid, the token is malformed, the provider doesn't match what was
  * expected, or the token has expired.
  */
-export function verifyState(token: string, expectedProvider: 'github' | 'gitlab'): { userId: string } | null {
+export function verifyState(token: string, expectedProvider: 'github' | 'gitlab' | 'bitbucket' | 'gitea'): { userId: string } | null {
   try {
     const [payloadB64, sigB64] = token.split('.');
     if (!payloadB64 || !sigB64) return null;

@@ -16,7 +16,7 @@ analyticsRouter.get('/admin/analytics', async (_req, res) => {
   const twelveMonthsAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
 
   const [
-    paidOrdersLast30d,
+    paidOrders30dAggregate,
     paidOrdersLast12mo,
     activeSubscriptions,
     cancelledSubscriptionsLast30d,
@@ -24,9 +24,9 @@ analyticsRouter.get('/admin/analytics', async (_req, res) => {
     nodes,
     servicesByType,
   ] = await Promise.all([
-    prisma.order.findMany({
+    prisma.order.aggregate({
+      _sum: { totalLkr: true },
       where: { status: 'paid', createdAt: { gte: thirtyDaysAgo } },
-      select: { totalLkr: true, createdAt: true },
     }),
     prisma.order.findMany({
       where: { status: 'paid', createdAt: { gte: twelveMonthsAgo } },
@@ -41,7 +41,7 @@ analyticsRouter.get('/admin/analytics', async (_req, res) => {
     prisma.orderItem.groupBy({ by: ['serviceId'], _count: true }),
   ]);
 
-  const revenueLast30dLkr = paidOrdersLast30d.reduce((sum: number, o: { totalLkr: number }) => sum + o.totalLkr, 0);
+  const revenueLast30dLkr = paidOrders30dAggregate._sum.totalLkr ?? 0;
 
   const revenueByMonth: Record<string, number> = {};
   for (const order of paidOrdersLast12mo) {
@@ -49,17 +49,17 @@ analyticsRouter.get('/admin/analytics', async (_req, res) => {
     revenueByMonth[key] = (revenueByMonth[key] ?? 0) + order.totalLkr;
   }
 
-  const serviceIds = servicesByType.map((s) => s.serviceId).filter((id): id is string => id !== null);
+  const serviceIds = servicesByType.map((s: { serviceId: string | null; _count: number }) => s.serviceId).filter((id: string | null): id is string => id !== null);
   const services = await prisma.service.findMany({
     where: { id: { in: serviceIds } },
     select: { id: true, name: true, type: true },
   });
-  const serviceMap = new Map(services.map((s) => [s.id, s]));
+  const serviceMap = new Map<string, { id: string; name: string; type: string }>(services.map((s: { id: string; name: string; type: string }) => [s.id, s]));
 
   const topServices = servicesByType
-    .sort((a, b) => b._count - a._count)
+    .sort((a: { _count: number }, b: { _count: number }) => b._count - a._count)
     .slice(0, 10)
-    .map((item) => {
+    .map((item: { serviceId: string | null; _count: number }) => {
       const s = item.serviceId ? serviceMap.get(item.serviceId) : undefined;
       return {
         serviceId: item.serviceId,

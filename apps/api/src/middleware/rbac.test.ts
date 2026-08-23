@@ -184,7 +184,7 @@ describe('RBAC Middleware', () => {
       );
     });
 
-    it('should return true when admin accesses any resource', () => {
+    it('should return false for admin on synchronous verifyResourceOwnership (admin requires verifyResourceOwnershipAsync)', () => {
       mockRequest.user = {
         id: 'admin-1',
         firebaseUid: 'firebase-admin',
@@ -198,8 +198,8 @@ describe('RBAC Middleware', () => {
         mockResponse as Response
       );
 
-      expect(result).toBe(true);
-      expect(statusMock).not.toHaveBeenCalled();
+      expect(result).toBe(false);
+      expect(statusMock).toHaveBeenCalledWith(404);
     });
 
     it('should return true when dev accesses any resource', () => {
@@ -432,12 +432,12 @@ describe('RBAC Middleware', () => {
 
       vi.clearAllMocks();
 
-      // Admin should have access to any deployment
+      // Dev should have access to any deployment
       mockRequest.user = {
-        id: 'admin-1',
-        firebaseUid: 'firebase-admin',
-        email: 'admin@example.com',
-        role: 'admin',
+        id: 'dev-1',
+        firebaseUid: 'firebase-dev',
+        email: 'dev@example.com',
+        role: 'dev',
       };
       expect(
         verifyResourceOwnership(deploymentOwnerId, mockRequest as AuthedRequest, mockResponse as Response)

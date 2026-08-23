@@ -1,10 +1,7 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn, exec } from 'child_process';
 import { env } from '../env';
 import { logger } from './logger';
-
-const execAsync = promisify(exec);
 
 function getR2Client(): S3Client | null {
   if (!env.r2Endpoint || !env.r2AccessKeyId || !env.r2SecretAccessKey) {
@@ -22,6 +19,42 @@ function getR2Client(): S3Client | null {
 
 function getSlot(): 'even' | 'odd' {
   return new Date().getDate() % 2 === 0 ? 'even' : 'odd';
+}
+
+function dumpDatabase(host: string, port: string, user: string, dbName: string, pgDumpEnv: NodeJS.ProcessEnv): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const pgDump = spawn('pg_dump', ['-h', host, '-p', port, '-U', user, '-d', dbName, '--no-owner', '--no-privileges'], {
+      env: pgDumpEnv,
+    });
+    const gzip = spawn('gzip', [], { stdio: ['pipe', 'pipe', 'pipe'] });
+
+    const chunks: Buffer[] = [];
+    let errOutput = '';
+
+    pgDump.stdout.pipe(gzip.stdin);
+
+    pgDump.stderr.on('data', (data) => {
+      errOutput += data.toString();
+    });
+
+    gzip.stderr.on('data', (data) => {
+      errOutput += data.toString();
+    });
+
+    gzip.stdout.on('data', (chunk) => {
+      chunks.push(chunk as Buffer);
+    });
+
+    gzip.on('close', (code) => {
+      if (code !== 0) {
+        return reject(new Error(`pg_dump/gzip failed with code ${code}: ${errOutput}`));
+      }
+      resolve(Buffer.concat(chunks));
+    });
+
+    pgDump.on('error', (err) => reject(err));
+    gzip.on('error', (err) => reject(err));
+  });
 }
 
 /**
@@ -43,16 +76,9 @@ export async function runBackup(): Promise<{ key: string; sizeBytes: number; dur
   const user = decodeURIComponent(dbUrl.username);
   const dbName = dbUrl.pathname.replace(/^\//, '');
 
-  const cmd = `pg_dump -h ${host} -p ${port} -U ${user} -d ${dbName} --no-owner --no-privileges | gzip`;
-
   let stdout: Buffer;
   try {
-    const result = await execAsync(cmd, {
-      env: pgDumpEnv,
-      maxBuffer: 500 * 1024 * 1024,
-      encoding: 'buffer',
-    });
-    stdout = result.stdout as unknown as Buffer;
+    stdout = await dumpDatabase(host, port, user, dbName, pgDumpEnv);
   } catch (err: any) {
     logger.error({ err: err.message }, 'pg_dump failed');
     throw new Error(`pg_dump failed: ${err.message}`);

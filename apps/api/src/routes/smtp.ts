@@ -288,11 +288,11 @@ smtpRouter.get('/smtp-accounts', async (req: AuthedRequest, res) => {
     include: { user: { select: { id: true, email: true, displayName: true, role: true } } },
   });
 
-  const enriched = accounts.map((acc) => {
-    const isStaff = acc.user.role === 'admin' || acc.user.role === 'dev';
+  const enriched = accounts.map((acc: any) => {
+    const isStaff = acc.user?.role === 'admin' || acc.user?.role === 'dev';
     const domain = acc.customDomain || (isStaff ? env.rootDomain : 'clientdomain.com');
     const tier = SMTP_PLAN_TIERS[acc.planTier || 'pro'];
-    const aliases = acc.aliases.length > 0 ? acc.aliases : generateDefaultAliases(domain, tier.maxAliases);
+    const aliases = (acc.aliases && acc.aliases.length > 0) ? acc.aliases : generateDefaultAliases(domain, tier.maxAliases);
 
     const serverIp = process.env.SERVER_IP || '154.53.56.88';
     return {
@@ -383,7 +383,7 @@ smtpRouter.patch('/smtp-accounts/:id/domain', async (req: AuthedRequest, res) =>
   const currentDomain = account.customDomain || 'clientdomain.com';
   const newDomain = domain.toLowerCase().trim();
   // Update domain suffixes for existing aliases
-  const newAliases = account.aliases.map((a) => `${a.split('@')[0]}@${newDomain}`);
+  const newAliases = account.aliases.map((a: string) => `${a.split('@')[0]}@${newDomain}`);
 
   const updated = await prisma.smtpAccount.update({
     where: { id: account.id },
@@ -436,7 +436,7 @@ smtpRouter.delete('/smtp-accounts/:id/aliases/:prefix', async (req: AuthedReques
     return;
   }
 
-  const filteredAliases = account.aliases.filter((a) => a.split('@')[0] !== prefix.toLowerCase());
+  const filteredAliases = account.aliases.filter((a: string) => a.split('@')[0] !== prefix.toLowerCase());
   const updated = await prisma.smtpAccount.update({
     where: { id: account.id },
     data: { aliases: filteredAliases },

@@ -23,7 +23,7 @@ export const secretsRouter = Router();
 async function logAudit(projectId: string, action: string, actorId: string, secretKey?: string) {
   await prisma.secretAuditEntry.create({
     data: { projectId, action, actorId, secretKey },
-  }).catch((err) => logger.error({ err, projectId, action }, 'Failed to write secrets audit entry'));
+  }).catch((err: any) => logger.error({ err, projectId, action }, 'Failed to write secrets audit entry'));
 }
 
 function decryptItem(item: { id: string; key: string; valueEnc: string; comment: string | null; updatedAt: Date }) {
@@ -43,7 +43,7 @@ secretsRouter.get('/secrets/projects', requireAuth, requireAdminOrDev, async (_r
     orderBy: { createdAt: 'desc' },
   });
   res.json({
-    projects: projects.map((p) => ({
+    projects: projects.map((p: any) => ({
       id: p.id,
       name: p.name,
       environment: p.environment,
@@ -207,7 +207,7 @@ secretsRouter.get('/secrets/audit', requireAuth, requireAdminOrDev, async (_req:
   });
 
   res.json({
-    auditLogs: entries.map((e) => ({
+    auditLogs: entries.map((e: any) => ({
       id: e.id,
       projectId: e.projectId,
       projectName: e.project.name,

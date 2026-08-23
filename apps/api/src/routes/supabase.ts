@@ -309,7 +309,7 @@ supabaseRouter.post('/supabase/smtp/templates', requireAuth, requireAdminOrDev, 
 supabaseRouter.get('/supabase/smtp/logs', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
   const logs = await prisma.supabaseSmtpDeliveryLog.findMany({ take: 50, orderBy: { createdAt: 'desc' } });
   res.json({
-    logs: logs.map((l) => ({
+    logs: logs.map((l: any) => ({
       id: l.id,
       recipient: l.recipient,
       subject: l.subject,

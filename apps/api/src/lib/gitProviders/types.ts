@@ -25,7 +25,7 @@ export interface GitRepoSummary {
 export interface ConnectedAccountSummary {
   /** Our own DB row ID (GitHubInstallation.id / GitLabConnection.id). */
   id: string;
-  provider: 'github' | 'gitlab';
+  provider: 'github' | 'gitlab' | 'bitbucket' | 'gitea';
   /** Login/username or org name this connection grants access to. */
   accountLabel: string;
   accountType?: string; // GitHub only: "User" | "Organization"
@@ -34,7 +34,7 @@ export interface ConnectedAccountSummary {
 }
 
 export interface GitProviderAdapter {
-  readonly provider: 'github' | 'gitlab';
+  readonly provider: 'github' | 'gitlab' | 'bitbucket' | 'gitea';
 
   /** Whether this provider is configured on this deployment at all (app/OAuth credentials present). */
   isConfigured(): boolean;

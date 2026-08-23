@@ -53,6 +53,9 @@ import { gitConnectRouter } from './routes/gitConnect';
 import { knowledgebaseRouter } from './routes/knowledgebase';
 import { emailRouter } from './routes/email';
 import { teamsRouter } from './routes/teams';
+import { openapiRouter } from './routes/openapi';
+import { prWebhooksRouter } from './routes/prWebhooks';
+import { dockerDeploymentsRouter } from './routes/dockerDeployments';
 import { ensureDefaultProductsSeeded } from './lib/seedProducts';
 
 
@@ -178,6 +181,9 @@ app.use('/api', deployWebhooksRouter);
 app.use('/api', pushTokensRouter);
 app.use('/api', supabaseRouter);
 app.use('/api', secretsRouter);
+app.use('/api', openapiRouter);
+app.use('/api', prWebhooksRouter);
+app.use('/api', dockerDeploymentsRouter);
 app.use('/api', webmailRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/knowledgebase', knowledgebaseRouter);

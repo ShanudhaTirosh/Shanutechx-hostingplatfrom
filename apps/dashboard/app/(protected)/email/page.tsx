@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { PageHeader, Card, Spinner, ErrorBanner, Button, Badge, useToast } from '@/components/ui';
 import { api } from '@/lib/api';
+import { useToast } from '@/components/ui';
 
 interface Mailbox {
   id: string;
@@ -30,136 +29,185 @@ interface Domain {
   spfRecord: string;
   dkimRecord: string;
   dmarcRecord: string;
-  createdAt: string;
 }
 
 interface EmailMessage {
   id: string;
   from: string;
+  fromAvatar?: string;
   to: string;
   subject: string;
+  snippet: string;
   body: string;
-  folder: 'inbox' | 'drafts' | 'scheduled' | 'sent' | 'spam' | 'trash';
+  folder: 'inbox' | 'starred' | 'delayed' | 'sent';
+  tag?: 'Documents' | 'Work' | 'News' | 'Important';
   isRead: boolean;
   isStarred: boolean;
-  hasAttachment?: boolean;
   timestamp: string;
+}
+
+interface TodoItem {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+interface UpcomingEvent {
+  id: string;
+  title: string;
+  dateStr: string;
+  timeStr: string;
+  participants: string[];
 }
 
 const DEMO_MESSAGES: EmailMessage[] = [
   {
     id: 'msg-1',
-    from: 'Martynas Sipavičius <martynas@hostinger.com>',
-    to: 'me',
-    subject: 'Re: Services',
-    body: `Sounds good to me. I am interested in learning more about the Stress Relief option.\n\nCould you please provide more details?\n\n---\nThis message and its attachments may contain privileged and confidential information. If you are not the intended recipient, do not use, copy, or disclose this information.`,
+    from: 'Mike Robertson',
+    fromAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
+    to: 'me@shanutechx.com',
+    subject: 'Landing page design system update',
+    snippet: 'Hey team, I updated the typography hierarchy and color variables for the new landing page...',
+    body: 'Hey team,\n\nI updated the typography hierarchy and color variables for the new landing page components. Please take a look at the attached preview and share feedback before end of day.\n\nBest regards,\nMike',
     folder: 'inbox',
+    tag: 'Work',
     isRead: false,
     isStarred: true,
-    hasAttachment: true,
-    timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+    timestamp: '10:42 AM',
   },
   {
     id: 'msg-2',
-    from: 'Hostinger Business Email <welcome@hostinger.com>',
-    to: 'me',
-    subject: 'Get started with business email',
-    body: 'Welcome to your professional business email workspace! Configure custom domain DNS records, set up IMAP/SMTP on mobile, and manage your mailboxes effortlessly.',
+    from: 'TechCrunch Newsletter',
+    to: 'me@shanutechx.com',
+    subject: 'Weekly AI Roundup & Cloud Infrastructure Trends',
+    snippet: 'This week in AI: Next-generation agentic assistants, serverless scale-to-zero databases...',
+    body: 'Welcome to this week\'s edition of TechCrunch Cloud & AI Insights. In today\'s issue:\n- Autonomous Agentic Coding\n- Edge compute optimization\n- Multi-cloud PaaS deployment tools',
     folder: 'inbox',
-    isRead: true,
+    tag: 'News',
+    isRead: false,
     isStarred: false,
-    hasAttachment: false,
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+    timestamp: 'Yesterday',
   },
   {
     id: 'msg-3',
-    from: 'SHANUTECHX Security <security@shanutechx.com>',
-    to: 'me',
-    subject: 'SSL Certificate Auto-Renewed for custom domain',
-    body: 'Your Let\'s Encrypt SSL certificate for custom email domain has been auto-renewed successfully.',
+    from: 'Finance Department',
+    to: 'me@shanutechx.com',
+    subject: 'Invoice #STX-2026-8890 Paid Successfully',
+    snippet: 'Your monthly payment for ShanuTechX Enterprise Hosting has been processed successfully...',
+    body: 'Dear Customer,\n\nYour invoice #STX-2026-8890 has been paid successfully via Stripe. Thank you for choosing ShanuTechX PaaS Cloud platform.',
     folder: 'inbox',
+    tag: 'Documents',
     isRead: true,
     isStarred: false,
-    hasAttachment: false,
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    timestamp: '18 May',
+  },
+  {
+    id: 'msg-4',
+    from: 'Security Operations',
+    to: 'me@shanutechx.com',
+    subject: 'SSL Certificate Auto-Renewal Notice for Domain',
+    snippet: 'Let\'s Encrypt SSL certificate for custom domain webmail.shanutechx.com renewed...',
+    body: 'Automated notification: Let\'s Encrypt SSL certificate auto-renewed successfully for webmail.shanutechx.com.',
+    folder: 'inbox',
+    tag: 'Important',
+    isRead: true,
+    isStarred: true,
+    timestamp: '15 May',
   },
 ];
 
-export default function CustomerEmailPage() {
-  const [activeTab, setActiveTab] = useState<'webmail' | 'smtp' | 'dns'>('webmail');
-  const [viewMode, setViewMode] = useState<'column' | 'row'>('column');
+const INITIAL_TODOS: TodoItem[] = [
+  { id: 't1', title: 'Design landing page for Oylers', completed: true },
+  { id: 't2', title: 'AI research & study', completed: true },
+  { id: 't3', title: 'Setup Claude Code for Mike', completed: false },
+  { id: 't4', title: 'Publish 3 designs on Dribbble', completed: false },
+  { id: 't5', title: 'Buy more coffee filters', completed: false },
+];
+
+const INITIAL_EVENTS: UpcomingEvent[] = [
+  {
+    id: 'e1',
+    title: 'Brainstorm UI Redesign',
+    dateStr: '16 May',
+    timeStr: '10:30 AM',
+    participants: ['M', 'S', 'A'],
+  },
+  {
+    id: 'e2',
+    title: 'Team Sync & Standup',
+    dateStr: '18 May',
+    timeStr: '12:00 PM',
+    participants: ['D', 'K'],
+  },
+];
+
+export default function RedesignedMailboxPage() {
+  const [activeFolder, setActiveFolder] = useState<'inbox' | 'starred' | 'delayed' | 'sent'>('inbox');
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [messages, setMessages] = useState<EmailMessage[]>(DEMO_MESSAGES);
+  const [selectedMessage, setSelectedMessage] = useState<EmailMessage | null>(DEMO_MESSAGES[0]);
+
+  const [todos, setTodos] = useState<TodoItem[]>(INITIAL_TODOS);
+  const [newTodoText, setNewTodoText] = useState('');
+  const [events, setEvents] = useState<UpcomingEvent[]>(INITIAL_EVENTS);
 
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
-  const [messages, setMessages] = useState<EmailMessage[]>(DEMO_MESSAGES);
-  const [activeFolder, setActiveFolder] = useState<'inbox' | 'drafts' | 'scheduled' | 'sent' | 'spam' | 'trash'>('inbox');
-  const [filterFilter, setFilterFilter] = useState<'all' | 'unread' | 'read' | 'starred'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMessage, setSelectedMessage] = useState<EmailMessage | null>(DEMO_MESSAGES[0]);
-
-  const [loading, setLoading] = useState(true);
-  const [noSubscription, setNoSubscription] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [showComposeModal, setShowComposeModal] = useState(false);
-  const [showAddDomainModal, setShowAddDomainModal] = useState(false);
-  const [showLayoutModal, setShowLayoutModal] = useState(false);
-  const [smtpProducts, setSmtpProducts] = useState<any[]>([]);
-
-  const [composeFrom, setComposeFrom] = useState('');
   const [composeTo, setComposeTo] = useState('');
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
-  const [sendingEmail, setSendingEmail] = useState(false);
-
-  const [newDomainStr, setNewDomainStr] = useState('');
-  const [addingDomain, setAddingDomain] = useState(false);
-  const [verifyingDomainId, setVerifyingDomainId] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   const { toast } = useToast();
 
-  async function loadData() {
-    setLoading(true);
-    setNoSubscription(false);
-    try {
-      const [mbRes, domRes, msgRes, prodRes] = await Promise.all([
-        api.email.mailboxes().catch(() => ({ mailboxes: [] })),
-        api.email.domains().catch(() => ({ domains: [] })),
-        api.email.messages(activeFolder).catch(() => ({ messages: [] })),
-        api.products.list('smtp_hosting' as any).catch(() => ({ products: [] })),
-      ]);
-      setMailboxes(mbRes.mailboxes || []);
-      setDomains(domRes.domains || []);
-      if (msgRes.messages && msgRes.messages.length > 0) {
-        setMessages(msgRes.messages);
-        setSelectedMessage(msgRes.messages[0]);
-      }
-      setSmtpProducts(prodRes.products || []);
-      if (mbRes.mailboxes?.length > 0 && !composeFrom) {
-        setComposeFrom(mbRes.mailboxes[0].email);
-      }
-      setError(null);
-    } catch (err: any) {
-      if (err.message?.includes('purchaseRequired') || err.message?.includes('purchase')) {
-        setNoSubscription(true);
-      } else {
-        setError(err.message || 'Failed to load email service data');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    loadData();
+    api.email.mailboxes().then((res) => setMailboxes(res.mailboxes || [])).catch(() => {});
+    api.email.domains().then((res) => setDomains(res.domains || [])).catch(() => {});
+    api.email.messages(activeFolder).then((res) => {
+      if (res.messages && res.messages.length > 0) {
+        setMessages(res.messages);
+        setSelectedMessage(res.messages[0]);
+      }
+    }).catch(() => {});
+
+    // Fetch live Todos & Events from API
+    fetch('/api/email/todos').then((r) => r.json()).then((d) => {
+      if (d.todos) setTodos(d.todos);
+    }).catch(() => {});
+    fetch('/api/email/events').then((r) => r.json()).then((d) => {
+      if (d.events) setEvents(d.events);
+    }).catch(() => {});
   }, [activeFolder]);
 
-  async function handleSendEmail(e: React.FormEvent) {
+  const toggleStar = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMessages((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, isStarred: !m.isStarred } : m))
+    );
+  };
+
+  const toggleTodo = (id: string) => {
+    setTodos((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
+    );
+  };
+
+  const handleAddTodo = (e: React.FormEvent) => {
     e.preventDefault();
-    setSendingEmail(true);
+    if (!newTodoText.trim()) return;
+    setTodos((prev) => [...prev, { id: `t-${Date.now()}`, title: newTodoText.trim(), completed: false }]);
+    setNewTodoText('');
+  };
+
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSending(true);
     try {
       await api.email.send({
-        from: composeFrom || 'me@domain.com',
+        from: mailboxes[0]?.email || 'me@shanutechx.com',
         to: composeTo,
         subject: composeSubject,
         body: composeBody,
@@ -168,14 +216,15 @@ export default function CustomerEmailPage() {
       setShowComposeModal(false);
       const newMsg: EmailMessage = {
         id: `msg-${Date.now()}`,
-        from: composeFrom || 'me@domain.com',
+        from: 'Me',
         to: composeTo,
         subject: composeSubject,
+        snippet: composeBody.slice(0, 80),
         body: composeBody,
         folder: 'sent',
         isRead: true,
         isStarred: false,
-        timestamp: new Date().toISOString(),
+        timestamp: 'Just now',
       };
       setMessages((prev) => [newMsg, ...prev]);
       setComposeTo('');
@@ -184,564 +233,377 @@ export default function CustomerEmailPage() {
     } catch (err: any) {
       toast(err.message || 'Failed to send email', 'error');
     } finally {
-      setSendingEmail(false);
+      setSending(false);
     }
-  }
-
-  async function handleAddDomain(e: React.FormEvent) {
-    e.preventDefault();
-    setAddingDomain(true);
-    try {
-      await api.email.addDomain(newDomainStr);
-      toast(`Added domain ${newDomainStr}! Please configure DNS records.`, 'success');
-      setShowAddDomainModal(false);
-      setNewDomainStr('');
-      loadData();
-    } catch (err: any) {
-      toast(err.message || 'Failed to add domain', 'error');
-    } finally {
-      setAddingDomain(false);
-    }
-  }
-
-  async function handleVerifyDomain(domainId: string) {
-    setVerifyingDomainId(domainId);
-    try {
-      const res = await api.email.verifyDomain(domainId);
-      toast(res.message, res.verified ? 'success' : 'info');
-      loadData();
-    } catch (err: any) {
-      toast(err.message || 'DNS Verification failed', 'error');
-    } finally {
-      setVerifyingDomainId(null);
-    }
-  }
-
-  function copyToClipboard(text: string, label: string) {
-    navigator.clipboard.writeText(text);
-    toast(`Copied ${label} to clipboard!`, 'info');
-  }
-
-  function toggleStar(msgId: string, e: React.MouseEvent) {
-    e.stopPropagation();
-    setMessages((prev) =>
-      prev.map((m) => (m.id === msgId ? { ...m, isStarred: !m.isStarred } : m))
-    );
-  }
+  };
 
   const filteredMessages = messages.filter((m) => {
-    const matchesFolder = m.folder === activeFolder || (activeFolder === 'inbox' && !m.folder);
-    const matchesFilter =
-      filterFilter === 'all'
-        ? true
-        : filterFilter === 'unread'
-        ? !m.isRead
-        : filterFilter === 'read'
-        ? m.isRead
-        : filterFilter === 'starred'
-        ? m.isStarred
-        : true;
-    const matchesSearch =
-      !searchQuery ||
-      m.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.body.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFolder && matchesFilter && matchesSearch;
+    if (activeFolder === 'starred' && !m.isStarred) return false;
+    if (activeFolder !== 'starred' && m.folder !== activeFolder) return false;
+    if (activeTag && m.tag !== activeTag) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return (
+        m.subject.toLowerCase().includes(q) ||
+        m.from.toLowerCase().includes(q) ||
+        m.snippet.toLowerCase().includes(q)
+      );
+    }
+    return true;
   });
 
-  if (loading) return <Spinner label="Loading Hostinger Mail Workspace..." />;
+  const unreadMessages = filteredMessages.filter((m) => !m.isRead);
+  const readMessages = filteredMessages.filter((m) => m.isRead);
 
   return (
-    <div className="space-y-6 animate-fade-in font-sans">
-      <PageHeader
-        title="Hostinger Mail Workspace"
-        description="Production-grade business email studio supporting Hostinger Mail, Postal, and custom SMTP hosts."
-        action={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveTab('webmail')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                activeTab === 'webmail' ? 'bg-indigo-600 text-white shadow-glow-violet' : 'glass text-text-muted hover:text-white'
-              }`}
-            >
-              ✉ Webmail Studio
-            </button>
-            <button
-              onClick={() => setActiveTab('smtp')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                activeTab === 'smtp' ? 'bg-indigo-600 text-white shadow-glow-violet' : 'glass text-text-muted hover:text-white'
-              }`}
-            >
-              ⚡ SMTP Credentials
-            </button>
-            <button
-              onClick={() => setActiveTab('dns')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                activeTab === 'dns' ? 'bg-indigo-600 text-white shadow-glow-violet' : 'glass text-text-muted hover:text-white'
-              }`}
-            >
-              🌐 Domains &amp; DNS
-            </button>
+    <div className="min-h-screen bg-[#f4f5f8] text-[#1c1d22] font-sans p-4 md:p-6 flex flex-col gap-6 animate-fade-in">
+      {/* Top Header Bar */}
+      <div className="bg-white rounded-3xl p-4 px-6 shadow-sm border border-slate-200/80 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white font-extrabold flex items-center justify-center text-lg shadow-md shadow-indigo-500/20">
+            S
           </div>
-        }
-      />
+          <div>
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight">ShanuTechX Mailbox Studio</h1>
+            <p className="text-xs text-slate-500">Production-grade business webmail & SMTP infrastructure</p>
+          </div>
+        </div>
 
-      {error && <ErrorBanner message={error} />}
+        {/* Global Search & Action CTA */}
+        <div className="flex items-center gap-3">
+          <div className="relative w-64 md:w-80">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search mail..."
+              className="w-full bg-slate-100 border border-slate-200 rounded-full py-2 pl-10 pr-4 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+            />
+            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </div>
 
-      {/* ── TAB 1: HOSTINGER-STYLE WEBMAIL STUDIO ── */}
-      {activeTab === 'webmail' && (
-        <div className="bg-[#0b0c16] border border-white/10 rounded-3xl overflow-hidden shadow-2xl min-h-[720px] flex flex-col">
-          {/* Top Search & Utilities Bar */}
-          <div className="bg-[#121324] border-b border-white/[0.08] px-4 py-3 flex items-center justify-between gap-4">
-            {/* Hostinger Logo */}
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="h-6 w-6 rounded-md bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
-                H
-              </span>
-              <span className="font-extrabold text-sm tracking-tight text-white">HOSTINGER <span className="text-text-muted font-normal">| Mail</span></span>
-            </div>
+          <button
+            onClick={() => setShowComposeModal(true)}
+            className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 px-5 rounded-full flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
+          >
+            <span className="text-sm">+</span>
+            <span>New email</span>
+          </button>
+        </div>
+      </div>
 
-            {/* Search Input */}
-            <div className="flex-1 max-w-xl relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search mail"
-                className="w-full bg-white/[0.06] border border-white/10 rounded-full px-4 py-1.5 pl-10 pr-10 text-xs text-white placeholder:text-text-muted focus:outline-none focus:border-indigo-500 transition-all"
-              />
-              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <button className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-white">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-              </button>
-            </div>
-
-            {/* Header Right Action Icons */}
-            <div className="flex items-center gap-3 shrink-0">
-              <button
-                onClick={() => setShowLayoutModal(true)}
-                title="Select Layout View Mode"
-                className="p-1.5 rounded-lg text-text-muted hover:text-white hover:bg-white/10 transition-colors"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </button>
-              <button className="p-1.5 rounded-lg text-text-muted hover:text-white hover:bg-white/10 transition-colors">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-              </button>
-              <button className="flex items-center gap-1.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full px-3 py-1 text-xs font-semibold hover:bg-indigo-500/30 transition-all">
-                <span>✨ Ask Kodee AI</span>
-              </button>
-              <div className="h-7 w-7 rounded-full bg-purple-600 text-white font-bold flex items-center justify-center text-xs">
-                D
+      {/* Main 3-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+        {/* COLUMN 1: LEFT NAVIGATION SIDEBAR (3 cols) */}
+        <div className="lg:col-span-3 bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 flex flex-col justify-between space-y-6">
+          <div className="space-y-6">
+            {/* Account Profile Selector */}
+            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-bold flex items-center justify-center text-xs">
+                  ST
+                </div>
+                <div className="overflow-hidden">
+                  <p className="text-xs font-bold text-slate-900 truncate">ShanutechX</p>
+                  <p className="text-[11px] text-slate-500 truncate">{mailboxes[0]?.email || 'me@shanutechx.com'}</p>
+                </div>
               </div>
+              <span className="text-xs text-slate-400">▼</span>
             </div>
-          </div>
 
-          {/* Main 3-Pane Body */}
-          <div className="flex-1 flex overflow-hidden">
-            {/* PANE 1: Hostinger Left Sidebar */}
-            <div className="w-56 bg-[#0e0f1d] border-r border-white/[0.08] p-3 flex flex-col justify-between shrink-0">
-              <div className="space-y-4">
-                {/* Primary CTA: + New message */}
+            {/* Folder Links */}
+            <div className="space-y-1">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 px-3 mb-2">Mailbox</p>
+              {[
+                { id: 'inbox', label: 'Inbox', badge: 4, icon: '📥' },
+                { id: 'starred', label: 'Starred', badge: 380, icon: '★' },
+                { id: 'delayed', label: 'Delayed', badge: 16, icon: '⏰' },
+                { id: 'sent', label: 'Sent', badge: 40839, icon: '📤' },
+              ].map((item) => (
                 <button
-                  onClick={() => setShowComposeModal(true)}
-                  className="w-full rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 text-xs flex items-center justify-center gap-2 shadow-glow-violet transition-all"
+                  key={item.id}
+                  onClick={() => { setActiveFolder(item.id as any); setActiveTag(null); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all ${
+                    activeFolder === item.id && !activeTag
+                      ? 'bg-indigo-50 text-indigo-700 font-bold'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  <span>New message</span>
+                  <span className="flex items-center gap-3">
+                    <span className="text-sm">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${activeFolder === item.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                    {item.badge.toLocaleString()}
+                  </span>
                 </button>
-
-                {/* Folder Links */}
-                <nav className="space-y-0.5 text-xs">
-                  {[
-                    { id: 'inbox', label: 'Inbox', icon: '📥', count: 119 },
-                    { id: 'drafts', label: 'Drafts', icon: '📝', count: 6 },
-                    { id: 'scheduled', label: 'Scheduled', icon: '⏰', count: 0 },
-                    { id: 'sent', label: 'Sent', icon: '📤', count: 0 },
-                    { id: 'spam', label: 'Spam', icon: '⚠️', count: 5 },
-                    { id: 'trash', label: 'Trash', icon: '🗑️', count: 5 },
-                  ].map((folder) => {
-                    const active = activeFolder === folder.id;
-                    return (
-                      <button
-                        key={folder.id}
-                        onClick={() => { setActiveFolder(folder.id as any); setSelectedMessage(null); }}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all font-medium ${
-                          active
-                            ? 'bg-indigo-600/20 text-indigo-300 font-bold border border-indigo-500/30'
-                            : 'text-text-muted hover:text-white hover:bg-white/[0.04]'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2.5">
-                          <span>{folder.icon}</span>
-                          <span>{folder.label}</span>
-                        </span>
-                        {folder.count > 0 && (
-                          <span className={`px-1.5 py-0.2 text-[10px] font-bold rounded-full ${active ? 'bg-indigo-600 text-white' : 'bg-white/10 text-text-muted'}`}>
-                            {folder.count}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </nav>
-
-                <div className="pt-2 border-t border-white/[0.06] space-y-1">
-                  <button className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-text-muted hover:text-white">
-                    <span className="flex items-center gap-2">📁 Folders</span>
-                    <span>+</span>
-                  </button>
-                  <button className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text-muted hover:text-white">
-                    👥 Contacts
-                  </button>
-                </div>
-              </div>
-
-              {/* Bottom Storage Meter Bar (Hostinger Style) */}
-              <div className="pt-4 border-t border-white/[0.08] space-y-3">
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[10px] font-mono text-text-muted">
-                    <span>Storage</span>
-                    <span className="text-white font-bold">434.68 MB / 50 GB</span>
-                  </div>
-                  <div className="w-full bg-white/10 rounded-full h-1">
-                    <div className="bg-indigo-500 h-full rounded-full w-[12%]" />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <button className="w-full bg-white/5 hover:bg-white/10 rounded-xl py-1.5 px-3 text-[11px] text-text-muted text-center font-medium transition-colors">
-                    💬 Send feedback
-                  </button>
-                  <button className="w-full bg-[#16182e] hover:bg-[#1f2242] border border-indigo-500/30 rounded-xl py-1.5 px-3 text-[11px] text-indigo-300 font-bold text-center flex items-center justify-center gap-1.5 transition-colors">
-                    🚀 Setup guide 0/5
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
 
-            {/* PANE 2: Middle Email Thread List */}
-            <div className={`${viewMode === 'column' ? 'w-80 border-r border-white/[0.08]' : 'flex-1'} bg-[#0d0e1b] flex flex-col shrink-0 overflow-hidden`}>
-              {/* Filter Pills Header */}
-              <div className="p-3 border-b border-white/[0.06] flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                  <input type="checkbox" className="rounded bg-black/40 border-white/20" />
-                  <span className="text-xs font-bold text-white capitalize">{activeFolder}</span>
-                </div>
+            {/* Tags Section */}
+            <div className="space-y-1">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 px-3 mb-2">Tags</p>
+              {[
+                { name: 'Documents', color: 'bg-emerald-500', count: 205 },
+                { name: 'Work', color: 'bg-indigo-500', count: 1038 },
+                { name: 'News', color: 'bg-amber-500', count: 23604 },
+                { name: 'Important', color: 'bg-rose-500', count: 89 },
+              ].map((tag) => (
+                <button
+                  key={tag.name}
+                  onClick={() => setActiveTag(activeTag === tag.name ? null : tag.name)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2 rounded-2xl text-xs font-medium transition-all ${
+                    activeTag === tag.name ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <span className={`h-2.5 w-2.5 rounded-full ${tag.color}`} />
+                    <span>{tag.name}</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">{tag.count.toLocaleString()}</span>
+                </button>
+              ))}
+            </div>
 
-                {/* Filter Pills */}
-                <div className="flex items-center gap-1">
-                  {[
-                    { id: 'all', label: 'All mail' },
-                    { id: 'unread', label: 'Unread' },
-                    { id: 'read', label: 'Read' },
-                    { id: 'starred', label: 'Starred' },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setFilterFilter(tab.id as any)}
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
-                        filterFilter === tab.id
-                          ? 'bg-white text-black font-bold'
-                          : 'text-text-muted hover:text-white hover:bg-white/10'
+            {/* Files Section */}
+            <div className="space-y-1">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 px-3 mb-2">Files</p>
+              <div className="flex items-center justify-between px-3.5 py-1.5 text-xs text-slate-600">
+                <span>📁 All Files</span>
+                <span className="text-[10px] text-slate-400 font-mono">5,903</span>
+              </div>
+              <div className="flex items-center justify-between px-3.5 py-1.5 text-xs text-slate-600">
+                <span>⭐ Starred Files</span>
+                <span className="text-[10px] text-slate-400 font-mono">120</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Storage Meter Bar (Reference Mockup matching) */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-slate-800">Storage usage</span>
+              <span className="text-[11px] font-mono text-slate-500">
+                {((mailboxes[0]?.storageUsedMb || 434.68) / 1024).toFixed(2)} GB / {((mailboxes[0]?.storageQuotaMb || 51200) / 1024).toFixed(0)} GB
+              </span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-indigo-600 h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.round(
+                      ((mailboxes[0]?.storageUsedMb || 434.68) / (mailboxes[0]?.storageQuotaMb || 51200)) * 100
+                    ) || 12
+                  )}%`,
+                }}
+              />
+            </div>
+            <button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs transition-all shadow-sm">
+              Upgrade Plan
+            </button>
+          </div>
+        </div>
+
+        {/* COLUMN 2: CENTER EMAIL LIST (6 cols) */}
+        <div className="lg:col-span-6 bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 flex flex-col space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h2 className="text-sm font-bold text-slate-900 capitalize flex items-center gap-2">
+              <span>{activeFolder}</span>
+              {activeTag && <span className="text-xs font-normal text-slate-500">/ {activeTag}</span>}
+            </h2>
+            <span className="text-xs text-slate-400 font-mono">{filteredMessages.length} messages</span>
+          </div>
+
+          <div className="space-y-6 overflow-y-auto max-h-[720px] pr-1">
+            {/* UNREAD SECTION */}
+            {unreadMessages.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-600">Unread ({unreadMessages.length})</p>
+                <div className="space-y-2">
+                  {unreadMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      onClick={() => setSelectedMessage(msg)}
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
+                        selectedMessage?.id === msg.id
+                          ? 'bg-indigo-50/60 border-indigo-200 shadow-sm'
+                          : 'bg-slate-50/60 border-slate-100 hover:border-slate-200'
                       }`}
                     >
-                      {tab.label}
-                    </button>
+                      <input type="checkbox" className="mt-1 rounded border-slate-300" onClick={(e) => e.stopPropagation()} />
+                      <div className="h-9 w-9 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-xs shrink-0 shadow-sm">
+                        {msg.from[0]}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-slate-900 truncate">{msg.from}</p>
+                          <span className="text-[10px] text-slate-400 font-mono">{msg.timestamp}</span>
+                        </div>
+                        <p className="text-xs font-semibold text-slate-800 truncate">{msg.subject}</p>
+                        <p className="text-[11px] text-slate-500 truncate">{msg.snippet}</p>
+                        {msg.tag && (
+                          <span className="inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 text-indigo-700">
+                            {msg.tag}
+                          </span>
+                        )}
+                      </div>
+                      <button onClick={(e) => toggleStar(msg.id, e)} className="text-slate-300 hover:text-amber-400 text-sm">
+                        {msg.isStarred ? '★' : '☆'}
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
-
-              {/* Thread Items List */}
-              <div className="flex-1 overflow-y-auto divide-y divide-white/[0.04]">
-                {filteredMessages.length === 0 ? (
-                  <div className="p-8 text-center text-text-muted text-xs">
-                    No messages in {activeFolder}.
-                  </div>
-                ) : (
-                  filteredMessages.map((msg) => {
-                    const isSelected = selectedMessage?.id === msg.id;
-                    return (
-                      <div
-                        key={msg.id}
-                        onClick={() => setSelectedMessage(msg)}
-                        className={`p-3.5 cursor-pointer transition-all flex flex-col gap-1 relative ${
-                          isSelected
-                            ? 'bg-indigo-600/15 border-l-4 border-indigo-500'
-                            : 'hover:bg-white/[0.03]'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-xs">
-                          <span className={`font-semibold truncate ${msg.isRead ? 'text-text-muted' : 'text-white font-bold'}`}>
-                            {msg.from.split('<')[0].trim()}
-                          </span>
-                          <div className="flex items-center gap-1.5 shrink-0 text-[10px] text-text-faint font-mono">
-                            {msg.hasAttachment && <span>📎</span>}
-                            <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-2">
-                          <p className={`text-xs truncate ${msg.isRead ? 'text-text-muted' : 'text-white font-medium'}`}>
-                            {msg.subject}
-                          </p>
-                          <button
-                            onClick={(e) => toggleStar(msg.id, e)}
-                            className="text-text-faint hover:text-amber-400 shrink-0"
-                          >
-                            {msg.isStarred ? '★' : '☆'}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            {/* PANE 3: Right Reading Pane (Hostinger Column View) */}
-            {viewMode === 'column' && (
-              <div className="flex-1 bg-[#0b0c16] flex flex-col overflow-hidden">
-                {selectedMessage ? (
-                  <div className="flex-1 flex flex-col h-full overflow-y-auto p-6 space-y-6">
-                    {/* Reading Action Toolbar */}
-                    <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
-                      <div className="flex items-center gap-3 text-text-muted">
-                        <button title="Archive" className="hover:text-white p-1">📥</button>
-                        <button title="Snooze" className="hover:text-white p-1">⏰</button>
-                        <button title="Delete" className="hover:text-white p-1">🗑️</button>
-                        <button title="Mark Unread" className="hover:text-white p-1">✉️</button>
-                      </div>
-
-                      <button className="flex items-center gap-1.5 bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 rounded-xl px-3 py-1 text-xs font-semibold hover:bg-indigo-500/20 transition-all">
-                        <span>✨ Summarize Thread</span>
-                      </button>
-                    </div>
-
-                    {/* Subject Header */}
-                    <div>
-                      <h2 className="text-xl font-bold text-white tracking-tight">{selectedMessage.subject}</h2>
-                    </div>
-
-                    {/* Sender Header Card */}
-                    <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
-                          {selectedMessage.from[0]}
-                        </div>
-                        <div>
-                          <p className="font-bold text-sm text-white">{selectedMessage.from}</p>
-                          <p className="text-xs text-text-muted mt-0.5">to me ▼</p>
-                        </div>
-                      </div>
-                      <span className="text-xs text-text-faint font-mono">
-                        {new Date(selectedMessage.timestamp).toLocaleString()}
-                      </span>
-                    </div>
-
-                    {/* Collapsible Quote Block button (...) */}
-                    <div className="space-y-3">
-                      <button className="text-xs bg-white/5 hover:bg-white/10 rounded px-2 py-0.5 text-text-muted font-bold">
-                        ...
-                      </button>
-
-                      {/* Rendered Email Body */}
-                      <div className="bg-[#101122] border border-white/[0.08] rounded-2xl p-6 text-sm text-text-primary leading-relaxed whitespace-pre-wrap font-sans shadow-inner">
-                        {selectedMessage.body}
-                      </div>
-                    </div>
-
-                    {/* Bottom Action Buttons */}
-                    <div className="flex gap-3 pt-4 border-t border-white/[0.08]">
-                      <button
-                        onClick={() => {
-                          setComposeTo(selectedMessage.from);
-                          setComposeSubject(`Re: ${selectedMessage.subject}`);
-                          setShowComposeModal(true);
-                        }}
-                        className="rounded-xl glass border border-white/15 px-5 py-2 text-xs font-semibold text-white hover:bg-white/10 flex items-center gap-2 transition-all"
-                      >
-                        <span>↩ Reply</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setComposeSubject(`Fwd: ${selectedMessage.subject}`);
-                          setComposeBody(`\n\n---------- Forwarded message ---------\nFrom: ${selectedMessage.from}\nSubject: ${selectedMessage.subject}\n\n${selectedMessage.body}`);
-                          setShowComposeModal(true);
-                        }}
-                        className="rounded-xl glass border border-white/15 px-5 py-2 text-xs font-semibold text-white hover:bg-white/10 flex items-center gap-2 transition-all"
-                      >
-                        <span>↪ Forward</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-12 text-text-muted space-y-3">
-                    <span className="text-4xl">📬</span>
-                    <p className="text-sm font-semibold text-white">Select a message to read</p>
-                  </div>
-                )}
-              </div>
             )}
-          </div>
-        </div>
-      )}
 
-      {/* ── TAB 2: SMTP CREDENTIALS ── */}
-      {activeTab === 'smtp' && (
-        <div className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            {mailboxes.length === 0 ? (
-              <Card className="flex flex-col items-center py-12 text-center space-y-3 md:col-span-2">
-                <span className="text-4xl">📭</span>
-                <p className="text-text-muted text-sm">No SMTP accounts provisioned yet.</p>
-              </Card>
-            ) : (
-              mailboxes.map((mb) => (
-                <div key={mb.id} className="glass border border-white/10 rounded-2xl p-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-sm text-white font-mono">{mb.email}</h4>
-                      <p className="text-[11px] text-text-muted">{mb.planName}</p>
+            {/* MARKED AS READ SECTION */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Marked as read</p>
+              <div className="space-y-2">
+                {readMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    onClick={() => setSelectedMessage(msg)}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
+                      selectedMessage?.id === msg.id
+                        ? 'bg-slate-100 border-slate-300 shadow-sm'
+                        : 'bg-white border-slate-100 hover:border-slate-200'
+                    }`}
+                  >
+                    <input type="checkbox" className="mt-1 rounded border-slate-300" onClick={(e) => e.stopPropagation()} />
+                    <div className="h-9 w-9 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs shrink-0">
+                      {msg.from[0]}
                     </div>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-300">
-                      {mb.status}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-[11px] font-mono bg-black/50 border border-white/10 rounded-xl p-3">
-                    <div>
-                      <span className="text-text-faint block">SMTP Host</span>
-                      <span className="text-indigo-400 font-bold">{mb.smtpHost}</span>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-slate-800 truncate">{msg.from}</p>
+                        <span className="text-[10px] text-slate-400 font-mono">{msg.timestamp}</span>
+                      </div>
+                      <p className="text-xs font-medium text-slate-700 truncate">{msg.subject}</p>
+                      <p className="text-[11px] text-slate-400 truncate">{msg.snippet}</p>
                     </div>
-                    <div>
-                      <span className="text-text-faint block">Ports</span>
-                      <span className="text-white">{mb.smtpPort} (TLS) / {mb.sslPort} (SSL)</span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => copyToClipboard(`SMTP Host: ${mb.smtpHost}\nPort: ${mb.smtpPort}\nUsername: ${mb.username}`, 'SMTP details')}
-                      className="text-xs text-indigo-400 hover:underline"
-                    >
-                      📋 Copy Config
+                    <button onClick={(e) => toggleStar(msg.id, e)} className="text-slate-300 hover:text-amber-400 text-sm">
+                      {msg.isStarred ? '★' : '☆'}
                     </button>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB 3: DOMAINS & DNS ── */}
-      {activeTab === 'dns' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-text-muted">Configure MX, SPF, DKIM, and DMARC records for custom email domain verification.</p>
-            <Button size="sm" onClick={() => setShowAddDomainModal(true)}>+ Add Domain</Button>
-          </div>
-          {domains.map((dom) => (
-            <Card key={dom.id} className="border border-white/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-sm text-white font-mono">{dom.domain}</h4>
-                <Button size="sm" onClick={() => handleVerifyDomain(dom.id)} loading={verifyingDomainId === dom.id}>Verify DNS</Button>
+                ))}
               </div>
-            </Card>
-          ))}
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Compose Email Floating Modal */}
+        {/* COLUMN 3: RIGHT ACTION WIDGETS & TO-DO / EVENTS (3 cols) */}
+        <div className="lg:col-span-3 space-y-6">
+          {/* Widget 1: This Week To-do Checklist */}
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-900">This Week To-do</h3>
+              <span className="text-[11px] text-indigo-600 font-bold cursor-pointer hover:underline">View all</span>
+            </div>
+
+            <div className="space-y-2.5">
+              {todos.map((todo) => (
+                <label
+                  key={todo.id}
+                  onClick={() => toggleTodo(todo.id)}
+                  className={`flex items-center gap-3 p-2.5 rounded-2xl border transition-all cursor-pointer ${
+                    todo.completed ? 'bg-slate-50 border-slate-100 text-slate-400 line-through' : 'bg-white border-slate-200/80 text-slate-800 font-medium'
+                  }`}
+                >
+                  <input type="checkbox" checked={todo.completed} onChange={() => {}} className="rounded text-indigo-600 focus:ring-indigo-500" />
+                  <span className="text-xs">{todo.title}</span>
+                </label>
+              ))}
+            </div>
+
+            <form onSubmit={handleAddTodo} className="pt-2 border-t border-slate-100 flex gap-2">
+              <input
+                type="text"
+                value={newTodoText}
+                onChange={(e) => setNewTodoText(e.target.value)}
+                placeholder="Add to-do item..."
+                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              <button type="submit" className="bg-slate-900 text-white font-bold px-3 py-1.5 rounded-xl text-xs">Add</button>
+            </form>
+          </div>
+
+          {/* Widget 2: Upcoming Events Calendar Card */}
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-900">Upcoming Events</h3>
+              <span className="text-[11px] text-indigo-600 font-bold cursor-pointer hover:underline">Calendar</span>
+            </div>
+
+            <div className="space-y-3">
+              {events.map((ev) => (
+                <div key={ev.id} className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-slate-900">{ev.title}</p>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                      {ev.dateStr}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-mono">🕒 {ev.timeStr}</p>
+                  <div className="flex items-center -space-x-1.5 pt-1">
+                    {ev.participants.map((p, idx) => (
+                      <div key={idx} className="h-6 w-6 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-[10px] border-2 border-white">
+                        {p}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Compose Email Modal */}
       {showComposeModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#121324] border border-white/15 rounded-3xl p-6 w-full max-w-lg space-y-4 shadow-2xl animate-slide-up">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <span>✉</span> New Message
-              </h3>
-              <button onClick={() => setShowComposeModal(false)} className="text-text-muted hover:text-white">✕</button>
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 w-full max-w-lg space-y-4 shadow-2xl animate-slide-up">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-sm text-slate-900">New Email Message</h3>
+              <button onClick={() => setShowComposeModal(false)} className="text-slate-400 hover:text-slate-700">✕</button>
             </div>
             <form onSubmit={handleSendEmail} className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-text-muted block mb-1">To</label>
+                <label className="text-xs font-medium text-slate-600 block mb-1">To</label>
                 <input
                   type="email" required value={composeTo}
                   onChange={(e) => setComposeTo(e.target.value)}
                   placeholder="recipient@domain.com"
-                  className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-text-muted block mb-1">Subject</label>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Subject</label>
                 <input
                   type="text" required value={composeSubject}
                   onChange={(e) => setComposeSubject(e.target.value)}
                   placeholder="Subject line"
-                  className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-text-muted block mb-1">Message Body</label>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Message</label>
                 <textarea
                   rows={6} required value={composeBody}
                   onChange={(e) => setComposeBody(e.target.value)}
-                  placeholder="Write your email..."
-                  className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500 resize-none font-sans"
+                  placeholder="Write message..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                 />
               </div>
-              <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
-                <Button type="button" variant="secondary" size="sm" onClick={() => setShowComposeModal(false)}>Discard</Button>
-                <Button type="submit" size="sm" loading={sendingEmail}>Send Email →</Button>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onClick={() => setShowComposeModal(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
+                <button type="submit" disabled={sending} className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md">
+                  {sending ? 'Sending...' : 'Send Email →'}
+                </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Select Layout View Mode Modal */}
-      {showLayoutModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#121324] border border-white/15 rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl animate-scale-in">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="font-bold text-sm text-white">Select layout</h3>
-              <button onClick={() => setShowLayoutModal(false)} className="text-text-muted hover:text-white">✕</button>
-            </div>
-            <p className="text-xs text-text-muted">Choose how your inbox is displayed:</p>
-            <div className="space-y-3">
-              <label
-                onClick={() => setViewMode('row')}
-                className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
-                  viewMode === 'row' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'glass border-white/10 text-text-muted'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <input type="radio" checked={viewMode === 'row'} onChange={() => {}} className="accent-indigo-500" />
-                  <span className="text-xs font-bold">Row View</span>
-                </div>
-                <span className="text-xs">☰</span>
-              </label>
-
-              <label
-                onClick={() => setViewMode('column')}
-                className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
-                  viewMode === 'column' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'glass border-white/10 text-text-muted'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <input type="radio" checked={viewMode === 'column'} onChange={() => {}} className="accent-indigo-500" />
-                  <span className="text-xs font-bold">Column View (3-Pane)</span>
-                </div>
-                <span className="text-xs">|||</span>
-              </label>
-            </div>
-
-            <div className="pt-3 border-t border-white/10 flex justify-end">
-              <Button size="sm" onClick={() => setShowLayoutModal(false)}>Apply Layout</Button>
-            </div>
           </div>
         </div>
       )}

@@ -34,6 +34,18 @@ vi.mock('../middleware/auth', () => ({
     }
     next();
   },
+  requireDev: (req: any, res: any, next: any) => {
+    if (!req.user || req.user.role !== 'dev') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    next();
+  },
+  requireAdminOrDev: (req: any, res: any, next: any) => {
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'dev')) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    next();
+  },
   AuthedRequest: {},
 }));
 
