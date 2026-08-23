@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { logger } from '../lib/logger';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { env } from '../env';
+import { pushWorkspaceToShadowRepo } from '../lib/shadowBackup';
 
 export const uploadDeploymentsRouter = Router();
 
@@ -68,6 +68,9 @@ uploadDeploymentsRouter.post('/deployments/upload', upload.array('files', 50), a
         nodeId: node.id,
       },
     });
+
+    // Trigger shadow backup push for non-Git deployment in background
+    void pushWorkspaceToShadowRepo(deployment.id);
 
     logger.info({ deploymentId: deployment.id, filesCount: files.length }, 'Created upload deployment');
     res.status(201).json({ ok: true, deployment, uploadedFiles: files.length });

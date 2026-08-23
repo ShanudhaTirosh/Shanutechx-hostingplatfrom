@@ -472,6 +472,11 @@ model Deployment {
   // Environment variables for deployment (encrypted) - Requirements 12.10-12.11
   envVarsEncrypted String? // Encrypted JSON string of environment variables
 
+  // Dedicated platform shadow backup repository fields (non-Git deployments)
+  backupRepoFullName String?   // Dedicated platform backup repo name (e.g. shanutechx-backups/deploy-{id})
+  backupLastPushedAt DateTime? // Last timestamp when workspace state was backed up
+  workspaceCleanedAt DateTime? // Timestamp when node-local workspace was purged (24h retention)
+
   uptimeChecks    UptimeCheck[]
   customDomains   CustomDomain[]
 }

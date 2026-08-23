@@ -23,27 +23,78 @@ function run(cmd, args, opts = {}) {
  * Workspace is intentionally keyed by deploymentId, not repo URL, so two
  * customers can't collide even if they point at forks of the same repo.
  */
-async function prepareWorkspace(deploymentId, repoUrl, branch = 'main') {
+async function prepareWorkspace(deploymentId, repoUrl, branch = 'main', remoteBackupUrl = null) {
   const dir = path.join(WORKSPACES_DIR, deploymentId);
 
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 
+  const files = fs.readdirSync(dir);
+  const isEmpty = files.length === 0;
+
+  // Handle Pull-to-Restore if local workspace was cleaned up after 24h
+  if (isEmpty && remoteBackupUrl) {
+    try {
+      await run('git', ['clone', '--depth', '1', remoteBackupUrl, dir]);
+      return dir;
+    } catch (err) {
+      // Fall through if clone fails
+    }
+  }
+
   // Handle uploaded zip/folder archive sources
   if (repoUrl && (repoUrl.startsWith('zip://') || repoUrl.startsWith('upload://'))) {
-    // Workspace directory populated from uploaded source payload
     return dir;
   }
 
   if (fs.existsSync(path.join(dir, '.git'))) {
     await run('git', ['fetch', '--depth', '1', 'origin', branch], { cwd: dir }).catch(() => {});
     await run('git', ['reset', '--hard', `origin/${branch}`], { cwd: dir }).catch(() => {});
-  } else {
+  } else if (!isEmpty && repoUrl && !repoUrl.startsWith('zip://')) {
     await run('git', ['clone', '--depth', '1', '--branch', branch, repoUrl, dir]);
   }
 
   return dir;
 }
 
-module.exports = { prepareWorkspace, WORKSPACES_DIR };
+/**
+ * Commits workspace files and pushes to a remote git backup repository.
+ */
+async function pushWorkspaceToRemote(
+  deploymentId,
+  remoteUrl,
+  commitMessage = 'Platform auto-backup sync',
+  authorName = 'ShanuTechX Platform',
+  authorEmail = 'platform@shanutechx.com'
+) {
+  const dir = path.join(WORKSPACES_DIR, deploymentId);
+  if (!fs.existsSync(dir)) {
+    throw new Error(`Workspace directory for deployment ${deploymentId} does not exist`);
+  }
+
+  if (!fs.existsSync(path.join(dir, '.git'))) {
+    await run('git', ['init'], { cwd: dir });
+  }
+
+  await run('git', ['config', 'user.name', authorName], { cwd: dir });
+  await run('git', ['config', 'user.email', authorEmail], { cwd: dir });
+
+  await run('git', ['add', '-A'], { cwd: dir });
+  
+  // Check if there are changes to commit
+  const status = await run('git', ['status', '--porcelain'], { cwd: dir }).catch(() => ({ stdout: '' }));
+  if (status.stdout.trim().length > 0) {
+    await run('git', ['commit', '-m', commitMessage], { cwd: dir }).catch(() => {});
+  }
+
+  // Ensure remote 'backup' points to remoteUrl
+  await run('git', ['remote', 'remove', 'backup'], { cwd: dir }).catch(() => {});
+  await run('git', ['remote', 'add', 'backup', remoteUrl], { cwd: dir });
+
+  // Push main branch to remote
+  await run('git', ['push', '-u', 'backup', 'HEAD:main', '--force'], { cwd: dir });
+  return true;
+}
+
+module.exports = { prepareWorkspace, pushWorkspaceToRemote, WORKSPACES_DIR };

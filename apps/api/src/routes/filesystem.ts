@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { canAccessResource } from '../middleware/rbac';
+import { pushWorkspaceToShadowRepo } from '../lib/shadowBackup';
 import { env } from '../env';
 
 export const filesystemRouter = Router();
@@ -67,6 +68,10 @@ filesystemRouter.put('/fs/:deploymentId/write', async (req: AuthedRequest, res) 
   const url = agentUrl(result.node.ip, `/agent/fs/${req.params.deploymentId}/write`);
   const r = await fetch(url, { method: 'PUT', headers: agentHeaders(), body: JSON.stringify(req.body) });
   const data = await r.json();
+
+  if (r.ok) {
+    void pushWorkspaceToShadowRepo(req.params.deploymentId);
+  }
 
   await prisma.auditLog.create({
     data: {

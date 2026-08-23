@@ -1,5 +1,3 @@
-import 'dotenv/config';
-import { Worker } from 'bullmq';
 import {
   redisConnectionOptions,
   SSLRenewalJob,
@@ -8,18 +6,14 @@ import {
   billingSweepQueue,
   UptimeSweepJob,
   uptimeSweepQueue,
+  WorkspaceCleanupJob,
+  workspaceCleanupQueue,
 } from './lib/queue';
 import { executeSSLRenewalJob } from './jobs/ssl-renewal';
 import { runBillingChecks } from './lib/billing';
 import { runUptimeChecks } from './lib/uptimeMonitor';
+import { executeWorkspaceCleanupJob } from './jobs/workspace-cleanup';
 import { logger } from './lib/logger';
-
-// NOTE: The Gemini/Groq-based payment-verification worker has been removed.
-// Payments are reviewed and approved/declined by a human admin/dev only —
-// see routes/payments.ts POST /payments/:id/review. There is no AI/OCR
-// extraction step and no delayed auto-approval anywhere in this platform.
-// lib/verifyPayment.ts is kept in the repo for reference only and is not
-// imported by anything; do not re-wire it into this worker.
 
 // SSL Certificate Renewal Worker
 const sslRenewalWorker = new Worker<SSLRenewalJob>(
@@ -30,7 +24,6 @@ const sslRenewalWorker = new Worker<SSLRenewalJob>(
   },
   {
     connection: redisConnectionOptions,
-    // Process one SSL renewal job at a time to avoid Cloudflare API rate limits
     concurrency: 1,
   }
 );
@@ -45,32 +38,49 @@ sslRenewalWorker.on('failed', (job, err) => {
 
 logger.info('SSL renewal worker started');
 
-// Schedule SSL renewal job to run daily (every 24 hours)
-// Using repeatable job pattern with cron-like syntax
 (async () => {
   try {
-    // Add repeating job that runs every 24 hours
     await sslRenewalQueue.add(
       'ssl-renewal-check',
-      {}, // No data required
+      {},
       {
-        repeat: {
-          pattern: '0 0 * * *', // Run at midnight every day (cron format)
-        },
-        jobId: 'ssl-renewal-daily', // Fixed job ID prevents duplicates
+        repeat: { pattern: '0 0 * * *' },
+        jobId: 'ssl-renewal-daily',
       }
     );
-
-    logger.info({
-      msg: 'SSL renewal job scheduled successfully',
-      schedule: 'Daily at midnight (00:00)',
-      pattern: '0 0 * * *',
-    });
   } catch (error) {
-    logger.error({
-      msg: 'Failed to schedule SSL renewal job',
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logger.error({ msg: 'Failed to schedule SSL renewal job', error: String(error) });
+  }
+})();
+
+// Workspace Retention Cleanup Worker (24h retention sweep)
+const workspaceCleanupWorker = new Worker<WorkspaceCleanupJob>(
+  'workspace-cleanup',
+  async (job) => {
+    logger.info({ jobId: job.id }, 'Starting 24h workspace retention cleanup sweep');
+    const result = await executeWorkspaceCleanupJob();
+    logger.info({ jobId: job.id, ...result }, 'Workspace retention cleanup job completed');
+  },
+  { connection: redisConnectionOptions, concurrency: 1 }
+);
+
+workspaceCleanupWorker.on('failed', (job, err) => {
+  logger.error({ jobId: job?.id, err }, 'Workspace cleanup job failed');
+});
+
+(async () => {
+  try {
+    await workspaceCleanupQueue.add(
+      'workspace-cleanup-hourly',
+      {},
+      {
+        repeat: { pattern: '0 * * * *' }, // Every hour
+        jobId: 'workspace-cleanup-hourly',
+      }
+    );
+    logger.info({ msg: 'Workspace retention cleanup job scheduled successfully', pattern: '0 * * * *' });
+  } catch (error) {
+    logger.error({ msg: 'Failed to schedule workspace cleanup job', error: String(error) });
   }
 })();
 

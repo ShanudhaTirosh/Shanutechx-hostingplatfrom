@@ -74,6 +74,7 @@ sslRenewalQueue.on('error', (err) => {
 // external dependency entirely.
 export interface BillingSweepJob {}
 export interface UptimeSweepJob {}
+export interface WorkspaceCleanupJob {}
 
 export const billingSweepQueue = new Queue<BillingSweepJob>('billing-sweep', {
   connection: redisConnectionOptions,
@@ -95,10 +96,23 @@ export const uptimeSweepQueue = new Queue<UptimeSweepJob>('uptime-sweep', {
   },
 });
 
+export const workspaceCleanupQueue = new Queue<WorkspaceCleanupJob>('workspace-cleanup', {
+  connection: redisConnectionOptions,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 60000 },
+    removeOnComplete: { age: 60 * 60 * 24 * 7 },
+    removeOnFail: { age: 60 * 60 * 24 * 30 },
+  },
+});
+
 billingSweepQueue.on('error', () => {
   isRedisConnected = false;
 });
 uptimeSweepQueue.on('error', () => {
+  isRedisConnected = false;
+});
+workspaceCleanupQueue.on('error', () => {
   isRedisConnected = false;
 });
 

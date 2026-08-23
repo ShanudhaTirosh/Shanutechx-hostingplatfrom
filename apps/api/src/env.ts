@@ -83,4 +83,8 @@ export const env = {
   giteaBaseUrl: process.env.GITEA_BASE_URL ?? '',
   giteaClientId: process.env.GITEA_CLIENT_ID ?? '',
   giteaRedirectUri: process.env.GITEA_REDIRECT_URI ?? '',
+
+  // Dedicated Platform Shadow Backup GitHub Account/Token
+  backupGithubToken: process.env.BACKUP_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN ?? '',
+  backupGithubOrg: process.env.BACKUP_GITHUB_ORG ?? 'shanutechx-deploy-backups',
 };

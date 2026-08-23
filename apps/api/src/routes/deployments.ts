@@ -11,6 +11,7 @@ import { verifyCnameTarget } from '../lib/customDomain';
 import { createSubdomainRecord } from '../lib/cloudflare';
 import { createCnameViaCloudflare, deleteCnameViaCloudflare } from '../lib/cloudflareDns';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
+import { deleteShadowRepo } from '../lib/shadowBackup';
 import { env } from '../env';
 import { validateCustomSubdomain } from '../lib/subdomain';
 import { getProvider } from '../lib/gitProviders';
@@ -409,6 +410,26 @@ deploymentsRouter.post('/deployments/:id/start', async (req: AuthedRequest, res)
     res.json({ ok: true, status: 'running' });
   } catch (err) {
     res.status(502).json({ error: 'Failed to start deployment on node' });
+  }
+});
+
+deploymentsRouter.delete('/deployments/:id', async (req: AuthedRequest, res) => {
+  const deployment = await loadOwnedDeployment(req, req.params.id);
+  if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
+
+  try {
+    if (deployment.containerId) {
+      await stopDeployment(deployment.node, deployment.containerId).catch(() => {});
+    }
+
+    // Teardown shadow backup repo if non-Git deployment
+    void deleteShadowRepo(deployment.id);
+
+    await prisma.deployment.delete({ where: { id: deployment.id } });
+    res.json({ ok: true, message: 'Deployment deleted successfully' });
+  } catch (err: any) {
+    logger.error({ err, deploymentId: req.params.id }, 'Failed to delete deployment');
+    res.status(500).json({ error: err.message || 'Failed to delete deployment' });
   }
 });
 

@@ -2,7 +2,7 @@ require('dotenv/config');
 const crypto = require('crypto');
 const express = require('express');
 const pino = require('pino');
-const { prepareWorkspace } = require('./repo');
+const { prepareWorkspace, pushWorkspaceToRemote, WORKSPACES_DIR } = require('./repo');
 const { buildImage } = require('./build');
 const { runContainer, stopAndRemove, stopContainer, getLogs, streamLogs, startContainer, restartContainer, listContainers, getContainerMetrics } = require('./docker');
 const { collectStats } = require('./stats');
@@ -471,6 +471,38 @@ app.post('/agent/fs/:deploymentId/extract', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
+// Purge workspace directory for 24h retention cleanup
+app.delete('/agent/fs/:deploymentId/cleanup', async (req, res) => {
+  try {
+    const dir = path.join(WORKSPACES_DIR, req.params.deploymentId);
+    if (fs.existsSync(dir)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Push workspace to remote shadow backup repo
+app.post('/agent/fs/:deploymentId/git-commit-push', async (req, res) => {
+  const { remoteUrl, commitMessage, authorName, authorEmail } = req.body || {};
+  if (!remoteUrl) return res.status(400).json({ error: 'remoteUrl is required' });
+  try {
+    await pushWorkspaceToRemote(
+      req.params.deploymentId,
+      remoteUrl,
+      commitMessage,
+      authorName,
+      authorEmail
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err, deploymentId: req.params.deploymentId }, 'Failed git-commit-push in node-agent');
+    res.status(500).json({ error: err.message });
   }
 });
 
