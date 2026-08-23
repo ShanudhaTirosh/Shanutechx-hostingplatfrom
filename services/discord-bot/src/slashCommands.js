@@ -5,16 +5,23 @@ const API_BASE = process.env.API_INTERNAL_URL || 'http://localhost:3000';
 const INTERNAL_SECRET = process.env.DISCORD_INTERNAL_SECRET;
 
 async function apiFetch(path, options = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'x-internal-secret': INTERNAL_SECRET,
-      ...(options.headers || {}),
-    },
-  });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': INTERNAL_SECRET,
+        ...(options.headers || {}),
+      },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, status: res.status, error: data.error || `HTTP ${res.status}` };
+    }
+    return { ok: true, ...data };
+  } catch (err) {
+    return { ok: false, error: err.message || 'Network request failed' };
+  }
 }
 
 const commands = [
@@ -115,13 +122,15 @@ async function handleInteraction(interaction) {
       return;
     }
 
+    const userLabel = interaction.user.username || interaction.user.tag;
+
     const reviewRes = await apiFetch(`/api/internal/review-payment`, {
       method: 'POST',
       body: JSON.stringify({
         orderId,
         approve: action === 'approve',
         reason,
-        reviewedBy: interaction.user.tag,
+        reviewedBy: userLabel,
       }),
     });
 
@@ -136,7 +145,7 @@ async function handleInteraction(interaction) {
       .addFields(
         { name: 'Order ID', value: `#${orderId.slice(0, 8).toUpperCase()}`, inline: true },
         { name: 'Action', value: action.toUpperCase(), inline: true },
-        { name: 'Staff Reviewer', value: interaction.user.tag, inline: true }
+        { name: 'Staff Reviewer', value: userLabel, inline: true }
       );
 
     if (reason) embed.addFields({ name: 'Reason', value: reason, inline: false });

@@ -4,16 +4,20 @@ const API_BASE = process.env.API_INTERNAL_URL || 'http://localhost:3000';
 const INTERNAL_SECRET = process.env.WHATSAPP_INTERNAL_SECRET;
 
 async function apiFetch(path, options = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'x-internal-secret': INTERNAL_SECRET,
-      ...(options.headers || {}),
-    },
-  });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': INTERNAL_SECRET,
+        ...(options.headers || {}),
+      },
+    });
+    if (!res.ok) return null;
+    return res.json().catch(() => null);
+  } catch (err) {
+    return null;
+  }
 }
 
 async function handleCommand(senderPhone, messageText) {
