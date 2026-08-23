@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { env } from '../env';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
-import { ownedResourceWhere } from '../middleware/rbac';
+import { ownedResourceWhere, canAccessResource } from '../middleware/rbac';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { generateLiveKitKeyPair, createRoomAccessToken } from '../lib/livekit';
 import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
@@ -92,7 +92,7 @@ const tokenSchema = z.object({
 livekitRouter.post('/livekit/projects/:id/token', async (req: AuthedRequest, res) => {
   const project = await prisma.liveKitProject.findUnique({ where: { id: req.params.id } });
   if (!project) return res.status(404).json({ error: 'Project not found' });
-  if (req.user!.role !== 'admin' && req.user!.role !== 'dev' && project.userId !== req.user!.id) {
+  if (!(await canAccessResource(project.userId, req))) {
     return res.status(404).json({ error: 'Project not found' });
   }
 
@@ -108,4 +108,24 @@ livekitRouter.post('/livekit/projects/:id/token', async (req: AuthedRequest, res
   });
 
   res.json({ token });
+});
+
+/**
+ * DELETE /api/livekit/projects/:id
+ * Deprovision a LiveKit project record
+ */
+livekitRouter.delete('/livekit/projects/:id', async (req: AuthedRequest, res) => {
+  const project = await prisma.liveKitProject.findUnique({ where: { id: req.params.id } });
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+  if (!(await canAccessResource(project.userId, req))) {
+    return res.status(404).json({ error: 'Project not found' });
+  }
+
+  await prisma.liveKitProject.delete({ where: { id: project.id } });
+
+  await prisma.auditLog.create({
+    data: { adminId: req.user!.id, action: 'livekit.delete_project', target: project.id },
+  });
+
+  res.json({ ok: true, deletedId: project.id });
 });

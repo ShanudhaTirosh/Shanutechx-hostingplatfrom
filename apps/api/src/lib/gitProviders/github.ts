@@ -45,6 +45,7 @@ async function mintInstallationToken(installationId: string): Promise<string> {
       Authorization: `Bearer ${appJwt}`,
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'ShanuTechX-Platform',
     },
   });
   if (!res.ok) {
@@ -95,6 +96,7 @@ export const githubProvider: GitProviderAdapter = {
           Authorization: `Bearer ${token}`,
           Accept: 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'ShanuTechX-Platform',
         },
       });
       if (!res.ok) throw new Error(`Failed to list GitHub repos (${res.status})`);
@@ -140,6 +142,7 @@ export const githubProvider: GitProviderAdapter = {
           Authorization: `Bearer ${appJwt}`,
           Accept: 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'ShanuTechX-Platform',
         },
       });
     } catch (err) {

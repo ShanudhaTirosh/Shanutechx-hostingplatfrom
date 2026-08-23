@@ -204,7 +204,12 @@ async function fetchInstallationDetails(
     { algorithm: 'RS256' }
   );
   const res = await fetch(`https://api.github.com/app/installations/${installationId}`, {
-    headers: { Authorization: `Bearer ${appJwt}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+    headers: {
+      Authorization: `Bearer ${appJwt}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'ShanuTechX-Platform',
+    },
   });
   if (!res.ok) throw new Error(`Failed to fetch installation details (${res.status})`);
   const data = await res.json();

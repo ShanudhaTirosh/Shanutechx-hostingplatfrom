@@ -228,6 +228,18 @@ teamsRouter.post('/teams/invites/accept/:token', async (req: AuthedRequest, res)
     return res.status(400).json({ error: 'Invalid or expired invitation token' });
   }
 
+  const existingMember = await prisma.teamMember.findUnique({
+    where: { teamId_userId: { teamId: invite.teamId, userId } },
+  });
+
+  if (existingMember) {
+    await prisma.teamInvite.update({
+      where: { id: invite.id },
+      data: { status: 'accepted' },
+    });
+    return res.json({ ok: true, member: existingMember, message: 'You are already a member of this team.' });
+  }
+
   // Create member record and mark invite as accepted
   const [member] = await prisma.$transaction([
     prisma.teamMember.create({
@@ -270,6 +282,11 @@ teamsRouter.patch('/teams/:id/members/:memberId', async (req: AuthedRequest, res
 
   const team = await prisma.team.findUnique({ where: { id: teamId } });
   if (!team) return res.status(404).json({ error: 'Team not found' });
+
+  const targetMember = await prisma.teamMember.findUnique({ where: { id: memberId } });
+  if (!targetMember || targetMember.teamId !== teamId) {
+    return res.status(404).json({ error: 'Member not found in this team' });
+  }
 
   if (team.ownerId !== userId && req.user!.role !== 'admin' && req.user!.role !== 'dev') {
     return res.status(403).json({ error: 'Only the team owner can edit member roles' });

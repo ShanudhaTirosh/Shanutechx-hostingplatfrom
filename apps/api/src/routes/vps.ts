@@ -34,6 +34,10 @@ vpsRouter.post('/vps-provisions', requireAdminOrDev, async (req: AuthedRequest, 
   const parsed = provisionSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
+  if (req.user!.role === 'admin' && !(await canAccessResource(parsed.data.userId, req))) {
+    return res.status(404).json({ error: 'Customer not found' });
+  }
+
   const { password, ...rest } = parsed.data;
   const credentialRef = encryptSecret(password, env.secretsEncryptionKey);
 
@@ -81,6 +85,26 @@ vpsRouter.get('/vps-provisions/:id/reveal-password', async (req: AuthedRequest, 
   }
 
   res.json({ password });
+});
+
+/**
+ * DELETE /api/vps-provisions/:id
+ * Remove a terminated VPS provision record (admin/dev or owner)
+ */
+vpsRouter.delete('/vps-provisions/:id', async (req: AuthedRequest, res) => {
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  await prisma.vpsProvision.delete({ where: { id: provision.id } });
+
+  await prisma.auditLog.create({
+    data: { adminId: req.user!.id, action: 'vps.delete_provision', target: provision.id },
+  });
+
+  res.json({ ok: true, deletedId: provision.id });
 });
 
 function omitCredentialRef<T extends { credentialRef: string | null }>(provision: T) {

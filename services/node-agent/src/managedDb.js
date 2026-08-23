@@ -40,12 +40,15 @@ async function provisionDatabase({ databaseId, type, password }) {
         ? [`MYSQL_ROOT_PASSWORD=${password}`, 'MYSQL_DATABASE=app']
         : type === 'mongodb'
           ? [`MONGO_INITDB_ROOT_USERNAME=app`, `MONGO_INITDB_ROOT_PASSWORD=${password}`, 'MONGO_INITDB_DATABASE=app']
-          : [`REDIS_ARGS=--requirepass ${password}`];
+          : [];
+
+  const cmd = type === 'redis' ? ['redis-server', '--requirepass', password] : undefined;
 
   const container = await docker.createContainer({
     Image: image,
     name: containerName,
     Env: env,
+    ...(cmd ? { Cmd: cmd } : {}),
     HostConfig: {
       NetworkMode: 'shanutechx-internal',
       RestartPolicy: { Name: 'unless-stopped' },

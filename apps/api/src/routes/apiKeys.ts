@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
+import { canAccessResource } from '../middleware/rbac';
 import { generateApiKey } from '../lib/apiKeys';
 
 export const apiKeysRouter = Router();
@@ -38,7 +39,14 @@ apiKeysRouter.post('/api-keys', async (req: AuthedRequest, res) => {
 
 apiKeysRouter.delete('/api-keys/:id', async (req: AuthedRequest, res) => {
   const key = await prisma.apiKey.findUnique({ where: { id: req.params.id } });
-  if (!key || key.userId !== req.user!.id) return res.status(404).json({ error: 'Key not found' });
+  if (!key) return res.status(404).json({ error: 'Key not found' });
+  if (!(await canAccessResource(key.userId, req))) {
+    return res.status(404).json({ error: 'Key not found' });
+  }
+
+  if (key.revokedAt) {
+    return res.status(400).json({ error: 'API key is already revoked' });
+  }
 
   await prisma.apiKey.update({ where: { id: key.id }, data: { revokedAt: new Date() } });
   res.json({ ok: true });
