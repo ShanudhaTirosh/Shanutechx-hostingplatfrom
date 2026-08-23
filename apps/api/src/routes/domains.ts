@@ -37,7 +37,7 @@ domainsRouter.use(requireAuth);
  * Request body schema for attaching a custom domain
  */
 const attachDomainSchema = z.object({
-  deploymentId: z.string().cuid('Invalid deployment ID format'),
+  deploymentId: z.string().min(1, 'Deployment ID is required'),
   domain: z
     .string()
     .min(3, 'Domain must be at least 3 characters')

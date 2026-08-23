@@ -216,7 +216,10 @@ projectAuthRouter.get('/projects/:id/auth/oauth/:provider/callback', async (req,
     // /user/emails and take the primary, verified one as a fallback.
     if (!email && provider === 'github') {
       const emailsRes = await fetch('https://api.github.com/user/emails', {
-        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+          'User-Agent': 'ShanuTechX-Platform',
+        },
       });
       const emails: any[] = await emailsRes.json().catch(() => []);
       email = emails.find((e) => e.primary && e.verified)?.email ?? emails[0]?.email ?? null;

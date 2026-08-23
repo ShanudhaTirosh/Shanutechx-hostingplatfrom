@@ -232,8 +232,13 @@ supabaseRouter.post('/supabase/smtp/test-email', requireAuth, requireAdminOrDev,
   const target = recipientEmail || req.user?.email || 'admin@shanutechx.com';
   const config = await getAuthSmtpConfig();
   const selectedTemplate =
-    (await prisma.supabaseEmailTemplate.findUnique({ where: { id: templateId || 'confirmation' } })) ||
-    (await prisma.supabaseEmailTemplate.findUnique({ where: { id: 'confirmation' } }))!;
+    (templateId ? await prisma.supabaseEmailTemplate.findUnique({ where: { id: templateId } }) : null) ||
+    (await prisma.supabaseEmailTemplate.findUnique({ where: { id: 'confirmation' } })) || {
+      id: 'confirmation',
+      name: 'Confirm Signup',
+      subject: 'Confirm your email',
+      html: '<p>Please confirm your account: <a href="{{ .ConfirmationURL }}">{{ .ConfirmationURL }}</a></p>',
+    };
 
   const mailOptions = {
     from: `"${config.senderName}" <${config.senderEmail}>`,
