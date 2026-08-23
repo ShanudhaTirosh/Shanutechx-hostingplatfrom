@@ -47,6 +47,8 @@ async function connect() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
+      currentQr = qr;
+      connectionState = 'qr_ready';
       appLogger.info('Scan this QR code with the SHANUTECHX WhatsApp number:');
       qrcode.generate(qr, { small: true });
     }
@@ -54,6 +56,8 @@ async function connect() {
     if (connection === 'close') {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
+      connectionState = loggedOut ? 'logged_out' : 'reconnecting';
+      currentQr = null;
 
       if (loggedOut) {
         appLogger.error('WhatsApp session logged out. Delete the auth/ folder and re-pair with a QR scan.');
@@ -64,6 +68,8 @@ async function connect() {
     }
 
     if (connection === 'open') {
+      connectionState = 'connected';
+      currentQr = null;
       appLogger.info('WhatsApp connected.');
     }
   });
@@ -78,4 +84,12 @@ function getSocket() {
   return sock;
 }
 
-module.exports = { connect, getSocket, logger: appLogger };
+function getTelemetryState() {
+  return {
+    state: connectionState,
+    qr: currentQr,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+module.exports = { connect, getSocket, getTelemetryState, logger: appLogger };

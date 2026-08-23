@@ -62,18 +62,55 @@ export async function notifyCustomer(user: NotifiableUser, message: string): Pro
   await Promise.all(sends);
 }
 
-async function sendEmailFallback(email: string, message: string): Promise<void> {
-  if (!env.postalApiUrl || !env.postalApiKey) return; // Postal not configured — skip silently, same as any other unlinked channel
+import { renderNotificationEmail } from './emailTemplates';
+import { sendSmtpEmail } from './smtpDispatcher';
 
+async function sendEmailFallback(email: string, message: string, customHtml?: string, customSubject?: string): Promise<void> {
+  const rendered = customHtml
+    ? { subject: customSubject || 'ShanuTechX Notification', html: customHtml, text: message }
+    : renderNotificationEmail({ title: 'ShanuTechX Alert', message });
+
+  // 1. Try Postal first if configured
+  if (env.postalApiUrl && env.postalApiKey) {
+    try {
+      await sendViaPostal({
+        to: [email],
+        from: env.postalFromAddress,
+        subject: rendered.subject,
+        html: rendered.html,
+        plainBody: rendered.text,
+      });
+      return;
+    } catch (err) {
+      if (!(err instanceof PostalError)) logger.warn({ err }, 'Postal email failed — attempting SMTP fallback');
+    }
+  }
+
+  // 2. Dual Transport Fallback: Try System Default SMTP
   try {
-    await sendViaPostal({
-      to: [email],
-      from: env.postalFromAddress,
-      subject: 'SHANUTECHX notification',
-      plainBody: message,
-    });
-  } catch (err) {
-    if (!(err instanceof PostalError)) logger.error({ err }, 'Email notification failed');
+    const smtpHost = process.env.SMTP_HOST || 'mail.shanutechx.com';
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (smtpUser && smtpPass) {
+      await sendSmtpEmail(
+        {
+          host: smtpHost,
+          port: Number(process.env.SMTP_PORT || 587),
+          user: smtpUser,
+          pass: smtpPass,
+        },
+        {
+          from: `"${env.rootDomain} Platform" <${env.postalFromAddress}>`,
+          to: email,
+          subject: rendered.subject,
+          html: rendered.html,
+          text: rendered.text,
+        }
+      );
+    }
+  } catch (smtpErr) {
+    logger.error({ smtpErr, email }, 'All email delivery mechanisms failed for customer notification');
   }
 }
 

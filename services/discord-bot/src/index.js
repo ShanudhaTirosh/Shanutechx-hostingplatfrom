@@ -82,6 +82,31 @@ app.post('/internal/send-channel', async (req, res) => {
   }
 });
 
+/** Posts a rich embed payload to the configured admin channel or DM */
+app.post('/internal/send-embed', async (req, res) => {
+  const { embed, channelId, discordUserId } = req.body || {};
+  if (!embed) return res.status(400).json({ error: 'embed object is required' });
+
+  try {
+    const client = getClient();
+    if (discordUserId) {
+      const user = await client.users.fetch(discordUserId);
+      await user.send({ embeds: [embed] });
+    } else {
+      const targetChannelId = channelId || ADMIN_ALERT_CHANNEL_ID;
+      if (!targetChannelId) {
+        return res.status(400).json({ error: 'No target channelId or ADMIN_ALERT_CHANNEL_ID configured' });
+      }
+      const channel = await client.channels.fetch(targetChannelId);
+      await channel.send({ embeds: [embed] });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, 'Failed to send Discord embed');
+    res.status(502).json({ error: 'Failed to send embed' });
+  }
+});
+
 // Audit finding H3: see the identical fix + explanation in
 // services/whatsapp-bot/src/index.js -- binding to 127.0.0.1 inside a
 // container blocks sibling-container access via Docker's network,
