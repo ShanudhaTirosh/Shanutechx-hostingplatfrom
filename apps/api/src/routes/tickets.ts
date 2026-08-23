@@ -129,11 +129,14 @@ const updateTicketSchema = z.object({
 });
 
 ticketsRouter.patch('/tickets/:id', requireStaff, async (req: AuthedRequest, res) => {
+  const existing = await loadOwnedTicket(req, req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Ticket not found' });
+
   const parsed = updateTicketSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const ticket = await prisma.ticket.update({
-    where: { id: req.params.id },
+    where: { id: existing.id },
     data: parsed.data,
   });
 

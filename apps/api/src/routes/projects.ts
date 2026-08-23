@@ -306,7 +306,7 @@ async function proxyToAgent(
     body: payload ? JSON.stringify(payload) : undefined,
   });
   const data = await agentRes.json().catch(() => ({}));
-  res.status(agentRes.ok ? 200 : 400).json(data);
+  res.status(agentRes.ok ? 200 : agentRes.status || 500).json(data);
 }
 
 projectsRouter.get('/projects/:id/tables/:table/rows', async (req: AuthedRequest, res) => {
