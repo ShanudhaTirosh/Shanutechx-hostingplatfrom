@@ -163,6 +163,10 @@ catalogRouter.get('/catalog', (_req, res) => {
   }
 });
 
+function isValidSlug(slug: string): boolean {
+  return typeof slug === 'string' && /^[a-z0-9-]+$/i.test(slug);
+}
+
 /**
  * GET /api/catalog/:slug
  * Returns full YAML content for a specific template.
@@ -170,6 +174,7 @@ catalogRouter.get('/catalog', (_req, res) => {
  * Validates: Requirements 1.1, 1.5
  */
 catalogRouter.get('/catalog/:slug', (req, res) => {
+  if (!isValidSlug(req.params.slug)) return res.status(400).json({ error: 'Invalid template slug format' });
   const filename = `${req.params.slug}.yaml`;
   const filePath = path.join(TEMPLATES_DIR, filename);
   const altPath = path.join(TEMPLATES_DIR, `${req.params.slug}.yml`);
@@ -199,6 +204,7 @@ const createTemplateSchema = z.object({
 });
 
 catalogRouter.post('/catalog/:slug', requireRole('admin', 'dev'), async (req: AuthedRequest, res) => {
+  if (!isValidSlug(req.params.slug)) return res.status(400).json({ error: 'Invalid template slug format' });
   try {
     const parsed = createTemplateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -325,6 +331,7 @@ const updateTemplateSchema = z.object({
 });
 
 catalogRouter.patch('/catalog/:slug', requireRole('admin', 'dev'), async (req: AuthedRequest, res) => {
+  if (!isValidSlug(req.params.slug)) return res.status(400).json({ error: 'Invalid template slug format' });
   try {
     const parsed = updateTemplateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -461,6 +468,7 @@ catalogRouter.patch('/catalog/:slug', requireRole('admin', 'dev'), async (req: A
  * Validates: Requirements 1.1, 5.1
  */
 catalogRouter.delete('/catalog/:slug', requireRole('admin', 'dev'), async (req: AuthedRequest, res) => {
+  if (!isValidSlug(req.params.slug)) return res.status(400).json({ error: 'Invalid template slug format' });
   try {
     const { slug } = req.params;
 

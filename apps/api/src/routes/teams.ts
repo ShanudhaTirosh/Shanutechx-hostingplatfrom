@@ -173,15 +173,18 @@ teamsRouter.post('/teams/:id/invites', async (req: AuthedRequest, res) => {
   const token = crypto.randomBytes(24).toString('hex');
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
+  const inviteData: any = {
+    teamId,
+    email: parsed.data.email.toLowerCase(),
+    role: parsed.data.role,
+    resourcePermissions: (parsed.data.resourcePermissions as any) ?? undefined,
+    token,
+    invitedByUserId: userId,
+    expiresAt,
+  };
+
   const invite = await prisma.teamInvite.create({
-    data: {
-      teamId,
-      email: parsed.data.email.toLowerCase(),
-      role: parsed.data.role,
-      token,
-      invitedByUserId: userId,
-      expiresAt,
-    },
+    data: inviteData,
   });
 
   const inviteLink = `${process.env.APP_URL || 'http://localhost:3000'}/team/accept?token=${token}`;
@@ -228,6 +231,10 @@ teamsRouter.post('/teams/invites/accept/:token', async (req: AuthedRequest, res)
     return res.status(400).json({ error: 'Invalid or expired invitation token' });
   }
 
+  if (invite.email.toLowerCase() !== req.user!.email.toLowerCase()) {
+    return res.status(403).json({ error: 'This invitation was issued for a different email address.' });
+  }
+
   const existingMember = await prisma.teamMember.findUnique({
     where: { teamId_userId: { teamId: invite.teamId, userId } },
   });
@@ -240,20 +247,35 @@ teamsRouter.post('/teams/invites/accept/:token', async (req: AuthedRequest, res)
     return res.json({ ok: true, member: existingMember, message: 'You are already a member of this team.' });
   }
 
-  // Create member record and mark invite as accepted
-  const [member] = await prisma.$transaction([
-    prisma.teamMember.create({
+  // Create member record, granular resource permissions (if specified), and mark invite as accepted
+  const member = await prisma.$transaction(async (tx) => {
+    const newMember = await tx.teamMember.create({
       data: {
         teamId: invite.teamId,
         userId,
         role: invite.role,
       },
-    }),
-    prisma.teamInvite.update({
+    });
+
+    const rawPermissions = (invite as any).resourcePermissions;
+    if (rawPermissions && Array.isArray(rawPermissions)) {
+      await tx.resourcePermission.createMany({
+        data: (rawPermissions as any[]).map((p) => ({
+          teamMemberId: newMember.id,
+          resourceType: p.resourceType,
+          resourceId: p.resourceId,
+          permission: p.permission,
+        })),
+      });
+    }
+
+    await tx.teamInvite.update({
       where: { id: invite.id },
       data: { status: 'accepted' },
-    }),
-  ]);
+    });
+
+    return newMember;
+  });
 
   res.json({ ok: true, member });
 });

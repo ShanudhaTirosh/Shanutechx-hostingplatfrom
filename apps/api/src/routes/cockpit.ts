@@ -379,7 +379,7 @@ cockpitRouter.post('/nodes/:nodeId/cockpit/ssh-ticket', async (req: AuthedReques
       },
     });
 
-    res.json({ ticket, expiresInMs: 30_000, ip: fullNode.ip, sshKeyRef: fullNode.sshKeyRef });
+    res.json({ ticket, expiresInMs: 30_000, ip: fullNode.ip });
   } catch (err: any) {
     logger.error({ err, nodeId: fullNode.id }, 'Failed to issue cockpit SSH ticket');
     res.status(500).json({ error: 'Failed to issue SSH ticket' });

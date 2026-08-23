@@ -142,7 +142,8 @@ export async function canAccessResource(resourceOwnerId: string, req: AuthedRequ
       where: { id: resourceOwnerId },
       select: { assignedAdminId: true },
     });
-    return owner?.assignedAdminId === req.user.id || owner?.assignedAdminId == null;
+    if (!owner) return false;
+    return owner.assignedAdminId === req.user.id || owner.assignedAdminId == null;
   }
   return req.user?.id === resourceOwnerId;
 }
@@ -212,7 +213,8 @@ export async function canSeeTicket(ticketOwnerId: string, req: AuthedRequest): P
   if (req.user?.role === 'dev' || req.user?.role === 'support') return true;
   if (req.user?.role === 'admin') {
     const owner = await prisma.user?.findUnique({ where: { id: ticketOwnerId }, select: { assignedAdminId: true } });
-    return owner?.assignedAdminId === req.user.id || owner?.assignedAdminId == null;
+    if (!owner) return false;
+    return owner.assignedAdminId === req.user.id || owner.assignedAdminId == null;
   }
   return req.user?.id === ticketOwnerId;
 }
@@ -236,7 +238,8 @@ export async function canReviewPayment(orderOwnerId: string, req: AuthedRequest)
   if (req.user?.role === 'dev') return true;
   if (req.user?.role === 'admin') {
     const owner = await prisma.user?.findUnique({ where: { id: orderOwnerId }, select: { assignedAdminId: true } });
-    return owner?.assignedAdminId === req.user.id || owner?.assignedAdminId == null;
+    if (!owner) return false;
+    return owner.assignedAdminId === req.user.id || owner.assignedAdminId == null;
   }
   return false;
 }

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabaseAdmin, EmailTemplate } from '@/lib/supabaseAdmin';
 import { Button } from '@/components/ui';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 export function EmailTemplateEditor() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -126,7 +127,7 @@ export function EmailTemplateEditor() {
           <div
             className="w-full h-[230px] rounded-lg bg-white p-4 text-black text-xs overflow-y-auto font-sans"
             dangerouslySetInnerHTML={{
-              __html: html.replace('{{ .ConfirmationURL }}', 'http://localhost:3000/auth/verify?token=demo123'),
+              __html: sanitizeHtml(html.replace('{{ .ConfirmationURL }}', 'http://localhost:3000/auth/verify?token=demo123')),
             }}
           />
         </div>

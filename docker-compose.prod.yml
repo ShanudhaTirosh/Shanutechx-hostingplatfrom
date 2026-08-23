@@ -55,7 +55,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-shanutechx}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME_secure_postgres_pass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in environment}
       POSTGRES_DB: ${POSTGRES_DB:-shanutechx}
     ports:
       - "5432:5432"
@@ -95,7 +95,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-shanutechx_minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-CHANGE_ME_minio_root_pass}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set in environment}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -113,7 +113,7 @@ services:
     restart: unless-stopped
     environment:
       STUDIO_PG_META_URL: http://postgres:5432
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME_secure_postgres_pass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in environment}
       DEFAULT_ORGANIZATION: "ShanuTechX Cloud"
       DEFAULT_PROJECT: "Main Production Project"
       SUPABASE_URL: http://localhost:8000
@@ -135,11 +135,11 @@ services:
     env_file: .env
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-shanutechx}:${POSTGRES_PASSWORD:-CHANGE_ME_secure_postgres_pass}@postgres:5432/${POSTGRES_DB:-shanutechx}?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-shanutechx}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-shanutechx}?schema=public
       - REDIS_URL=redis://redis:6379
       - R2_ENDPOINT=${R2_ENDPOINT:-http://minio:9000}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-shanutechx_minio}
-      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-CHANGE_ME_minio_root_pass}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}}
       - R2_BUCKET_NAME=${R2_BUCKET_NAME:-shanutechx-backups}
     ports:
       - "4000:4000"

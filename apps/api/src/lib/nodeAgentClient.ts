@@ -250,6 +250,17 @@ export async function containerAction(
   }
 }
 
+export async function removeNodeContainer(node: Node, containerId: string): Promise<void> {
+  const res = await fetch(agentUrl(node, `/agent/containers/${containerId}`), {
+    method: 'DELETE',
+    headers: agentHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Failed to remove container (${res.status})`);
+  }
+}
+
 export async function getContainerLogs(node: Node, containerId: string, tail = 200): Promise<string> {
   const res = await fetch(agentUrl(node, `/agent/containers/${containerId}/logs?tail=${tail}`), {
     headers: agentHeaders(),

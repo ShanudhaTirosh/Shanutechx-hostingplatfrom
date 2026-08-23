@@ -19,7 +19,7 @@ const WORKSPACE_ROOT = process.env.AGENT_WORKSPACES_DIR || process.env.WORKSPACE
 function resolveSafe(deploymentId, relPath = '') {
   const base = path.resolve(WORKSPACE_ROOT, deploymentId);
   const target = path.resolve(base, relPath.replace(/^\/+/, ''));
-  if (!target.startsWith(base)) {
+  if (target !== base && !target.startsWith(base + path.sep)) {
     throw Object.assign(new Error('Path escape detected'), { statusCode: 400 });
   }
   return target;
@@ -59,14 +59,14 @@ async function readFile(deploymentId, relPath) {
 
 /** Write (overwrite) a text file. Creates parent directories if needed. */
 async function writeFile(deploymentId, relPath, content) {
-  const target = resolveSafe(deploymentId, relPath);
+  const target = await resolveSafe(deploymentId, relPath);
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, content, 'utf8');
 }
 
 /** Write binary file from base64 string. */
 async function writeBinaryFile(deploymentId, relPath, base64Content) {
-  const target = resolveSafe(deploymentId, relPath);
+  const target = await resolveSafe(deploymentId, relPath);
   await fs.mkdir(path.dirname(target), { recursive: true });
   const buffer = Buffer.from(base64Content, 'base64');
   await fs.writeFile(target, buffer);
@@ -74,8 +74,29 @@ async function writeBinaryFile(deploymentId, relPath, base64Content) {
 
 /** Extract zip / tar.gz / tar archive. */
 async function extractArchive(deploymentId, relPath) {
-  const archive = resolveSafe(deploymentId, relPath);
+  const archive = await resolveSafe(deploymentId, relPath);
   const targetDir = path.dirname(archive);
+
+  // Inspect entries before extracting to prevent Zip-Slip path traversal
+  let entries = [];
+  if (archive.endsWith('.zip')) {
+    const { stdout } = await execFileAsync('unzip', ['-Z1', archive]);
+    entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
+  } else if (archive.endsWith('.tar.gz') || archive.endsWith('.tgz')) {
+    const { stdout } = await execFileAsync('tar', ['-tzf', archive]);
+    entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
+  } else if (archive.endsWith('.tar')) {
+    const { stdout } = await execFileAsync('tar', ['-tf', archive]);
+    entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
+  } else {
+    throw new Error('Unsupported archive format. Supported formats: .zip, .tar.gz, .tgz, .tar');
+  }
+
+  for (const entry of entries) {
+    if (entry.startsWith('/') || entry.includes('../') || entry.includes('..\\')) {
+      throw Object.assign(new Error('Path escape detected in archive entry: ' + entry), { statusCode: 400 });
+    }
+  }
 
   if (archive.endsWith('.zip')) {
     await execFileAsync('unzip', ['-o', archive, '-d', targetDir]);
@@ -83,14 +104,12 @@ async function extractArchive(deploymentId, relPath) {
     await execFileAsync('tar', ['-xzf', archive, '-C', targetDir]);
   } else if (archive.endsWith('.tar')) {
     await execFileAsync('tar', ['-xf', archive, '-C', targetDir]);
-  } else {
-    throw new Error('Unsupported archive format. Supported formats: .zip, .tar.gz, .tgz, .tar');
   }
 }
 
 /** Create an empty directory. */
 async function makeDir(deploymentId, relPath) {
-  const target = resolveSafe(deploymentId, relPath);
+  const target = await resolveSafe(deploymentId, relPath);
   await fs.mkdir(target, { recursive: true });
 }
 

@@ -1367,6 +1367,7 @@ model TeamInvite {
   team            Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
   email           String
   role            TeamRole     @default(developer)
+  resourcePermissions Json?
   token           String       @unique
   invitedByUserId String
   invitedByUser   User         @relation(fields: [invitedByUserId], references: [id], onDelete: Cascade)

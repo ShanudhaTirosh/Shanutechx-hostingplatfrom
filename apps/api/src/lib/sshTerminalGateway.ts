@@ -120,10 +120,9 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
             const privateKey = decryptSecret(sshKeyRef, env.secretsEncryptionKey);
             connectOpts.username = 'root';
             connectOpts.privateKey = privateKey;
-          } catch {
-            // May be a plain ref string for nodes added manually — fall back
-            connectOpts.username = 'root';
-            connectOpts.agent = process.env.SSH_AUTH_SOCK;
+          } catch (err: any) {
+            fail(`Failed to decrypt SSH key: ${err?.message || 'Invalid key reference or encryption key'}`);
+            return;
           }
         }
 

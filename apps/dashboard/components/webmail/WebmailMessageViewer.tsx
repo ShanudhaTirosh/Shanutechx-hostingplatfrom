@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 interface WebmailMessageViewerProps {
   message: any;
@@ -71,7 +72,7 @@ export function WebmailMessageViewer({
 
       {/* Rendered HTML Email Body Container */}
       <div className="bg-white rounded-xl p-6 text-black min-h-[300px] overflow-y-auto text-xs shadow-inner">
-        <div dangerouslySetInnerHTML={{ __html: message.htmlBody }} />
+        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(message.htmlBody) }} />
       </div>
     </div>
   );

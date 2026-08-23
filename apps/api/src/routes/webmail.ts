@@ -148,7 +148,8 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
   }
 
   const senderEmail = account.smtpUsername;
-  const senderName = (req.user as any)?.displayName || req.user?.email || senderEmail;
+  const rawSenderName = (req.user as any)?.displayName || req.user?.email || senderEmail;
+  const senderName = String(rawSenderName).replace(/[\r\n]/g, '').trim();
 
   const message = await prisma.webmailMessage.create({
     data: {

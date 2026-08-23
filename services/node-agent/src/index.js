@@ -127,6 +127,16 @@ app.post('/agent/containers/:containerId/stop', async (req, res) => {
   }
 });
 
+app.delete('/agent/containers/:containerId', async (req, res) => {
+  try {
+    await stopAndRemove(req.params.containerId);
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, 'Failed to remove container');
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/agent/containers/:containerId/restart', async (req, res) => {
   try {
     await restartContainer(req.params.containerId);

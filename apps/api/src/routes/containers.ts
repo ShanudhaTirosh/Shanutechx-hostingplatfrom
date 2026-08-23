@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
-import { listNodeContainers, containerAction, getContainerLogs } from '../lib/nodeAgentClient';
+import { listNodeContainers, containerAction, getContainerLogs, removeNodeContainer } from '../lib/nodeAgentClient';
 
 /**
  * Dev/admin-only: see and manage every container on every registered node —
@@ -102,7 +102,7 @@ containersRouter.delete('/nodes/:nodeId/containers/:containerId', async (req: Au
   if (!node) return res.status(404).json({ error: 'Node not found' });
 
   try {
-    await containerAction(node, req.params.containerId, 'stop');
+    await removeNodeContainer(node, req.params.containerId);
     await prisma.auditLog.create({
       data: { adminId: req.user!.id, action: 'container.remove', target: req.params.containerId },
     });

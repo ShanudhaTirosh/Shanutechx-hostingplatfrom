@@ -1,5 +1,14 @@
 import { env } from '../env';
 
+function escapeHtml(str: string): string {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function baseEmailLayout(title: string, contentHtml: string): string {
   const rootDomain = env.rootDomain || 'shanutechx.com';
   return `<!DOCTYPE html>
@@ -7,7 +16,7 @@ function baseEmailLayout(title: string, contentHtml: string): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
+  <title>${escapeHtml(title)}</title>
   <style>
     body { margin: 0; padding: 0; background-color: #0c0a0f; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; color: #f3f0f7; }
     .container { max-width: 580px; margin: 0 auto; padding: 32px 20px; }
@@ -52,11 +61,12 @@ export function renderOrderPaidEmail({
   totalLkr: number;
   items: Array<{ name: string; quantity: number; price: number }>;
 }): { subject: string; html: string; text: string } {
+  const safeName = escapeHtml(customerName);
   const subject = `Order Confirmed & Provisioned (#${orderId.slice(0, 8).toUpperCase()})`;
   const itemsHtml = items
     .map(
       (item) => `<tr>
-      <td>${item.name}</td>
+      <td>${escapeHtml(item.name)}</td>
       <td style="text-align: center;">${item.quantity}</td>
       <td style="text-align: right;">Rs ${item.price.toLocaleString('en-LK')}</td>
     </tr>`
@@ -67,7 +77,7 @@ export function renderOrderPaidEmail({
     subject,
     `
     <div class="status-badge status-success">Payment Confirmed</div>
-    <h1>Thank you for your order, ${customerName}!</h1>
+    <h1>Thank you for your order, ${safeName}!</h1>
     <p>Your payment for Order <strong>#${orderId.slice(0, 8).toUpperCase()}</strong> has been confirmed and your products have been automatically provisioned.</p>
     
     <table class="table">
@@ -111,10 +121,12 @@ export function renderPaymentReviewEmail({
     ? `<div class="status-badge status-success">Payment Approved</div>`
     : `<div class="status-badge status-danger">Review Update</div>`;
 
+  const safeReason = escapeHtml(reason || 'Proof details did not match order total.');
+
   const bodyHtml = approved
     ? `<p>Your payment proof for Order <strong>#${orderId.slice(0, 8).toUpperCase()}</strong> has been verified and approved by our team!</p>`
     : `<p>Your payment proof for Order <strong>#${orderId.slice(0, 8).toUpperCase()}</strong> could not be verified.</p>
-       <div class="quote-box"><strong>Reason:</strong> ${reason || 'Proof details did not match order total.'}</div>
+       <div class="quote-box"><strong>Reason:</strong> ${safeReason}</div>
        <p>Please re-upload a clear payment slip or contact support if you need assistance.</p>`;
 
   const html = baseEmailLayout(
@@ -145,14 +157,18 @@ export function renderTicketReplyEmail({
   messageBody: string;
   ticketId: string;
 }): { subject: string; html: string; text: string } {
+  const safeSender = escapeHtml(senderName);
+  const safeSubject = escapeHtml(ticketSubject);
+  const safeBody = escapeHtml(messageBody).replace(/\n/g, '<br/>');
+
   const subject = `[Ticket Update] ${ticketSubject}`;
   const html = baseEmailLayout(
     subject,
     `
     <div class="status-badge status-info">Support Reply</div>
-    <h1>New reply from ${senderName}</h1>
-    <p>There is a new reply on your support ticket <strong>"${ticketSubject}"</strong>:</p>
-    <div class="quote-box">${messageBody.replace(/\n/g, '<br/>')}</div>
+    <h1>New reply from ${safeSender}</h1>
+    <p>There is a new reply on your support ticket <strong>"${safeSubject}"</strong>:</p>
+    <div class="quote-box">${safeBody}</div>
     <a href="https://${env.rootDomain}/tickets/${ticketId}" class="btn">Reply to Ticket →</a>
   `
   );
@@ -169,13 +185,16 @@ export function renderNotificationEmail({
   title: string;
   message: string;
 }): { subject: string; html: string; text: string } {
+  const safeTitle = escapeHtml(title);
+  const safeMessage = escapeHtml(message).replace(/\n/g, '<br/>');
+
   const subject = `[ShanuTechX] ${title}`;
   const html = baseEmailLayout(
     subject,
     `
     <div class="status-badge status-info">Notification</div>
-    <h1>${title}</h1>
-    <p>${message.replace(/\n/g, '<br/>')}</p>
+    <h1>${safeTitle}</h1>
+    <p>${safeMessage}</p>
     <a href="https://${env.rootDomain}/dashboard" class="btn">Open Dashboard →</a>
   `
   );

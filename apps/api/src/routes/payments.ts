@@ -28,7 +28,7 @@ async function loadOwnedOrder(req: AuthedRequest, orderId: string) {
     include: { user: true },
   });
   if (!order) return null;
-  if (req.user!.role !== 'admin' && order.userId !== req.user!.id) return null;
+  if (req.user!.role !== 'admin' && req.user!.role !== 'dev' && order.userId !== req.user!.id) return null;
   return order;
 }
 

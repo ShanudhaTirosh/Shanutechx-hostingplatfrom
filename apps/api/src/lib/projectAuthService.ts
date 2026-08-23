@@ -22,7 +22,7 @@ export function signProjectAuthToken(payload: ProjectAuthTokenPayload): string {
 }
 
 export function verifyProjectAuthToken(token: string): ProjectAuthTokenPayload {
-  return jwt.verify(token, env.projectAuthJwtSecret) as ProjectAuthTokenPayload;
+  return jwt.verify(token, env.projectAuthJwtSecret, { algorithms: ['HS256'] }) as ProjectAuthTokenPayload;
 }
 
 export async function hashPassword(password: string): Promise<string> {
