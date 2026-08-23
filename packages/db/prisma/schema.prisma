@@ -428,7 +428,7 @@ model Deployment {
   repoUrl      String?
   runtime      String?  // detected by the builder: nodejs | python
   containerId  String?
-  subdomain    String?  // null for non-public deployments (e.g. discord bots)
+  subdomain    String?  @unique // null for non-public deployments (e.g. discord bots)
   internalPort Int?
   status       DeploymentStatus @default(pending)
   createdAt    DateTime @default(now())

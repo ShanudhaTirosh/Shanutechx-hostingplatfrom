@@ -57,13 +57,13 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
       }
 
       if (['opened', 'synchronize', 'reopened'].includes(action)) {
-        logger.info({ repoFullName, prNumber, headBranch }, 'Triggering PR preview deployment');
-        return res.json({ ok: true, message: `Triggered preview deployment for PR #${prNumber}` });
+        logger.info({ repoFullName, prNumber, headBranch }, 'Received PR preview deployment webhook payload');
+        return res.status(501).json({ ok: false, error: `Automated PR preview deployments for PR #${prNumber} are not yet implemented` });
       }
 
       if (action === 'closed') {
-        logger.info({ repoFullName, prNumber }, 'Teardown preview deployment for closed PR');
-        return res.json({ ok: true, message: `Teardown preview deployment for PR #${prNumber}` });
+        logger.info({ repoFullName, prNumber }, 'Received PR preview teardown webhook payload');
+        return res.status(501).json({ ok: false, error: `Automated PR preview teardowns for PR #${prNumber} are not yet implemented` });
       }
     }
 
@@ -73,11 +73,11 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
       const mrIid = payload.object_attributes?.iid;
 
       if (['open', 'update', 'reopen'].includes(action)) {
-        return res.json({ ok: true, message: `Triggered preview deployment for MR !${mrIid}` });
+        return res.status(501).json({ ok: false, error: `Automated MR preview deployments for MR !${mrIid} are not yet implemented` });
       }
 
       if (action === 'close' || action === 'merge') {
-        return res.json({ ok: true, message: `Teardown preview deployment for MR !${mrIid}` });
+        return res.status(501).json({ ok: false, error: `Automated MR preview teardowns for MR !${mrIid} are not yet implemented` });
       }
     }
 

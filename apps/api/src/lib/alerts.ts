@@ -50,6 +50,7 @@ export async function checkMetricAlerts(thresholds: MetricAlertThresholds = DEFA
       }
     }
 
+    // TODO: Wire checkMetricAlerts into worker/cron job scheduler.
     // 2. Check Failed/Crashed Deployments
     const failedDeployments = await prisma.deployment.findMany({
       where: { status: 'failed' },

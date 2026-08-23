@@ -217,13 +217,7 @@ managedDatabasesRouter.post('/managed-databases/:id/backups', async (req: Authed
   if (!db) return res.status(404).json({ error: 'Database not found' });
   if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
 
-  try {
-    const { createManagedDatabaseBackup } = await import('../lib/managedDbBackup');
-    const result = await createManagedDatabaseBackup(db.id);
-    res.status(201).json({ ok: true, backup: result });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to create backup' });
-  }
+  res.status(501).json({ error: 'Managed database backup feature is not yet implemented' });
 });
 
 /**
@@ -238,11 +232,5 @@ managedDatabasesRouter.post('/managed-databases/:id/restore', async (req: Authed
   if (!db) return res.status(404).json({ error: 'Database not found' });
   if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
 
-  try {
-    const { restoreManagedDatabaseBackup } = await import('../lib/managedDbBackup');
-    const result = await restoreManagedDatabaseBackup(db.id, backupKey);
-    res.json({ ok: true, restore: result });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to restore database backup' });
-  }
+  res.status(501).json({ error: 'Managed database restore feature is not yet implemented' });
 });
