@@ -4,6 +4,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Client as SshClient } from 'ssh2';
 import { logger } from './logger';
 import { getVps, getCredentials, LeasewebApiError } from './leasewebClient';
+import { decryptSecret } from './secretsVault';
+import { env } from '../env';
 
 /**
  * Real, interactive SSH-from-the-browser for a customer's (or staff's) VPS.
@@ -92,6 +94,71 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
 
   (async () => {
     try {
+      // Cockpit-native node ticket: format is 'node:IP:sshKeyRef'
+      // These connect directly to the node using the stored SSH key,
+      // bypassing Leaseweb entirely.
+      if (entry.vpsId.startsWith('node:')) {
+        const parts = entry.vpsId.split(':');
+        const ip = parts[1];
+        const sshKeyRef = parts.slice(2).join(':');
+
+        sendStatus(`Connecting to node at ${ip}…`);
+
+        // Decrypt the SSH key from the vault if it's an encrypted ref,
+        // or use as a password if it starts with 'ssh://'
+        let connectOpts: any = { host: ip, port: 22, readyTimeout: 15_000 };
+
+        if (sshKeyRef.startsWith('ssh://')) {
+          // Format: ssh://username@host:port — password was used at provision time
+          // The sshKeyRef is used as username only here; password SSH requires
+          // re-prompting (not supported in this flow). Use key auth.
+          connectOpts.username = sshKeyRef.replace('ssh://', '').split('@')[0] || 'root';
+          connectOpts.username = connectOpts.username || 'root';
+        } else {
+          // Encrypted private key stored in vault
+          try {
+            const privateKey = decryptSecret(sshKeyRef, env.secretsEncryptionKey);
+            connectOpts.username = 'root';
+            connectOpts.privateKey = privateKey;
+          } catch {
+            // May be a plain ref string for nodes added manually — fall back
+            connectOpts.username = 'root';
+            connectOpts.agent = process.env.SSH_AUTH_SOCK;
+          }
+        }
+
+        ssh!.on('ready', () => {
+          sendStatus('Connected. Opening shell…');
+          ssh!.shell({ term: 'xterm-256color' }, (err, stream) => {
+            if (err || closed) {
+              fail(`Failed to open shell: ${err?.message ?? 'connection closed'}`);
+              return;
+            }
+            ws.on('message', (data) => {
+              const text = data.toString();
+              if (text.startsWith('{')) {
+                try {
+                  const msg = JSON.parse(text);
+                  if (msg.type === 'resize' && msg.cols && msg.rows) {
+                    stream.setWindow(msg.rows, msg.cols, 0, 0);
+                    return;
+                  }
+                } catch { /* raw input */ }
+              }
+              stream.write(data);
+            });
+            stream.on('data', (chunk: Buffer) => { if (ws.readyState === WebSocket.OPEN) ws.send(chunk); });
+            stream.on('close', () => { ws.close(); });
+            ws.on('close', () => { closed = true; stream.close(); ssh?.end(); });
+          });
+        });
+
+        ssh!.on('error', (err) => fail(`SSH connection failed: ${err.message}`));
+        ssh!.connect(connectOpts);
+        return;
+      }
+
+      // Leaseweb-managed VPS path (original implementation)
       sendStatus('Fetching VPS details…');
       const [instance, credentials] = await Promise.all([
         getVps(entry.vpsId),

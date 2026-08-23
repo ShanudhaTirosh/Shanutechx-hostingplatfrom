@@ -15,6 +15,8 @@ interface Props {
  * manual-handoff fields (panelUrl/username/credentialRef) still shown by
  * the VPS page for any non-Leaseweb provider.
  */
+import { CockpitDashboardPanel } from './CockpitDashboardPanel';
+
 export default function LeasewebInstancePanel({ kind, id }: Props) {
   const [instance, setInstance] = useState<any>(null);
   const [monitoring, setMonitoring] = useState<any>(null);
@@ -23,6 +25,7 @@ export default function LeasewebInstancePanel({ kind, id }: Props) {
   const [creds, setCreds] = useState<{ username: string; password: string } | null>(null);
   const [snapshots, setSnapshots] = useState<any[] | null>(null);
   const [snapshotName, setSnapshotName] = useState('');
+  const [showCockpit, setShowCockpit] = useState(false);
 
   function load() {
     api.leaseweb
@@ -94,7 +97,7 @@ export default function LeasewebInstancePanel({ kind, id }: Props) {
   if (!instance) return <p className="text-text-muted text-xs">Loading Leaseweb status...</p>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium">{instance.ips?.[0]?.ip ?? 'No IP yet'}</p>
@@ -116,11 +119,14 @@ export default function LeasewebInstancePanel({ kind, id }: Props) {
         <Button variant="ghost" onClick={handleConsole}>
           Open console
         </Button>
+        <Button variant="primary" onClick={() => setShowCockpit(!showCockpit)}>
+          {showCockpit ? 'Hide Cockpit Dashboard' : '🖥️ Cockpit Management'}
+        </Button>
       </div>
 
       <div>
         {creds ? (
-          <div className="text-xs bg-black/30 rounded-lg p-3 space-y-1">
+          <div className="text-xs bg-black/30 rounded-lg p-3 space-y-1 font-mono">
             <p>Username: {creds.username}</p>
             <p className="select-all">Password: {creds.password}</p>
           </div>
@@ -130,6 +136,12 @@ export default function LeasewebInstancePanel({ kind, id }: Props) {
           </Button>
         )}
       </div>
+
+      {showCockpit && (
+        <div className="pt-4 border-t border-white/10">
+          <CockpitDashboardPanel nodeId={id} ipAddress={instance.ips?.[0]?.ip} />
+        </div>
+      )}
 
       <div>
         {snapshots === null ? (

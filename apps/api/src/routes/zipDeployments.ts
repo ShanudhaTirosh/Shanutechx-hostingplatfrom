@@ -49,13 +49,34 @@ uploadDeploymentsRouter.post('/deployments/upload', upload.array('files', 50), a
     const storageKey = `source-uploads/${req.user!.id}/${preferredName}-${Date.now()}.zip`;
     const client = getR2Client();
 
-    if (client && files[0]?.buffer) {
+    if (!client) {
+      return res.status(503).json({ error: 'R2 object storage client is not configured on this server' });
+    }
+
+    // For single zip file uploads, upload directly. For multi-file uploads, upload all files.
+    if (files.length === 1 && files[0]?.buffer) {
       await client.send(
         new PutObjectCommand({
           Bucket: env.r2BucketName,
           Key: storageKey,
           Body: files[0].buffer,
           ContentType: files[0].mimetype || 'application/zip',
+        })
+      );
+    } else {
+      // Multi-file directory upload: upload each file under the folder key prefix
+      await Promise.all(
+        files.map((file, idx) => {
+          const filePath = file.originalname || `file-${idx}`;
+          const itemKey = `source-uploads/${req.user!.id}/${preferredName}-${Date.now()}/${filePath}`;
+          return client.send(
+            new PutObjectCommand({
+              Bucket: env.r2BucketName,
+              Key: itemKey,
+              Body: file.buffer,
+              ContentType: file.mimetype || 'application/octet-stream',
+            })
+          );
         })
       );
     }

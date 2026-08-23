@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { z } from 'zod';
-import { spawn } from 'child_process';
+import { Client as SshClient, ConnectConfig } from 'ssh2';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 import { env } from '../env';
+import { encryptSecret } from '../lib/secretsVault';
 
 export const nodesRouter = Router();
 
@@ -268,8 +269,33 @@ const connectSSHSchema = z.object({
 });
 
 /**
+ * Executes a command over an established SSH2 connection and streams stdout/stderr.
+ * Resolves with exit code. Rejects on stream error.
+ */
+function sshExec(
+  conn: SshClient,
+  command: string,
+  onData?: (chunk: string) => void
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    conn.exec(command, (err, stream) => {
+      if (err) return reject(err);
+      stream.on('data', (d: Buffer) => onData?.(d.toString()));
+      stream.stderr.on('data', (d: Buffer) => onData?.(`[stderr] ${d.toString()}`));
+      stream.on('close', (code: number) => resolve(code ?? 0));
+    });
+  });
+}
+
+/**
  * POST /api/nodes/connect
- * Directly SSH into target server/VPS, executes remote setup script, and registers it.
+ *
+ * Connects to a remote server via SSH (password or private key), installs all
+ * Cockpit management prerequisites (from COCKPIT_MANAGEMENT_GUIDE.md), deploys
+ * the node agent, and registers the node in the database.
+ *
+ * Returns the final node record. For live step-by-step progress, use the
+ * SSE streaming variant: POST /api/nodes/connect/stream
  */
 nodesRouter.post('/nodes/connect', async (req: AuthedRequest, res: Response) => {
   const parsed = connectSSHSchema.safeParse(req.body);
@@ -281,89 +307,266 @@ nodesRouter.post('/nodes/connect', async (req: AuthedRequest, res: Response) => 
   const rootDomain = process.env.ROOT_DOMAIN || 'shanutechx.com';
   const apiUrl = `https://api.${rootDomain}`;
 
-  const tagsStr = roleTags.join(',');
-  const remoteCmd = `curl -sSL ${apiUrl}/api/nodes/install.sh | bash -s -- "${apiUrl}" "${CLUSTER_SECRET}" "${label}" "${tagsStr}"`;
+  const ssh = new SshClient();
+  const logs: string[] = [];
+  const log = (msg: string) => { logs.push(msg); };
+
+  const connectCfg: ConnectConfig = {
+    host: ip,
+    port,
+    username,
+    readyTimeout: 20_000,
+    ...(privateKey ? { privateKey } : {}),
+    ...(password && !privateKey ? { password } : {}),
+  };
 
   try {
-    let sshCmd: string;
-    let args: string[];
+    await new Promise<void>((resolve, reject) => {
+      ssh.on('ready', () => resolve());
+      ssh.on('error', (e) => reject(e));
+      ssh.connect(connectCfg);
+    });
 
-    if (password) {
-      sshCmd = 'sshpass';
-      args = [
-        '-p',
-        password,
-        'ssh',
-        '-o',
-        'StrictHostKeyChecking=no',
-        '-o',
-        'ConnectTimeout=15',
-        '-p',
-        String(port),
-        `${username}@${ip}`,
-        remoteCmd,
-      ];
-    } else {
-      sshCmd = 'ssh';
-      args = [
-        '-o',
-        'StrictHostKeyChecking=no',
-        '-o',
-        'ConnectTimeout=15',
-        '-p',
-        String(port),
-        `${username}@${ip}`,
-        remoteCmd,
-      ];
+    log(`✅ SSH connected to ${username}@${ip}:${port}`);
+
+    // Step 1: Install system packages
+    log('📦 [1/6] Installing required system packages...');
+    await sshExec(ssh, [
+      'apt-get update -qq',
+      'apt-get install -y systemd systemd-sysv ufw docker.io curl unzip tar util-linux nodejs npm 2>&1',
+    ].join(' && '), log);
+
+    // Step 2: Collect hardware specs
+    log('📊 [2/6] Collecting hardware specifications...');
+    const cpuRes: string[] = [];
+    const ramRes: string[] = [];
+    const diskRes: string[] = [];
+    const ipRes: string[] = [];
+    await sshExec(ssh, 'nproc', (d) => cpuRes.push(d.trim()));
+    await sshExec(ssh, "free -m | awk '/^Mem:/{print $2}'", (d) => ramRes.push(d.trim()));
+    await sshExec(ssh, "df -BG / | awk 'NR==2{print $2}' | tr -d G", (d) => diskRes.push(d.trim()));
+    await sshExec(ssh, 'curl -s https://api.ipify.org || hostname -I | awk \'{ print $1 }\'', (d) => ipRes.push(d.trim()));
+
+    const cpuCores = Math.max(1, parseInt(cpuRes[0] || '2', 10));
+    const ramMb = Math.max(512, parseInt(ramRes[0] || '2048', 10));
+    const diskGb = Math.max(5, parseInt(diskRes[0] || '40', 10));
+    const detectedIp = ipRes[0] || ip;
+    log(`   CPU: ${cpuCores} cores | RAM: ${ramMb} MB | Disk: ${diskGb} GB | Public IP: ${detectedIp}`);
+
+    // Step 3: Create shanutechx-agent system user and directories
+    log('👤 [3/6] Creating shanutechx-agent system user...');
+    await sshExec(ssh, [
+      'id shanutechx-agent &>/dev/null || useradd -r -s /bin/false -d /var/lib/shanutechx shanutechx-agent',
+      'mkdir -p /var/lib/shanutechx/workspaces /opt/shanutechx/services/node-agent',
+      'chown -R shanutechx-agent:shanutechx-agent /var/lib/shanutechx',
+    ].join(' && '), log);
+
+    // Step 4: Write sudoers file
+    log('🛡️ [4/6] Configuring sudoers permissions...');
+    const sudoersContent = [
+      '# ShanuTechX Node Agent narrowly-scoped sudo privileges',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl list-units *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl start *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl disable *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/journalctl -u *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/useradd *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/userdel *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/usermod *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/passwd *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/ufw *',
+    ].join('\n');
+    const escapedSudoers = sudoersContent.replace(/'/g, "'\\''" );
+    await sshExec(ssh, [
+      `echo '${escapedSudoers}' > /etc/sudoers.d/shanutechx-agent`,
+      'chmod 0440 /etc/sudoers.d/shanutechx-agent',
+      'visudo -cf /etc/sudoers.d/shanutechx-agent',
+    ].join(' && '), log);
+
+    // Step 5: Download and install the node agent
+    log('🤖 [5/6] Deploying ShanuTechX Node Agent...');
+    const installCmd = [
+      `curl -sSL "${apiUrl}/api/nodes/install.sh" -o /tmp/shanutechx-install.sh`,
+      `bash /tmp/shanutechx-install.sh "${apiUrl}" "${CLUSTER_SECRET}" "${label}" "${roleTags.join(',')}" 2>&1`,
+    ].join(' && ');
+    await sshExec(ssh, installCmd, log);
+
+    // Step 6: Write and enable systemd service
+    log('⚙️ [6/6] Configuring systemd service...');
+    const serviceContent = [
+      '[Unit]',
+      'Description=ShanuTechX Node Agent & Cockpit Management Service',
+      'After=network.target docker.service',
+      'Requires=docker.service',
+      '',
+      '[Service]',
+      'Type=simple',
+      'User=shanutechx-agent',
+      'Group=shanutechx-agent',
+      'WorkingDirectory=/opt/shanutechx/services/node-agent',
+      'Environment=NODE_ENV=production',
+      'Environment=AGENT_PORT=5000',
+      `Environment=NODE_AGENT_SECRET=${CLUSTER_SECRET}`,
+      `Environment=API_URL=${apiUrl}`,
+      'Environment=AGENT_WORKSPACES_DIR=/var/lib/shanutechx/workspaces',
+      'ExecStart=/usr/bin/node src/index.js',
+      'Restart=always',
+      'RestartSec=5',
+      'LimitNOFILE=65536',
+      '',
+      '[Install]',
+      'WantedBy=multi-user.target',
+    ].join('\n');
+    const escapedService = serviceContent.replace(/'/g, "'\\''" );
+    await sshExec(ssh, [
+      `echo '${escapedService}' > /etc/systemd/system/shanutechx-node-agent.service`,
+      'systemctl daemon-reload',
+      'systemctl enable --now shanutechx-node-agent 2>&1 || true',
+    ].join(' && '), log);
+
+    log('🎉 All setup steps completed successfully!');
+    ssh.end();
+
+    // Encrypt and store the SSH key/password reference in the vault
+    let sshKeyRef = `ssh://${username}@${ip}:${port}`;
+    if (privateKey) {
+      sshKeyRef = encryptSecret(privateKey, env.secretsEncryptionKey);
     }
 
-    const child = spawn(sshCmd, args, { timeout: 60000 });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', (d) => {
-      stdout += d.toString();
-    });
-
-    child.stderr.on('data', (d) => {
-      stderr += d.toString();
-    });
-
-    child.on('close', async (code) => {
-      if (code !== 0) {
-        // Fallback registration so node is recorded even if SSH output was partial
-        const node = await prisma.node.create({
-          data: {
-            label,
-            ip,
-            sshKeyRef: `ssh://${username}@${ip}:${port}`,
-            cpuCores: 2,
-            ramMb: 2048,
-            diskGb: 40,
-            roleTags,
-            isActive: false,
-          },
+    // Upsert the node record
+    const existing = await prisma.node.findFirst({ where: { OR: [{ ip: detectedIp }, { label }] } });
+    const node = existing
+      ? await prisma.node.update({
+          where: { id: existing.id },
+          data: { label, ip: detectedIp, sshKeyRef, cpuCores, ramMb, diskGb, roleTags, isActive: true, lastSeenAt: new Date() },
+        })
+      : await prisma.node.create({
+          data: { label, ip: detectedIp, sshKeyRef, cpuCores, ramMb, diskGb, roleTags, isActive: true, lastSeenAt: new Date() },
         });
-        return res.status(500).json({
-          error: `SSH connection finished with exit code ${code}`,
-          stderr: stderr || stdout,
-          node,
-        });
-      }
 
-      const node = await prisma.node.findFirst({ where: { ip } });
-      res.json({
-        success: true,
-        message: 'Node provisioned via SSH successfully',
-        output: stdout,
-        node,
-      });
+    await prisma.auditLog.create({
+      data: { adminId: req.user!.id, action: 'node.ssh_provision', target: node.id },
     });
+
+    res.json({ success: true, message: 'Node provisioned and fully configured via SSH', node, logs });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to execute SSH provisioning' });
+    ssh.end();
+    res.status(500).json({ error: err.message || 'SSH provisioning failed', logs });
   }
 });
+
+/**
+ * POST /api/nodes/connect/stream
+ *
+ * Same as /nodes/connect but uses Server-Sent Events (SSE) to stream each
+ * provisioning step in real-time so the UI can show a live progress log.
+ */
+nodesRouter.post('/nodes/connect/stream', async (req: AuthedRequest, res: Response) => {
+  const parsed = connectSSHSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  // Set up SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const send = (type: string, data: object) => {
+    res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
+  };
+  const step = (msg: string) => send('step', { message: msg });
+  const done = (node: any) => { send('done', { node }); res.end(); };
+  const fail = (err: string, logs: string[]) => { send('error', { error: err, logs }); res.end(); };
+
+  const { ip, port, username, password, privateKey, label, roleTags } = parsed.data;
+  const rootDomain = process.env.ROOT_DOMAIN || 'shanutechx.com';
+  const apiUrl = `https://api.${rootDomain}`;
+
+  const ssh = new SshClient();
+  const logs: string[] = [];
+  const log = (msg: string) => { logs.push(msg); step(msg); };
+
+  const connectCfg: ConnectConfig = {
+    host: ip, port, username, readyTimeout: 20_000,
+    ...(privateKey ? { privateKey } : {}),
+    ...(password && !privateKey ? { password } : {}),
+  };
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      ssh.on('ready', () => resolve());
+      ssh.on('error', (e) => reject(e));
+      ssh.connect(connectCfg);
+    });
+
+    log(`✅ SSH connected to ${username}@${ip}:${port}`);
+
+    step('📦 [1/6] Installing required system packages...');
+    await sshExec(ssh, 'apt-get update -qq && apt-get install -y systemd systemd-sysv ufw docker.io curl unzip tar util-linux nodejs npm 2>&1', log);
+
+    step('📊 [2/6] Collecting hardware specifications...');
+    const cpuRes: string[] = [], ramRes: string[] = [], diskRes: string[] = [], ipRes: string[] = [];
+    await sshExec(ssh, 'nproc', (d) => cpuRes.push(d.trim()));
+    await sshExec(ssh, "free -m | awk '/^Mem:/{print $2}'", (d) => ramRes.push(d.trim()));
+    await sshExec(ssh, "df -BG / | awk 'NR==2{print $2}' | tr -d G", (d) => diskRes.push(d.trim()));
+    await sshExec(ssh, 'curl -s https://api.ipify.org || hostname -I | awk \'{ print $1 }\'', (d) => ipRes.push(d.trim()));
+    const cpuCores = Math.max(1, parseInt(cpuRes[0] || '2', 10));
+    const ramMb = Math.max(512, parseInt(ramRes[0] || '2048', 10));
+    const diskGb = Math.max(5, parseInt(diskRes[0] || '40', 10));
+    const detectedIp = ipRes[0] || ip;
+    log(`   CPU: ${cpuCores}c | RAM: ${ramMb}MB | Disk: ${diskGb}GB | IP: ${detectedIp}`);
+
+    step('👤 [3/6] Creating shanutechx-agent system user...');
+    await sshExec(ssh, 'id shanutechx-agent &>/dev/null || useradd -r -s /bin/false -d /var/lib/shanutechx shanutechx-agent && mkdir -p /var/lib/shanutechx/workspaces /opt/shanutechx/services/node-agent && chown -R shanutechx-agent:shanutechx-agent /var/lib/shanutechx', log);
+
+    step('🛡️ [4/6] Configuring sudoers permissions...');
+    const sudoers = [
+      '# ShanuTechX Node Agent narrowly-scoped sudo privileges',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl list-units *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl start *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl disable *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/journalctl -u *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/useradd *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/userdel *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/usermod *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/passwd *',
+      'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/ufw *',
+    ].join('\n').replace(/'/g, "'\\''" );
+    await sshExec(ssh, `printf '%s' '${sudoers}' > /etc/sudoers.d/shanutechx-agent && chmod 0440 /etc/sudoers.d/shanutechx-agent && visudo -cf /etc/sudoers.d/shanutechx-agent`, log);
+
+    step('🤖 [5/6] Deploying ShanuTechX Node Agent...');
+    await sshExec(ssh, `curl -sSL "${apiUrl}/api/nodes/install.sh" -o /tmp/shanutechx-install.sh && bash /tmp/shanutechx-install.sh "${apiUrl}" "${CLUSTER_SECRET}" "${label}" "${roleTags.join(',')}" 2>&1`, log);
+
+    step('⚙️ [6/6] Configuring systemd service...');
+    const svcContent = `[Unit]\nDescription=ShanuTechX Node Agent & Cockpit Management Service\nAfter=network.target docker.service\nRequires=docker.service\n\n[Service]\nType=simple\nUser=shanutechx-agent\nGroup=shanutechx-agent\nWorkingDirectory=/opt/shanutechx/services/node-agent\nEnvironment=NODE_ENV=production\nEnvironment=AGENT_PORT=5000\nEnvironment=NODE_AGENT_SECRET=${CLUSTER_SECRET}\nEnvironment=API_URL=${apiUrl}\nEnvironment=AGENT_WORKSPACES_DIR=/var/lib/shanutechx/workspaces\nExecStart=/usr/bin/node src/index.js\nRestart=always\nRestartSec=5\nLimitNOFILE=65536\n\n[Install]\nWantedBy=multi-user.target`.replace(/'/g, "'\\''" );
+    await sshExec(ssh, `printf '%s' '${svcContent}' > /etc/systemd/system/shanutechx-node-agent.service && systemctl daemon-reload && systemctl enable --now shanutechx-node-agent 2>&1 || true`, log);
+
+    log('🎉 All 6 setup steps completed successfully!');
+    ssh.end();
+
+    let sshKeyRef = `ssh://${username}@${ip}:${port}`;
+    if (privateKey) sshKeyRef = encryptSecret(privateKey, env.secretsEncryptionKey);
+
+    const existing = await prisma.node.findFirst({ where: { OR: [{ ip: detectedIp }, { label }] } });
+    const node = existing
+      ? await prisma.node.update({ where: { id: existing.id }, data: { label, ip: detectedIp, sshKeyRef, cpuCores, ramMb, diskGb, roleTags, isActive: true, lastSeenAt: new Date() } })
+      : await prisma.node.create({ data: { label, ip: detectedIp, sshKeyRef, cpuCores, ramMb, diskGb, roleTags, isActive: true, lastSeenAt: new Date() } });
+
+    await prisma.auditLog.create({ data: { adminId: req.user!.id, action: 'node.ssh_provision', target: node.id } });
+    done(node);
+  } catch (err: any) {
+    ssh.end();
+    fail(err.message || 'SSH provisioning failed', logs);
+  }
+});
+
 
 const statsSchema = z.object({
   cpuUsedPct: z.number().min(0).max(100),

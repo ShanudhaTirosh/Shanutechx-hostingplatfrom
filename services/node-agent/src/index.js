@@ -11,6 +11,7 @@ const { addDomainRoute, removeDomainRoute } = require('./customDomain');
 const { provisionDatabase } = require('./managedDb');
 const { listDir, readFile, writeFile, writeBinaryFile, extractArchive, makeDir, remove: fsRemove, rename } = require('./filesystem');
 const { provisionProject, deprovisionProject, execSql, listTables } = require('./projects');
+const cockpit = require('./cockpit');
 
 const PORT = process.env.AGENT_PORT || 5000;
 const AGENT_SECRET = process.env.NODE_AGENT_SECRET;
@@ -503,6 +504,153 @@ app.post('/agent/fs/:deploymentId/git-commit-push', async (req, res) => {
   } catch (err) {
     logger.error({ err, deploymentId: req.params.deploymentId }, 'Failed git-commit-push in node-agent');
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Cockpit System Management Routes ────────────────────────────────────────
+
+app.get('/agent/cockpit/monitoring', async (req, res) => {
+  try {
+    const data = await cockpit.getSystemMonitoringInfo();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/agent/cockpit/services', async (req, res) => {
+  try {
+    const services = await cockpit.listSystemdServices();
+    res.json({ services });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/cockpit/services/action', async (req, res) => {
+  const { action, serviceName } = req.body || {};
+  try {
+    const result = await cockpit.controlSystemdService(action, serviceName);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/agent/cockpit/services/logs', async (req, res) => {
+  const { serviceName, lines } = req.query || {};
+  try {
+    const result = await cockpit.getServiceLogs(String(serviceName), lines ? Number(lines) : 100);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/agent/cockpit/users', async (req, res) => {
+  try {
+    const users = await cockpit.listLinuxUsers();
+    res.json({ users });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/cockpit/users', async (req, res) => {
+  const { username, password } = req.body || {};
+  try {
+    const result = await cockpit.createLinuxUser(username, password);
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/agent/cockpit/users/:username', async (req, res) => {
+  const removeHome = req.query.removeHome !== 'false';
+  try {
+    const result = await cockpit.deleteLinuxUser(req.params.username, removeHome);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/agent/cockpit/users/:username/password', async (req, res) => {
+  const { password } = req.body || {};
+  try {
+    const result = await cockpit.setLinuxUserPassword(req.params.username, password);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/agent/cockpit/users/:username/groups', async (req, res) => {
+  const { group, action } = req.body || {};
+  try {
+    const result = await cockpit.modifyLinuxUserGroups(req.params.username, group, action || 'add');
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/agent/cockpit/docker/containers', async (req, res) => {
+  try {
+    const containers = await cockpit.listDockerContainers();
+    res.json({ containers });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/cockpit/docker/containers/:id/action', async (req, res) => {
+  const { action } = req.body || {};
+  try {
+    const result = await cockpit.controlDockerContainer(action, req.params.id);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/agent/cockpit/docker/containers/:id/logs', async (req, res) => {
+  const tail = req.query.tail ? Number(req.query.tail) : 200;
+  try {
+    const result = await cockpit.getDockerContainerLogs(req.params.id, tail);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/agent/cockpit/firewall', async (req, res) => {
+  try {
+    const status = await cockpit.getUfwStatus();
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/cockpit/firewall/rules', async (req, res) => {
+  const { port, protocol, action } = req.body || {};
+  try {
+    const result = await cockpit.addUfwRule(port, protocol, action);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/agent/cockpit/firewall/rules', async (req, res) => {
+  const { port, protocol } = req.query || {};
+  try {
+    const result = await cockpit.deleteUfwRule(port, protocol);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 

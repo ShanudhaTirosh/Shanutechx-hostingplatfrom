@@ -57,6 +57,7 @@ import { openapiRouter } from './routes/openapi';
 import { prWebhooksRouter } from './routes/prWebhooks';
 import { dockerDeploymentsRouter } from './routes/dockerDeployments';
 import { uploadDeploymentsRouter } from './routes/zipDeployments';
+import { cockpitRouter } from './routes/cockpit';
 import { ensureDefaultProductsSeeded } from './lib/seedProducts';
 
 
@@ -186,6 +187,7 @@ app.use('/api', openapiRouter);
 app.use('/api', prWebhooksRouter);
 app.use('/api', dockerDeploymentsRouter);
 app.use('/api', uploadDeploymentsRouter);
+app.use('/api', cockpitRouter);
 app.use('/api', webmailRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/knowledgebase', knowledgebaseRouter);

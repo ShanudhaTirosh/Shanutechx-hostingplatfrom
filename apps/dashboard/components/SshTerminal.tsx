@@ -37,7 +37,13 @@ export function SshTerminal({
 
     (async () => {
       try {
-        const { ticket } = await api.leaseweb.sshTicket(kind, id);
+        // Cockpit node tickets use the dedicated cockpit SSH ticket endpoint
+        // which connects via the node's stored IP + SSH key, bypassing Leaseweb.
+        // Leaseweb provision tickets use the existing leaseweb endpoint.
+        const ticketRes = kind === 'node'
+          ? await api.cockpit.sshTicket(id)
+          : await api.leaseweb.sshTicket(kind, id);
+        const { ticket } = ticketRes;
         if (disposed || !containerRef.current) return;
 
         term = new Terminal({

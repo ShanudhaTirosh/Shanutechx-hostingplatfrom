@@ -51,7 +51,7 @@ async function prepareWorkspace(deploymentId, repoUrl, branch = 'main', remoteBa
   if (fs.existsSync(path.join(dir, '.git'))) {
     await run('git', ['fetch', '--depth', '1', 'origin', branch], { cwd: dir }).catch(() => {});
     await run('git', ['reset', '--hard', `origin/${branch}`], { cwd: dir }).catch(() => {});
-  } else if (!isEmpty && repoUrl && !repoUrl.startsWith('zip://')) {
+  } else if (repoUrl && !repoUrl.startsWith('zip://') && !repoUrl.startsWith('upload://')) {
     await run('git', ['clone', '--depth', '1', '--branch', branch, repoUrl, dir]);
   }
 

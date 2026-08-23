@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { api } from '@/lib/api';
 import { Node } from '@/lib/types';
 import {
@@ -13,6 +13,7 @@ import {
   Input,
   useToast,
 } from '@/components/ui';
+import { CockpitDashboardPanel } from '@/components/CockpitDashboardPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,9 +105,10 @@ export default function NodesPage() {
 
 function NodeCard({ node }: { node: Node }) {
   const stale = !node.lastSeenAt || Date.now() - new Date(node.lastSeenAt).getTime() > 5 * 60 * 1000;
+  const [showCockpit, setShowCockpit] = useState(false);
 
   return (
-    <Card className="border border-white/[0.06] hover:border-white/12 transition-all flex flex-col justify-between">
+    <Card className="border border-white/[0.06] hover:border-white/12 transition-all flex flex-col justify-between space-y-4">
       <div>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -142,8 +144,20 @@ function NodeCard({ node }: { node: Node }) {
         </div>
       </div>
 
+      <div className="pt-2 border-t border-white/[0.04] flex justify-between items-center">
+        <Button size="sm" variant={showCockpit ? 'secondary' : 'primary'} onClick={() => setShowCockpit(!showCockpit)}>
+          {showCockpit ? 'Hide Cockpit' : '🖥️ Open Cockpit Dashboard'}
+        </Button>
+      </div>
+
+      {showCockpit && (
+        <div className="pt-4 border-t border-white/10">
+          <CockpitDashboardPanel nodeId={node.id} nodeLabel={node.label} ipAddress={node.ip} />
+        </div>
+      )}
+
       {stale && (
-        <p className="text-[10px] text-orange-300 bg-orange-500/5 border border-orange-500/10 rounded-lg px-2.5 py-1.5 mt-4">
+        <p className="text-[10px] text-orange-300 bg-orange-500/5 border border-orange-500/10 rounded-lg px-2.5 py-1.5 mt-2">
           ⚠️ {node.lastSeenAt ? `Stats are stale (Last seen: ${new Date(node.lastSeenAt).toLocaleString()})` : 'No stats reported yet'}
         </p>
       )}
@@ -213,12 +227,26 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
   const apiUrl = typeof window !== 'undefined' ? `${window.location.protocol}//api.${window.location.hostname.replace(/^(app|dev|admin)\./, '')}` : 'https://api.shanutechx.com';
   const installCmd = `curl -sSL https://api.shanutechx.com/api/nodes/install.sh | bash -s -- "https://api.shanutechx.com" "${clusterSecret}" "${nodeLabel}" "${tagsStr}"`;
 
+  const [provisionLog, setProvisionLog] = useState<string[]>([]);
+  const [provisionDone, setProvisionDone] = useState(false);
+  const provisionLogRef = useRef<HTMLPreElement>(null);
+
+  // Auto-scroll provision log to bottom
+  useEffect(() => {
+    if (provisionLogRef.current) {
+      provisionLogRef.current.scrollTop = provisionLogRef.current.scrollHeight;
+    }
+  }, [provisionLog]);
+
   async function handleSshConnect(e: React.FormEvent) {
     e.preventDefault();
     setSshBusy(true);
     setSshError(null);
+    setProvisionLog([]);
+    setProvisionDone(false);
+
     try {
-      const res = await api.nodes.connectSSH({
+      const res = await api.nodes.connectSSHStream({
         ip: sshIp,
         port: Number(sshPort),
         username: sshUser,
@@ -227,11 +255,36 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
         label: nodeLabel,
         roleTags,
       });
-      if (res.success) {
-        toast('Node provisioned and connected via SSH successfully!', 'success');
-        onCreated();
-      } else {
-        setSshError(res.message || 'SSH provisioning completed with errors');
+
+      if (!res.body) throw new Error('No stream body received');
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === 'step') {
+              setProvisionLog((p) => [...p, event.message]);
+            } else if (event.type === 'done') {
+              setProvisionLog((p) => [...p, '🎉 Node provisioned and registered successfully!']);
+              setProvisionDone(true);
+              toast('Node provisioned and connected via SSH successfully!', 'success');
+              onCreated();
+            } else if (event.type === 'error') {
+              setSshError(event.error || 'Provisioning failed');
+              setProvisionLog((p) => [...p, `❌ Error: ${event.error}`]);
+            }
+          } catch { /* skip malformed lines */ }
+        }
       }
     } catch (err: any) {
       setSshError(err.message || 'Failed to connect via SSH');
@@ -444,9 +497,35 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
 
           <div className="pt-2">
             <Button type="submit" loading={sshBusy} disabled={sshBusy || !sshIp}>
-              Connect &amp; Provision Node via SSH
+              {sshBusy ? '⏳ Provisioning Node...' : '🚀 Connect & Provision Node (6-Step Auto Setup)'}
             </Button>
           </div>
+
+          {/* Live Provisioning Log */}
+          {provisionLog.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <div className={`h-2 w-2 rounded-full animate-pulse ${provisionDone ? 'bg-emerald-400' : sshError ? 'bg-red-400' : 'bg-amber-400'}`} />
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                  {provisionDone ? '✅ Provisioning Complete' : sshError ? '❌ Provisioning Failed' : '⏳ Live Provisioning Log...'}
+                </p>
+              </div>
+              <pre
+                ref={provisionLogRef}
+                className="bg-black/60 border border-white/10 rounded-xl p-4 font-mono text-[11px] text-emerald-300 max-h-64 overflow-y-auto whitespace-pre-wrap"
+              >
+                {provisionLog.map((line, i) => (
+                  <span key={i} className={`block ${
+                    line.startsWith('❌') ? 'text-red-400' :
+                    line.startsWith('🎉') ? 'text-emerald-400 font-bold' :
+                    line.startsWith('[stderr]') ? 'text-orange-300' :
+                    line.startsWith('✅') ? 'text-emerald-400' :
+                    'text-emerald-300'
+                  }`}>{line}</span>
+                ))}
+              </pre>
+            </div>
+          )}
         </form>
       )}
 

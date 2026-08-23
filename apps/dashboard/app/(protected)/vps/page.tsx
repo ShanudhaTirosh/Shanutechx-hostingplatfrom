@@ -20,6 +20,8 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+import { CockpitDashboardPanel } from '@/components/CockpitDashboardPanel';
+
 const SshTerminal = nextDynamic(() => import('@/components/SshTerminal').then((m) => m.SshTerminal), {
   ssr: false,
 });
@@ -176,11 +178,13 @@ export default function VpsPage() {
     }
   }
 
+  const [cockpitTargetId, setCockpitTargetId] = useState<string | null>(null);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Your VPS Instance Fleet"
-        description="Manage virtual servers assigned to your account — power controls, OS reload, web SSH terminal, snapshots, and bandwidth telemetry."
+        description="Manage virtual servers assigned to your account — power controls, Cockpit OS dashboard, web SSH terminal, snapshots, and bandwidth telemetry."
       />
 
       {error && <ErrorBanner message={error} />}
@@ -197,6 +201,7 @@ export default function VpsPage() {
           const state = instance?.state?.toLowerCase();
           const isTerminated = p.status === 'terminated';
           const pSnapshots = snapshots[p.id] ?? [];
+          const isCockpitOpen = cockpitTargetId === p.id;
 
           return (
             <Card key={p.id} className="border border-white/[0.08] flex flex-col justify-between space-y-4">
@@ -248,7 +253,7 @@ export default function VpsPage() {
 
                   {/* Primary Power Actions */}
                   <div>
-                    <p className="text-[11px] font-semibold uppercase text-text-muted tracking-wider mb-2">Server Power Controls</p>
+                    <p className="text-[11px] font-semibold uppercase text-text-muted tracking-wider mb-2">Server Power &amp; Management</p>
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" variant="secondary" loading={busyId === p.id} onClick={() => handlePower(p, 'start')}>
                         ▶ Start
@@ -261,6 +266,9 @@ export default function VpsPage() {
                       </Button>
                       <Button size="sm" variant="primary" onClick={() => setTerminalTarget(p)}>
                         💻 Web SSH Terminal
+                      </Button>
+                      <Button size="sm" variant={isCockpitOpen ? 'secondary' : 'primary'} onClick={() => setCockpitTargetId(isCockpitOpen ? null : p.id)}>
+                        {isCockpitOpen ? 'Hide Cockpit' : '🖥️ Cockpit Dashboard'}
                       </Button>
                     </div>
                   </div>
@@ -289,6 +297,13 @@ export default function VpsPage() {
                       Copy IP ({ip ?? '—'})
                     </button>
                   </div>
+
+                  {/* Cockpit OS Dashboard Drawer */}
+                  {isCockpitOpen && (
+                    <div className="pt-4 border-t border-white/10">
+                      <CockpitDashboardPanel nodeId={p.id} ipAddress={ip} />
+                    </div>
+                  )}
 
                   {/* Reset Password Output */}
                   {resetPasswordResult?.id === p.id && (

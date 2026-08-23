@@ -54,11 +54,14 @@ webmailRouter.get('/webmail/messages', async (req: AuthedRequest, res: Response)
 
   const where: any = {
     folder,
-    OR: [
-      { userId: { in: accessibleOwnerUserIds } },
+    OR: role === 'dev' ? undefined : [
+      { userId },
       { smtpAccountId: { in: accessibleAccountIds } },
     ],
   };
+  if (role === 'dev') {
+    delete where.OR;
+  }
 
   if (smtpAccountId) {
     where.smtpAccountId = smtpAccountId;

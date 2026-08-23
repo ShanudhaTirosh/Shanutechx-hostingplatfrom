@@ -497,7 +497,20 @@ export const api = {
       privateKey?: string;
       label: string;
       roleTags: string[];
-    }) => apiFetch('/api/nodes/connect', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ success: boolean; message: string; output?: string; node?: Node }>(r)),
+    }) => apiFetch('/api/nodes/connect', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ success: boolean; message: string; node?: Node; logs?: string[] }>(r)),
+    /**
+     * Open a Server-Sent Events stream for live provisioning progress.
+     * The caller is responsible for closing the EventSource when done.
+     * Events: { type:'step', message } | { type:'done', node } | { type:'error', error, logs }
+     */
+    connectSSHStream: (data: {
+      ip: string; port?: number; username?: string; password?: string;
+      privateKey?: string; label: string; roleTags: string[];
+    }) => {
+      // SSE via fetch (EventSource doesn't support POST + body)
+      // Returns the raw Response; consumer should iterate the ReadableStream.
+      return apiFetch('/api/nodes/connect/stream', { method: 'POST', body: JSON.stringify(data) });
+    },
     create: (data: {
       label: string;
       ip: string;
@@ -508,6 +521,7 @@ export const api = {
       roleTags: string[];
     }) => apiFetch('/api/nodes', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ node: Node }>(r)),
   },
+
 
   payments: {
     reviewQueue: () => apiFetch('/api/payments/review-queue').then((r) => asJson<{ payments: Payment[] }>(r)),
@@ -818,18 +832,69 @@ export const api = {
       apiFetch(`/api/leaseweb/instances/${kind}/${id}/dns`).then((r) =>
         asJson<{ supported: boolean; reason?: string }>(r)
       ),
-    publicProducts: (location?: string) =>
-      apiFetch(`/api/leaseweb/public-products${location ? `?location=${location}` : ''}`).then((r) =>
-        asJson<{ products: any[] }>(r)
-      ),
-    addToCart: (code: string) =>
-      apiFetch(`/api/leaseweb/products/${code}/add-to-cart`, { method: 'POST' }).then((r) =>
-        asJson<any>(r)
-      ),
     logs: (take = 50) => apiFetch(`/api/leaseweb/logs?take=${take}`).then((r) => asJson<{ logs: any[] }>(r)),
     health: () =>
       apiFetch('/api/leaseweb/health').then((r) =>
         asJson<{ apiKeyConfigured: boolean; lastCallAt: string | null; lastCallSucceeded: boolean | null }>(r)
+      ),
+  },
+
+  cockpit: {
+    monitoring: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/monitoring`).then((r) => asJson<any>(r)),
+    services: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/services`).then((r) => asJson<{ services: any[] }>(r)),
+    serviceAction: (nodeId: string, serviceName: string, action: string) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/services/action`, {
+        method: 'POST',
+        body: JSON.stringify({ serviceName, action }),
+      }).then((r) => asJson<any>(r)),
+    serviceLogs: (nodeId: string, serviceName: string, lines = 100) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/services/logs?serviceName=${encodeURIComponent(serviceName)}&lines=${lines}`).then(
+        (r) => asJson<{ service: string; logs: string }>(r)
+      ),
+    users: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/users`).then((r) => asJson<{ users: any[] }>(r)),
+    createUser: (nodeId: string, data: { username: string; password?: string }) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/users`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) => asJson<any>(r)),
+    deleteUser: (nodeId: string, username: string) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/users/${encodeURIComponent(username)}`, { method: 'DELETE' }).then(
+        (r) => asJson<any>(r)
+      ),
+    setUserPassword: (nodeId: string, username: string, password: string) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/users/${encodeURIComponent(username)}/password`, {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      }).then((r) => asJson<any>(r)),
+    containers: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/docker/containers`).then((r) => asJson<{ containers: any[] }>(r)),
+    containerAction: (nodeId: string, containerId: string, action: string) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/docker/containers/${encodeURIComponent(containerId)}/action`, {
+        method: 'POST',
+        body: JSON.stringify({ action }),
+      }).then((r) => asJson<any>(r)),
+    containerLogs: (nodeId: string, containerId: string, tail = 200) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/docker/containers/${encodeURIComponent(containerId)}/logs?tail=${tail}`).then(
+        (r) => asJson<{ containerId: string; logs: string }>(r)
+      ),
+    firewallStatus: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/firewall`).then((r) => asJson<any>(r)),
+    addFirewallRule: (nodeId: string, rule: { port: number; protocol: string; action: string }) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/firewall/rules`, {
+        method: 'POST',
+        body: JSON.stringify(rule),
+      }).then((r) => asJson<any>(r)),
+    deleteFirewallRule: (nodeId: string, port: string, protocol: string) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/firewall/rules?port=${encodeURIComponent(port)}&protocol=${encodeURIComponent(protocol)}`, {
+        method: 'DELETE',
+      }).then((r) => asJson<any>(r)),
+    /** Mint a short-lived SSH ticket for the cockpit terminal (non-Leaseweb nodes) */
+    sshTicket: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/cockpit/ssh-ticket`, { method: 'POST' }).then(
+        (r) => asJson<{ ticket: string; expiresInMs: number; ip: string; sshKeyRef: string }>(r)
       ),
   },
 

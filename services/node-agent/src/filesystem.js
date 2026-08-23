@@ -10,7 +10,7 @@ const { execFile } = require('child_process');
 const util = require('util');
 const execFileAsync = util.promisify(execFile);
 
-const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/opt/shanutechx/workspaces';
+const WORKSPACE_ROOT = process.env.AGENT_WORKSPACES_DIR || process.env.WORKSPACE_ROOT || '/var/lib/shanutechx/workspaces';
 
 /**
  * Resolve a path relative to the deployment workspace and validate it doesn't

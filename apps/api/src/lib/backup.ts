@@ -159,13 +159,31 @@ export async function restoreBackup(key: string): Promise<{ success: boolean; du
   const restoreCmd = `gunzip -c | psql -h ${host} -p ${port} -U ${user} -d ${dbName}`;
 
   return new Promise((resolve, reject) => {
-    const child = exec(restoreCmd, { env: pgEnv }, (err) => {
-      if (err) return reject(err);
+    const child = spawn('sh', ['-c', restoreCmd], { env: pgEnv, stdio: ['pipe', 'ignore', 'pipe'] });
+
+    let stderr = '';
+    child.stderr.on('data', (d) => { stderr += d.toString(); });
+
+    child.on('close', (code) => {
+      if (code !== 0) return reject(new Error(`Restore process exited with code ${code}: ${stderr}`));
       resolve({ success: true, durationMs: Date.now() - start });
     });
-    if (child.stdin) {
-      child.stdin.write(Buffer.from(byteArray));
-      child.stdin.end();
+
+    if (response.Body && 'pipe' in response.Body) {
+      (response.Body as any).pipe(child.stdin);
+    } else if (response.Body) {
+      // ReadableStream fallback
+      const reader = (response.Body as any).getReader();
+      (async () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          child.stdin.write(Buffer.from(value));
+        }
+        child.stdin.end();
+      })().catch(reject);
+    } else {
+      reject(new Error('Failed to retrieve backup stream'));
     }
   });
 }
