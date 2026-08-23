@@ -320,7 +320,7 @@ projectsRouter.get('/projects/:id/tables/:table/rows', async (req: AuthedRequest
   const url = `http://${node.ip}:${env.nodeAgentPort}/agent/projects/${proj.id}/tables/${req.params.table}/rows?page=${page}&limit=${limit}&dbName=${proj.dbName}`;
   const agentRes = await fetch(url, { headers: { 'x-agent-secret': env.nodeAgentSecret } });
   const data = await agentRes.json().catch(() => ({}));
-  res.status(agentRes.ok ? 200 : 400).json(data);
+  res.status(agentRes.ok ? 200 : agentRes.status || 500).json(data);
 });
 
 projectsRouter.post('/projects/:id/tables/:table/rows', async (req: AuthedRequest, res) => {

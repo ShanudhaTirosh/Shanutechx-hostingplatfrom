@@ -1,4 +1,4 @@
-require('dotenv/config');
+const crypto = require('crypto');
 const express = require('express');
 const { connect, getSocket, logger } = require('./connection');
 const { sendNotification } = require('./sendNotification');
@@ -25,7 +25,14 @@ app.get('/internal/health', (_req, res) => {
 // network in infra/docker-compose.yml.
 app.post('/internal/send', async (req, res) => {
   const secret = req.headers['x-internal-secret'];
-  if (secret !== INTERNAL_SECRET) {
+  const key = 'shanutechx-whatsapp-gate';
+  const isValid =
+    typeof secret === 'string' &&
+    crypto.timingSafeEqual(
+      crypto.createHmac('sha256', key).update(secret).digest(),
+      crypto.createHmac('sha256', key).update(INTERNAL_SECRET).digest()
+    );
+  if (!isValid) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

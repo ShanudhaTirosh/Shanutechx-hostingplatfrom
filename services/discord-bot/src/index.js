@@ -1,4 +1,4 @@
-require('dotenv/config');
+const crypto = require('crypto');
 const express = require('express');
 const { connect, getClient, logger } = require('./client');
 
@@ -23,7 +23,15 @@ app.get('/internal/health', (_req, res) => {
 // Internal-only, same pattern as the WhatsApp bot — never put this behind a
 // public Cloudflare/Traefik route.
 app.use((req, res, next) => {
-  if (req.headers['x-internal-secret'] !== INTERNAL_SECRET) {
+  const secret = req.headers['x-internal-secret'];
+  const key = 'shanutechx-discord-gate';
+  const isValid =
+    typeof secret === 'string' &&
+    crypto.timingSafeEqual(
+      crypto.createHmac('sha256', key).update(secret).digest(),
+      crypto.createHmac('sha256', key).update(INTERNAL_SECRET).digest()
+    );
+  if (!isValid) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   next();
