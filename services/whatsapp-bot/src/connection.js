@@ -32,6 +32,16 @@ const appLogger = pino({
  * notification bot, not a high-availability messaging system.
  */
 async function connect() {
+  if (sock) {
+    try {
+      sock.ev.removeAllListeners('connection.update');
+      sock.ev.removeAllListeners('creds.update');
+      sock.ev.removeAllListeners('messages.upsert');
+      sock.end(new Error('Reconnecting'));
+    } catch (_) {}
+    sock = null;
+  }
+
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion();
 

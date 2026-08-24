@@ -24,6 +24,7 @@ function validateIdentifier(name, fieldName = 'Identifier') {
 }
 
 function quoteSqlLiteral(str) {
+  if (str === null || str === undefined) return 'NULL';
   return "'" + String(str).replace(/'/g, "''") + "'";
 }
 
@@ -55,9 +56,13 @@ async function provisionProject({ projectId, dbName, dbUsername, password }) {
 
   // 2. Start a PostgREST container for instant CRUD API
   const containerName = `project-api-${projectId}`;
+  await execFileAsync('docker', ['rm', '-f', containerName]).catch(() => {});
+
   const apiPort = 18000 + (Math.abs(hashCode(projectId)) % 1000);
   const postgresHost = process.env.POSTGRES_HOST || 'shanutechx-postgres';
-  const pgrstConnStr = `postgres://${dbUsername}:${password}@${postgresHost}:5432/${dbName}`;
+  const encodedUser = encodeURIComponent(dbUsername);
+  const encodedPass = encodeURIComponent(password);
+  const pgrstConnStr = `postgres://${encodedUser}:${encodedPass}@${postgresHost}:5432/${dbName}`;
 
   await execFileAsync('docker', [
     'run', '-d',
@@ -216,7 +221,8 @@ async function insertRow({ projectId, dbName, tableName, row }) {
   if (projectId) validateIdentifier(projectId, 'projectId');
   validateIdentifier(dbName, 'dbName');
   validateIdentifier(tableName, 'tableName');
-  const keys = Object.keys(row).filter((k) => k !== 'dbName');
+  const keys = Object.keys(row || {}).filter((k) => k !== 'dbName');
+  if (keys.length === 0) throw new Error('At least one column value must be provided for insert');
   keys.forEach((k) => validateIdentifier(k, 'columnName'));
   const cols = keys.map((k) => `"${k}"`).join(', ');
   const vals = keys.map((k) => quoteSqlLiteral(row[k])).join(', ');
@@ -229,7 +235,8 @@ async function updateRow({ projectId, dbName, tableName, pkColumn = 'id', pkValu
   validateIdentifier(dbName, 'dbName');
   validateIdentifier(tableName, 'tableName');
   validateIdentifier(pkColumn, 'pkColumn');
-  const keys = Object.keys(row).filter((k) => k !== 'dbName');
+  const keys = Object.keys(row || {}).filter((k) => k !== 'dbName');
+  if (keys.length === 0) throw new Error('At least one column value must be provided for update');
   keys.forEach((k) => validateIdentifier(k, 'columnName'));
   const setClauses = keys.map((k) => `"${k}" = ${quoteSqlLiteral(row[k])}`).join(', ');
   const sql = `UPDATE "${tableName}" SET ${setClauses} WHERE "${pkColumn}" = ${quoteSqlLiteral(pkValue)} RETURNING *;`;

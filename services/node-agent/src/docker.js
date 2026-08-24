@@ -204,8 +204,9 @@ async function getContainerMetrics(containerId) {
   const cpuUsagePercent =
     systemDelta > 0 && cpuDelta > 0 ? Math.round((cpuDelta / systemDelta) * onlineCpus * 100 * 100) / 100 : 0;
 
-  const memoryUsedMb = Math.round((stats.memory_stats.usage || 0) / (1024 * 1024));
-  const rawMemLimit = stats.memory_stats.limit || 0;
+  const memoryStats = stats.memory_stats || {};
+  const memoryUsedMb = Math.round((memoryStats.usage || 0) / (1024 * 1024));
+  const rawMemLimit = memoryStats.limit || 0;
   // Docker reports an effectively "no limit" value as the host's total
   // memory when the container wasn't given an explicit --memory; treat
   // limits above 1 TB as "no configured limit" rather than a real number.

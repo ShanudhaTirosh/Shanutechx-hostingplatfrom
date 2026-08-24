@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
@@ -72,7 +73,7 @@ adminRouter.post('/admin/users', async (req: AuthedRequest, res) => {
       email: parsed.data.email,
       displayName: parsed.data.displayName || parsed.data.email.split('@')[0],
       role: parsed.data.role,
-      firebaseUid: `manual_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      firebaseUid: `manual_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`,
     },
   });
 

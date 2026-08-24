@@ -59,14 +59,14 @@ async function readFile(deploymentId, relPath) {
 
 /** Write (overwrite) a text file. Creates parent directories if needed. */
 async function writeFile(deploymentId, relPath, content) {
-  const target = await resolveSafe(deploymentId, relPath);
+  const target = resolveSafe(deploymentId, relPath);
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, content, 'utf8');
 }
 
 /** Write binary file from base64 string. */
 async function writeBinaryFile(deploymentId, relPath, base64Content) {
-  const target = await resolveSafe(deploymentId, relPath);
+  const target = resolveSafe(deploymentId, relPath);
   await fs.mkdir(path.dirname(target), { recursive: true });
   const buffer = Buffer.from(base64Content, 'base64');
   await fs.writeFile(target, buffer);
@@ -74,7 +74,7 @@ async function writeBinaryFile(deploymentId, relPath, base64Content) {
 
 /** Extract zip / tar.gz / tar archive. */
 async function extractArchive(deploymentId, relPath) {
-  const archive = await resolveSafe(deploymentId, relPath);
+  const archive = resolveSafe(deploymentId, relPath);
   const targetDir = path.dirname(archive);
 
   // Inspect entries before extracting to prevent Zip-Slip path traversal
@@ -109,19 +109,14 @@ async function extractArchive(deploymentId, relPath) {
 
 /** Create an empty directory. */
 async function makeDir(deploymentId, relPath) {
-  const target = await resolveSafe(deploymentId, relPath);
+  const target = resolveSafe(deploymentId, relPath);
   await fs.mkdir(target, { recursive: true });
 }
 
 /** Delete a file or directory (recursive). */
 async function remove(deploymentId, relPath) {
   const target = resolveSafe(deploymentId, relPath);
-  const stats = await fs.stat(target);
-  if (stats.isDirectory()) {
-    await fs.rm(target, { recursive: true, force: true });
-  } else {
-    await fs.unlink(target);
-  }
+  await fs.rm(target, { recursive: true, force: true });
 }
 
 /** Rename / move a path inside the same workspace. */

@@ -833,7 +833,7 @@ app.post('/agent/compose/up', async (req, res) => {
     // Write env vars with auto-generated secrets
     const resolvedEnv = resolveEnvVars(composeYaml, envVars || {});
     const envFileContent = Object.entries(resolvedEnv)
-      .map(([k, v]) => `${k}=${v}`)
+      .map(([k, v]) => `${k}="${String(v ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`)
       .join('\n');
 
     const fs = require('fs');
