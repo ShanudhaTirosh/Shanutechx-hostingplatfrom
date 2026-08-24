@@ -64,18 +64,19 @@ export class NodeAgentClient {
     return this.request('GET', '/agent/containers');
   }
 
-  async stopContainer(deploymentId: string): Promise<void> {
-    return this.request('POST', `/agent/deployments/${deploymentId}/stop`);
+  /** Stop container by Docker container ID */
+  async stopContainer(containerId: string): Promise<void> {
+    return this.request('POST', `/agent/deployments/${containerId}/stop`);
   }
 
-  /** Start container by deployment ID */
-  async startContainer(deploymentId: string): Promise<void> {
-    return this.request('POST', `/agent/deployments/${deploymentId}/start`);
+  /** Start container by Docker container ID */
+  async startContainer(containerId: string): Promise<void> {
+    return this.request('POST', `/agent/deployments/${containerId}/start`);
   }
 
-  /** Restart container by deployment ID */
-  async restartContainer(deploymentId: string): Promise<void> {
-    return this.request('POST', `/agent/deployments/${deploymentId}/restart`);
+  /** Restart container by Docker container ID */
+  async restartContainer(containerId: string): Promise<void> {
+    return this.request('POST', `/agent/deployments/${containerId}/restart`);
   }
 
   /** Read workspace file */

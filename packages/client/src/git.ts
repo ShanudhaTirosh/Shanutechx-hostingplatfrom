@@ -7,8 +7,8 @@ export class GitResource extends BaseClient {
     return res.accounts;
   }
 
-  async removeAccount(accountId: string): Promise<void> {
-    return this.httpPost('/api/git/disconnect', { accountId });
+  async removeAccount(accountId: string, provider: 'github' | 'gitlab' = 'github'): Promise<void> {
+    return this.httpPost('/api/git/disconnect', { accountId, provider });
   }
 
   async listRepos(gitAccountId: string): Promise<GitRepo[]> {
@@ -21,11 +21,11 @@ export class GitResource extends BaseClient {
 
   /** Get GitHub OAuth authorization URL */
   getGitHubAuthUrl(): string {
-    return `${this.apiUrl}/api/git/connect/github/authorize`;
+    return `${this.apiUrl}/api/git/connect/github/start`;
   }
 
   getGitLabAuthUrl(): string {
-    return `${this.apiUrl}/api/git/connect/gitlab/authorize`;
+    return `${this.apiUrl}/api/git/connect/gitlab/start`;
   }
 
   /** The flow that actually works today: connect an account with a

@@ -75,9 +75,6 @@ export class DeploymentBuilder {
     if (!this.config.repoUrl) {
       throw new Error('DeploymentBuilder error: repository URL is required (.fromRepo())');
     }
-    if (!this.config.nodeId) {
-      throw new Error('DeploymentBuilder error: node ID is required (.onNode())');
-    }
 
     return this.client.deployments.create(this.config as DeploymentCreateInput);
   }

@@ -8,15 +8,27 @@ export class NodesResource extends BaseClient {
   }
 
   async get(id: string): Promise<PlatformNode> {
-    return this.httpGet<PlatformNode>(`/api/nodes/${id}`);
+    const res = await this.httpGet<{ node: PlatformNode }>(`/api/nodes/${id}`);
+    return res.node;
   }
 
   async getStats(id: string): Promise<NodeStats> {
-    return this.httpGet<NodeStats>(`/api/nodes/${id}/stats`);
+    const node: any = await this.get(id);
+    return {
+      nodeId: id,
+      cpuUsagePercent: node.cpuUsedPct ?? 0,
+      memoryUsedMb: node.ramUsedMb ?? 0,
+      memoryTotalMb: (node.ramMb ?? node.ramGb ? (node.ramGb * 1024) : 2048),
+      diskUsedGb: node.diskUsedGb ?? 0,
+      diskTotalGb: node.diskGb ?? 40,
+      loadAverage: [0, 0, 0],
+      uptimeSeconds: 0,
+      timestamp: node.lastSeenAt || new Date().toISOString(),
+    };
   }
 
   async getInstallScript(): Promise<string> {
-    const res = await this.httpGet<{ script: string }>('/api/nodes/install-script');
-    return res.script;
+    const res = await fetch(`${this.apiUrl}/api/nodes/install.sh`);
+    return res.text();
   }
 }

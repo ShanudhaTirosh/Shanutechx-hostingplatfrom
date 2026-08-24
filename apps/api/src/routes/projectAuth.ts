@@ -101,22 +101,26 @@ async function validateProjectRedirectUrl(
     select: { redirectUri: true },
   });
 
-  if (oauthConfigs.length > 0) {
-    const allowedOrigins = new Set(
-      oauthConfigs
-        .map((c) => {
-          try {
-            return new URL(c.redirectUri).origin;
-          } catch {
-            return null;
-          }
-        })
-        .filter((o): o is string => Boolean(o))
-    );
-    return allowedOrigins.has(parsedUrl.origin);
+  const allowedOrigins = new Set<string>();
+  for (const c of oauthConfigs) {
+    try {
+      allowedOrigins.add(new URL(c.redirectUri).origin);
+    } catch (_) {}
   }
 
-  return true;
+  if (allowedOrigins.has(parsedUrl.origin)) {
+    return true;
+  }
+
+  const rootDomain = process.env.ROOT_DOMAIN || 'shanutechx.com';
+  const isLocalhost = parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1';
+  const isPlatformDomain = parsedUrl.hostname === rootDomain || parsedUrl.hostname.endsWith(`.${rootDomain}`);
+
+  if (isLocalhost || isPlatformDomain) {
+    return true;
+  }
+
+  return false;
 }
 
 const magicLinkRequestSchema = z.object({ email: z.string().email(), redirectUrl: z.string().url() });

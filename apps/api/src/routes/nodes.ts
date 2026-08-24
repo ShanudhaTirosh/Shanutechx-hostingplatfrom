@@ -214,6 +214,12 @@ nodesRouter.get('/nodes/cluster-secret', (_req: AuthedRequest, res: Response) =>
   res.json({ secret: CLUSTER_SECRET });
 });
 
+nodesRouter.get('/nodes/:id', async (req: AuthedRequest, res: Response) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.id } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  res.json({ node });
+});
+
 const createNodeSchema = z.object({
   label: z.string().min(1),
   ip: z.string().min(1),

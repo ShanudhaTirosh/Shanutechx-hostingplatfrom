@@ -11,6 +11,7 @@ import { env } from '../env';
 import { encryptSecret } from '../lib/secretsVault';
 import { invalidateCache } from '../lib/catalog/catalog-manager';
 import { parseTemplateYaml, validateTemplateStructure } from '../lib/catalog/template-parser';
+import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
 
 export const catalogRouter = Router();
 catalogRouter.use(requireAuth);
@@ -559,16 +560,18 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
   const meta = parseMeta(yamlContent, path.basename(resolved));
   const composeName = projectName ?? `${slug}-${Date.now().toString(36)}`;
 
-  // Find target node or select best available node if customer passed 'default' or node not found
-  let node = inputNodeId !== 'default' ? await prisma.node.findUnique({ where: { id: inputNodeId } }) : null;
-  if (!node || !node.isActive) {
-    // Auto-select best available node
-    node = await prisma.node.findFirst({ 
-      where: { isActive: true },
-      orderBy: { cpuUsedPct: 'asc' }, // Pick least-loaded node
+  const isAdmin = req.user!.role === 'admin' || req.user!.role === 'dev';
+  let node;
+  try {
+    node = await selectNodeForDeployment({
+      requiredTag: 'node-hosting',
+      isAdminDeployment: isAdmin,
+      explicitNodeId: inputNodeId !== 'default' ? inputNodeId : undefined,
     });
+  } catch (err) {
+    if (err instanceof NodeSelectionError) return res.status(409).json({ error: err.message });
+    throw err;
   }
-  if (!node) return res.status(404).json({ error: 'No active node available for deployment' });
 
   const nodeId = node.id;
 
