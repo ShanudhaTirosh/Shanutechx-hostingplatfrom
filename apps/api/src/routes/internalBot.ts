@@ -76,6 +76,21 @@ internalBotRouter.get('/internal/customer-summary', async (req: Request, res: Re
 });
 
 /**
+ * GET /api/internal/open-tickets
+ * Retrieve open customer support tickets for internal bots (Discord/WhatsApp)
+ */
+internalBotRouter.get('/internal/open-tickets', async (_req: Request, res: Response) => {
+  const tickets = await prisma.ticket.findMany({
+    where: { status: { in: ['open', 'pending'] } },
+    orderBy: { createdAt: 'desc' },
+    take: 25,
+    include: { user: { select: { email: true, displayName: true } } },
+  });
+
+  res.json({ tickets });
+});
+
+/**
  * GET /api/internal/all-deployments
  * Retrieve all active container deployments across nodes
  */

@@ -94,7 +94,7 @@ async function handleInteraction(interaction) {
     await interaction.editReply({ embeds: [embed] });
   } else if (commandName === 'tickets') {
     await interaction.deferReply();
-    const data = await apiFetch('/api/tickets?status=open');
+    const data = await apiFetch('/api/internal/open-tickets');
 
     if (!data || !data.tickets || data.tickets.length === 0) {
       await interaction.editReply('🎫 No open support tickets right now! 🎉');

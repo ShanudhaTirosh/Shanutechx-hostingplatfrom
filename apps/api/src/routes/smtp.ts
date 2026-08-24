@@ -57,8 +57,16 @@ async function getGlobalSmtpConfig() {
   });
 }
 
+function isSsrfTarget(host: string): boolean {
+  if (!host) return false;
+  const h = host.toLowerCase().trim();
+  if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '0.0.0.0' || h === '169.254.169.254') return true;
+  if (/^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(h)) return true;
+  return false;
+}
+
 // 1. General Outbound Global SMTP Configuration
-smtpRouter.get('/smtp/global-config', async (_req: AuthedRequest, res) => {
+smtpRouter.get('/smtp/global-config', requireDev, async (_req: AuthedRequest, res) => {
   const config = await getGlobalSmtpConfig();
   const { passwordEnc, ...safeConfig } = config;
   res.json({ config: safeConfig, hasPassword: !!passwordEnc });
@@ -89,8 +97,13 @@ smtpRouter.post('/smtp/global-config', requireDev, async (req: AuthedRequest, re
 });
 
 // 2. Test Connection Handshake to Global SMTP Host
-smtpRouter.post('/smtp/verify', async (req: AuthedRequest, res) => {
+smtpRouter.post('/smtp/verify', requireDev, async (req: AuthedRequest, res) => {
   const { host, port, user, pass, secure } = req.body;
+
+  if (host && isSsrfTarget(host)) {
+    return res.status(400).json({ error: 'Verification target host is not allowed (SSRF protection)' });
+  }
+
   const globalConfig = await getGlobalSmtpConfig();
   const targetHost = host || globalConfig.host;
   const targetPort = port ? Number(port) : globalConfig.port;
@@ -181,7 +194,7 @@ smtpRouter.post('/smtp/verify-dns', async (req: AuthedRequest, res) => {
   }
 });
 
-// 3. Send General Outbound Email
+// 3. Send General Outbound Email (Platform Outbound Relay — Dev/Admin Only)
 const sendEmailSchema = z.object({
   to: z.string().email(),
   subject: z.string().min(1).max(200),
@@ -189,7 +202,7 @@ const sendEmailSchema = z.object({
   text: z.string().optional(),
 });
 
-smtpRouter.post('/smtp/send', async (req: AuthedRequest, res) => {
+smtpRouter.post('/smtp/send', requireDev, async (req: AuthedRequest, res) => {
   const parsed = sendEmailSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 

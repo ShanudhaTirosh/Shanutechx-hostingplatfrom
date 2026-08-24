@@ -7,6 +7,7 @@ import { logger } from '../lib/logger';
 import { env } from '../env';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { sendSmtpReleaseEmail, getTierFromPlanName } from '../lib/smtpProvisioner';
+import { sendSmtpEmail } from '../lib/smtpDispatcher';
 import dns from 'dns';
 
 export const emailRouter = Router();
@@ -501,20 +502,41 @@ emailRouter.post('/email/send', async (req: AuthedRequest, res) => {
   if (!parse.success) return res.status(400).json({ error: 'Invalid email data', details: parse.error.format() });
 
   const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
-  if (!isStaff) {
-    const smtpSubscription = await prisma.smtpAccount.findFirst({
-      where: { userId: req.user!.id },
-    });
+  let smtpAccount = await prisma.smtpAccount.findFirst({
+    where: { userId: req.user!.id },
+    orderBy: { createdAt: 'asc' },
+  });
 
-    if (!smtpSubscription) {
-      return res.status(403).json({
-        error: 'You need an active SMTP Hosting subscription to send emails.',
-        purchaseRequired: true,
-      });
-    }
+  if (!isStaff && !smtpAccount) {
+    return res.status(403).json({
+      error: 'You need an active SMTP Hosting subscription to send emails.',
+      purchaseRequired: true,
+    });
   }
 
   const { from, to, subject, body } = parse.data;
+
+  // Real SMTP Dispatch
+  try {
+    if (smtpAccount) {
+      const password = decryptSecret(smtpAccount.credentialRef, env.secretsEncryptionKey);
+      await sendSmtpEmail(
+        { host: smtpAccount.smtpHost, port: smtpAccount.smtpPort, user: smtpAccount.smtpUsername, pass: password },
+        { from: `"${from}" <${smtpAccount.smtpUsername}>`, to, subject, html: body }
+      );
+    } else {
+      const globalConfig = await prisma.platformSmtpConfig.findUnique({ where: { id: 'global' } });
+      if (!globalConfig) throw new Error('Global platform SMTP is not configured');
+      const pass = decryptSecret(globalConfig.passwordEnc, env.secretsEncryptionKey);
+      await sendSmtpEmail(
+        { host: globalConfig.host, port: globalConfig.port, user: globalConfig.user, pass },
+        { from: `"${globalConfig.senderName}" <${globalConfig.senderEmail}>`, to, subject, html: body }
+      );
+    }
+  } catch (err: any) {
+    logger.error({ err: err.message, from, to }, 'Failed to dispatch email via SMTP');
+    return res.status(502).json({ error: `Email dispatch failed: ${err.message || 'SMTP server error'}` });
+  }
 
   try {
     // Persist sent message in DB
@@ -545,7 +567,7 @@ emailRouter.post('/email/send', async (req: AuthedRequest, res) => {
       delivered: true,
     });
   } catch (err: any) {
-    logger.error({ err }, 'Failed to send/save email message');
+    logger.error({ err }, 'Failed to save sent email message record');
     res.status(500).json({ error: err.message || 'Failed to send email' });
   }
 });
