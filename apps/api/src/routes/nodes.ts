@@ -9,22 +9,10 @@ import { encryptSecret } from '../lib/secretsVault';
 
 export const nodesRouter = Router();
 
-// SECURITY (audit finding C5): this used to fall back to a hardcoded
-// literal secret if NODE_AGENT_SECRET was unset. env.ts already marks
-// NODE_AGENT_SECRET as a *required* env var (the app refuses to start
-// without it), so there is no legitimate case where falling back to a
-// baked-in value was needed -- it only created a live, exploitable
-// backdoor for any deployment that left the env var unset (or, as found
-// in this audit, a deployment whose real .env happened to still be set
-// to that same published fallback value). Use the validated env value
-// directly; there is no fallback.
 const CLUSTER_SECRET = env.nodeAgentSecret;
 
 function clusterSecretMatches(submitted: string): boolean {
-  // Timing-safe comparison (audit finding H4/C5) -- HMAC both sides first
-  // so we're always comparing equal-length buffers regardless of the
-  // submitted string's length, consistent with the pattern already used
-  // in routes/billing.ts and routes/status.ts.
+  // Timing-safe comparison -- HMAC both sides first so we're always comparing equal-length buffers
   const key = 'shanutechx-cluster-secret-gate';
   const a = crypto.createHmac('sha256', key).update(submitted).digest();
   const b = crypto.createHmac('sha256', key).update(CLUSTER_SECRET).digest();

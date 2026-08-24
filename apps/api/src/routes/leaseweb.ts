@@ -184,8 +184,7 @@ async function resolveLeasewebVpsId(req: AuthedRequest, kind: 'provision' | 'nod
   if (kind === 'provision') {
     const provision = await prisma.vpsProvision.findUnique({ where: { id } });
     if (!provision?.leasewebVpsId) return null;
-    // Phase 15: admin scoped to an assigned customer's provision (was:
-    // blanket access for admin, same as dev).
+    // Admin scoped to an assigned customer's provision.
     if (!(await canAccessResource(provision.userId, req))) return null;
     return provision.leasewebVpsId;
   }
@@ -261,11 +260,6 @@ leasewebRouter.get('/leaseweb/instances/:kind/:id/credentials', async (req: Auth
 
   try {
     const creds = await getCredentials(vpsId, 'OPERATING_SYSTEM');
-    // Audit finding H9: viewing a VPS's root/Administrator credentials is
-    // one of the most sensitive reads in this file and previously left no
-    // trail at all -- log who viewed it and when (never the credential
-    // value itself). actorRole distinguishes a customer viewing their own
-    // VPS's credentials from a staff member viewing a customer's.
     await prisma.auditLog.create({
       data: {
         adminId: req.user!.id,
@@ -411,11 +405,6 @@ leasewebRouter.post('/leaseweb/instances/:kind/:id/reset-password', async (req: 
         adminId: req.user!.id,
         action: 'vps.reset_password',
         target: vpsId,
-        // Audit finding H9: this route is explicitly customer
-        // self-service (not admin-only), so record when the actor was
-        // the resource's own owner rather than staff -- previously every
-        // row here was indistinguishable from a real admin action in the
-        // /admin/audit-log view.
         actorRole: req.user!.role === 'customer' ? 'customer' : null,
       },
     });
@@ -453,9 +442,6 @@ leasewebRouter.post('/leaseweb/instances/:kind/:id/ssh-ticket', async (req: Auth
   if (!vpsId) return res.status(404).json({ error: 'Not found' });
 
   const ticket = issueSshTicket(vpsId, req.user!.id);
-  // Audit finding H9: opening an SSH terminal to a VPS is one of the two
-  // most sensitive actions in this file (alongside viewing credentials
-  // above) and previously left no audit trail at all.
   await prisma.auditLog.create({
     data: {
       adminId: req.user!.id,

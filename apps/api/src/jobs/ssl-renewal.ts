@@ -17,8 +17,6 @@
  * - Failed renewals are logged with detailed error information
  * - Job continues processing remaining certificates after a failure
  * - BullMQ will automatically retry the entire job in 24 hours
- * 
- * **Validates: Requirements 16.4, 16.5**
  */
 
 import { logger } from '../lib/logger';

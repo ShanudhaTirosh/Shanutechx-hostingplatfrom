@@ -29,8 +29,7 @@ const ALLOWED_ORIGINS = [
  * state-changing requests) and by the CORS configuration in index.ts (for
  * every request, including GET). Previously index.ts had its own,
  * separate "reflect any Origin back with credentials: true" CORS
- * middleware -- this consolidates both onto the one real allowlist
- * (audit finding M1) instead of maintaining two divergent origin checks.
+ * middleware instead of maintaining two divergent origin checks.
  */
 export function isOriginAllowed(origin: string): boolean {
   return (

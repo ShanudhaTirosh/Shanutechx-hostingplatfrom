@@ -164,16 +164,6 @@ services:
       # Self-hosted Supabase stack (see the "Self-Hosted Supabase" section
       # below) -- reachable at these in-network hostnames automatically,
       # no manual URL configuration needed for a first run.
-      # Audit correction: an earlier pass of this fix inlined a SECOND,
-      # duplicate Supabase stack directly into this file -- that would
-      # have collided with the pre-existing docker/supabase/docker-compose.yml
-      # (already wired into docker/docker-compose.shanutechx.yml's unified
-      # `include:` orchestrator). Removed the duplicate; these now point at
-      # THAT stack's real service names/ports instead. Run the unified
-      # stack via `docker compose -f docker/docker-compose.shanutechx.yml
-      # up -d` (from the repo root) to bring this up together with
-      # everything else, or run `docker-compose.local.yml` alone if you
-      # don't need Supabase/Infisical for a given session.
       - SUPABASE_KONG_URL=http://kong:8000
       - SUPABASE_META_URL=http://meta:8080
       - SUPABASE_STUDIO_URL=http://localhost:3003

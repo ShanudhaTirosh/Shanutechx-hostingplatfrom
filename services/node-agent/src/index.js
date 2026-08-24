@@ -18,15 +18,6 @@ const cockpit = require('./cockpit');
 const PORT = process.env.AGENT_PORT || 5000;
 const AGENT_SECRET = process.env.NODE_AGENT_SECRET;
 const ROOT_DOMAIN = process.env.ROOT_DOMAIN;
-// Audit finding H2: this previously always bound to all interfaces
-// (app.listen(PORT, ...) with no host), which directly contradicted the
-// comment below saying this service must never be exposed publicly.
-// Binding was silently 0.0.0.0 by default with nothing in code enforcing
-// otherwise. This keeps 0.0.0.0 as the default (so existing deployments
-// that rely on control-plane-to-node communication over a real network
-// keep working) but makes it configurable, and adds an optional IP
-// allowlist (AGENT_ALLOWED_IPS) as a real enforced control rather than
-// just a comment -- set it to your control plane's IP/CIDR in production.
 const BIND_HOST = process.env.AGENT_BIND_HOST || '0.0.0.0';
 const ALLOWED_IPS = (process.env.AGENT_ALLOWED_IPS || '')
   .split(',')
@@ -66,10 +57,7 @@ app.use((req, res, next) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
   }
-  // Timing-safe comparison (audit finding H4). HMAC both sides first so
-  // this works safely even when the submitted header is a different
-  // length than the real secret (timingSafeEqual requires equal-length
-  // buffers).
+  // Timing-safe comparison. HMAC both sides first so this works safely.
   const submitted = req.headers['x-agent-secret'];
   const key = 'shanutechx-node-agent-gate';
   const isValid =
@@ -227,10 +215,6 @@ app.get('/agent/deployments/:containerId/logs', async (req, res) => {
 
 /**
  * GET /agent/deployments/:containerId/metrics
- * Audit finding C6: this route did not exist at all -- apps/api's
- * getResourceUsage() called it and always got a 404, so the deployment
- * detail page's live resource-usage panel was silently empty. Backed by
- * docker.js's getContainerMetrics (docker stats + inspect).
  */
 app.get('/agent/deployments/:containerId/metrics', async (req, res) => {
   try {

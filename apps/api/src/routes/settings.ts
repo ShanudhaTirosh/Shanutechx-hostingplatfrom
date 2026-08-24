@@ -16,13 +16,6 @@ const verifyPasswordSchema = z.object({
 /**
  * Verify settings password or PIN.
  *
- * SECURITY: fixed 2026-08-19 (audit finding C4). The previous
- * implementation fell back, whenever no PIN was configured, to accepting
- * the literal strings '123456'/'admin', the user's own email, or *any*
- * string 4+ characters long -- effectively no protection at all. It also
- * stored the PIN in an in-memory Map, so even a custom PIN reverted to
- * that open fallback on every server restart.
- *
  * The new behavior fails closed: if the user hasn't set a PIN yet
  * (User.settingsPinHash is null), verification always fails and the
  * response tells the caller to set one via POST /settings/change-pin
@@ -68,17 +61,7 @@ const changePinSchema = z.object({
   newPin: z.string().min(4, 'PIN/Password must be at least 4 characters long'),
 });
 
-/**
  * Set / change the settings security PIN.
- *
- * SECURITY: fixed 2026-08-19 (audit finding C4). The previous
- * implementation accepted the literal '123456' or 'admin' as a permanent
- * master override for currentPin, even after a real PIN had been set --
- * meaning the "change PIN" gate itself could always be bypassed. That
- * override has been removed entirely; currentPin must match the real
- * stored hash (or be omitted, only on first-time setup when no PIN
- * exists yet).
- */
 settingsRouter.post('/change-pin', requireAdminOrDev, async (req: AuthedRequest, res) => {
   const parsed = changePinSchema.safeParse(req.body);
   if (!parsed.success) {

@@ -12,7 +12,7 @@ adminRouter.get('/admin/customers', async (req: AuthedRequest, res) => {
   const { take, skip } = parsePagination(req.query);
   const search = typeof req.query.search === 'string' ? req.query.search : undefined;
 
-  // Phase 15: admin only sees customers explicitly assigned to them by dev.
+  // Admin only sees customers explicitly assigned to them by dev.
   // Dev (which also passes requireAdmin) still sees everyone.
   const where = {
     role: 'customer' as const,
@@ -186,10 +186,8 @@ adminRouter.patch('/admin/staff/:userId/role', async (req: AuthedRequest, res) =
 });
 
 /**
- * The audit log has been written to since Phase 0 (every admin action:
- * payment approvals, CMS edits, node changes, staff role changes, secret
- * reveals) but there was never a page to actually read it back — this
- * closes that gap.
+ * The audit log records admin actions (payment approvals, CMS edits, node changes,
+ * staff role changes, secret reveals). This endpoint provides paginated access.
  */
 adminRouter.get('/admin/audit-log', async (req: AuthedRequest, res) => {
   const { take, skip } = parsePagination(req.query);
@@ -208,11 +206,8 @@ adminRouter.get('/admin/audit-log', async (req: AuthedRequest, res) => {
 });
 
 /**
- * Phase 15 — assigns (or unassigns, with adminId: null) a customer to an
- * admin. Dev-only: this is how dev delegates day-to-day customer management
- * without giving that admin platform-wide visibility. Requires
- * `User.assignedAdminId` on the schema (see packages/db/prisma/schema.prisma
- * — add this migration; it wasn't present as of this change).
+ * Assigns (or unassigns, with adminId: null) a customer to an admin.
+ * Dev-only: allows dev to delegate day-to-day customer management.
  */
 const assignCustomerSchema = z.object({ adminId: z.string().nullable() });
 

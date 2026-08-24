@@ -22,15 +22,9 @@ export type UserRole = 'customer' | 'admin' | 'support' | 'dev';
  * // Allow all authenticated users (any role)
  * router.get('/catalog', requireAuth, requireRole('customer', 'admin', 'support', 'dev'), getCatalog);
  * 
- * **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.11, 5.12**
- * 
  * Authorization Rules:
- * - 5.1: Only admin and dev users can create catalog items
- * - 5.2: Only admin and dev users can edit catalog items
- * - 5.3: Only admin and dev users can create VPS plans
- * - 5.4: Only admin and dev users can edit VPS plans
- * - 5.11: Admin features are hidden in the UI for customer users
- * - 5.12: User roles validated at both API endpoint level and UI component level
+ * - Admin and dev users can manage catalog items and VPS plans
+ * - User roles validated at both API endpoint level and UI component level
  */
 export function requireRole(...roles: UserRole[]) {
   return (req: AuthedRequest, res: Response, next: NextFunction) => {
@@ -65,8 +59,7 @@ export function requireRole(...roles: UserRole[]) {
  * resource to avoid revealing the resource's existence.
  * 
  * Dev bypasses ownership checks unconditionally and can access all resources.
- * Admin no longer gets a blanket bypass (changed 2026 — see CLAUDE.md "Phase 15:
- * Scoped Admin"): an admin can only act on a resource owned by a customer who
+ * An admin can only act on a resource owned by a customer who
  * is explicitly assigned to them (`User.assignedAdminId`), which the dev user
  * sets via `PATCH /admin/customers/:id/assign`. This is an async check (it
  * hits the DB), so use `verifyResourceOwnershipAsync` in any route handler —
@@ -88,15 +81,8 @@ export function requireRole(...roles: UserRole[]) {
  *   return; // Response already sent
  * }
  * 
- * **Validates: Requirements 5.7, 5.8**
- * 
- * Authorization Rules:
- * - 5.7: Customer users can only view their own deployments
- * - 5.8: Customer users can only manage their own custom domains
- * 
  * **Security Note**: Returns 404 instead of 403 for customers accessing other
- * customers' resources to prevent information disclosure about resource existence
- * (Requirement 5.12 enforcement - task detail requirement).
+ * customers' resources to prevent information disclosure about resource existence.
  */
 export function verifyResourceOwnership(
   resourceOwnerId: string,
@@ -153,9 +139,7 @@ export async function canAccessResource(resourceOwnerId: string, req: AuthedRequ
  * should actually use. Dev: unconditional access. Customer: self only.
  * Admin: only if the resource's owner has `assignedAdminId === req.user.id`.
  *
- * Requires `User.assignedAdminId` (see packages/db/prisma/schema.prisma —
- * add this field as part of the Phase 15 migration, it isn't in the schema
- * yet as of this change).
+ * Requires `User.assignedAdminId` (see packages/db/prisma/schema.prisma).
  */
 export async function verifyResourceOwnershipAsync(
   resourceOwnerId: string,
@@ -174,7 +158,7 @@ export async function verifyResourceOwnershipAsync(
 
 /**
  * Returns the set of customer user IDs visible under the "assigned OR
- * still unassigned" rule (Phase 15) — used for anything that's a shared
+ * still unassigned" rule — used for anything that's a shared
  * work queue rather than a strictly-owned resource: tickets and the
  * payment review queue. `null` means "no filter, sees everyone"
  * (dev always; support for tickets specifically, handled by the caller).
@@ -189,8 +173,7 @@ async function assignedOrUnassignedCustomerIds(req: AuthedRequest): Promise<stri
 }
 
 /**
- * Ticket visibility is a deliberate exception to the plain "admin only sees
- * assigned customers" rule (Phase 15). Two reasons:
+ * Ticket visibility rules:
  *  1. `support` exists specifically to handle tickets platform-wide — that's
  *     its whole job (see RBAC_README.md) — so it stays unrestricted.
  *  2. Unlike SMTP/billing/deployments, an unanswered ticket from an

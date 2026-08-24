@@ -18,9 +18,7 @@ async function loadOwnedOrderWithItems(req: AuthedRequest, orderId: string) {
     include: { items: { include: { service: true, plan: { include: { product: true } } } }, user: true, invoice: true },
   });
   if (!order) return null;
-  // Phase 15: was `role !== 'admin' && order.userId !== req.user!.id`, which
-  // actually locked dev out of every invoice too (dev !== 'admin'). Now
-  // dev always passes, admin only passes for an assigned customer's order.
+  // Dev always passes, admin only passes for an assigned customer's order.
   if (!(await canAccessResource(order.userId, req))) return null;
   return order;
 }

@@ -5,14 +5,6 @@ export type GitProvider = 'github' | 'gitlab';
 export interface GitAccount {
   id: string;
   provider: GitProvider;
-  // Audit finding H10: this was previously `login` -- the real API
-  // (routes/gitConnect.ts's GET /git/accounts) returns `username`, not
-  // `login`. The mismatch meant every account object coming back from
-  // the real API had `login: undefined` in this type's shape, and
-  // GitResource.resolveAccountForRepo (which read `.login`) silently
-  // matched nothing, ever. Also removed `userId`, `displayName`, and
-  // `connectedAt`, which the real endpoint doesn't return either (it
-  // returns `updatedAt`, not `connectedAt`).
   username: string;
   avatarUrl: string | null;
   updatedAt: string;

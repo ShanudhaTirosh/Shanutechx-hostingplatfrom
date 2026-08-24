@@ -137,7 +137,7 @@ model User {
   // plaintext PIN.
   settingsPinHash String?
 
-  // Phase 15 (Scoped Admin): the admin this customer is delegated to. Null
+  // Scoped Admin: the admin this customer is delegated to. Null
   // = unassigned. Only meaningful when role == customer; set via
   // PATCH /admin/customers/:userId/assign (dev-only — see routes/admin.ts).
   // An admin can only see/manage a customer's resources (SMTP accounts,
@@ -205,7 +205,7 @@ model Node {
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
 
-  // Live utilization, updated by the node stats collector (Phase 2+)
+  // Live utilization, updated by the node stats collector
   cpuUsedPct  Float? 
   ramUsedMb   Int?
   diskUsedGb  Int?
@@ -501,12 +501,7 @@ model DeploymentTemplate {
   deployments Deployment[]
 }
 
-// Audit finding C3: replaces the old unscoped, in-memory, GLOBAL
-// messagesStore in routes/webmail.ts, which had no userId/accountId
-// filter at all -- meaning any authenticated user could read, mark-read,
-// or delete any OTHER user's webmail messages by guessing/enumerating
-// message IDs (a cross-tenant IDOR). Every message is now owned by
-// exactly one user and every route filters by it.
+// Webmail messages owned per user and filtered by userId.
 model WebmailMessage {
   id             String   @id @default(cuid())
   userId         String
@@ -554,21 +549,15 @@ model SmtpAccount {
   createdAt     DateTime @default(now())
   webmailMessages WebmailMessage[]
 
-  // Audit finding H1: replaces the old in-memory accountDetailsStore Map
-  // in routes/smtp.ts (per-account custom domain + alias list + plan
-  // tier, reset on every restart) with real persisted columns.
+  // Per-account custom domain + alias list + plan tier
+
   customDomain  String?
   aliases       String[] @default([])
   planTier      String   @default("pro")
   allowedAdminIds String[] @default([]) // Dev-assigned admin user IDs allowed to read/write/send via this mailbox
 }
 
-// Audit finding H1: replaces the old in-memory `globalSmtpConfig` mutable
-// module-level variable in routes/smtp.ts (the platform-wide outbound
-// mailer config -- provider/host/credentials -- which reverted to
-// env-var defaults, including a hardcoded literal password, on every
-// restart) with a persisted singleton row. There is intentionally always
-// exactly one row (id "global") rather than a real multi-row table.
+// Platform-wide outbound mailer config (singleton row, id "global").
 model PlatformSmtpConfig {
   id            String  @id @default("global")
   provider      String  @default("custom")
@@ -668,15 +657,7 @@ model ContentBlock {
   @@unique([page, key])
 }
 
-// Audit findings H7/H8/H10 rewrite: replaces the old unpersisted, in-memory
-// `gitUserAccounts` Map in routes/gitConnect.ts (which lost every
-// connected account on every API restart, and only supported manually
-// pasted PATs) with real, persisted, provider-native connections. GitHub
-// uses a GitHub App installation (no PAT, no long-lived user token stored
-// -- only the installation ID; actual API access uses short-lived
-// installation access tokens minted on demand). GitLab uses an OAuth
-// application (access + refresh token, both encrypted at rest via
-// lib/secretsVault.ts, refreshed automatically when expired).
+// Git provider connections (GitHub App installations / GitLab OAuth applications).
 model GitHubInstallation {
   id             String   @id @default(cuid())
   userId         String
@@ -710,11 +691,7 @@ model GitLabConnection {
   @@unique([userId, gitlabUserId])
 }
 
-// Audit finding H1: replaces the old unpersisted, in-memory `articles`/
-// `categories` arrays in routes/knowledgebase.ts (module-level `let`
-// variables reset to seed data on every restart/redeploy, and
-// inconsistent across horizontally-scaled instances) with real,
-// persisted tables.
+// Knowledge Base categories and articles.
 model KbCategory {
   id          String     @id @default(cuid())
   name        String
@@ -741,9 +718,7 @@ model KbArticle {
   @@index([categoryId, published])
 }
 
-// Audit finding H1: replaces the old in-memory `emailDomainStore` Map in
-// routes/email.ts (custom email domain verification records, reset on
-// every restart) with a persisted table.
+// Custom email domain verification records.
 model EmailDomain {
   id            String   @id @default(cuid())
   userId        String
@@ -756,14 +731,7 @@ model EmailDomain {
   @@index([userId])
 }
 
-// Audit finding H1: replaces the old in-memory Secrets Vault
-// (secretProjects Map + auditTrail array in routes/secrets.ts, reset on
-// every restart) with real, persisted tables. Secret values are
-// encrypted at rest via lib/secretsVault.ts (AES-256-GCM), the same
-// pattern already used correctly everywhere else in this codebase
-// (SmtpAccount.credentialRef, VpsProvision.sshKeyRef, etc.) -- this was
-// the one place that claimed to be a "vault" but didn't actually encrypt
-// anything or persist anything.
+// Secrets Vault for encrypted environment secret storage (AES-256-GCM).
 model SecretProject {
   id          String       @id @default(cuid())
   name        String
@@ -800,14 +768,7 @@ model SecretAuditEntry {
   @@index([projectId])
 }
 
-// Audit finding H1: replaces the last four in-memory stores in
-// routes/supabase.ts (clientProjectsStore, smtpConfig,
-// emailTemplatesStore, smtpDeliveryLogsStore) with persisted tables.
-// NOTE: this only fixes the persistence-layer bug -- it does not change
-// the underlying architectural fact that these "client projects" don't
-// correspond to real, separately-provisioned, isolated Supabase stacks
-// (this platform runs one shared Kong/GoTrue/PostgREST stack); that's a
-// larger infrastructure project outside the scope of this fix.
+// Supabase client projects and configuration.
 model SupabaseClientProject {
   id             String   @id @default(cuid())
   name           String
@@ -866,21 +827,12 @@ model AuditLog {
   target    String?
   createdAt DateTime @default(now())
 
-  // Audit finding H9: some entries in this table are written by
-  // customer self-service actions (e.g. a customer resetting their own
-  // VPS's OS password via routes/leaseweb.ts), not by staff -- but the
-  // relation/field name ("AdminAuditLogs"/adminId) and the admin
-  // dashboard's own /admin/audit-log page both assume every row here
-  // represents a staff action. Rather than rename the field (a wider,
-  // riskier change), this adds an explicit, nullable actor-role marker:
-  // null = legacy rows / genuinely staff-performed (the common case),
-  // 'customer' = the actor was the resource's own owner acting on
-  // themselves. The admin audit-log UI should filter/label on this.
+  // Null = staff-performed, 'customer' = customer self-service action.
   actorRole String?
 }
 
 // Customer support tickets. Separate from the Realtime DB live-chat
-// widget (Phase 9 in the plan) — tickets are threaded, have a status and
+// widget — tickets are threaded, have a status and
 // priority, and persist in Postgres alongside everything else, rather than
 // living in Firebase. A ticket can optionally reference an order, so a
 // "my payment hasn't gone through" ticket can show the order inline.

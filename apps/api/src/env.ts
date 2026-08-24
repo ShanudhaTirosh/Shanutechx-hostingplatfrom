@@ -29,11 +29,8 @@ export const env = {
   traefikApiUrl: process.env.TRAEFIK_API_URL ?? 'http://traefik:8080',
   nodeAgentSecret: required('NODE_AGENT_SECRET'),
   nodeAgentPort: Number(process.env.NODE_AGENT_PORT ?? 5000),
-  // NOTE: AI-based payment verification (Gemini/Groq) was removed
-  // entirely (audit finding M7) — all payments are approved/declined by
-  // a human admin/dev only (see routes/payments.ts). The dead
-  // lib/verifyPayment.ts.disabled, lib/gemini.ts, and lib/groq.ts files
-  // that referenced these keys have been deleted.
+  // NOTE: AI-based payment verification (Gemini/Groq) was removed. All payments
+  // are approved/declined by a human admin/dev only (see routes/payments.ts).
   gracePeriodDays: Number(process.env.GRACE_PERIOD_DAYS ?? 7), // 7 days default
   smsWebhookSecret: required('SMS_WEBHOOK_SECRET'),
   discordBotUrl: process.env.DISCORD_BOT_URL ?? 'http://localhost:4200',
@@ -56,10 +53,8 @@ export const env = {
   r2Endpoint: process.env.R2_ENDPOINT ?? '',
   r2BucketName: process.env.R2_BUCKET_NAME ?? 'shanutechx-backups',
 
-  // GitHub App (audit finding H7 rewrite: replaces the old PAT-paste
-  // flow). Optional at boot -- if unset, the "Connect GitHub" feature
-  // reports itself as not configured rather than blocking API startup,
-  // since not every deployment needs this integration turned on.
+  // GitHub App. Optional at boot -- if unset, the "Connect GitHub" feature
+  // reports itself as not configured rather than blocking API startup.
   githubAppId: process.env.GITHUB_APP_ID ?? '',
   githubAppSlug: process.env.GITHUB_APP_SLUG ?? '',
   // PEM private key, usually \n-escaped in .env like the Firebase key above.
@@ -69,7 +64,7 @@ export const env = {
   // install/authorize redirect -- not a long-lived credential.
   gitOauthStateSecret: process.env.GIT_OAUTH_STATE_SECRET || process.env.PROJECT_AUTH_JWT_SECRET || '',
 
-  // GitLab OAuth application (audit finding H7 rewrite).
+  // GitLab OAuth application.
   gitlabAppClientId: process.env.GITLAB_APP_CLIENT_ID ?? '',
   gitlabAppClientSecret: process.env.GITLAB_APP_CLIENT_SECRET ?? '',
   // Must exactly match the redirect URI configured on the GitLab

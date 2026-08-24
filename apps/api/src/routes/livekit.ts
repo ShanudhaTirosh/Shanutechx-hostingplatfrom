@@ -75,8 +75,7 @@ livekitRouter.post('/livekit/projects', requireAdminOrDev, async (req: AuthedReq
 });
 
 livekitRouter.get('/livekit/projects', async (req: AuthedRequest, res) => {
-  // Phase 15: admin scoped to assigned customers' projects; also fixes dev
-  // previously falling into the customer-only branch here.
+  // Admin scoped to assigned customers' projects.
   const where = await ownedResourceWhere(req);
   const projects = await prisma.liveKitProject.findMany({ where, orderBy: { createdAt: 'desc' } });
   res.json({

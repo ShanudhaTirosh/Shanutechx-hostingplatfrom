@@ -43,8 +43,7 @@ ticketsRouter.post('/tickets', async (req: AuthedRequest, res) => {
 });
 
 ticketsRouter.get('/tickets', async (req: AuthedRequest, res) => {
-  // Phase 15: admin sees tickets from their assigned customers + anyone
-  // still unassigned (so nothing goes unhandled); support/dev unrestricted.
+  // Admin sees tickets from their assigned customers + anyone unassigned.
   const where = await ticketVisibilityWhere(req);
   const statusFilter = typeof req.query.status === 'string' ? req.query.status : undefined;
   const { take, skip } = parsePagination(req.query);

@@ -86,11 +86,7 @@ workspaceCleanupWorker.on('failed', (job, err) => {
   }
 })();
 
-// Billing past-due/cancel sweep worker (audit finding H6). Same
-// self-scheduling pattern as SSL renewal above -- routes/billing.ts's
-// POST /billing/run-checks (manual trigger, or external cron with
-// BILLING_CRON_SECRET) still works too; this just means the sweep no
-// longer depends on either of those being wired up externally.
+// Billing past-due/cancel sweep worker.
 const billingSweepWorker = new Worker<BillingSweepJob>(
   'billing-sweep',
   async (job) => {
@@ -124,9 +120,7 @@ billingSweepWorker.on('failed', (job, err) => {
   }
 })();
 
-// Uptime monitoring sweep worker (audit finding H6). Runs far more
-// frequently than the daily jobs above since it's meant to catch
-// deployments going down promptly, not just once a day.
+// Uptime monitoring sweep worker.
 const uptimeSweepWorker = new Worker<UptimeSweepJob>(
   'uptime-sweep',
   async (job) => {

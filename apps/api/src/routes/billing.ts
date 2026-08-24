@@ -12,10 +12,7 @@ import { notifyDiscordChannel } from '../lib/discordWebhooks';
 export const billingRouter = Router();
 
 billingRouter.get('/subscriptions', requireAuth, async (req: AuthedRequest, res) => {
-  // Phase 15: admin scoped to assigned customers' subscriptions; dev sees
-  // all (previously dev wasn't special-cased here at all and would have
-  // incorrectly fallen into the customer-only branch — fixed as part of
-  // this pass too).
+  // Admin scoped to assigned customers' subscriptions; dev sees all.
   const where = await ownedResourceWhere(req);
   const subscriptions = await prisma.subscription.findMany({
     where,

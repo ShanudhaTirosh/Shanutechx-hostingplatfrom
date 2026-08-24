@@ -39,13 +39,6 @@ const createDeploymentSchema = z.object({
   repoUrl: z.string().url().optional(),
   branch: z.string().regex(/^[a-zA-Z0-9_\-\/\.]+$/, 'Invalid branch name').max(100).optional(),
   gitProvider: z.enum(['github', 'gitlab', 'custom']).optional(),
-  // Audit findings H7/H10 rewrite: gitAccountId (a connected GitHub App
-  // installation / GitLab OAuth connection) is now the primary way to
-  // supply credentials for a private github.com/gitlab.com repo -- no
-  // PAT is requested from or stored for the user. `gitToken` is kept only
-  // for `gitProvider: 'custom'` (e.g. a self-hosted Gitea/Bitbucket
-  // instance), which isn't covered by the GitHub/GitLab App integrations
-  // and legitimately has no other way to authenticate.
   gitAccountId: z.string().optional(),
   gitToken: z.string().optional(),
   preferredName: z.string().min(1),
@@ -69,12 +62,6 @@ deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
 
   let data = parsed.data;
 
-  // Audit findings H7/H10 rewrite: resolve a connected GitHub App
-  // installation / GitLab OAuth connection into a short-lived, narrowly-
-  // scoped token server-side, rather than requiring the frontend to have
-  // ever held a long-lived PAT. `gitToken` remains supported only for
-  // `gitProvider: 'custom'` git hosts, which have no App/OAuth
-  // integration here.
   if (data.repoUrl && data.gitAccountId && (data.gitProvider === 'github' || data.gitProvider === 'gitlab')) {
     const adapter = getProvider(data.gitProvider);
     if (!adapter) {
@@ -127,7 +114,7 @@ deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
   const effectiveIsAdminDeployment = callerIsAdmin && Boolean(data.isAdminDeployment);
   const effectiveNodeId = effectiveIsAdminDeployment ? data.nodeId : undefined;
 
-  // Resource limits can only be set by admin/dev users (Requirement 17)
+  // Resource limits can only be set by admin/dev users
   if ((data.cpuLimit || data.memoryLimit || data.storageLimit) && !callerIsAdminOrDev) {
     return res.status(403).json({ error: 'Resource limits can only be set by admin or dev users' });
   }
@@ -165,9 +152,7 @@ deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
 });
 
 deploymentsRouter.get('/deployments', async (req: AuthedRequest, res) => {
-  // Phase 15: admin scoped to assigned customers' deployments. Also fixes
-  // a pre-existing bug where dev fell into the customer-only branch here
-  // (only 'admin' was special-cased) and would have seen just their own.
+  // Admin scoped to assigned customers' deployments.
   const where = await ownedResourceWhere(req);
   const { take, skip } = parsePagination(req.query);
 
@@ -192,8 +177,7 @@ async function loadOwnedDeployment(req: AuthedRequest, id: string) {
   });
 
   if (!deployment) return null;
-  // Phase 15: dev unrestricted; admin only for an assigned customer's
-  // deployment (was: unconditional bypass for admin, same as dev).
+  // Dev unrestricted; admin only for an assigned customer's deployment.
   if (!(await canAccessResource(deployment.userId, req))) return null;
   return deployment;
 }
@@ -216,7 +200,6 @@ deploymentsRouter.get('/deployments/:id/logs', async (req: AuthedRequest, res) =
  * Streams real-time logs from a deployment using Server-Sent Events (SSE).
  * 
  * Requirements:
- * - Requirement 19.4: Support log streaming for real-time log viewing
  * - Stream container stdout and stderr to API clients
  * - Display timestamps with each log line
  * - RBAC: deployment owner or admin/dev can stream logs
@@ -333,7 +316,6 @@ deploymentsRouter.get('/deployments/:id', async (req: AuthedRequest, res) => {
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
 
   // Fetch resource usage metrics if deployment is running with a container
-  // (Requirement 17.7: Display resource usage metrics)
   let resourceUsage: ResourceMetrics | null = null;
   if (deployment.status === 'running' && deployment.containerId) {
     try {
@@ -346,7 +328,7 @@ deploymentsRouter.get('/deployments/:id', async (req: AuthedRequest, res) => {
     }
   }
 
-  // Decrypt environment variables if present (Requirement 12.4)
+  // Decrypt environment variables if present
   let envVars: Record<string, string> | null = null;
   if (deployment.envVarsEncrypted) {
     try {
@@ -796,12 +778,12 @@ const updateResourceLimitsSchema = z.object({
 
 /**
  * Updates resource limits for an existing deployment and restarts it to
- * apply the new limits (Requirement 17). Only admin/dev users can update
+ * apply the new limits. Only admin/dev users can update
  * resource limits. The deployment is restarted automatically to ensure the
  * new limits are enforced by Docker.
  */
 deploymentsRouter.patch('/deployments/:id/limits', async (req: AuthedRequest, res) => {
-  // Only admin/dev can update resource limits (Requirement 17 RBAC)
+  // Only admin/dev can update resource limits
   if (req.user!.role !== 'admin' && req.user!.role !== 'dev') {
     return res.status(403).json({ error: 'Only admin or dev users can update resource limits' });
   }
@@ -917,7 +899,7 @@ deploymentsRouter.patch('/deployments/:id/env', async (req: AuthedRequest, res) 
   const parsed = updateEnvVarsSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  // Encrypt the new environment variables (Requirement 12.10)
+  // Encrypt the new environment variables
   const envVarsEncrypted = encryptSecret(
     JSON.stringify(parsed.data.envVars),
     env.secretsEncryptionKey
@@ -929,7 +911,7 @@ deploymentsRouter.patch('/deployments/:id/env', async (req: AuthedRequest, res) 
     data: { envVarsEncrypted },
   });
 
-  // Restart deployment to apply new environment variables (Requirement 12.11)
+  // Restart deployment to apply new environment variables
   // Only restart if the deployment is currently running and has the necessary fields
   if (deployment.status === 'running' && deployment.containerId && deployment.repoUrl && deployment.internalPort) {
     res.setHeader('Content-Type', 'application/x-ndjson');

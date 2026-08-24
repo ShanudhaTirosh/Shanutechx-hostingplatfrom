@@ -7,15 +7,7 @@ import { env } from '../env';
 import { logger } from '../lib/logger';
 
 /**
- * Secrets Vault. Rewritten (audit finding H1) from an in-memory
- * `secretProjects` Map + `auditTrail` array -- reset to hardcoded demo
- * secrets on every restart, and never actually encrypted despite being
- * the one feature explicitly branded as a "vault" -- to real, persisted
- * tables (SecretProject, SecretItem, SecretAuditEntry). Values are
- * encrypted at rest via lib/secretsVault.ts (AES-256-GCM), the same
- * pattern used correctly everywhere else in this codebase. Response
- * shapes are unchanged so the existing dashboard (lib/secretsApi.ts)
- * keeps working without modification.
+ * Secrets Vault API endpoints (AES-256-GCM encrypted storage).
  */
 
 export const secretsRouter = Router();

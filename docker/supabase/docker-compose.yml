@@ -1,36 +1,6 @@
 # Supabase Self-Hosted Stack for ShanuTechX Platform
 # Non-conflicting port bindings:
 # Kong HTTP: 8001, Studio: 3003, Postgres: 5435, Supavisor: 6543
-#
-# FIXES APPLIED (this file previously shipped with these unfixed):
-#   - `db` and `storage` had NO persistent volumes at all -- every
-#     restart/recreate silently wiped all Supabase data (users, tables,
-#     files). Added supabase-db-data / supabase-storage-data below.
-#   - `storage` used STORAGE_BACKEND: file (container-local disk, same
-#     data-loss problem as above) instead of the S3-compatible MinIO this
-#     platform already runs for everything else. Switched to `s3`.
-#   - KONG_DECLARATIVE_CONFIG pointed at /usr/local/kong/kong.yml, but no
-#     such file was ever mounted anywhere in this repo -- Kong would fail
-#     to start (or start with zero routes). Added kong.yml.template +
-#     the kong-config service below that generates the real file at
-#     startup, same pattern Supabase's own official compose setup uses.
-#   - .env.example shipped Supabase's own well-known, publicly-documented
-#     DEMO anon/service_role JWT keys (the ones with "iss": "supabase-demo"
-#     used in thousands of tutorials) as the actual example values, next
-#     to an equally-generic default JWT_SECRET -- meaning anyone who
-#     didn't realize they needed to change these would be running with a
-#     completely public, forgeable auth token. Fixed .env.example to
-#     require real generated values (see infra/supabase/generate-keys.js).
-#
-# NETWORKING: this file is meant to run together with the rest of the
-# platform via `docker compose -f docker/docker-compose.shanutechx.yml up
-# -d` from the repo root (which includes this file alongside
-# docker-compose.local.yml) -- it is not designed to run fully standalone
-# anymore, now that `storage` depends on the MinIO service defined in
-# docker-compose.local.yml. It joins that file's `shanutechx-local`
-# network as an external network (see `networks:` at the bottom) rather
-# than its own isolated one, so `api`/`worker` (in docker-compose.local.yml)
-# and this stack's services can reach each other by plain service name.
 
 services:
   studio:
@@ -70,11 +40,6 @@ services:
       AUTH_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
       ENABLED_FEATURES_LOGS_ALL: "false"
 
-  # Fixed: KONG_DECLARATIVE_CONFIG below pointed at a file
-  # (/usr/local/kong/kong.yml) that was never mounted anywhere in this
-  # repo -- Kong had no routes configured. This generates the real file
-  # (substituting ANON_KEY/SERVICE_ROLE_KEY into kong.yml.template) into a
-  # shared volume before `kong` starts.
   kong-config:
     container_name: supabase-kong-config
     image: kong/kong:3.9.3
@@ -214,10 +179,6 @@ services:
       DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
       STORAGE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8001}
       FILE_SIZE_LIMIT: 52428800
-      # Fixed: was STORAGE_BACKEND: file (container-local disk -- lost on
-      # every recreate). Points at the same MinIO instance
-      # docker-compose.local.yml's `api` service uses for backups, so
-      # Supabase Storage files are durable across restarts/replacement.
       STORAGE_BACKEND: s3
       GLOBAL_S3_BUCKET: supabase-storage
       GLOBAL_S3_ENDPOINT: http://minio:9000
@@ -294,12 +255,6 @@ volumes:
   supabase-kong-config:
 
 networks:
-  # Fixed: was its own fully-isolated network (shanutechx-supabase-net),
-  # which meant nothing outside this file could reach these services by
-  # name even when run together via docker/docker-compose.shanutechx.yml.
-  # Joins docker-compose.local.yml's network instead (created there;
-  # `external: true` here because THIS file doesn't own it) so `api`/
-  # `worker` and this stack's services can reach each other directly.
   default:
     name: shanutechx-local
     external: true

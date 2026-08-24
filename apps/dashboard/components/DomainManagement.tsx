@@ -22,8 +22,6 @@ import {
  * - Domain list view with status badges
  * - Verify domain functionality
  * - Remove domain with confirmation
- * 
- * **Validates: Requirements 4, 8**
  */
 export function DomainManagement({
   deployment,

@@ -7,10 +7,7 @@ import pino from 'pino';
  */
 export const logger = pino({
   level: process.env.LOG_LEVEL ?? 'info',
-  // Defense-in-depth redaction (audit finding H5) for any code that logs
-  // a raw object containing one of these common secret-shaped field
-  // names, in addition to the header redaction configured on the
-  // pino-http instance in index.ts.
+  // Defense-in-depth redaction for secret-shaped field names.
   redact: {
     paths: [
       '*.password',

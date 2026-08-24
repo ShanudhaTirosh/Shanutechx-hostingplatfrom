@@ -7,11 +7,6 @@ export class GitResource extends BaseClient {
     return res.accounts;
   }
 
-  // Audit finding H10: previously DELETE /api/git/accounts/:id, which
-  // does not exist. The real route is POST /api/git/disconnect with
-  // { accountId } in the body (see routes/gitConnect.ts). Passing no
-  // accountId there disconnects every account for the user, so this
-  // always passes one explicitly.
   async removeAccount(accountId: string): Promise<void> {
     return this.httpPost('/api/git/disconnect', { accountId });
   }
@@ -24,19 +19,7 @@ export class GitResource extends BaseClient {
     return res.repos;
   }
 
-  /**
-   * Audit finding H7/H10: as of this writing, the "Connect via OAuth"
-   * flow is incomplete server-side -- GET /api/git/connect/:provider/authorize
-   * exists and returns a real GitHub/GitLab consent URL, but nothing
-   * implements the callback route that URL redirects back to
-   * (/api/git/connect/:provider/callback), so completing this flow will
-   * currently dead-end. The only working way to connect an account today
-   * is POST /api/git/connect/:provider/token with a manually-created
-   * personal access token -- see connectWithToken() below. These two
-   * methods are fixed to call the real (existing) authorize endpoint
-   * rather than the previously-wrong /api/git/{provider}/auth path, but
-   * are not usable end-to-end until the callback route is built.
-   */
+  /** Get GitHub OAuth authorization URL */
   getGitHubAuthUrl(): string {
     return `${this.apiUrl}/api/git/connect/github/authorize`;
   }
@@ -71,8 +54,6 @@ export class GitResource extends BaseClient {
     repoUrl: string,
   ): Promise<GitAccount | undefined> {
     const accounts = await this.listAccounts();
-    // Audit finding H10: previously read `a.login`, which doesn't exist
-    // on the real account shape -- see GitAccount in @shanutechx/types.
     return accounts.find(
       (a) =>
         repoUrl.includes(`github.com/${a.username}`) ||

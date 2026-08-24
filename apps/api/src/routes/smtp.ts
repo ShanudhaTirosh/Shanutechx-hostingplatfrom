@@ -85,9 +85,7 @@ smtpRouter.post('/smtp/global-config', requireDev, async (req: AuthedRequest, re
   if (senderName) data.senderName = senderName;
   if (secure !== undefined) data.secure = !!secure;
 
-  // Ensure the row exists first (lazy-create), then apply the update --
-  // audit finding H1: this now actually persists across restarts,
-  // unlike the old in-memory mutable object.
+  // Ensure the row exists first (lazy-create), then apply the update.
   await getGlobalSmtpConfig();
   const updated = await prisma.platformSmtpConfig.update({ where: { id: 'global' }, data });
 

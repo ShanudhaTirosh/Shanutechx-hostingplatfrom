@@ -5,18 +5,10 @@
  * domain attachment, CNAME verification, SSL certificate provisioning,
  * and domain removal.
  * 
- * **Validates: Requirements 4, 8, 16**
- * 
- * Endpoints:
- * - POST /api/domains/attach - Attach a custom domain to a deployment
- * - POST /api/domains/:id/verify - Verify CNAME record and provision SSL
- * - DELETE /api/domains/:id - Remove a custom domain
- * - GET /api/deployments/:id/domains - List all domains for a deployment
- * 
  * Authorization:
  * - All endpoints require authentication
  * - Domain operations require deployment/domain ownership or admin role
- * - Uses verifyResourceOwnershipAsync (Phase 15: admin scoped to assigned customers) for fine-grained access control
+ * - Uses verifyResourceOwnershipAsync for fine-grained access control
  */
 
 import { Router } from 'express';
@@ -55,8 +47,6 @@ const attachDomainSchema = z.object({
  * 
  * Attach a custom domain to a deployment. This creates a CustomDomain
  * record with status 'pending' and returns CNAME configuration instructions.
- * 
- * **Validates: Requirements 4.1, 4.2, 8**
  * 
  * Request Body:
  * - deploymentId: string - The deployment ID to attach the domain to
@@ -217,8 +207,6 @@ domainsRouter.post('/domains/attach', async (req: AuthedRequest, res) => {
  * correctly and if verified, triggers SSL certificate provisioning and
  * Traefik routing configuration.
  * 
- * **Validates: Requirements 4.3, 4.4, 4.5, 8, 16.1**
- * 
  * Path Parameters:
  * - id: string - The custom domain ID
  * 
@@ -359,8 +347,6 @@ domainsRouter.post('/domains/:id/verify', async (req: AuthedRequest, res) => {
  * Remove a custom domain from a deployment. Removes the Traefik routing
  * configuration and deletes the CustomDomain record.
  * 
- * **Validates: Requirements 4.10, 8**
- * 
  * Path Parameters:
  * - id: string - The custom domain ID
  * 
@@ -474,8 +460,6 @@ domainsRouter.delete('/domains/:id', async (req: AuthedRequest, res) => {
  * 
  * List all custom domains attached to a deployment. Returns an array of
  * CustomDomain records with their current status and configuration.
- * 
- * **Validates: Requirements 4.9, 8**
  * 
  * Path Parameters:
  * - id: string - The deployment ID

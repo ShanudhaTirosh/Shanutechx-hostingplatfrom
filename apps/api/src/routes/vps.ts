@@ -59,8 +59,7 @@ vpsRouter.post('/vps-provisions', requireAdminOrDev, async (req: AuthedRequest, 
 });
 
 vpsRouter.get('/vps-provisions', async (req: AuthedRequest, res) => {
-  // Phase 15: admin scoped to assigned customers' VPS provisions; also
-  // fixes dev previously falling into the customer-only branch here.
+  // Admin scoped to assigned customers' VPS provisions.
   const where = await ownedResourceWhere(req);
   const provisions = await prisma.vpsProvision.findMany({ where, orderBy: { createdAt: 'desc' } });
   res.json({ provisions: provisions.map(omitCredentialRef) });
@@ -69,9 +68,7 @@ vpsRouter.get('/vps-provisions', async (req: AuthedRequest, res) => {
 vpsRouter.get('/vps-provisions/:id/reveal-password', async (req: AuthedRequest, res) => {
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision || !provision.credentialRef) return res.status(404).json({ error: 'Not found' });
-  // Phase 15: was `role !== 'admin' && ...`, which actually locked dev out
-  // of every customer's VPS credential too (dev !== 'admin'). Now dev is
-  // unrestricted, admin only for an assigned customer.
+  // Dev is unrestricted, admin only for an assigned customer.
   if (!(await canAccessResource(provision.userId, req))) {
     return res.status(404).json({ error: 'Not found' });
   }

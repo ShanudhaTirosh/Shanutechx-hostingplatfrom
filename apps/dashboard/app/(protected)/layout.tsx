@@ -61,10 +61,7 @@ function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { childre
     const userRole = apiUser.role;
 
     // Role-based route gating
-    // Phase 15: /projects (the Project auth+storage+db+functions+realtime
-    // primitive) is dev-only now — nobody else should land on this page
-    // even by direct URL, since the backend already 403s them but the page
-    // itself has no client-side guard of its own.
+    // /projects is dev-only
     if (userRole !== 'dev' && (pathname.startsWith('/projects') || pathname.startsWith('/admin/projects'))) {
       router.replace(userRole === 'customer' ? '/dashboard' : '/admin/review-queue');
       return;

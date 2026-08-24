@@ -63,15 +63,6 @@ sslRenewalQueue.on('error', (err) => {
   isRedisConnected = false;
 });
 
-// Audit finding H6: routes/billing.ts's past-due/cancel sweep and
-// routes/status.ts's uptime-check sweep both referenced (in billing.ts's
-// own comment) an external ".github/workflows/billing-cron.yml" that
-// never actually existed anywhere in this repo -- so neither ran on any
-// schedule unless a human clicked the "run checks" button in the
-// dashboard, or someone separately set up an undocumented external cron
-// hitting the endpoint with BILLING_CRON_SECRET. Self-scheduling these
-// via BullMQ, the same way ssl-renewal already does, removes that
-// external dependency entirely.
 export interface BillingSweepJob {}
 export interface UptimeSweepJob {}
 export interface WorkspaceCleanupJob {}

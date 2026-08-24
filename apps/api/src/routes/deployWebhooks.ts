@@ -51,7 +51,6 @@ deployWebhooksRouter.post('/deployments/:id/webhook-secret', requireAuth, async 
   const deployment = await prisma.deployment.findUnique({ where: { id: req.params.id } });
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
 
-  // Phase 15: admin scoped to an assigned customer's deployment.
   if (!(await canAccessResource(deployment.userId, req))) {
     return res.status(404).json({ error: 'Deployment not found' });
   }

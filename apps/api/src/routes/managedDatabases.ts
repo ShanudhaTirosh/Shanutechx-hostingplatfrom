@@ -29,8 +29,7 @@ managedDatabasesRouter.post('/managed-databases', requireAdminOrDev, async (req:
   const parsed = createDbSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  // Phase 15: admin can only provision for a customer assigned to them —
-  // previously requireAdminOrDev let admin provision for anyone.
+  // Admin can only provision for a customer assigned to them.
   if (req.user!.role === 'admin' && !(await canAccessResource(parsed.data.userId, req))) {
     return res.status(404).json({ error: 'Customer not found' });
   }
@@ -73,7 +72,7 @@ managedDatabasesRouter.post('/managed-databases', requireAdminOrDev, async (req:
 });
 
 managedDatabasesRouter.get('/managed-databases', async (req: AuthedRequest, res) => {
-  // Phase 15: admin scoped to assigned customers' databases; dev unrestricted.
+  // Admin scoped to assigned customers' databases; dev unrestricted.
   const where = await ownedResourceWhere(req);
   const databases = await prisma.managedDatabase.findMany({
     where,

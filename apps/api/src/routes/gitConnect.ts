@@ -10,9 +10,8 @@ import { encryptSecret } from '../lib/secretsVault';
 import jwt from 'jsonwebtoken';
 
 /**
- * Git repository access — GitHub App + GitLab OAuth application (rewrite
- * of audit findings H7/H8/H10). No PATs/deploy tokens/other long-lived
- * credentials are ever requested from or stored for the user:
+ * Git repository access — GitHub App + GitLab OAuth application.
+ * No PATs/deploy tokens are requested from or stored for the user:
  *
  *  - GitHub: the user installs a GitHub App and picks which repos to
  *    grant on GitHub's own UI. We store only the installation ID;
@@ -71,11 +70,7 @@ gitConnectRouter.get('/git/connect/:provider/start', (req: AuthedRequest, res: R
 
 /**
  * GitHub App installation callback. GitHub redirects here after the user
- * finishes the "Install App" flow with `installation_id` and our signed
- * `state` (see lib/gitProviders/state.ts). This is the route that never
- * existed before this rewrite (audit finding H7) — "Connect via OAuth"
- * previously dead-ended here.
- */
+ * finishes the "Install App" flow.
 gitConnectRouter.get('/git/github/callback', async (req, res: Response) => {
   const { installation_id, state, setup_action } = req.query as Record<string, string | undefined>;
 
@@ -158,10 +153,8 @@ gitConnectRouter.get('/git/repos', async (req: AuthedRequest, res: Response) => 
 
   try {
     const repos = await adapter.listRepos(accountId);
-    // NOTE: unlike the old implementation, no token is ever included in
-    // this response (audit finding H10) -- deployment creation resolves
-    // a fresh, scoped token server-side via gitAccountId instead (see
-    // routes/deployments.ts).
+    // No token is included in this response — deployment creation resolves
+    // a fresh, scoped token server-side via gitAccountId instead.
     res.json({ repos, accountId, accountLabel: owned.accountLabel });
   } catch (err: any) {
     res.status(502).json({ error: err.message || 'Failed to list repositories' });

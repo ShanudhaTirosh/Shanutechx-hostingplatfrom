@@ -64,11 +64,6 @@ export class NodeAgentClient {
     return this.request('GET', '/agent/containers');
   }
 
-  /** Stop container by deployment ID */
-  // Audit finding H10: these three previously called
-  // POST /agent/{stop,start,restart}/:id, which does not exist on the
-  // real node-agent service -- its routes are action-last
-  // (/agent/deployments/:id/{stop,start,restart}), not action-first.
   async stopContainer(deploymentId: string): Promise<void> {
     return this.request('POST', `/agent/deployments/${deploymentId}/stop`);
   }

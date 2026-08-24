@@ -247,9 +247,7 @@ ordersRouter.post('/cart/checkout', idempotent, async (req: AuthedRequest, res) 
 });
 
 ordersRouter.get('/orders', async (req: AuthedRequest, res) => {
-  // Phase 15: admin scoped to assigned customers' orders (previously
-  // unscoped-all; and dev fell through to customer-only, same bug as
-  // billing.ts — fixed here too).
+  // Admin scoped to assigned customers' orders; dev sees all.
   const where = await ownedResourceWhere(req);
   const { take, skip } = parsePagination(req.query);
 

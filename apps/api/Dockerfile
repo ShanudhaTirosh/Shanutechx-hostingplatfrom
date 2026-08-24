@@ -27,12 +27,6 @@ COPY --from=builder /repo/node_modules ./node_modules
 COPY --from=builder /repo/packages/db ./packages/db
 COPY --from=builder /repo/apps/api/dist ./apps/api/dist
 COPY --from=builder /repo/apps/api/package.json ./apps/api/package.json
-# Audit finding C7: the self-hosted app catalog (WordPress/n8n/MongoDB/
-# Redis/Lavalink/LiveKit one-click deploy) reads templates/*.yaml off disk
-# at request time (see lib/catalog/catalog-manager.ts and
-# routes/catalog.ts) — this directory was never copied into the runtime
-# image, so the catalog silently returned empty/errored in every
-# production deployment built from this Dockerfile.
 COPY --from=builder /repo/templates ./templates
 
 WORKDIR /repo/apps/api

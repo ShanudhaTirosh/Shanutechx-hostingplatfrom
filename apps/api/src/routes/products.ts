@@ -4,11 +4,8 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 
 /**
- * The category-aware product catalog (Product + Plan). Superseded the flat
- * `Service` model — see packages/db/scripts/migrate-services-to-products.ts
- * for the one-off backfill and Phase 1 delivery notes for context. Legacy
- * `/services` routes keep working untouched; new checkout flows should use
- * this instead.
+ * The category-aware product catalog (Product + Plan).
+ * Legacy `/services` routes keep working untouched; checkout flows use this.
  */
 export const productsRouter = Router();
 

@@ -10,16 +10,10 @@ import { provisionProjectBucket } from '../lib/r2Storage';
 export const projectsRouter = Router();
 
 /**
- * Phase 15 change (see CLAUDE.md "Scoped Admin / Dev-only Projects"): the
- * Project primitive — isolated auth (ProjectAuthUser), storage bucket,
+ * The Project primitive — isolated auth (ProjectAuthUser), storage bucket,
  * Postgres database, realtime, functions — is the platform's in-house
  * Supabase clone. It is infrastructure the dev (platform owner) uses to
- * build ShanuTechX's own products, not something sold to or touched by
- * customers or admin. Previously this router only required `requireAuth`
- * at the top and `requireStaff` (admin/support/dev) on creation, which let
- * admin and support provision and see all projects. Both are now locked to
- * `requireDev` for every route in this file — admin and support get a 403,
- * same as customer.
+ * build ShanuTechX's own products.
  */
 projectsRouter.use(requireAuth, requireDev);
 

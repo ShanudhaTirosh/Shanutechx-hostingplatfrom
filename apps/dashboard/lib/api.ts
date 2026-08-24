@@ -420,12 +420,6 @@ export const api = {
         internalPort: number;
         branch?: string;
         gitProvider?: 'github' | 'gitlab' | 'custom';
-        // Audit findings H7/H10 rewrite: a connected GitHub App
-        // installation / GitLab OAuth connection ID. The server resolves
-        // this into a short-lived, scoped token itself -- the frontend
-        // never handles a token. gitToken is kept only for
-        // gitProvider: 'custom' (a self-hosted git host with no App/OAuth
-        // integration here).
         gitAccountId?: string;
         gitToken?: string;
       },

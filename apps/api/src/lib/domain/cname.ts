@@ -2,8 +2,6 @@
  * CNAME Target Generation Utilities
  * 
  * Utilities for generating and validating CNAME targets for custom domains.
- * 
- * **Validates: Requirements 4.2**
  */
 
 /**

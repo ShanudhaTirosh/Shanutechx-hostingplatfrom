@@ -68,14 +68,7 @@ import { csrfProtection, isOriginAllowed } from './middleware/csrfProtection';
 const app = express();
 app.set('etag', false);
 
-// CORS: explicit allowlist (audit finding M1).
-//
-// The previous implementation reflected ANY Origin header back with
-// Access-Control-Allow-Credentials: true -- meaning any website could make
-// credentialed cross-origin requests against this API. This uses the same
-// allowlist csrfProtection.ts already maintains for state-changing
-// requests, applied here to every request (including GET, which the old
-// CSRF-only check never covered).
+// CORS: explicit allowlist.
 app.use(
   cors({
     origin(origin, callback) {
@@ -112,10 +105,7 @@ app.use(
       if (res.statusCode >= 400) return 'warn';
       return 'info';
     },
-    // Audit finding H5: pino-http's default req serializer logs
-    // req.headers in full, which previously meant every request's
-    // Authorization bearer token (and every internal shared secret header)
-    // was written to plaintext application logs. Redact them.
+    // Redact sensitive headers in request logs
     redact: {
       paths: [
         'req.headers.authorization',

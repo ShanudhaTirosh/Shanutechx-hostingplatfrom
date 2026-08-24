@@ -55,14 +55,7 @@ export class DeploymentsResource extends BaseClient {
   }
 
   /**
-   * Audit finding H10: there is no DELETE /api/deployments/:id route on
-   * the real API -- deployments are torn down via stop() (which stops
-   * and removes the running container) but the Deployment record itself
-   * is never hard-deleted. This previously called a nonexistent route
-   * and would 404. Throwing explicitly here is intentional: adding a
-   * real delete-the-record endpoint needs a deliberate decision about
-   * cascade behavior (subscriptions, invoices, logs) that's outside the
-   * scope of this fix -- use stop() to tear down the running workload.
+   * Deployments are torn down via stop(). The Deployment record itself is kept.
    */
   async delete(_id: string): Promise<void> {
     throw new Error(
@@ -82,10 +75,6 @@ export class DeploymentsResource extends BaseClient {
     return this.httpPatch(`/api/deployments/${id}/env`, { envVars });
   }
 
-  // Audit finding H10: there is no GET /api/deployments/:id/stats route.
-  // Live resource usage is embedded in the deployment detail response
-  // (GET /api/deployments/:id) as `resourceUsage`, which can be null if
-  // the node-agent couldn't be reached. Fetch the detail and extract it.
   async getResourceUsage(id: string): Promise<ResourceUsage | null> {
     const deployment = await this.get(id);
     return (deployment as Deployment & { resourceUsage?: ResourceUsage | null }).resourceUsage ?? null;
@@ -104,13 +93,7 @@ export class DeploymentsResource extends BaseClient {
   }
 
   /**
-   * Audit finding H10: previously POSTed to /domains (no such route).
-   * The real route is POST /api/deployments/:id/custom-domain, which
-   * only supports one custom domain per deployment at a time (not an
-   * array), and separately optionally accepts a scoped Cloudflare API
-   * token to auto-create the DNS record instead of asking the customer
-   * to add a CNAME manually. cloudflare credentials are used once and
-   * never stored server-side.
+   * Adds a custom domain to a deployment.
    */
   async addDomain(
     id: string,
@@ -130,9 +113,7 @@ export class DeploymentsResource extends BaseClient {
     return this.httpPost(`/api/deployments/${id}/custom-domain/verify`);
   }
 
-  /** Audit finding H10: previously DELETE /domains/:domain (no such
-   * route, and the real API only tracks one custom domain per
-   * deployment, not a set) -- fixed to DELETE /custom-domain. */
+  /** Removes a custom domain from a deployment. */
   async removeDomain(id: string, _domain?: string): Promise<void> {
     return this.httpDelete(`/api/deployments/${id}/custom-domain`);
   }

@@ -107,11 +107,6 @@ app.post('/internal/send-embed', async (req, res) => {
   }
 });
 
-// Audit finding H3: see the identical fix + explanation in
-// services/whatsapp-bot/src/index.js -- binding to 127.0.0.1 inside a
-// container blocks sibling-container access via Docker's network,
-// silently breaking Discord notifications from apps/api in the
-// docker-compose stack (DISCORD_BOT_URL=http://discord-bot:4200).
 app.listen(PORT, () => {
   logger.info({ port: PORT }, 'discord-bot internal API listening');
 });

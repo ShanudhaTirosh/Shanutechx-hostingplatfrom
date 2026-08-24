@@ -4,12 +4,7 @@ import { requireAuth, requireAdmin, AuthedRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 
 /**
- * Knowledge Base. Rewritten (audit finding H1) from module-level `let
- * articles = [...]` / `let categories = [...]` in-memory arrays -- reset
- * to the original seed data on every restart/redeploy, and inconsistent
- * across horizontally-scaled instances -- to real Prisma-backed tables
- * (KbArticle, KbCategory). Behavior and response shapes are unchanged;
- * only the storage layer is different.
+ * Knowledge Base API endpoints.
  */
 
 export const knowledgebaseRouter = Router();

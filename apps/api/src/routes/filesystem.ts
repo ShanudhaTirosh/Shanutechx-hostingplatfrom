@@ -173,12 +173,6 @@ filesystemRouter.post('/fs/:deploymentId/extract', async (req: AuthedRequest, re
  * 4. Calls GitHub/GitLab API to create/update the file and commit.
  */
 
-// Audit findings H7/H8/H10 rewrite: previously resolved via an
-// unpersisted, in-memory `gitUserAccounts` map shared between this module
-// and gitConnect.ts, populated only by manually-pasted PATs. Now uses the
-// real, persisted GitHub App / GitLab OAuth provider adapters -- no PATs
-// are stored anywhere, and tokens are minted fresh (GitHub) or refreshed
-// on demand (GitLab) rather than read from a long-lived stored secret.
 import { getProvider } from '../lib/gitProviders';
 
 filesystemRouter.post('/fs/:deploymentId/git-commit-push', async (req: AuthedRequest, res) => {

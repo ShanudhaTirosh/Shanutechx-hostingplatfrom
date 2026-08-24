@@ -11,8 +11,6 @@ vpsPlansRouter.use(requireAuth);
 /**
  * Validation schema for VPS plan creation and updates.
  * Validates that numeric fields are positive integers with appropriate constraints.
- * 
- * **Validates: Requirements 2.1, 2.3**
  */
 const vpsplanSchema = z.object({
   provider: z.string().min(1, 'Provider name is required'),
@@ -37,8 +35,6 @@ const updateVpsPlanSchema = vpsplanSchema.partial();
  * GET /api/vps-plans
  * Returns all VPS plans available for customer browsing and provisioning.
  * Access: All authenticated users (customers for browsing)
- * 
- * **Validates: Requirements 2.1, 2.2, 2.4, 5.5, 5.6**
  */
 vpsPlansRouter.get('/vps-plans', async (req: AuthedRequest, res) => {
   try {
@@ -61,8 +57,6 @@ vpsPlansRouter.get('/vps-plans', async (req: AuthedRequest, res) => {
  * POST /api/vps-plans
  * Create a new VPS plan.
  * Access: Admin and Dev only
- * 
- * **Validates: Requirements 2.1, 2.2, 2.3, 5.3**
  */
 vpsPlansRouter.post('/vps-plans', requireRole('admin', 'dev'), async (req: AuthedRequest, res) => {
   try {
@@ -103,8 +97,6 @@ vpsPlansRouter.post('/vps-plans', requireRole('admin', 'dev'), async (req: Authe
  * PATCH /api/vps-plans/:id
  * Update an existing VPS plan.
  * Access: Admin and Dev only
- * 
- * **Validates: Requirements 2.3, 2.5, 5.4**
  */
 vpsPlansRouter.patch('/vps-plans/:id', requireRole('admin', 'dev'), async (req: AuthedRequest, res) => {
   try {
@@ -156,8 +148,6 @@ vpsPlansRouter.patch('/vps-plans/:id', requireRole('admin', 'dev'), async (req: 
  * DELETE /api/vps-plans/:id
  * Delete a VPS plan.
  * Access: Admin and Dev only
- * 
- * **Validates: Requirements 2.5, 5.3, 5.4**
  */
 vpsPlansRouter.delete('/vps-plans/:id', requireRole('admin', 'dev'), async (req: AuthedRequest, res) => {
   const { id } = req.params;
@@ -188,12 +178,8 @@ vpsPlansRouter.delete('/vps-plans/:id', requireRole('admin', 'dev'), async (req:
     logger.info({ planId: id, userId: req.user!.id }, 'VPS plan deleted');
     return res.json({ success: true, id, deleted: true });
   } catch (err: any) {
-    // Audit finding H4: this used to just return a raw 500 here, which
-    // directly violated the project's own CLAUDE.md guardrail #2 --
-    // VPS Plans are its explicit example of "gracefully set isActive:
-    // false rather than crashing with foreign key constraint errors"
-    // when historical order references exist. products.ts already
-    // implements this correctly; mirroring that pattern here.
+    // Fallback: gracefully set isActive: false when historical order references exist
+    // to prevent foreign key constraint errors.
     logger.warn(
       { err, planId: id, userId: req.user!.id },
       'Failed to hard-delete VPS plan (likely existing order/provision references) — deactivating instead'

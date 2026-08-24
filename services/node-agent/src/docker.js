@@ -123,18 +123,7 @@ async function inspectContainer(containerId) {
   return container.inspect();
 }
 
-// ── Audit findings C6 / (docker.js export gap): these four functions were
-// imported by index.js (`listContainers`, `startContainer`, `getLogs`,
-// `streamLogs`) but never defined or exported here, so every route that
-// used them (list containers, start container, fetch logs, stream logs)
-// threw a TypeError at request time in the real deployed node-agent,
-// silently, since apps/api's tests only mock the client side of this
-// contract and never exercise the real service. Implementing them for
-// real below.
-
-/** Lists every container on this node (not just ones this agent deployed
- * — deliberately broad, matching the /agent/containers route's intent of
- * showing what's actually running here). */
+/** Lists every container on this node */
 async function listContainers() {
   const containers = await docker.listContainers({ all: true });
   return containers.map((c) => ({
@@ -198,10 +187,7 @@ async function streamLogs(containerId) {
 
 /**
  * Live CPU/memory/storage usage for a single container, shaped to match
- * apps/api's ResourceMetrics type (lib/nodeAgentClient.ts). Backs the
- * GET /agent/deployments/:containerId/metrics route (audit finding C6),
- * which previously didn't exist at all, so the deployment detail page's
- * resource-usage panel was silently empty for every deployment.
+ * apps/api's ResourceMetrics type.
  */
 async function getContainerMetrics(containerId) {
   const container = docker.getContainer(containerId);

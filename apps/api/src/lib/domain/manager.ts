@@ -12,8 +12,6 @@
  * - Enforce HTTPS redirection for custom domains
  * - Track certificate expiration and trigger renewal
  * - Support multiple domains per deployment
- * 
- * **Validates: Requirements 4, 16**
  */
 
 import { prisma } from '../prisma';
@@ -134,8 +132,6 @@ export class DomainManager {
    * Creates a CustomDomain record with status 'pending' and returns
    * CNAME target instructions for the customer.
    * 
-   * **Validates: Requirements 4.1, 4.2, 4.9**
-   * 
    * @param deploymentId - The deployment ID to attach the domain to
    * @param domain - The fully qualified domain name (e.g., "app.example.com")
    * @returns Attachment result with CNAME target and instructions
@@ -250,8 +246,6 @@ export class DomainManager {
    * 
    * Checks if the CNAME record resolves correctly to the expected target.
    * If verified, updates status to 'verified' and triggers SSL provisioning.
-   * 
-   * **Validates: Requirements 4.3, 4.4, 4.5**
    * 
    * @param customDomainId - The custom domain ID to verify
    * @returns Verification result with status and resolved target
@@ -410,8 +404,6 @@ export class DomainManager {
    * status to 'ssl_provisioning'. Once the certificate is active, triggers
    * Traefik route configuration.
    * 
-   * **Validates: Requirements 16.1, 16.2, 16.3**
-   * 
    * @param customDomainId - The custom domain ID to provision SSL for
    * @returns SSL provisioning result with certificate ID
    * @throws DomainManagerError if custom domain not found or not verified
@@ -521,8 +513,6 @@ export class DomainManager {
    * Configures Traefik to route traffic from the custom domain to the
    * deployment's internal service with SSL enabled and HTTPS enforcement.
    * Updates custom domain status to 'active'.
-   * 
-   * **Validates: Requirements 4.6, 4.7, 4.8, 16.3, 16.6**
    * 
    * @param customDomainId - The custom domain ID to configure routing for
    * @returns Route configuration result
@@ -636,8 +626,6 @@ export class DomainManager {
    * Removes the Traefik route configuration and deletes the CustomDomain record.
    * This stops traffic routing to the custom domain.
    * 
-   * **Validates: Requirements 4.10**
-   * 
    * @param customDomainId - The custom domain ID to remove
    * @returns Removal result
    * @throws DomainManagerError if custom domain not found
@@ -731,8 +719,6 @@ export class DomainManager {
    * Queries all custom domains with SSL certificates and checks their
    * expiration status. Returns domains requiring renewal (expiring within 7 days).
    * 
-   * **Validates: Requirements 16.4**
-   * 
    * @returns Array of certificate expiration check results
    */
   async checkCertificateExpiration(): Promise<CertificateExpirationCheck[]> {
@@ -823,8 +809,6 @@ export class DomainManager {
    * 
    * Requests a new SSL certificate from Cloudflare to replace the expiring one.
    * Updates the custom domain with the new certificate ID.
-   * 
-   * **Validates: Requirements 16.4, 16.5**
    * 
    * @param customDomainId - The custom domain ID to renew SSL for
    * @returns Renewal result with new certificate information

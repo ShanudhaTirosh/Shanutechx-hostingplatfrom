@@ -17,15 +17,6 @@ catalogRouter.use(requireAuth);
 
 // ── Template catalogue ────────────────────────────────────────────────────────
 
-// Audit finding C7 (secondary issue): previously resolved relative to
-// process.cwd(), which is fragile -- it depends entirely on the working
-// directory the Node process happens to be launched from, and drifted
-// from lib/catalog/catalog-manager.ts's __dirname-relative resolution of
-// the same directory. Unified to the same __dirname-relative strategy
-// used there, which is robust regardless of how/where the process is
-// started. From apps/api/dist/routes/catalog.js, 4 levels up reaches the
-// repo root (dist/routes -> dist -> apps/api -> repo root), matching
-// where the Dockerfile now actually copies templates/ into the image.
 const TEMPLATES_DIR = path.resolve(__dirname, '../../../../templates');
 
 interface TemplateMeta {
@@ -171,7 +162,6 @@ function isValidSlug(slug: string): boolean {
  * GET /api/catalog/:slug
  * Returns full YAML content for a specific template.
  * Access: All authenticated users
- * Validates: Requirements 1.1, 1.5
  */
 catalogRouter.get('/catalog/:slug', (req, res) => {
   if (!isValidSlug(req.params.slug)) return res.status(400).json({ error: 'Invalid template slug format' });
@@ -190,7 +180,6 @@ catalogRouter.get('/catalog/:slug', (req, res) => {
  * POST /api/catalog/:slug
  * Create a new template in the catalog.
  * Access: Admin and Dev only
- * Validates: Requirements 1.1, 1.2, 5.1
  */
 const createTemplateSchema = z.object({
   name: z.string().optional(),
@@ -317,7 +306,6 @@ catalogRouter.post('/catalog/:slug', requireRole('admin', 'dev'), async (req: Au
  * PATCH /api/catalog/:slug
  * Update an existing template in the catalog.
  * Access: Admin and Dev only
- * Validates: Requirements 1.1, 1.3, 5.2
  */
 const updateTemplateSchema = z.object({
   name: z.string().optional(),
@@ -465,7 +453,6 @@ catalogRouter.patch('/catalog/:slug', requireRole('admin', 'dev'), async (req: A
  * DELETE /api/catalog/:slug
  * Delete a template from the catalog.
  * Access: Admin and Dev only
- * Validates: Requirements 1.1, 5.1
  */
 catalogRouter.delete('/catalog/:slug', requireRole('admin', 'dev'), async (req: AuthedRequest, res) => {
   if (!isValidSlug(req.params.slug)) return res.status(400).json({ error: 'Invalid template slug format' });
@@ -509,14 +496,7 @@ catalogRouter.delete('/catalog/:slug', requireRole('admin', 'dev'), async (req: 
 
 // ── Template deploy ───────────────────────────────────────────────────────────
 
-// Audit finding (templates note under C7): several catalog templates
-// require secrets (DB root passwords, API keys) with no safe way to
-// leave them unset — the YAML files now use Compose's ${VAR:?msg}
-// required-variable syntax instead of a hardcoded weak default. This map
-// lists which keys, per template, get a strong random value generated
-// automatically if the customer doesn't supply one, so a catalog deploy
-// never fails for a "missing" secret and never falls back to a weak,
-// predictable default either.
+// Auto-generated secret keys for catalog templates
 const AUTO_GENERATED_SECRET_KEYS: Record<string, string[]> = {
   lavalink: ['LAVALINK_PASSWORD'],
   livekit: ['LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET'],

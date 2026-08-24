@@ -3,17 +3,6 @@ version: "3.9"
 name: shanutechx-infisical
 
 services:
-  # Fixed: this and the redis service below were previously named `db`/
-  # `redis` -- both names collide with services in docker/supabase/
-  # docker-compose.yml (`db`) and docker-compose.local.yml (`redis`).
-  # docker/docker-compose.shanutechx.yml's `include:` merges services by
-  # name across all three files, so with the original names, whichever
-  # file was included last would silently OVERRIDE the earlier
-  # same-named service instead of running alongside it -- e.g. Infisical's
-  # Postgres would have replaced Supabase's entirely, breaking Supabase
-  # auth/storage, and Infisical's Redis would have replaced ShanuTechX's
-  # own Redis, breaking BullMQ/session cache. Renamed to be collision-safe
-  # in the unified stack.
   infisical-db:
     image: postgres:14-alpine
     container_name: infisical-db
