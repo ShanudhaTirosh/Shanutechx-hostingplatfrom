@@ -166,11 +166,6 @@ services:
         condition: service_healthy
       rest:
         condition: service_started
-    depends_on:
-      db:
-        condition: service_healthy
-      rest:
-        condition: service_started
     environment:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}

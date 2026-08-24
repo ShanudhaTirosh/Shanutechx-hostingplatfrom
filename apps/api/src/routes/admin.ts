@@ -63,6 +63,10 @@ adminRouter.post('/admin/users', async (req: AuthedRequest, res) => {
   const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
   if (existing) return res.status(400).json({ error: 'User with this email already exists' });
 
+  if (parsed.data.role === 'dev' && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'Only the platform dev account can create a dev user account.' });
+  }
+
   const user = await prisma.user.create({
     data: {
       email: parsed.data.email,

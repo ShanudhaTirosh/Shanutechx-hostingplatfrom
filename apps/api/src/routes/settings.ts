@@ -61,7 +61,9 @@ const changePinSchema = z.object({
   newPin: z.string().min(4, 'PIN/Password must be at least 4 characters long'),
 });
 
+/**
  * Set / change the settings security PIN.
+ */
 settingsRouter.post('/change-pin', requireAdminOrDev, async (req: AuthedRequest, res) => {
   const parsed = changePinSchema.safeParse(req.body);
   if (!parsed.success) {

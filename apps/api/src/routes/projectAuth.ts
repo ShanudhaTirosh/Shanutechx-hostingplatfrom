@@ -68,6 +68,57 @@ projectAuthRouter.post('/projects/:id/auth/login', async (req, res) => {
   res.json({ token, user: { id: user.id, email: user.email, emailVerified: user.emailVerified } });
 });
 
+/**
+ * Validates that a target redirectUrl is safe:
+ * - Must be valid HTTP or HTTPS URL
+ * - Must have origin matching one of the project's configured OAuth redirectUri origins (if configured)
+ */
+async function validateProjectRedirectUrl(
+  projectId: string,
+  redirectUrlStr: string,
+  providerConfig?: { redirectUri: string } | null
+): Promise<boolean> {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(redirectUrlStr);
+  } catch {
+    return false;
+  }
+
+  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+    return false;
+  }
+
+  if (providerConfig?.redirectUri) {
+    try {
+      const allowedOrigin = new URL(providerConfig.redirectUri).origin;
+      if (parsedUrl.origin === allowedOrigin) return true;
+    } catch (_) {}
+  }
+
+  const oauthConfigs = await prisma.projectOAuthConfig.findMany({
+    where: { projectId },
+    select: { redirectUri: true },
+  });
+
+  if (oauthConfigs.length > 0) {
+    const allowedOrigins = new Set(
+      oauthConfigs
+        .map((c) => {
+          try {
+            return new URL(c.redirectUri).origin;
+          } catch {
+            return null;
+          }
+        })
+        .filter((o): o is string => Boolean(o))
+    );
+    return allowedOrigins.has(parsedUrl.origin);
+  }
+
+  return true;
+}
+
 const magicLinkRequestSchema = z.object({ email: z.string().email(), redirectUrl: z.string().url() });
 
 /**
@@ -82,6 +133,11 @@ projectAuthRouter.post('/projects/:id/auth/magic-link', async (req, res) => {
 
   const project = await prisma.project.findUnique({ where: { id: req.params.id } });
   if (!project) return res.status(404).json({ error: 'Project not found' });
+
+  const isValidRedirect = await validateProjectRedirectUrl(project.id, parsed.data.redirectUrl);
+  if (!isValidRedirect) {
+    return res.status(400).json({ error: 'Invalid or unauthorized redirectUrl' });
+  }
 
   const rawToken = await createMagicLink(project.id, parsed.data.email);
   const link = `${parsed.data.redirectUrl}${parsed.data.redirectUrl.includes('?') ? '&' : '?'}token=${rawToken}`;
@@ -155,6 +211,11 @@ projectAuthRouter.get('/projects/:id/auth/oauth/:provider/start', async (req, re
   });
   if (!config) return res.status(404).json({ error: `${provider} is not configured for this project` });
 
+  const isValidRedirect = await validateProjectRedirectUrl(req.params.id, redirectUrl, config);
+  if (!isValidRedirect) {
+    return res.status(400).json({ error: 'Invalid or unauthorized redirectUrl' });
+  }
+
   const state = crypto.randomUUID();
   oauthStates.set(state, { projectId: req.params.id, provider, redirectUrl, expiresAt: Date.now() + OAUTH_STATE_TTL_MS });
 
@@ -222,11 +283,11 @@ projectAuthRouter.get('/projects/:id/auth/oauth/:provider/callback', async (req,
         },
       });
       const emails: any[] = await emailsRes.json().catch(() => []);
-      email = emails.find((e) => e.primary && e.verified)?.email ?? emails[0]?.email ?? null;
+      email = emails.find((e) => e.primary && e.verified)?.email ?? null;
     }
 
     if (!email) {
-      return res.status(400).json({ error: `Could not obtain an email address from ${provider}` });
+      return res.status(400).json({ error: `Could not obtain a verified email address from ${provider}` });
     }
 
     const existingAccount = await prisma.projectOAuthAccount.findUnique({

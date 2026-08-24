@@ -95,7 +95,7 @@ statusRouter.post('/status/run-checks', async (req, res) => {
 statusRouter.get('/deployments/:id/uptime', requireAuth, async (req: AuthedRequest, res) => {
   const deployment = await prisma.deployment.findUnique({ where: { id: req.params.id } });
   if (!deployment) return res.status(404).json({ error: 'Not found' });
-  if (req.user!.role !== 'admin' && deployment.userId !== req.user!.id) {
+  if (req.user!.role !== 'admin' && req.user!.role !== 'dev' && deployment.userId !== req.user!.id) {
     return res.status(404).json({ error: 'Not found' });
   }
 
