@@ -58,6 +58,9 @@ export async function requireAuth(
   try {
     let decoded: import('firebase-admin/auth').DecodedIdToken;
     try {
+      if (!firebaseAuth) {
+        return res.status(503).json({ error: 'Firebase authentication service is not configured on server' });
+      }
       decoded = await firebaseAuth.verifyIdToken(idToken);
     } catch (firebaseErr: any) {
       return res.status(401).json({ error: 'Invalid or expired token', detail: firebaseErr.code ?? firebaseErr.message });

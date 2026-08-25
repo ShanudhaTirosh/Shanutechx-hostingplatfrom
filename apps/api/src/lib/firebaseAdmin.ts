@@ -2,19 +2,33 @@ import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getDatabase } from 'firebase-admin/database';
 import { env } from '../env';
+import { logger } from './logger';
+
+let isInitialized = false;
 
 if (getApps().length === 0) {
-  initializeApp({
-    credential: cert({
-      projectId: env.firebaseProjectId,
-      clientEmail: env.firebaseClientEmail,
-      privateKey: env.firebasePrivateKey,
-    }),
-    // Only needed for the live-chat admin sync (lib/chatAdminSync.ts).
-    // Safe to leave unset elsewhere — getDatabase() just won't be called.
-    databaseURL: env.firebaseDatabaseUrl || undefined,
-  });
+  const formattedKey = env.firebasePrivateKey ? env.firebasePrivateKey.replace(/\\n/g, '\n') : '';
+  if (formattedKey && formattedKey.includes('BEGIN PRIVATE KEY')) {
+    try {
+      initializeApp({
+        credential: cert({
+          projectId: env.firebaseProjectId,
+          clientEmail: env.firebaseClientEmail,
+          privateKey: formattedKey,
+        }),
+        databaseURL: env.firebaseDatabaseUrl || undefined,
+      });
+      isInitialized = true;
+    } catch (err: any) {
+      logger.warn({ err: err.message }, 'Firebase Admin initialization failed. Firebase features will be disabled.');
+    }
+  } else {
+    logger.warn('Firebase private key is not configured or invalid. Firebase features disabled.');
+  }
+} else {
+  isInitialized = true;
 }
 
-export const firebaseAuth = getAuth();
-export const firebaseDb = env.firebaseDatabaseUrl ? getDatabase() : null;
+export const firebaseAuth = isInitialized ? getAuth() : null;
+export const firebaseDb = isInitialized && env.firebaseDatabaseUrl ? getDatabase() : null;
+
