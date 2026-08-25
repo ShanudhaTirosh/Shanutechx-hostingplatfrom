@@ -62,7 +62,7 @@ export async function ensureShadowRepo(deploymentId: string): Promise<string> {
     }
 
     if (createRes.ok) {
-      const data = await createRes.json();
+      const data: any = await createRes.json();
       fullName = data.full_name;
     } else if (createRes.status === 422) {
       // Repository already exists

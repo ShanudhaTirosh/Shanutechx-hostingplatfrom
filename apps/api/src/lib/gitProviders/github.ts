@@ -52,7 +52,7 @@ async function mintInstallationToken(installationId: string): Promise<string> {
     const body = await res.text().catch(() => '');
     throw new Error(`Failed to mint GitHub installation token (${res.status}): ${body}`);
   }
-  const data = await res.json();
+  const data: any = await res.json();
   return data.token as string;
 }
 
@@ -100,7 +100,7 @@ export const githubProvider: GitProviderAdapter = {
         },
       });
       if (!res.ok) throw new Error(`Failed to list GitHub repos (${res.status})`);
-      const data = await res.json();
+      const data: any = await res.json();
       for (const r of data.repositories ?? []) {
         repos.push({
           id: String(r.id),

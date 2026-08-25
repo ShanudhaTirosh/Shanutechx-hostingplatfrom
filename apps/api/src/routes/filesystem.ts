@@ -252,7 +252,7 @@ filesystemRouter.post('/fs/:deploymentId/git-commit-push', async (req: AuthedReq
       const getRes = await fetch(getUrl, {
         headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'ShanuTechX-Platform', Accept: 'application/vnd.github+json' },
       });
-      const existing = getRes.ok ? await getRes.json() : null;
+      const existing: any = getRes.ok ? await getRes.json() : null;
 
       // Create or update file
       const putRes = await fetch(`https://api.github.com/repos/${owner}/${cleanRepo}/contents/${filePath}`, {
@@ -272,7 +272,7 @@ filesystemRouter.post('/fs/:deploymentId/git-commit-push', async (req: AuthedReq
         return res.status(502).json({ error: `GitHub push failed: ${(err as any).message ?? putRes.status}` });
       }
 
-      const pushData = await putRes.json();
+      const pushData: any = await putRes.json();
       return res.json({ ok: true, provider: 'github', commitSha: pushData.commit?.sha, commitUrl: pushData.commit?.html_url });
     }
 

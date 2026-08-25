@@ -232,7 +232,7 @@ export interface NodeContainer {
 export async function listNodeContainers(node: Node): Promise<NodeContainer[]> {
   const res = await fetch(agentUrl(node, '/agent/containers'), { headers: agentHeaders() });
   if (!res.ok) throw new Error(`Failed to list containers (${res.status})`);
-  const data = await res.json();
+  const data: any = await res.json();
   return data.containers;
 }
 
@@ -246,7 +246,7 @@ export async function containerAction(
     headers: agentHeaders(),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
+    const body: any = await res.json().catch(() => ({}));
     throw new Error(body.error || `Failed to ${action} container (${res.status})`);
   }
 }
@@ -257,7 +257,7 @@ export async function removeNodeContainer(node: Node, containerId: string): Prom
     headers: agentHeaders(),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
+    const body: any = await res.json().catch(() => ({}));
     throw new Error(body.error || `Failed to remove container (${res.status})`);
   }
 }
@@ -267,6 +267,6 @@ export async function getContainerLogs(node: Node, containerId: string, tail = 2
     headers: agentHeaders(),
   });
   if (!res.ok) throw new Error(`Failed to fetch logs (${res.status})`);
-  const data = await res.json();
+  const data: any = await res.json();
   return data.logs;
 }

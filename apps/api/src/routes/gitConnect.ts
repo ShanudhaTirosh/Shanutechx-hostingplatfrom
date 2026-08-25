@@ -205,7 +205,7 @@ async function fetchInstallationDetails(
     },
   });
   if (!res.ok) throw new Error(`Failed to fetch installation details (${res.status})`);
-  const data = await res.json();
+  const data: any = await res.json();
   return {
     accountLogin: data.account?.login ?? 'unknown',
     accountType: data.account?.type ?? 'User',
@@ -226,13 +226,13 @@ async function exchangeGitLabCode(code: string, userId: string): Promise<void> {
     }),
   });
   if (!tokenRes.ok) throw new Error(`GitLab token exchange failed (${tokenRes.status})`);
-  const tokenData = await tokenRes.json();
+  const tokenData: any = await tokenRes.json();
 
   const userRes = await fetch('https://gitlab.com/api/v4/user', {
     headers: { Authorization: `Bearer ${tokenData.access_token}` },
   });
   if (!userRes.ok) throw new Error(`Failed to fetch GitLab user profile (${userRes.status})`);
-  const gitlabUser = await userRes.json();
+  const gitlabUser: any = await userRes.json();
 
   await prisma.gitLabConnection.upsert({
     where: { userId_gitlabUserId: { userId, gitlabUserId: String(gitlabUser.id) } },

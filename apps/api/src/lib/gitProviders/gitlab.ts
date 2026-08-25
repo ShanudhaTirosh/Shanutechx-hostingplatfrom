@@ -46,7 +46,7 @@ async function getFreshAccessToken(connectionId: string): Promise<string> {
   if (!res.ok) {
     throw new Error(`Failed to refresh GitLab token (${res.status}) — the user may need to reconnect their account.`);
   }
-  const data = await res.json();
+  const data: any = await res.json();
 
   const newAccessTokenEnc = encryptSecret(data.access_token, env.secretsEncryptionKey);
   const newRefreshTokenEnc = encryptSecret(data.refresh_token ?? refreshToken, env.secretsEncryptionKey);
@@ -97,7 +97,7 @@ export const gitlabProvider: GitProviderAdapter = {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!res.ok) throw new Error(`Failed to list GitLab projects (${res.status})`);
-      const data = await res.json();
+      const data: any = await res.json();
       for (const p of data) {
         repos.push({
           id: String(p.id),
