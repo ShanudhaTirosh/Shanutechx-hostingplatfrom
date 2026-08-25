@@ -49,6 +49,8 @@ services:
       context: ../..
       dockerfile: services/node-agent/Dockerfile
     restart: unless-stopped
+    ports:
+      - "5000:5000"
     env_file: .env
     environment:
       - AGENT_PUBLIC_NETWORK=shanutechx-public
