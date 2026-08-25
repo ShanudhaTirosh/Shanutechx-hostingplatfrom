@@ -178,7 +178,10 @@ async function listTables({ dbName, dbUsername }) {
           ['exec', '-i', POSTGRES_CONTAINER, 'psql', '-U', targetUser, '-d', dbName, '-t', '-c', `SELECT COUNT(*) FROM "${tableName}";`]
         );
         rowCount = parseInt(countOut.trim(), 10) || 0;
-      } catch (_) {}
+      } catch (err) {
+        // Default to 0 rows if count query fails (e.g. view or permission restriction)
+        rowCount = 0;
+      }
 
       return { name: tableName, columns, rowCount };
     })

@@ -10,6 +10,8 @@ const pino = require('pino');
 const AUTH_DIR = require('path').join(__dirname, '..', 'auth');
 
 let sock = null;
+let currentQr = null;
+let connectionState = 'disconnected';
 
 // Baileys' own internal logger — kept quiet at 'warn' so its verbose
 // protocol-level logging doesn't drown out our own connection events.

@@ -128,8 +128,13 @@ internalBotRouter.post('/internal/review-payment', async (req: Request, res: Res
     return res.status(400).json({ error: 'orderId and approve (boolean) are required' });
   }
 
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
+  const order = await prisma.order.findFirst({
+    where: {
+      OR: [
+        { id: orderId },
+        { id: { startsWith: orderId } },
+      ],
+    },
     include: {
       payments: true,
       user: true,

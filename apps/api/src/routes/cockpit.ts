@@ -52,7 +52,9 @@ async function resolveNodeAccess(req: AuthedRequest, nodeId: string) {
       try {
         const url = new URL(provision.panelUrl);
         ip = url.hostname;
-      } catch (_) {}
+      } catch (err) {
+        logger.warn({ err, provisionId: provision.id, panelUrl: provision.panelUrl }, 'Invalid panelUrl on VPS provision');
+      }
     }
 
     if (!ip || ip === '127.0.0.1' || ip === 'localhost') {
@@ -384,25 +386,20 @@ cockpitRouter.post('/nodes/:nodeId/cockpit/ssh-ticket', async (req: AuthedReques
   const node = await resolveNodeAccess(req, req.params.nodeId);
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
-  // Only full cluster nodes have a direct SSH key ref — VPS provisions
-  // use the Leaseweb ticket endpoint instead.
-  const fullNode = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
-  if (!fullNode) return res.status(404).json({ error: 'Node not found' });
-
-  try {
-    const ticket = issueSshTicket(`node:${fullNode.ip}:${fullNode.sshKeyRef}`, req.user!.id);
+    const sshKeyRef = 'sshKeyRef' in node ? (node as any).sshKeyRef || 'default' : 'default';
+    const ticket = issueSshTicket(`node:${node.ip}:${sshKeyRef}`, req.user!.id);
 
     await prisma.auditLog.create({
       data: {
         adminId: req.user!.id,
         action: 'cockpit.ssh_ticket_issued',
-        target: `${fullNode.id}:${fullNode.ip}`,
+        target: `${node.id}:${node.ip}`,
       },
     });
 
-    res.json({ ticket, expiresInMs: 30_000, ip: fullNode.ip });
+    res.json({ ticket, expiresInMs: 30_000, ip: node.ip });
   } catch (err: any) {
-    logger.error({ err, nodeId: fullNode.id }, 'Failed to issue cockpit SSH ticket');
+    logger.error({ err, nodeId: node.id }, 'Failed to issue cockpit SSH ticket');
     res.status(500).json({ error: 'Failed to issue SSH ticket' });
   }
 });
