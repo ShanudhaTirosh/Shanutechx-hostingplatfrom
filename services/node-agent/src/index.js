@@ -26,9 +26,6 @@ const ALLOWED_IPS = (process.env.AGENT_ALLOWED_IPS || '')
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
-  ...(process.env.NODE_ENV !== 'production'
-    ? { transport: { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:standard', ignore: 'pid,hostname' } } }
-    : {}),
 });
 
 if (!AGENT_SECRET) {
