@@ -286,7 +286,7 @@ projectAuthRouter.get('/projects/:id/auth/oauth/:provider/callback', async (req,
           'User-Agent': 'ShanuTechX-Platform',
         },
       });
-      const emails: any[] = await emailsRes.json().catch(() => []);
+      const emails: any[] = (await emailsRes.json().catch(() => [])) as any[];
       email = emails.find((e) => e.primary && e.verified)?.email ?? null;
     }
 

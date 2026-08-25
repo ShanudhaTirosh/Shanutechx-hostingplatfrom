@@ -347,7 +347,7 @@ supabaseRouter.get('/supabase/auth/users', requireAuth, requireAdminOrDev, async
       total: 1,
     });
   }
-  const usersList = Array.isArray(result.data) ? result.data : (result.data?.users || []);
+  const usersList = Array.isArray(result.data) ? result.data : ((result.data as any)?.users || []);
   res.json({ users: usersList, total: usersList.length });
 });
 
@@ -431,7 +431,7 @@ supabaseRouter.get('/supabase/storage/buckets', requireAuth, requireAdminOrDev, 
       buckets: [{ id: 'avatars', name: 'avatars', public: true, created_at: new Date().toISOString() }],
     });
   }
-  const bucketList = Array.isArray(result.data) ? result.data : (result.data?.buckets || []);
+  const bucketList = Array.isArray(result.data) ? result.data : ((result.data as any)?.buckets || []);
   res.json({ buckets: bucketList });
 });
 
