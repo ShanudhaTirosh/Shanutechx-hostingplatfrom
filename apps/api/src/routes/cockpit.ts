@@ -386,6 +386,7 @@ cockpitRouter.post('/nodes/:nodeId/cockpit/ssh-ticket', async (req: AuthedReques
   const node = await resolveNodeAccess(req, req.params.nodeId);
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
+  try {
     const sshKeyRef = 'sshKeyRef' in node ? (node as any).sshKeyRef || 'default' : 'default';
     const ticket = issueSshTicket(`node:${node.ip}:${sshKeyRef}`, req.user!.id);
 
