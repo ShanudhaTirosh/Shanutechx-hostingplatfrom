@@ -40,3 +40,23 @@ tmp/
 config/firebase/*.json
 *firebase*adminsdk*.json
 infra/postal/signing.key
+*.pem
+*.key
+
+# Archives & Transferred Packages
+*.tar
+*.tar.gz
+*.zip
+*.tgz
+
+# IDE & Editor Settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build Caches & Coverage
+.turbo/
+coverage/
+.vercel/
+
