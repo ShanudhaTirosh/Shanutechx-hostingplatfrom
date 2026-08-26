@@ -22,7 +22,7 @@ const PUBLIC_SERVICE_TYPES = new Set(['web_hosting', 'node_hosting', 'python_hos
 
 interface DeployParams {
   userId: string;
-  serviceType: keyof typeof SERVICE_TYPE_TO_TAG;
+  serviceType: string;
   repoUrl: string;
   branch?: string;
   preferredName: string;
@@ -37,6 +37,11 @@ interface DeployParams {
   cpuLimit?: number;
   memoryLimit?: number;
   storageLimit?: number;
+  startCommand?: string;
+  entryFile?: string;
+  frameworkPreset?: string;
+  exposureMode?: string;
+  publishedPort?: number;
   onEvent?: (event: BuildEvent) => void;
 }
 
@@ -70,16 +75,21 @@ export async function deployService(params: DeployParams) {
     cpuLimit,
     memoryLimit,
     storageLimit,
+    startCommand,
+    entryFile,
+    frameworkPreset,
+    exposureMode,
+    publishedPort,
     onEvent,
   } = params;
 
   const node = await selectNodeForDeployment({
-    requiredTag: SERVICE_TYPE_TO_TAG[serviceType],
+    requiredTag: SERVICE_TYPE_TO_TAG[serviceType] || 'web-hosting',
     isAdminDeployment,
     explicitNodeId,
   });
 
-  const isPublic = PUBLIC_SERVICE_TYPES.has(serviceType);
+  const isPublic = PUBLIC_SERVICE_TYPES.has(serviceType) || (exposureMode && exposureMode !== 'no_ssl');
   const subdomain = isPublic ? await generateSubdomain(preferredName, params.customSubdomain) : undefined;
 
   // Encrypt environment variables if provided (Requirements 12.10-12.11)
@@ -105,6 +115,11 @@ export async function deployService(params: DeployParams) {
       memoryLimit: memoryLimit ?? null,
       storageLimit: storageLimit ?? null,
       envVarsEncrypted: envVarsEncrypted,
+      startCommand: startCommand ?? null,
+      entryFile: entryFile ?? null,
+      frameworkPreset: frameworkPreset ?? 'auto',
+      exposureMode: exposureMode ?? 'ssl_with_proxy',
+      publishedPort: publishedPort ?? null,
     },
   });
 
@@ -125,6 +140,11 @@ export async function deployService(params: DeployParams) {
         cpuLimit,
         memoryLimit,
         storageLimit,
+        startCommand,
+        entryFile,
+        frameworkPreset,
+        exposureMode,
+        publishedPort,
       },
       (event) => onEvent?.(event)
     );

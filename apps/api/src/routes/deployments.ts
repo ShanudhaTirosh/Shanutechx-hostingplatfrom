@@ -28,9 +28,10 @@ const createDeploymentSchema = z.object({
     'python_hosting',
     'discordbot_python',
     'discordbot_node',
+    'whatsapp_baileys',
+    'lavalink',
     'n8n',
     'livekit',
-    'lavalink',
     'wordpress',
     'supabase_stack',
     'custom_docker',
@@ -50,6 +51,11 @@ const createDeploymentSchema = z.object({
   cpuLimit: z.number().min(0.1).max(16).optional(),
   memoryLimit: z.number().int().min(64).max(32768).optional(),
   storageLimit: z.number().int().min(1).max(500).optional(),
+  startCommand: z.string().max(500).optional(),
+  entryFile: z.string().max(255).optional(),
+  frameworkPreset: z.enum(['auto', 'nextjs', 'react_vite', 'nodejs_bot', 'whatsapp_baileys', 'python_bot', 'lavalink_java', 'static_html', 'custom']).optional(),
+  exposureMode: z.enum(['ssl_with_proxy', 'ssl_direct', 'no_ssl']).optional(),
+  publishedPort: z.number().int().min(1).max(65535).optional(),
 }).refine((data) => data.templateId || (data.repoUrl && data.internalPort), {
   message: 'Either templateId, or both repoUrl and internalPort, are required',
 });
@@ -139,6 +145,11 @@ deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
       cpuLimit: data.cpuLimit,
       memoryLimit: data.memoryLimit,
       storageLimit: data.storageLimit,
+      startCommand: data.startCommand,
+      entryFile: data.entryFile,
+      frameworkPreset: data.frameworkPreset,
+      exposureMode: data.exposureMode,
+      publishedPort: data.publishedPort,
       onEvent: (event) => res.write(JSON.stringify(event) + '\n'),
     });
 

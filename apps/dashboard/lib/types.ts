@@ -126,6 +126,11 @@ export interface Deployment {
   customDomain?: string | null;
   customDomainStatus?: 'none' | 'pending' | 'verified' | 'failed';
   customDomains?: CustomDomain[];
+  startCommand?: string | null;
+  entryFile?: string | null;
+  frameworkPreset?: string | null;
+  exposureMode?: string | null;
+  publishedPort?: number | null;
 }
 
 export interface Node {

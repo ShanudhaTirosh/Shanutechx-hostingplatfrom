@@ -422,6 +422,11 @@ export const api = {
         gitProvider?: 'github' | 'gitlab' | 'custom';
         gitAccountId?: string;
         gitToken?: string;
+        startCommand?: string;
+        entryFile?: string;
+        exposureMode?: string;
+        frameworkPreset?: string;
+        publishedPort?: number;
       },
       onEvent: (event: BuildEvent) => void
     ): Promise<void> => {

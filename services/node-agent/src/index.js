@@ -152,7 +152,22 @@ app.get('/agent/containers/:containerId/logs', async (req, res) => {
  */
 app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
   const { deploymentId } = req.params;
-  const { repoUrl, branch, subdomain, internalPort, envVars, cpuLimit, memoryLimit, backupRepoUrl, routingMode, publishedPort } = req.body || {};
+  const {
+    repoUrl,
+    branch,
+    subdomain,
+    internalPort,
+    envVars,
+    cpuLimit,
+    memoryLimit,
+    backupRepoUrl,
+    routingMode,
+    exposureMode,
+    startCommand,
+    entryFile,
+    frameworkPreset,
+    publishedPort,
+  } = req.body || {};
 
   if (!repoUrl || !internalPort) {
     return res.status(400).json({ error: 'repoUrl and internalPort are required' });
@@ -163,16 +178,19 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
   const emit = (event) => res.write(JSON.stringify(event) + '\n');
 
   try {
-    logger.info({ deploymentId, repoUrl }, 'Starting build');
+    logger.info({ deploymentId, repoUrl, startCommand, exposureMode }, 'Starting build');
     emit({ phase: 'fetch', message: 'Fetching repository...' });
     const workspaceDir = await prepareWorkspace(deploymentId, repoUrl, branch || 'main', backupRepoUrl);
 
-    emit({ phase: 'build', message: 'Building with Railpack...' });
+    emit({ phase: 'build', message: 'Building container image...' });
     const imageTag = `shanutechx/${deploymentId}:latest`;
     await buildImage({
       workspaceDir,
       imageTag,
       envVars,
+      startCommand,
+      entryFile,
+      frameworkPreset,
       onData: (chunk) => emit({ phase: 'build', log: chunk.toString() }),
     });
 
@@ -187,6 +205,8 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
       cpuLimit: cpuLimit ?? 1,
       memLimitMb: memoryLimit ?? 512,
       routingMode: routingMode || 'proxied',
+      exposureMode: exposureMode || 'ssl_with_proxy',
+      startCommand: startCommand || null,
       publishedPort: publishedPort ?? null,
     });
 

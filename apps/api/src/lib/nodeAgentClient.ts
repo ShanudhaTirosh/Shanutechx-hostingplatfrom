@@ -24,6 +24,11 @@ export interface BuildAndRunParams {
   memoryLimit?: number;   // Memory in MB (64-32768)
   storageLimit?: number;  // Storage in GB (1-500)
   backupRepoUrl?: string;
+  startCommand?: string;
+  entryFile?: string;
+  frameworkPreset?: string;
+  exposureMode?: string;  // ssl_with_proxy | ssl_direct | no_ssl
+  publishedPort?: number;
 }
 
 export interface BuildEvent {

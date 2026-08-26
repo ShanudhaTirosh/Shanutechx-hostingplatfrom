@@ -477,6 +477,13 @@ model Deployment {
   backupLastPushedAt DateTime? // Last timestamp when workspace state was backed up
   workspaceCleanedAt DateTime? // Timestamp when node-local workspace was purged (24h retention)
 
+  // Advanced bot & web hosting options: custom start commands, entry files, framework presets, flexible SSL exposure
+  startCommand    String?   // Custom start command (e.g. "java -jar Lavalink.jar", "node index.js", "python bot.py")
+  entryFile       String?   // Config or entry file (e.g. "application.yml", "Lavalink.jar", "index.js")
+  frameworkPreset String?   @default("auto") // auto | nextjs | react_vite | nodejs_bot | whatsapp_baileys | python_bot | lavalink_java | static_html | custom
+  exposureMode    String    @default("ssl_with_proxy") // ssl_with_proxy | ssl_direct | no_ssl
+  publishedPort   Int?      // Direct host port mapping for no_ssl / direct TCP exposure
+
   uptimeChecks    UptimeCheck[]
   customDomains   CustomDomain[]
 }

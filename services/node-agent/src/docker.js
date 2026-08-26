@@ -23,6 +23,8 @@ async function runContainer({
   cpuLimit = 1, // cores
   memLimitMb = 512,
   routingMode = 'proxied',
+  exposureMode = 'ssl_with_proxy',
+  startCommand = null,
   publishedPort = null,
 }) {
   const containerName = `deploy-${deploymentId}`;
@@ -34,8 +36,11 @@ async function runContainer({
   const networks = [];
   const portBindings = {};
 
-  if (routingMode === 'direct') {
-    // Raw Host Port Mapping — bypass Traefik proxy
+  // Resolve effective exposure mode ('no_ssl', 'ssl_direct', 'ssl_with_proxy')
+  const effectiveMode = exposureMode || (routingMode === 'direct' ? 'no_ssl' : 'ssl_with_proxy');
+
+  if (effectiveMode === 'no_ssl' || routingMode === 'direct') {
+    // Raw Host Port Mapping — bypass Traefik proxy for direct TCP/UDP (e.g. Lavalink on port 2333)
     const hostPort = String(publishedPort || internalPort);
     portBindings[`${internalPort}/tcp`] = [{ HostPort: hostPort }];
     portBindings[`${internalPort}/udp`] = [{ HostPort: hostPort }];
@@ -49,11 +54,12 @@ async function runContainer({
     labels[`traefik.http.routers.${routerName}.rule`] = `Host(\`${activeSubdomain}.${rootDomain}\`)`;
     labels[`traefik.http.services.${routerName}.loadbalancer.server.port`] = String(internalPort);
 
-    if (routingMode === 'no_ssl') {
-      labels[`traefik.http.routers.${routerName}.entrypoints`] = 'web';
+    if (effectiveMode === 'ssl_direct') {
+      labels[`traefik.http.routers.${routerName}.entrypoints`] = 'websecure';
+      labels[`traefik.http.routers.${routerName}.tls`] = 'true';
       labels[`traefik.http.routers.${routerName}.middlewares`] = 'gzip-compress@file';
     } else {
-      // Default: Proxied + TLS Let's Encrypt
+      // Default: ssl_with_proxy — Proxied + TLS Let's Encrypt
       labels[`traefik.http.routers.${routerName}.entrypoints`] = 'websecure';
       labels[`traefik.http.routers.${routerName}.tls.certresolver`] = 'le';
       labels[`traefik.http.routers.${routerName}.middlewares`] = 'security-headers@file,rate-limit@file,gzip-compress@file';
@@ -62,7 +68,7 @@ async function runContainer({
     networks.push(PUBLIC_NETWORK);
   }
 
-  const container = await docker.createContainer({
+  const containerConfig = {
     name: containerName,
     Image: imageTag,
     Env: Object.entries(envVars).map(([k, v]) => `${k}=${v}`),
@@ -75,7 +81,13 @@ async function runContainer({
       NetworkMode: networks[0] || 'bridge',
     },
     User: '1000:1000', // never run customer code as root
-  });
+  };
+
+  if (startCommand && typeof startCommand === 'string' && startCommand.trim().length > 0) {
+    containerConfig.Cmd = ['sh', '-c', startCommand.trim()];
+  }
+
+  const container = await docker.createContainer(containerConfig);
 
   await container.start();
 

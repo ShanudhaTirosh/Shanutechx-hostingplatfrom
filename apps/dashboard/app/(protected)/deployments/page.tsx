@@ -22,10 +22,19 @@ export const dynamic = 'force-dynamic';
 
 const SERVICE_TYPES = [
   { value: 'web_hosting', label: 'Web Application (Node.js / React / Next.js / Static)' },
+  { value: 'whatsapp_baileys', label: 'WhatsApp Bot (Baileys / KnightBot / Raganork / Prabath MD)' },
+  { value: 'discordbot_node', label: 'Discord Bot (Node.js)' },
+  { value: 'discordbot_python', label: 'Discord Bot (Python)' },
+  { value: 'lavalink', label: 'Lavalink Audio Node (Java JAR + application.yml)' },
   { value: 'node_hosting', label: 'Node.js Backend Service (Express / NestJS)' },
   { value: 'python_hosting', label: 'Python Application (FastAPI / Django / Flask)' },
-  { value: 'discordbot_python', label: 'Discord Bot (Python)' },
-  { value: 'discordbot_node', label: 'Discord Bot (Node.js)' },
+  { value: 'custom_docker', label: 'Custom Container / Script' },
+];
+
+const EXPOSURE_MODES = [
+  { value: 'ssl_with_proxy', label: 'SSL with Proxy (Traefik HTTPS + Automatic Let\'s Encrypt TLS)' },
+  { value: 'ssl_direct', label: 'SSL Direct (Container Direct TLS Termination)' },
+  { value: 'no_ssl', label: 'No SSL / Direct Host Port (Direct TCP/UDP — Required for Lavalink audio, game servers, raw sockets)' },
 ];
 
 export interface ConnectedGitAccount {
@@ -57,8 +66,8 @@ export default function DeploymentsPage() {
   return (
     <div className="space-y-8 animate-fade-in">
       <PageHeader
-        title="Custom Application Deployments"
-        description="Connect multiple GitHub or GitLab accounts to deploy public &amp; private repositories seamlessly via Railpack."
+        title="Custom Application & Bot Deployments"
+        description="Deploy WhatsApp bots, Discord bots, Lavalink music servers, Next.js web apps, and custom scripts with full control over start commands and port exposure."
       />
 
       {error && <ErrorBanner message={error} />}
@@ -106,12 +115,15 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
   const [preferredName, setPreferredName] = useState('');
   const [customSubdomain, setCustomSubdomain] = useState('');
   const [internalPort, setInternalPort] = useState('3000');
+  const [startCommand, setStartCommand] = useState('');
+  const [entryFile, setEntryFile] = useState('');
+  const [exposureMode, setExposureMode] = useState('ssl_with_proxy');
   const [deploying, setDeploying] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const isPublic = serviceType === 'web_hosting' || serviceType === 'node_hosting' || serviceType === 'python_hosting';
+  const isPublic = exposureMode !== 'no_ssl' && serviceType !== 'discordbot_node' && serviceType !== 'discordbot_python';
 
   function loadAccounts() {
     api.git.accounts().then((res) => {
@@ -232,6 +244,9 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
           preferredName,
           customSubdomain: customSubdomain.trim() || undefined,
           internalPort: Number(internalPort),
+          startCommand: startCommand.trim() || undefined,
+          entryFile: entryFile.trim() || undefined,
+          exposureMode: exposureMode || 'ssl_with_proxy',
         },
         (event: BuildEvent) => {
           if (event.log) setLog((prev) => [...prev, event.log!]);
@@ -259,7 +274,7 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
         🚀 Deploy Repository (GitHub App &amp; GitLab Multi-Account Support)
       </h2>
       <p className="text-xs text-text-muted mb-4">
-        Connect your GitHub or GitLab account (no personal access tokens needed) to pick repositories directly from an account dropdown, or deploy any public Git URL.
+        Connect your GitHub or GitLab account to pick repositories directly from an account dropdown, or deploy any public Git URL.
       </p>
 
       {error && <div className="mb-4"><ErrorBanner message={error} /></div>}
@@ -381,7 +396,29 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
             <label className="text-xs font-medium text-text-muted">Application Type &amp; Framework</label>
             <select
               value={serviceType}
-              onChange={(e) => setServiceType(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setServiceType(val);
+                if (val === 'lavalink') {
+                  setInternalPort('2333');
+                  setStartCommand('java -jar Lavalink.jar');
+                  setEntryFile('application.yml');
+                  setExposureMode('no_ssl');
+                } else if (val === 'whatsapp_baileys') {
+                  setInternalPort('3000');
+                  setStartCommand('node index.js');
+                  setEntryFile('index.js');
+                  setExposureMode('ssl_with_proxy');
+                } else if (val === 'discordbot_node') {
+                  setStartCommand('node index.js');
+                  setEntryFile('index.js');
+                  setExposureMode('no_ssl');
+                } else if (val === 'discordbot_python') {
+                  setStartCommand('python bot.py');
+                  setEntryFile('bot.py');
+                  setExposureMode('no_ssl');
+                }
+              }}
               className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-accent-violet transition-all"
             >
               {SERVICE_TYPES.map((t) => (
@@ -447,17 +484,59 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
           />
         </div>
 
-        {isPublic && (
-          <Input
-            required
-            type="number"
-            label="Internal Application Listening Port"
-            placeholder="3000"
-            value={internalPort}
-            onChange={(e) => setInternalPort(e.target.value)}
-            hint="Port specified in your package.json or web server (e.g. 3000, 8080, 5000)."
-          />
-        )}
+        {/* Advanced Bot & Hosting Configuration */}
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-4">
+          <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Advanced Bot &amp; Container Settings
+          </h3>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <Input
+              label="Custom Start Command (Optional)"
+              placeholder="e.g. java -jar Lavalink.jar, node index.js, python bot.py, npm start"
+              value={startCommand}
+              onChange={(e) => setStartCommand(e.target.value)}
+              hint="Override container default start command (e.g. java -Xmx1024M -jar Lavalink.jar)."
+            />
+
+            <Input
+              label="Entry / Config File (Optional)"
+              placeholder="e.g. application.yml, index.js, bot.py"
+              value={entryFile}
+              onChange={(e) => setEntryFile(e.target.value)}
+              hint="Specify entrypoint or primary config file (e.g. application.yml for Lavalink)."
+            />
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-text-muted">Exposure &amp; SSL Routing Mode</label>
+              <select
+                value={exposureMode}
+                onChange={(e) => setExposureMode(e.target.value)}
+                className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-accent-violet transition-all"
+              >
+                {EXPOSURE_MODES.map((m) => (
+                  <option key={m.value} value={m.value} className="bg-bg text-white">
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {isPublic && (
+              <Input
+                required
+                type="number"
+                label="Internal Application Listening Port"
+                placeholder="3000"
+                value={internalPort}
+                onChange={(e) => setInternalPort(e.target.value)}
+                hint="Port specified in package.json, application.yml, or web server (e.g. 3000, 2333, 8080)."
+              />
+            )}
+          </div>
+        </div>
 
         <Button type="submit" loading={deploying} className="w-full justify-center bg-brand-gradient">
           {deploying ? 'Building Container...' : '🚀 Deploy Application via Railpack →'}
@@ -557,7 +636,7 @@ function DeploymentRow({ deployment, onChanged }: { deployment: Deployment; onCh
     <Card className="border border-white/[0.06] hover:border-white/12 transition-all">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <p className="font-semibold text-text-primary text-sm">
               {deployment.subdomain ? `${deployment.subdomain}.shanutechx.com` : deployment.repoUrl ?? deployment.id}
             </p>
@@ -566,10 +645,25 @@ function DeploymentRow({ deployment, onChanged }: { deployment: Deployment; onCh
                 {deployment.customDomain}
               </span>
             )}
+            {deployment.exposureMode && (
+              <span className={`text-[10px] rounded-full px-2 py-0.5 font-medium ${
+                deployment.exposureMode === 'no_ssl'
+                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+              }`}>
+                {deployment.exposureMode === 'no_ssl' ? 'Direct TCP (No SSL)' : deployment.exposureMode === 'ssl_direct' ? 'SSL Direct' : 'SSL Proxy'}
+              </span>
+            )}
           </div>
-          <p className="text-text-faint text-xs mt-1 font-mono">
-            {deployment.node?.label ? `Cluster Node: ${deployment.node.label}` : 'Deploying...'}
-          </p>
+          <div className="flex items-center gap-3 text-text-faint text-xs mt-1 font-mono flex-wrap">
+            <span>{deployment.node?.label ? `Cluster Node: ${deployment.node.label}` : 'Deploying...'}</span>
+            {deployment.startCommand && (
+              <span className="text-text-muted">Cmd: <code className="text-emerald-300">{deployment.startCommand}</code></span>
+            )}
+            {deployment.entryFile && (
+              <span className="text-text-muted">Entry: <code className="text-cyan-300">{deployment.entryFile}</code></span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Badge status={deployment.status} dot />
