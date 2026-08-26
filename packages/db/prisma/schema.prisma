@@ -1171,6 +1171,46 @@ model StatusPageConfig {
   updatedAt         DateTime @updatedAt
 }
 
+model SystemComponent {
+  id           String   @id @default(cuid())
+  name         String
+  group        String   // "Core Platform" | "Compute & Edge" | "Databases & Storage" | "Email & Messaging"
+  description  String?
+  status       String   @default("operational") // operational | degraded | partial_outage | major_outage | maintenance
+  uptimePct90d Float    @default(99.99)
+  order        Int      @default(0)
+  isPublic     Boolean  @default(true)
+  history90d   Json?    // Array of { date: string, status: string, uptimePct: number, note?: string }
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ScheduledMaintenance {
+  id                 String   @id @default(cuid())
+  title              String
+  description        String   @db.Text
+  impact             String   @default("minor") // minor | major | critical | none
+  status             String   @default("scheduled") // scheduled | in_progress | completed | cancelled
+  scheduledStart     DateTime
+  scheduledEnd       DateTime
+  affectedComponents String[] @default([])
+  updates            Json?    // Array of { timestamp: string, message: string }
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model StatusSubscriber {
+  id          String   @id @default(cuid())
+  type        String   // "email" | "webhook" | "push"
+  target      String   // email or webhook URL
+  secretToken String   @unique
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([target, type])
+}
+
 enum IncidentSeverity {
   informational
   degraded_performance
