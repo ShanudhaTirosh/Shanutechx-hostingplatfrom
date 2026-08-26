@@ -170,9 +170,12 @@ export default function AdminStatusStudioPage() {
           <button
             onClick={loadStatus}
             disabled={loading}
-            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition-all"
+            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center gap-2"
           >
-            {loading ? '↻ Loading...' : '↻ Refresh Data'}
+            <svg className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {loading ? 'Loading...' : 'Refresh Data'}
           </button>
         </div>
       </div>
@@ -180,14 +183,22 @@ export default function AdminStatusStudioPage() {
       {actionMessage && (
         <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex justify-between items-center">
           <span>{actionMessage}</span>
-          <button onClick={() => setActionMessage(null)} className="font-bold text-emerald-400">✕</button>
+          <button onClick={() => setActionMessage(null)} className="p-1 hover:bg-emerald-500/20 rounded">
+            <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       )}
 
       {error && (
         <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex justify-between items-center">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="font-bold text-red-400">✕</button>
+          <button onClick={() => setError(null)} className="p-1 hover:bg-red-500/20 rounded">
+            <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       )}
 

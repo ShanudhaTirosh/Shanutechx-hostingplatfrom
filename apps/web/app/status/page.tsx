@@ -62,7 +62,11 @@ const STATUS_CONFIG = {
     badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     barColor: 'bg-emerald-400 hover:bg-emerald-300',
     dot: 'bg-emerald-400',
-    icon: '✔',
+    iconSvg: (
+      <svg className="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+      </svg>
+    ),
   },
   degraded: {
     label: 'Degraded Performance',
@@ -71,7 +75,11 @@ const STATUS_CONFIG = {
     badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
     barColor: 'bg-amber-400 hover:bg-amber-300',
     dot: 'bg-amber-400',
-    icon: '⚠️',
+    iconSvg: (
+      <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    ),
   },
   partial_outage: {
     label: 'Partial System Outage',
@@ -80,7 +88,11 @@ const STATUS_CONFIG = {
     badge: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
     barColor: 'bg-orange-400 hover:bg-orange-300',
     dot: 'bg-orange-400',
-    icon: '⚡',
+    iconSvg: (
+      <svg className="w-6 h-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    ),
   },
   major_outage: {
     label: 'Major System Outage',
@@ -89,7 +101,11 @@ const STATUS_CONFIG = {
     badge: 'bg-red-500/20 text-red-300 border-red-500/30',
     barColor: 'bg-red-500 hover:bg-red-400',
     dot: 'bg-red-500',
-    icon: '✖',
+    iconSvg: (
+      <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    ),
   },
   maintenance: {
     label: 'Scheduled Maintenance In Progress',
@@ -98,7 +114,12 @@ const STATUS_CONFIG = {
     badge: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
     barColor: 'bg-sky-400 hover:bg-sky-300',
     dot: 'bg-sky-400',
-    icon: '🔧',
+    iconSvg: (
+      <svg className="w-6 h-6 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
   },
 };
 
@@ -216,8 +237,8 @@ export default function PublicStatusPage() {
         {/* Top Overall Status Banner */}
         <div className={`bg-gradient-to-r ${overall.bannerBg} border rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden`}>
           <div className="flex items-start sm:items-center gap-4 z-10">
-            <div className={`h-12 w-12 rounded-2xl ${overall.badge} flex items-center justify-center text-xl font-bold border shadow-inner shrink-0`}>
-              {overall.icon}
+            <div className={`h-12 w-12 rounded-2xl ${overall.badge} flex items-center justify-center border shadow-inner shrink-0`}>
+              {overall.iconSvg}
             </div>
             <div>
               <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">{overall.label}</h2>
@@ -331,7 +352,10 @@ export default function PublicStatusPage() {
         <div className="space-y-4 pt-4">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <h3 className="text-base font-extrabold text-white tracking-tight flex items-center gap-2">
-              <span className="text-sky-400">🔧</span>
+              <svg className="w-5 h-5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
               Scheduled Maintenance
             </h3>
             <span className="text-xs text-slate-400 font-mono">Planned Windows</span>
@@ -381,7 +405,9 @@ export default function PublicStatusPage() {
         <div className="space-y-4 pt-4">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <h3 className="text-base font-extrabold text-white tracking-tight flex items-center gap-2">
-              <span className="text-purple-400">📜</span>
+              <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
               Past Incidents &amp; Event Logs
             </h3>
             <span className="text-xs text-slate-400 font-mono">Last 15 Days</span>
@@ -431,9 +457,11 @@ export default function PublicStatusPage() {
           <div className="bg-[#0b0e20] border border-white/20 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl relative">
             <button
               onClick={() => setShowSubscribeModal(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-white text-lg font-bold"
+              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-all"
             >
-              ✕
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
 
             <div>
@@ -445,15 +473,21 @@ export default function PublicStatusPage() {
             <div className="flex p-1 bg-black/40 rounded-xl border border-white/10 font-medium text-xs">
               <button
                 onClick={() => setSubType('email')}
-                className={`flex-1 py-2 rounded-lg transition-all ${subType === 'email' ? 'bg-purple-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'}`}
+                className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${subType === 'email' ? 'bg-purple-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'}`}
               >
-                ✉ Email
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Email
               </button>
               <button
                 onClick={() => setSubType('webhook')}
-                className={`flex-1 py-2 rounded-lg transition-all ${subType === 'webhook' ? 'bg-purple-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'}`}
+                className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${subType === 'webhook' ? 'bg-purple-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'}`}
               >
-                🔗 Webhook
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                Webhook
               </button>
             </div>
 
