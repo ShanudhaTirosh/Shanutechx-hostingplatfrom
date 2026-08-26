@@ -479,6 +479,7 @@ function ClientTeamTab() {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'developer' | 'billing' | 'viewer'>('developer');
+  const [resourcePermissions, setResourcePermissions] = useState<Record<string, 'manage' | 'view' | 'none'>>({});
   const [generatedInviteLink, setGeneratedInviteLink] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
 
@@ -531,11 +532,21 @@ function ClientTeamTab() {
     if (!selectedTeamId || !inviteEmail.trim()) return;
     setInviting(true);
     try {
+      const permsArray: any[] = [];
+      Object.entries(resourcePermissions).forEach(([key, val]) => {
+        const [resourceType, resourceId] = key.split(':');
+        if (val && val !== 'none') {
+          permsArray.push({ resourceType, resourceId, permission: val });
+        }
+      });
+
       const res = await api.teams.invite(selectedTeamId, {
         email: inviteEmail.trim(),
         role: inviteRole,
+        resourcePermissions: permsArray.length > 0 ? permsArray : undefined,
       });
-      toast(`Invite token created for ${inviteEmail}`, 'success');
+
+      toast(`Invitation email automatically sent to ${inviteEmail}`, 'success');
       setGeneratedInviteLink(res.inviteLink);
       setInviteEmail('');
       if (selectedTeamId) api.teams.get(selectedTeamId).then(setTeamDetail);
@@ -567,7 +578,7 @@ function ClientTeamTab() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-text-primary">Team Management &amp; Role-Based Access Control (RBAC)</h3>
-          <p className="text-xs text-text-muted">Invite team members to manage deployments, databases, VPS, and SMTP servers with granular permissions.</p>
+          <p className="text-xs text-text-muted">Invite team members via email or unique link to manage deployments, databases, VPS, and SMTP servers with granular permissions.</p>
         </div>
 
         {allTeams.length > 0 && (
@@ -599,13 +610,19 @@ function ClientTeamTab() {
               <button
                 key={t.id}
                 onClick={() => setSelectedTeamId(t.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 flex items-center gap-2 ${
                   selectedTeamId === t.id
                     ? 'bg-indigo-600 text-white shadow-glow-violet'
                     : 'glass text-text-muted hover:text-white'
                 }`}
               >
-                👥 {t.name}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                {t.name}
               </button>
             ))}
           </div>
@@ -629,7 +646,7 @@ function ClientTeamTab() {
                     <div key={m.id} className="flex items-center justify-between bg-white/[0.02] border border-white/[0.06] rounded-xl p-3.5">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-indigo-600/30 text-indigo-300 font-bold flex items-center justify-center text-xs">
-                          {m.user.displayName ? m.user.displayName[0] : m.user.email[0]}
+                          {m.user.displayName ? m.user.displayName[0].toUpperCase() : m.user.email[0].toUpperCase()}
                         </div>
                         <div>
                           <p className="text-xs font-bold text-white">{m.user.displayName || m.user.email}</p>
@@ -661,17 +678,63 @@ function ClientTeamTab() {
                 <Card className="border border-white/[0.06] p-5 space-y-3">
                   <h4 className="font-bold text-sm text-white">Pending Invitations ({teamDetail.team.invites.length})</h4>
                   <div className="space-y-2">
-                    {teamDetail.team.invites.map((inv: any) => (
-                      <div key={inv.id} className="flex items-center justify-between text-xs p-3 glass rounded-xl border border-white/[0.06]">
-                        <div>
-                          <span className="font-bold text-white font-mono">{inv.email}</span>
-                          <span className="text-text-muted ml-2">Role: {inv.role}</span>
+                    {teamDetail.team.invites.map((inv: any) => {
+                      const inviteUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/team/accept?token=${inv.token}`;
+                      return (
+                        <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs p-3 glass rounded-xl border border-white/[0.06]">
+                          <div>
+                            <span className="font-bold text-white font-mono">{inv.email}</span>
+                            <span className="text-text-muted ml-2">Role: <strong className="text-indigo-300 uppercase">{inv.role}</strong></span>
+                            <span className="ml-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300">
+                              {inv.status}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(inviteUrl);
+                                toast('Unique invitation URL copied!', 'success');
+                              }}
+                              className="px-2.5 py-1 glass rounded text-[11px] font-semibold text-white hover:bg-white/10 transition-colors"
+                            >
+                              Copy URL
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await api.teams.resendInvite(selectedTeamId!, inv.id);
+                                  toast(`Invitation email re-sent to ${inv.email}`, 'success');
+                                } catch (err: any) {
+                                  toast(err.message, 'error');
+                                }
+                              }}
+                              className="px-2.5 py-1 glass rounded text-[11px] font-semibold text-indigo-300 hover:bg-white/10 transition-colors"
+                            >
+                              Resend Email
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!confirm(`Revoke invitation for ${inv.email}?`)) return;
+                                try {
+                                  await api.teams.revokeInvite(selectedTeamId!, inv.id);
+                                  toast('Invitation revoked', 'success');
+                                  if (selectedTeamId) api.teams.get(selectedTeamId).then(setTeamDetail);
+                                } catch (err: any) {
+                                  toast(err.message, 'error');
+                                }
+                              }}
+                              className="px-2.5 py-1 rounded text-[11px] font-semibold bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors"
+                            >
+                              Revoke
+                            </button>
+                          </div>
                         </div>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300">
-                          {inv.status}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </Card>
               )}
@@ -730,9 +793,62 @@ function ClientTeamTab() {
               </select>
             </div>
 
+            {/* Granular Resource Permissions Selection Matrix */}
+            {teamDetail && (
+              <div className="space-y-2 border-t border-white/10 pt-3">
+                <label className="text-xs font-bold text-white">Granular Resource Permissions (Optional)</label>
+                <p className="text-[11px] text-text-muted">Grant specific manage or view permissions per resource item:</p>
+                <div className="max-h-44 overflow-y-auto space-y-2 pr-1">
+                  {teamDetail.resources.deployments.map((d: any) => (
+                    <div key={d.id} className="flex items-center justify-between text-xs glass p-2 rounded-lg">
+                      <span className="font-mono text-text-muted truncate max-w-[200px]">Deployment: {d.subdomain}</span>
+                      <select
+                        value={resourcePermissions[`deployment:${d.id}`] || 'manage'}
+                        onChange={(e) => setResourcePermissions({ ...resourcePermissions, [`deployment:${d.id}`]: e.target.value as any })}
+                        className="bg-black/50 border border-white/10 rounded px-2 py-1 text-[11px] text-white"
+                      >
+                        <option value="manage">Manage</option>
+                        <option value="view">View</option>
+                        <option value="none">None</option>
+                      </select>
+                    </div>
+                  ))}
+                  {teamDetail.resources.databases.map((db: any) => (
+                    <div key={db.id} className="flex items-center justify-between text-xs glass p-2 rounded-lg">
+                      <span className="font-mono text-text-muted truncate max-w-[200px]">DB ({db.type}): {db.internalHost || db.id}</span>
+                      <select
+                        value={resourcePermissions[`managed_database:${db.id}`] || 'manage'}
+                        onChange={(e) => setResourcePermissions({ ...resourcePermissions, [`managed_database:${db.id}`]: e.target.value as any })}
+                        className="bg-black/50 border border-white/10 rounded px-2 py-1 text-[11px] text-white"
+                      >
+                        <option value="manage">Manage</option>
+                        <option value="view">View</option>
+                        <option value="none">None</option>
+                      </select>
+                    </div>
+                  ))}
+                  {teamDetail.resources.vpsInstances.map((v: any) => (
+                    <div key={v.id} className="flex items-center justify-between text-xs glass p-2 rounded-lg">
+                      <span className="font-mono text-text-muted truncate max-w-[200px]">VPS: {v.provider} ({v.id.slice(0, 8)})</span>
+                      <select
+                        value={resourcePermissions[`vps:${v.id}`] || 'manage'}
+                        onChange={(e) => setResourcePermissions({ ...resourcePermissions, [`vps:${v.id}`]: e.target.value as any })}
+                        className="bg-black/50 border border-white/10 rounded px-2 py-1 text-[11px] text-white"
+                      >
+                        <option value="manage">Manage</option>
+                        <option value="view">View</option>
+                        <option value="none">None</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {generatedInviteLink && (
               <div className="bg-black/50 border border-emerald-500/30 rounded-xl p-3 space-y-2">
-                <p className="text-xs font-bold text-emerald-400">✅ Invitation Created!</p>
+                <p className="text-xs font-bold text-emerald-400">Invitation Email Dispatched Automatically!</p>
+                <p className="text-[11px] text-text-muted">You can also copy the unique invitation link directly below:</p>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
@@ -744,9 +860,9 @@ function ClientTeamTab() {
                     type="button"
                     onClick={() => {
                       navigator.clipboard.writeText(generatedInviteLink);
-                      toast('Invitation link copied!', 'success');
+                      toast('Invitation link copied to clipboard!', 'success');
                     }}
-                    className="px-2.5 py-1 bg-emerald-600 text-white rounded text-xs font-bold shrink-0"
+                    className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold shrink-0 hover:bg-emerald-500 transition-colors"
                   >
                     Copy Link
                   </button>
@@ -758,7 +874,7 @@ function ClientTeamTab() {
               <Button type="button" variant="ghost" size="sm" onClick={() => { setInviteModalOpen(false); setGeneratedInviteLink(null); }}>
                 Close
               </Button>
-              <Button type="submit" size="sm" loading={inviting}>Generate Invite Token</Button>
+              <Button type="submit" size="sm" loading={inviting}>Send Email &amp; Generate Link</Button>
             </div>
           </form>
         </Modal>

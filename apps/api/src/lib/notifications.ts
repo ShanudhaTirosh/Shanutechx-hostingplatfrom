@@ -62,7 +62,7 @@ export async function notifyCustomer(user: NotifiableUser, message: string): Pro
   await Promise.all(sends);
 }
 
-import { renderNotificationEmail } from './emailTemplates';
+import { renderNotificationEmail, renderTeamInviteEmail } from './emailTemplates';
 import { sendSmtpEmail } from './smtpDispatcher';
 
 async function sendEmailFallback(email: string, message: string, customHtml?: string, customSubject?: string): Promise<void> {
@@ -112,6 +112,23 @@ async function sendEmailFallback(email: string, message: string, customHtml?: st
   } catch (smtpErr) {
     logger.error({ smtpErr, email }, 'All email delivery mechanisms failed for customer notification');
   }
+}
+
+export async function sendTeamInviteNotification({
+  email,
+  teamName,
+  inviterName,
+  role,
+  inviteLink,
+}: {
+  email: string;
+  teamName: string;
+  inviterName: string;
+  role: string;
+  inviteLink: string;
+}): Promise<void> {
+  const rendered = renderTeamInviteEmail({ teamName, inviterName, role, inviteLink });
+  await sendEmailFallback(email, rendered.text, rendered.html, rendered.subject);
 }
 
 /**

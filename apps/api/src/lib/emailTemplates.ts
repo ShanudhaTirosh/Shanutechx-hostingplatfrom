@@ -203,3 +203,44 @@ export function renderNotificationEmail({
 
   return { subject, html, text };
 }
+
+export function renderTeamInviteEmail({
+  teamName,
+  inviterName,
+  role,
+  inviteLink,
+}: {
+  teamName: string;
+  inviterName: string;
+  role: string;
+  inviteLink: string;
+}): { subject: string; html: string; text: string } {
+  const safeTeam = escapeHtml(teamName);
+  const safeInviter = escapeHtml(inviterName);
+  const safeRole = escapeHtml(role.toUpperCase());
+  const safeLink = escapeHtml(inviteLink);
+
+  const subject = `You've been invited to join ${teamName} on ShanuTechX`;
+
+  const html = baseEmailLayout(
+    subject,
+    `
+    <div class="status-badge status-info">Team Invitation</div>
+    <h1>You're invited to join ${safeTeam}!</h1>
+    <p><strong>${safeInviter}</strong> has invited you to join the <strong>${safeTeam}</strong> workspace on ShanuTechX with the role of <strong>${safeRole}</strong>.</p>
+    
+    <div class="quote-box">
+      <strong>Assigned Role:</strong> ${safeRole}<br/>
+      <strong>Access Granted:</strong> Granular workspace &amp; resource permissions managed by ${safeTeam}.
+    </div>
+
+    <p>Click the button below to accept the invitation. If you don't have a ShanuTechX account yet, you can sign in directly with Google or Email to claim your spot.</p>
+
+    <a href="${safeLink}" class="btn">Accept Team Invitation →</a>
+  `
+  );
+
+  const text = `${inviterName} has invited you to join ${teamName} on ShanuTechX as ${role}.\n\nAccept your invitation here:\n${inviteLink}`;
+
+  return { subject, html, text };
+}

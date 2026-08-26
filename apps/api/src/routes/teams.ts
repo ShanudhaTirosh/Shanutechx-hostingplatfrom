@@ -1,10 +1,45 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
+import { sendTeamInviteNotification } from '../lib/notifications';
 
 export const teamsRouter = Router();
+
+/**
+ * GET /api/teams/public/invites/:token
+ * Public unauthenticated endpoint to inspect invitation details before login/signup.
+ */
+teamsRouter.get('/teams/public/invites/:token', async (req: Request, res: Response) => {
+  const token = req.params.token;
+  const invite = await prisma.teamInvite.findUnique({
+    where: { token },
+    include: {
+      team: { include: { owner: { select: { id: true, displayName: true, email: true } } } },
+      invitedByUser: { select: { id: true, displayName: true, email: true } },
+    },
+  });
+
+  if (!invite) return res.status(404).json({ error: 'Invalid or expired invitation token' });
+  if (invite.status !== 'pending' || invite.expiresAt < new Date()) {
+    return res.status(410).json({ error: 'This invitation link has expired or has already been used' });
+  }
+
+  res.json({
+    id: invite.id,
+    teamId: invite.teamId,
+    teamName: invite.team.name,
+    inviterName: invite.invitedByUser.displayName || invite.invitedByUser.email,
+    inviterEmail: invite.invitedByUser.email,
+    email: invite.email,
+    role: invite.role,
+    resourcePermissions: invite.resourcePermissions,
+    expiresAt: invite.expiresAt,
+    status: invite.status,
+  });
+});
+
 teamsRouter.use(requireAuth);
 
 /**
@@ -147,6 +182,7 @@ teamsRouter.get('/teams/:id', async (req: AuthedRequest, res) => {
 /**
  * POST /api/teams/:id/invites
  * Invite a new member by email with a role and optional per-resource permissions.
+ * Automatically dispatches an email notification to the target email.
  */
 teamsRouter.post('/teams/:id/invites', async (req: AuthedRequest, res) => {
   const inviteSchema = z.object({
@@ -169,7 +205,7 @@ teamsRouter.post('/teams/:id/invites', async (req: AuthedRequest, res) => {
 
   const team = await prisma.team.findUnique({
     where: { id: teamId },
-    include: { members: true },
+    include: { members: true, owner: { select: { displayName: true, email: true } } },
   });
 
   if (!team) return res.status(404).json({ error: 'Team not found' });
@@ -198,18 +234,100 @@ teamsRouter.post('/teams/:id/invites', async (req: AuthedRequest, res) => {
     data: inviteData,
   });
 
-  const inviteLink = `${process.env.APP_URL || 'http://localhost:3000'}/team/accept?token=${token}`;
+  const appBaseUrl = process.env.APP_URL || 'http://localhost:3000';
+  const inviteLink = `${appBaseUrl}/team/accept?token=${token}`;
+  const inviterName = req.user!.displayName || req.user!.email;
+
+  // Dispatch background email notification automatically
+  sendTeamInviteNotification({
+    email: parsed.data.email.toLowerCase(),
+    teamName: team.name,
+    inviterName,
+    role: parsed.data.role,
+    inviteLink,
+  }).catch((err) => {
+    console.error('Failed to send team invite email:', err);
+  });
 
   res.status(201).json({
     invite,
     inviteLink,
-    message: `Invitation generated for ${parsed.data.email}`,
+    message: `Invitation email sent automatically to ${parsed.data.email}`,
   });
 });
 
 /**
+ * POST /api/teams/:id/invites/:inviteId/resend
+ * Resend an invitation email.
+ */
+teamsRouter.post('/teams/:id/invites/:inviteId/resend', async (req: AuthedRequest, res) => {
+  const userId = req.user!.id;
+  const { id: teamId, inviteId } = req.params;
+
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    include: { members: true },
+  });
+
+  if (!team) return res.status(404).json({ error: 'Team not found' });
+
+  const invite = await prisma.teamInvite.findUnique({
+    where: { id: inviteId },
+  });
+
+  if (!invite || invite.teamId !== teamId) {
+    return res.status(404).json({ error: 'Invitation not found' });
+  }
+
+  const isOwner = team.ownerId === userId;
+  const myMembership = team.members.find((m: any) => m.userId === userId);
+  const canInvite = isOwner || myMembership?.role === 'admin' || req.user!.role === 'dev';
+
+  if (!canInvite) return res.status(403).json({ error: 'Permission denied' });
+
+  const appBaseUrl = process.env.APP_URL || 'http://localhost:3000';
+  const inviteLink = `${appBaseUrl}/team/accept?token=${invite.token}`;
+  const inviterName = req.user!.displayName || req.user!.email;
+
+  await sendTeamInviteNotification({
+    email: invite.email,
+    teamName: team.name,
+    inviterName,
+    role: invite.role,
+    inviteLink,
+  });
+
+  res.json({ ok: true, message: `Invitation email re-sent to ${invite.email}` });
+});
+
+/**
+ * DELETE /api/teams/:id/invites/:inviteId
+ * Revoke/delete a pending team invitation.
+ */
+teamsRouter.delete('/teams/:id/invites/:inviteId', async (req: AuthedRequest, res) => {
+  const userId = req.user!.id;
+  const { id: teamId, inviteId } = req.params;
+
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    include: { members: true },
+  });
+
+  if (!team) return res.status(404).json({ error: 'Team not found' });
+
+  const isOwner = team.ownerId === userId;
+  const myMembership = team.members.find((m: any) => m.userId === userId);
+  const canRevoke = isOwner || myMembership?.role === 'admin' || req.user!.role === 'dev';
+
+  if (!canRevoke) return res.status(403).json({ error: 'Permission denied' });
+
+  await prisma.teamInvite.delete({ where: { id: inviteId } });
+  res.json({ ok: true, deletedId: inviteId });
+});
+
+/**
  * GET /api/teams/invites/accept/:token
- * Inspect an invitation token.
+ * Inspect an invitation token (Authenticated version).
  */
 teamsRouter.get('/teams/invites/accept/:token', async (req: AuthedRequest, res) => {
   const invite = await prisma.teamInvite.findUnique({

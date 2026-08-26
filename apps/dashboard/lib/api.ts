@@ -752,6 +752,14 @@ export const api = {
       apiFetch(`/api/teams/${teamId}/members/${memberId}`, { method: 'DELETE' }).then((r) =>
         asJson<{ ok: boolean; deletedId: string }>(r)
       ),
+    resendInvite: (teamId: string, inviteId: string) =>
+      apiFetch(`/api/teams/${teamId}/invites/${inviteId}/resend`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; message: string }>(r)
+      ),
+    revokeInvite: (teamId: string, inviteId: string) =>
+      apiFetch(`/api/teams/${teamId}/invites/${inviteId}`, { method: 'DELETE' }).then((r) =>
+        asJson<{ ok: boolean; deletedId: string }>(r)
+      ),
   },
 
   leaseweb: {
