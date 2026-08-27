@@ -556,17 +556,20 @@ model SmtpAccount {
   // some SMTP-only packages (transactional sending) have no mailbox/webmail
   // at all, just SMTP credentials, so this is deliberately nullable.
   webmailUrl    String?
-  storageQuotaMb Int     @default(5120)
+  storageQuotaMb Int     @default(1024)
   dailySendLimit Int     @default(1000)
   storageUsedMb  Int     @default(0)
   dailySendCount Int     @default(0)
   createdAt     DateTime @default(now())
+  expiresAt     DateTime?
+  isSuspended   Boolean  @default(false)
   webmailMessages WebmailMessage[]
 
   // Per-account custom domain + alias list + plan tier
 
   customDomain  String?
   aliases       String[] @default([])
+  maxAliases    Int      @default(10)
   planTier      String   @default("pro")
   allowedAdminIds String[] @default([]) // Dev-assigned admin user IDs allowed to read/write/send via this mailbox
 }

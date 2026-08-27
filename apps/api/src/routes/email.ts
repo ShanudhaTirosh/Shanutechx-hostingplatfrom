@@ -37,14 +37,21 @@ emailRouter.get('/email/mailboxes', async (req: AuthedRequest, res) => {
       },
     });
 
+    const now = new Date();
+
     const mailboxes = accounts.map((acc: any) => {
-      const planName = acc.orderItem?.plan?.name || 'Shared Mail Plan';
+      const planName = acc.orderItem?.plan?.name || 'Business Email';
       const orderStatus = acc.orderItem?.order?.status;
-      const domain = acc.smtpHost.replace(/^mail\./, '');
+      const domain = acc.customDomain || acc.smtpHost.replace(/^mail\./, '');
+      const isExpired = acc.expiresAt ? new Date(acc.expiresAt) < now : false;
+      const isSuspended = acc.isSuspended || isExpired;
+      const status = isSuspended ? 'expired' : (orderStatus ? (orderStatus === 'paid' ? 'active' : 'pending') : 'active');
+
       return {
         id: acc.id,
         email: `${acc.smtpUsername}@${domain}`,
         username: acc.smtpUsername,
+        domain,
         smtpHost: acc.smtpHost,
         smtpPort: acc.smtpPort,
         sslPort: 465,
@@ -52,7 +59,13 @@ emailRouter.get('/email/mailboxes', async (req: AuthedRequest, res) => {
         storageQuotaMb: acc.storageQuotaMb,
         dailySendCount: acc.dailySendCount,
         dailySendLimit: acc.dailySendLimit,
-        status: orderStatus ? (orderStatus === 'paid' ? 'active' : 'pending') : 'active',
+        aliases: acc.aliases || [],
+        maxAliases: acc.maxAliases || 10,
+        allowedAdminIds: acc.allowedAdminIds || [],
+        expiresAt: acc.expiresAt ? acc.expiresAt.toISOString() : null,
+        isExpired,
+        isSuspended,
+        status,
         planName,
         webmailUrl: acc.webmailUrl || (process.env.NODE_ENV === 'production' ? `https://mail.${env.rootDomain}` : 'http://localhost:3001/email'),
         createdAt: acc.createdAt.toISOString(),
@@ -107,15 +120,17 @@ const adminProvisionSchema = z.object({
   username: z.string().min(3),
   domain: z.string().optional(),
   password: z.string().min(8),
-  storageQuotaMb: z.number().int().positive().default(5120),
+  storageQuotaMb: z.number().int().positive().default(1024),
   dailySendLimit: z.number().int().positive().default(1000),
+  maxAliases: z.number().int().positive().default(10),
+  allowedAdminIds: z.array(z.string()).optional(),
 });
 
 emailRouter.post('/admin/email/provision', requireAdminOrDev, async (req: AuthedRequest, res) => {
   const parse = adminProvisionSchema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: 'Invalid provisioning data', details: parse.error.format() });
 
-  const { targetUserId, username, domain, password, storageQuotaMb, dailySendLimit } = parse.data;
+  const { targetUserId, username, domain, password, storageQuotaMb, dailySendLimit, maxAliases, allowedAdminIds } = parse.data;
 
   // Verify target user exists
   const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
@@ -125,6 +140,8 @@ emailRouter.post('/admin/email/provision', requireAdminOrDev, async (req: Authed
   const smtpHost = `mail.${domainStr}`;
   const credentialRef = encryptSecret(password, env.secretsEncryptionKey);
   const webmailUrl = process.env.NODE_ENV === 'production' ? `https://mail.${domainStr}` : 'http://localhost:3001/email';
+  // Dev/Admin assigned mailboxes have permanent access (expiresAt: null)
+  const expiresAt = null;
 
   try {
     const newAccount = await prisma.smtpAccount.create({
@@ -138,6 +155,11 @@ emailRouter.post('/admin/email/provision', requireAdminOrDev, async (req: Authed
         webmailUrl,
         storageQuotaMb,
         dailySendLimit,
+        maxAliases,
+        allowedAdminIds: allowedAdminIds || [],
+        customDomain: domainStr,
+        expiresAt,
+        isSuspended: false,
         storageUsedMb: 0,
         dailySendCount: 0,
       },
@@ -150,11 +172,11 @@ emailRouter.post('/admin/email/provision', requireAdminOrDev, async (req: Authed
       data: {
         adminId: req.user!.id,
         action: 'email.admin_provision',
-        target: `Provisioned mail account ${username}@${domainStr} for ${targetUser.email} (Quota: ${storageQuotaMb}MB, Limit: ${dailySendLimit}/day)`,
+        target: `Provisioned mail account ${username}@${domainStr} for ${targetUser.email} (Quota: ${storageQuotaMb}MB, Limit: ${dailySendLimit}/day, Assigned by Dev/Admin)`,
       },
     });
 
-    logger.info({ adminId: req.user!.id, targetUserId, username }, 'Admin provisioned new SMTP account');
+    logger.info({ adminId: req.user!.id, targetUserId, username }, 'Admin provisioned new SMTP account with permanent dev assignment');
 
     res.status(201).json({
       mailbox: {
@@ -168,6 +190,11 @@ emailRouter.post('/admin/email/provision', requireAdminOrDev, async (req: Authed
         storageQuotaMb,
         dailySendCount: 0,
         dailySendLimit,
+        maxAliases,
+        allowedAdminIds: newAccount.allowedAdminIds,
+        expiresAt: null,
+        isExpired: false,
+        isSuspended: false,
         status: 'active',
         webmailUrl,
         createdAt: newAccount.createdAt.toISOString(),
@@ -175,7 +202,7 @@ emailRouter.post('/admin/email/provision', requireAdminOrDev, async (req: Authed
         userEmail: targetUser.email,
         userDisplayName: targetUser.displayName,
       },
-      message: `Mail account ${username}@${domainStr} provisioned successfully for ${targetUser.email}.`,
+      message: `Mail account ${username}@${domainStr} provisioned successfully for ${targetUser.email} (Assigned by Dev).`,
     });
   } catch (err: any) {
     logger.error({ err }, 'Failed to admin-provision mail account');
@@ -190,7 +217,7 @@ emailRouter.post('/admin/email/provision', requireAdminOrDev, async (req: Authed
 const createMailboxSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  storageQuotaMb: z.number().optional().default(5120),
+  storageQuotaMb: z.number().optional().default(1024),
   dailySendLimit: z.number().optional().default(1000),
 });
 
@@ -220,6 +247,7 @@ emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
   const smtpHost = `mail.${domainStr}`;
   const credentialRef = encryptSecret(password, env.secretsEncryptionKey);
   const webmailUrl = process.env.NODE_ENV === 'production' ? `https://mail.${domainStr}` : 'http://localhost:3001/email';
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // First month free trial for customer self-created mailboxes
 
   try {
     const newAccount = await prisma.smtpAccount.create({
@@ -233,6 +261,9 @@ emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
         webmailUrl,
         storageQuotaMb,
         dailySendLimit,
+        maxAliases: 10,
+        expiresAt,
+        isSuspended: false,
         storageUsedMb: 0,
         dailySendCount: 0,
       },
@@ -282,6 +313,153 @@ emailRouter.delete('/email/mailboxes/:id', async (req: AuthedRequest, res) => {
   } catch (err: any) {
     logger.error({ err }, 'Failed to delete mailbox');
     res.status(500).json({ error: err.message || 'Failed to delete mailbox' });
+  }
+});
+
+/**
+ * POST /api/email/mailboxes/:id/renew
+ * Renew subscription for a business email mailbox (extends trial/subscription by 30 days).
+ */
+emailRouter.post('/email/mailboxes/:id/renew', async (req: AuthedRequest, res) => {
+  try {
+    const account = await prisma.smtpAccount.findUnique({ where: { id: req.params.id } });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const isOwner = account.userId === req.user!.id;
+    const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
+    if (!isOwner && !isStaff) return res.status(403).json({ error: 'Access denied' });
+
+    const newExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days renewal
+    const updated = await prisma.smtpAccount.update({
+      where: { id: account.id },
+      data: {
+        expiresAt: newExpiresAt,
+        isSuspended: false,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'email.renew_subscription',
+        target: `Renewed mailbox subscription for ${account.smtpUsername} until ${newExpiresAt.toISOString()}`,
+      },
+    });
+
+    res.json({
+      ok: true,
+      message: 'Subscription renewed successfully for 30 days.',
+      expiresAt: newExpiresAt.toISOString(),
+      isSuspended: false,
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to renew mailbox subscription');
+    res.status(500).json({ error: err.message || 'Failed to renew subscription' });
+  }
+});
+
+/**
+ * PATCH /api/email/mailboxes/:id/access
+ * Dev/Admin endpoint to grant or modify admin delegation access (allowedAdminIds).
+ */
+const accessSchema = z.object({
+  allowedAdminIds: z.array(z.string()),
+});
+
+emailRouter.patch('/email/mailboxes/:id/access', async (req: AuthedRequest, res) => {
+  try {
+    const isDev = req.user!.role === 'dev';
+    const account = await prisma.smtpAccount.findUnique({ where: { id: req.params.id } });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const isOwner = account.userId === req.user!.id;
+    if (!isDev && !isOwner) {
+      return res.status(403).json({ error: 'Only account owners or dev administrators can update delegation access.' });
+    }
+
+    const parse = accessSchema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: 'Invalid access data' });
+
+    const updated = await prisma.smtpAccount.update({
+      where: { id: account.id },
+      data: { allowedAdminIds: parse.data.allowedAdminIds },
+    });
+
+    res.json({ ok: true, allowedAdminIds: updated.allowedAdminIds });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to update mailbox access delegation');
+    res.status(500).json({ error: err.message || 'Failed to update delegation access' });
+  }
+});
+
+/**
+ * POST /api/email/mailboxes/:id/aliases
+ * Add an email alias (prefix@domain) enforcing maximum alias limits (maxAliases).
+ */
+emailRouter.post('/email/mailboxes/:id/aliases', async (req: AuthedRequest, res) => {
+  try {
+    const { prefix } = req.body || {};
+    if (!prefix || !/^[a-zA-Z0-9._-]+$/.test(prefix)) {
+      return res.status(400).json({ error: 'Valid alias prefix name is required (letters, numbers, dot, underscore, dash).' });
+    }
+
+    const account = await prisma.smtpAccount.findUnique({ where: { id: req.params.id } });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const isOwner = account.userId === req.user!.id;
+    const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
+    if (!isOwner && !isStaff) return res.status(403).json({ error: 'Access denied' });
+
+    const maxAliases = account.maxAliases || 10;
+    if ((account.aliases || []).length >= maxAliases) {
+      return res.status(400).json({
+        error: `Alias limit reached for this mailbox. Maximum allowed: ${maxAliases} aliases.`,
+      });
+    }
+
+    const domain = account.customDomain || account.smtpHost.replace(/^mail\./, '');
+    const newAlias = `${prefix.toLowerCase()}@${domain}`;
+
+    if ((account.aliases || []).includes(newAlias)) {
+      return res.status(400).json({ error: 'Alias already exists' });
+    }
+
+    const updated = await prisma.smtpAccount.update({
+      where: { id: account.id },
+      data: { aliases: [...(account.aliases || []), newAlias] },
+    });
+
+    res.json({ ok: true, aliases: updated.aliases, count: updated.aliases.length, maxAliases });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to add alias');
+    res.status(500).json({ error: err.message || 'Failed to add alias' });
+  }
+});
+
+/**
+ * DELETE /api/email/mailboxes/:id/aliases/:prefix
+ * Remove an email alias from mailbox.
+ */
+emailRouter.delete('/email/mailboxes/:id/aliases/:prefix', async (req: AuthedRequest, res) => {
+  try {
+    const { prefix } = req.params;
+    const account = await prisma.smtpAccount.findUnique({ where: { id: req.params.id } });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const isOwner = account.userId === req.user!.id;
+    const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
+    if (!isOwner && !isStaff) return res.status(403).json({ error: 'Access denied' });
+
+    const filteredAliases = (account.aliases || []).filter((a: string) => a.split('@')[0] !== prefix.toLowerCase());
+    const updated = await prisma.smtpAccount.update({
+      where: { id: account.id },
+      data: { aliases: filteredAliases },
+    });
+
+    res.json({ ok: true, aliases: updated.aliases });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to delete alias');
+    res.status(500).json({ error: err.message || 'Failed to delete alias' });
   }
 });
 
@@ -512,6 +690,16 @@ emailRouter.post('/email/send', async (req: AuthedRequest, res) => {
       error: 'You need an active SMTP Hosting subscription to send emails.',
       purchaseRequired: true,
     });
+  }
+
+  if (smtpAccount && !isStaff) {
+    const isExpired = smtpAccount.expiresAt ? new Date(smtpAccount.expiresAt) < new Date() : false;
+    if (isExpired || smtpAccount.isSuspended) {
+      return res.status(403).json({
+        error: 'Your Business Email subscription has expired after the 1-month initial period. Please renew your subscription to continue sending emails.',
+        renewRequired: true,
+      });
+    }
   }
 
   const { from, to, subject, body } = parse.data;

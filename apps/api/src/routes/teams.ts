@@ -236,7 +236,7 @@ teamsRouter.post('/teams/:id/invites', async (req: AuthedRequest, res) => {
 
   const appBaseUrl = process.env.APP_URL || 'http://localhost:3000';
   const inviteLink = `${appBaseUrl}/team/accept?token=${token}`;
-  const inviterName = req.user!.displayName || req.user!.email;
+  const inviterName = (req.user as any).displayName || req.user!.email;
 
   // Dispatch background email notification automatically
   sendTeamInviteNotification({
@@ -287,7 +287,7 @@ teamsRouter.post('/teams/:id/invites/:inviteId/resend', async (req: AuthedReques
 
   const appBaseUrl = process.env.APP_URL || 'http://localhost:3000';
   const inviteLink = `${appBaseUrl}/team/accept?token=${invite.token}`;
-  const inviterName = req.user!.displayName || req.user!.email;
+  const inviterName = (req.user as any).displayName || req.user!.email;
 
   await sendTeamInviteNotification({
     email: invite.email,

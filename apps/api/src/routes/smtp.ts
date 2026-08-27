@@ -31,6 +31,7 @@ const createSmtpAccountSchema = z.object({
   domain: z.string().optional(),
   planTier: z.enum(['starter', 'pro', 'enterprise']).default('starter'),
   customAliases: z.array(z.string()).optional(),
+  allowedAdminIds: z.array(z.string()).optional(),
 });
 
 /**
@@ -238,7 +239,7 @@ smtpRouter.post('/smtp-accounts', requireDev, async (req: AuthedRequest, res) =>
   const parsed = createSmtpAccountSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const { smtpPassword, planTier, domain: inputDomain, customAliases, ...rest } = parsed.data;
+  const { smtpPassword, planTier, domain: inputDomain, customAliases, allowedAdminIds, ...rest } = parsed.data;
   const targetUser = await prisma.user.findUnique({ where: { id: rest.userId } });
 
   const domain = inputDomain || (targetUser?.role === 'admin' || targetUser?.role === 'dev' ? env.rootDomain : 'clientdomain.com');
@@ -252,9 +253,20 @@ smtpRouter.post('/smtp-accounts', requireDev, async (req: AuthedRequest, res) =>
   const credentialRef = encryptSecret(smtpPassword, env.secretsEncryptionKey);
   const tier = SMTP_PLAN_TIERS[planTier] || SMTP_PLAN_TIERS.starter;
   const aliases = customAliases || generateDefaultAliases(domain, tier.maxAliases);
+  const expiresAt = null; // Dev assigned mailbox: permanent access, exempt from 1-month trial expiry
 
   const account = await prisma.smtpAccount.create({
-    data: { ...rest, credentialRef, customDomain: domain, aliases, planTier: tier.id },
+    data: {
+      ...rest,
+      credentialRef,
+      customDomain: domain,
+      aliases,
+      planTier: tier.id,
+      maxAliases: tier.maxAliases,
+      allowedAdminIds: allowedAdminIds || [],
+      expiresAt,
+      isSuspended: false,
+    },
     include: { user: true },
   });
 
