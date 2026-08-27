@@ -419,7 +419,7 @@ export default function SupabaseSettingsPage() {
                         </td>
                         <td className="p-3 text-right">
                           <Button size="sm" variant="ghost" onClick={() => toast('Downloading PDF invoice...', 'info')}>
-                            Download PDF 📄
+                            Download PDF
                           </Button>
                         </td>
                       </tr>
@@ -435,7 +435,7 @@ export default function SupabaseSettingsPage() {
                         </td>
                         <td className="p-3 text-right">
                           <Button size="sm" variant="ghost" onClick={() => toast('Downloading PDF invoice...', 'info')}>
-                            Download PDF 📄
+                            Download PDF
                           </Button>
                         </td>
                       </tr>

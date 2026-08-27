@@ -14,7 +14,8 @@ export function ProjectConfigModal({ project, isOpen, onClose }: ProjectConfigMo
   const [activeTab, setActiveTab] = useState<'endpoints' | 'keys' | 'env' | 'sdk'>('endpoints');
   const [revealServiceKey, setRevealServiceKey] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [sdkLang, setSdkLang] = useState<'js' | 'python' | 'flutter' | 'curl'>('js');
+  const [sdkLang, setSdkLang] = useState<keyof typeof sdkSnippets>('nextjs');
+
   const { toast } = useToast();
 
   if (!isOpen || !project) return null;
@@ -44,28 +45,71 @@ SUPABASE_GRAPHQL_URL=${graphqlUrl}
 `;
 
   const sdkSnippets = {
-    js: `import { createClient } from '@supabase/supabase-js';
+    nextjs: `// Next.js App Router (Server & Client Components)
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
-// Initialize Supabase BaaS Client
+export async function createClient() {
+  const cookieStore = await cookies();
+  return createServerClient(
+    '${baseUrl}',
+    '${project.anonKey}',
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll(); },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+          } catch {}
+        },
+      },
+    }
+  );
+}`,
+
+    js: `// React / SPA / Web Client
+import { createClient } from '@supabase/supabase-js';
+
 const supabaseUrl = '${baseUrl}';
 const supabaseAnonKey = '${project.anonKey}';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Example Query:
+// Query Example:
 // const { data, error } = await supabase.from('users').select('*');`,
 
-    python: `from supabase import create_client, Client
+    vue: `// Vue 3 / Nuxt 3 Composable
+import { createClient } from '@supabase/supabase-js'
+
+export const useSupabase = () => {
+  return createClient(
+    '${baseUrl}',
+    '${project.anonKey}'
+  )
+}`,
+
+    svelte: `// SvelteKit Server Load Function
+import { createClient } from '@supabase/supabase-js'
+
+export const load = async () => {
+  const supabase = createClient('${baseUrl}', '${project.anonKey}')
+  const { data } = await supabase.from('todos').select('*')
+  return { todos: data ?? [] }
+}`,
+
+    python: `# Python / Flask / FastAPI Client
+from supabase import create_client, Client
 
 url: str = "${baseUrl}"
 key: str = "${project.anonKey}"
 supabase: Client = create_client(url, key)
 
-# Example Query:
+# Query Example:
 # response = supabase.table("users").select("*").execute()
 # print(response.data)`,
 
-    flutter: `import 'package:supabase_flutter/supabase_flutter.dart';
+    flutter: `// Flutter (iOS & Android)
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
   await Supabase.initialize(
@@ -77,11 +121,76 @@ Future<void> main() async {
 
 final supabase = Supabase.instance.client;`,
 
+    swift: `// iOS SwiftUI (Swift SDK)
+import Supabase
+
+let supabase = SupabaseClient(
+    supabaseURL: URL(string: "${baseUrl}")!,
+    supabaseKey: "${project.anonKey}"
+)`,
+
+    kotlin: `// Android Kotlin (Jetpack Compose)
+import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.postgrest.Postgrest
+
+val supabase = createSupabaseClient(
+    supabaseUrl = "${baseUrl}",
+    supabaseKey = "${project.anonKey}"
+) {
+    install(Postgrest)
+}`,
+
+    expo: `// Expo React Native with SecureStore
+import 'react-native-url-polyfill/auto';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createClient } from '@supabase/supabase-js';
+
+export const supabase = createClient('${baseUrl}', '${project.anonKey}', {
+  auth: {
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});`,
+
+    hono: `// Hono Lightweight Web API
+import { Hono } from 'hono'
+import { createClient } from '@supabase/supabase-js'
+
+const app = new Hono()
+const supabase = createClient('${baseUrl}', '${project.anonKey}')
+
+app.get('/api/todos', async (c) => {
+  const { data } = await supabase.from('todos').select('*')
+  return c.json(data)
+})`,
+
+    php: `// Laravel / PHP PDO Direct Database Config (.env)
+DB_CONNECTION=pgsql
+DB_HOST=db.shanutechx.net
+DB_PORT=5432
+DB_DATABASE=${project.dbName}
+DB_USERNAME=postgres
+DB_PASSWORD=YOUR_POSTGRES_PASSWORD`,
+
+    rails: `# Ruby on Rails (config/database.yml)
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  host: db.shanutechx.net
+  port: 5432
+  database: ${project.dbName}
+  username: postgres
+  password: <%= ENV["POSTGRES_PASSWORD"] %>`,
+
     curl: `# Fetch database schema tables over PostgREST API
 curl -X GET "${restUrl}/" \\
   -H "apikey: ${project.anonKey}" \\
   -H "Authorization: Bearer ${project.anonKey}"`,
   };
+
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -303,21 +412,36 @@ curl -X GET "${restUrl}/" \\
           {activeTab === 'sdk' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {(['js', 'python', 'flutter', 'curl'] as const).map((lang) => (
+                <div className="flex items-center gap-1.5 overflow-x-auto max-w-lg py-1">
+                  {[
+                    { id: 'nextjs', name: 'Next.js' },
+                    { id: 'js', name: 'React / JS' },
+                    { id: 'vue', name: 'Vue / Nuxt' },
+                    { id: 'svelte', name: 'SvelteKit' },
+                    { id: 'python', name: 'Python' },
+                    { id: 'flutter', name: 'Flutter' },
+                    { id: 'swift', name: 'iOS Swift' },
+                    { id: 'kotlin', name: 'Android Kotlin' },
+                    { id: 'expo', name: 'Expo RN' },
+                    { id: 'hono', name: 'Hono API' },
+                    { id: 'php', name: 'Laravel' },
+                    { id: 'rails', name: 'Rails' },
+                    { id: 'curl', name: 'cURL' },
+                  ].map((framework) => (
                     <button
-                      key={lang}
-                      onClick={() => setSdkLang(lang)}
-                      className={`px-3 py-1 rounded-lg text-xs font-mono uppercase transition-all ${
-                        sdkLang === lang
+                      key={framework.id}
+                      onClick={() => setSdkLang(framework.id as any)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-mono whitespace-nowrap transition-all ${
+                        sdkLang === framework.id
                           ? 'bg-accent-violet text-white font-bold shadow-glow-violet'
-                          : 'text-text-muted hover:bg-white/[0.04]'
+                          : 'text-text-muted hover:bg-white/[0.04] border border-white/[0.04]'
                       }`}
                     >
-                      {lang === 'js' ? 'JS / TS' : lang}
+                      {framework.name}
                     </button>
                   ))}
                 </div>
+
 
                 <button
                   onClick={() => copyToClipboard(sdkSnippets[sdkLang], `${sdkLang.toUpperCase()} SDK Code`)}
