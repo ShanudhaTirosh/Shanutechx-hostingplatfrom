@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabaseAdmin, ClientSupabaseProject } from '@/lib/supabaseAdmin';
+import { ProjectConfigModal } from './ProjectConfigModal';
 
 interface ProjectSwitcherProps {
   activeProject: ClientSupabaseProject | null;
@@ -12,6 +13,7 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
   const [projects, setProjects] = useState<ClientSupabaseProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
   // New Project Form
   const [name, setName] = useState('');
@@ -54,12 +56,22 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
   return (
     <div className="flex items-center justify-between glass p-3 rounded-xl border border-white/[0.06]">
       <div className="flex items-center gap-3">
-        <div className="h-8 w-8 rounded-lg bg-brand-gradient flex items-center justify-center text-white text-xs font-bold shrink-0">
-          ⚡
+        <div className="h-8 w-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+          </svg>
         </div>
         <div>
-          <p className="text-[10px] uppercase font-semibold text-text-faint tracking-wider">Active Supabase Project</p>
           <div className="flex items-center gap-2">
+            <p className="text-[10px] uppercase font-semibold text-text-faint tracking-wider">Active Supabase BaaS Project</p>
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-violet-500/20 text-violet-300 border border-violet-500/30 flex items-center gap-1">
+              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Dev User Studio
+            </span>
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
             <select
               value={activeProject?.id || ''}
               onChange={(e) => {
@@ -75,7 +87,7 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
               ))}
             </select>
             {activeProject && (
-              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30">
                 {activeProject.dbName}
               </span>
             )}
@@ -83,12 +95,33 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
         </div>
       </div>
 
-      <button
-        onClick={() => setShowModal(true)}
-        className="px-3 py-1.5 rounded-lg bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet-light border border-accent-violet/30 text-xs font-semibold transition-all flex items-center gap-1.5"
-      >
-        <span>+ New Client Project</span>
-      </button>
+      <div className="flex items-center gap-2">
+        {activeProject && (
+          <button
+            onClick={() => setShowConfigModal(true)}
+            className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all flex items-center gap-1.5"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>View & Copy Config</span>
+          </button>
+        )}
+
+        <button
+          onClick={() => setShowModal(true)}
+          className="px-3 py-1.5 rounded-lg bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet-light border border-accent-violet/30 text-xs font-semibold transition-all flex items-center gap-1.5"
+        >
+          <span>+ New Client Project</span>
+        </button>
+      </div>
+
+      <ProjectConfigModal
+        project={activeProject}
+        isOpen={showConfigModal}
+        onClose={() => setShowConfigModal(false)}
+      />
 
       {/* New Project Modal */}
       {showModal && (

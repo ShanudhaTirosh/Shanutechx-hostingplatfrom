@@ -158,7 +158,12 @@ export default function SupabaseDatabasePage() {
                     : 'text-text-muted hover:bg-white/[0.04] hover:text-text-primary'
                 }`}
               >
-                <span className="truncate">📋 {t.name}</span>
+                <span className="truncate flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  {t.name}
+                </span>
                 <span className="text-[10px] text-text-faint font-mono">{t.rows_count ?? 0}</span>
               </button>
             ))}
@@ -169,42 +174,59 @@ export default function SupabaseDatabasePage() {
         <div className="md:col-span-3 space-y-4">
           {/* SQL Templates Bar */}
           <div className="flex items-center gap-2 overflow-x-auto text-xs pb-1">
-            <span className="text-text-muted font-mono text-[11px]">SQL Snippets:</span>
+            <span className="text-text-muted font-mono text-[11px] shrink-0">SQL Snippets:</span>
             {selectedTable && (
               <>
                 <button
                   type="button"
                   onClick={() => setSqlQuery(`SELECT * FROM public."${selectedTable}" ORDER BY 1 DESC LIMIT 50;`)}
-                  className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 font-mono text-[11px]"
+                  className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 font-mono text-[11px] shrink-0"
                 >
                   SELECT ALL
                 </button>
                 <button
                   type="button"
                   onClick={() => setSqlQuery(`SELECT COUNT(*) FROM public."${selectedTable}";`)}
-                  className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 font-mono text-[11px]"
+                  className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 font-mono text-[11px] shrink-0"
                 >
                   COUNT(*)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSqlQuery(`TRUNCATE TABLE public."${selectedTable}" RESTART IDENTITY;`)}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 font-mono text-[11px] shrink-0"
+                >
+                  TRUNCATE TABLE
                 </button>
               </>
             )}
             <button
               type="button"
               onClick={() => setSqlQuery(`SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_schema = 'public';`)}
-              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 font-mono text-[11px]"
+              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 font-mono text-[11px] shrink-0"
             >
               SCHEMA COLUMNS
+            </button>
+            <button
+              type="button"
+              onClick={() => setSqlQuery(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";\nCREATE EXTENSION IF NOT EXISTS "vector";`)}
+              className="px-2.5 py-1 rounded-lg bg-accent-violet/10 hover:bg-accent-violet/20 text-accent-violet-light border border-accent-violet/20 font-mono text-[11px] shrink-0"
+            >
+              ENABLE EXTENSIONS
             </button>
           </div>
 
           {/* Monaco SQL Editor */}
           <Card className="border border-white/[0.06] p-0 overflow-hidden shadow-2xl">
             <div className="p-3 bg-[#0d0f17] border-b border-white/[0.06] flex items-center justify-between">
-              <span className="text-xs font-semibold text-accent-cyan uppercase tracking-wider font-mono">
-                ⚡ SQL Editor (Press Cmd+Enter / Ctrl+Enter)
+              <span className="text-xs font-semibold text-accent-cyan uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                SQL Editor (Press Cmd+Enter / Ctrl+Enter)
               </span>
               <Button size="sm" onClick={() => handleRunQuery()} disabled={executing}>
-                {executing ? 'Executing...' : '▶ Run SQL'}
+                {executing ? 'Executing...' : 'Run SQL'}
               </Button>
             </div>
             <div className="h-44">

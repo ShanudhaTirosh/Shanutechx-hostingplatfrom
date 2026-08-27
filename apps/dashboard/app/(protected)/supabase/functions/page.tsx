@@ -164,7 +164,12 @@ export default function SupabaseFunctionsPage() {
                     : 'text-text-muted hover:bg-white/[0.04] hover:text-text-primary'
                 }`}
               >
-                <span className="truncate">⚡ {fn.slug}</span>
+                <span className="truncate flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  {fn.slug}
+                </span>
                 <span className="text-[10px] text-text-faint">{fn.invocations}</span>
               </button>
             ))}
@@ -183,7 +188,7 @@ export default function SupabaseFunctionsPage() {
                 </span>
               </div>
               <Button size="sm" onClick={handleDeployCode} loading={saving}>
-                🚀 Deploy Function
+                Deploy Function
               </Button>
             </div>
             <div className="h-64">
@@ -215,7 +220,7 @@ export default function SupabaseFunctionsPage() {
               />
               <div className="flex justify-end mt-2">
                 <Button size="sm" onClick={handleInvokeTest} loading={invoking}>
-                  ▶ Invoke Test Endpoint
+                  Invoke Test Endpoint
                 </Button>
               </div>
             </Card>

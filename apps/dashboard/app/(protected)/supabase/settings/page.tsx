@@ -31,7 +31,7 @@ export default function SupabaseSettingsPage() {
   const [sendingTest, setSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
 
-  const [activeTab, setActiveTab] = useState<'config' | 'templates' | 'logs' | 'code'>('config');
+  const [activeTab, setActiveTab] = useState<'config' | 'templates' | 'logs' | 'code' | 'project'>('config');
 
   useEffect(() => {
     Promise.allSettled([supabaseAdmin.config(), supabaseAdmin.smtp.getConfig()])
@@ -81,11 +81,15 @@ export default function SupabaseSettingsPage() {
 
   if (loading) return <Spinner label="Loading Supabase settings..." />;
 
+  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || config?.supabaseUrl || 'https://supabase.shanutechx.net';
+  const anonKey = config?.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoYW51dGVjaHgiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY3MjUxMjAwMCwiZXhwIjoyMDE4MDg4MDAwfQ.placeholder';
+  const serviceKey = config?.serviceRoleKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoYW51dGVjaHgiLCJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNjcyNTEyMDAwLCJleHAiOjIwMTg0ODgwMDB9.placeholder';
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="SMTP Mailer Engine &amp; Supabase Settings"
-        description="Configure SMTP server, verify TLS handshake, customize auth templates, track outbound logs, and generate code snippets."
+        description="Configure SMTP server, verify TLS handshake, customize auth templates, track outbound logs, and inspect project API credentials."
       />
 
       {error && <ErrorBanner message={error} />}
@@ -93,10 +97,11 @@ export default function SupabaseSettingsPage() {
       {/* Main Tab Navigation */}
       <div className="flex items-center gap-2 border-b border-white/[0.06] pb-2 overflow-x-auto">
         {[
-          { id: 'config', label: '⚙️ SMTP Server Config' },
-          { id: 'templates', label: '✉️ Auth Email Templates' },
-          { id: 'logs', label: '📜 Delivery Logs' },
-          { id: 'code', label: '💻 Connection Code Snippets' },
+          { id: 'config', label: 'SMTP Server Config' },
+          { id: 'templates', label: 'Auth Email Templates' },
+          { id: 'logs', label: 'Delivery Logs' },
+          { id: 'code', label: 'Connection Code Snippets' },
+          { id: 'project', label: 'Project API & Config Details' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -126,7 +131,7 @@ export default function SupabaseSettingsPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="secondary" onClick={handleVerifySmtp} disabled={verifyingSmtp}>
-                  {verifyingSmtp ? 'Testing TLS...' : '🔍 Verify SMTP Handshake'}
+                  {verifyingSmtp ? 'Testing TLS...' : 'Verify SMTP Handshake'}
                 </Button>
               </div>
             </div>
@@ -246,7 +251,7 @@ export default function SupabaseSettingsPage() {
                 required
               />
               <Button type="submit" size="sm" disabled={sendingTest}>
-                {sendingTest ? 'Sending Email...' : '✉️ Send Test Email'}
+                {sendingTest ? 'Sending Email...' : 'Send Test Email'}
               </Button>
             </form>
 
@@ -277,7 +282,7 @@ export default function SupabaseSettingsPage() {
                 </button>
               </div>
               <p className="font-mono text-xs text-text-muted break-all bg-black/40 p-2.5 rounded-lg border border-white/[0.04]">
-                {revealedKey === 'anon' ? config?.anonKey : '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••'}
+                {revealedKey === 'anon' ? anonKey : '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••'}
               </p>
             </div>
 
@@ -293,7 +298,7 @@ export default function SupabaseSettingsPage() {
               </div>
               <p className="font-mono text-xs text-text-muted break-all bg-black/40 p-2.5 rounded-lg border border-white/[0.04]">
                 {revealedKey === 'service'
-                  ? config?.serviceRoleKey
+                  ? serviceKey
                   : '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••'}
               </p>
             </div>
@@ -309,6 +314,46 @@ export default function SupabaseSettingsPage() {
 
       {/* TAB 4: Code Snippets */}
       {activeTab === 'code' && <SmtpCodeSnippets smtp={smtp} />}
+
+      {/* TAB 5: Project API & Config Details */}
+      {activeTab === 'project' && (
+        <Card className="border border-white/[0.06] space-y-4">
+          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+            <div>
+              <h3 className="text-sm font-semibold text-text-primary">Project API Endpoints & Gateway Parameters</h3>
+              <p className="text-xs text-text-muted">Master connection parameters for Supabase BaaS suite services</p>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
+              <span className="text-xs font-semibold text-text-primary">Gateway Base URL</span>
+              <p className="font-mono text-xs text-emerald-400 break-all">{baseUrl}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
+              <span className="text-xs font-semibold text-text-primary">PostgREST REST API</span>
+              <p className="font-mono text-xs text-emerald-400 break-all">{baseUrl}/rest/v1</p>
+            </div>
+            <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
+              <span className="text-xs font-semibold text-text-primary">GoTrue Auth API</span>
+              <p className="font-mono text-xs text-emerald-400 break-all">{baseUrl}/auth/v1</p>
+            </div>
+            <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
+              <span className="text-xs font-semibold text-text-primary">Realtime WebSockets</span>
+              <p className="font-mono text-xs text-emerald-400 break-all">{baseUrl.replace(/^http/, 'ws')}/socket/websocket</p>
+            </div>
+            <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
+              <span className="text-xs font-semibold text-text-primary">Storage S3 API</span>
+              <p className="font-mono text-xs text-emerald-400 break-all">{baseUrl}/storage/v1</p>
+            </div>
+            <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
+              <span className="text-xs font-semibold text-text-primary">GraphQL API</span>
+              <p className="font-mono text-xs text-emerald-400 break-all">{baseUrl}/graphql/v1</p>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
+

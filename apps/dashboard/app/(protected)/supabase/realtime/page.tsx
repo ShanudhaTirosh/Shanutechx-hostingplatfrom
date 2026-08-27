@@ -73,7 +73,12 @@ export default function SupabaseRealtimePage() {
         description="Listen to PostgreSQL CDC database change broadcasts, Presence, and WebSockets channels in real time."
         action={
           <Button size="sm" variant={connected ? 'secondary' : 'primary'} onClick={() => setConnected(!connected)}>
-            {connected ? '⏸ Pause Listener' : '▶ Reconnect WebSockets'}
+            <span className="flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071a9.9 9.9 0 0114.142 0M2.828 9.9a14.85 14.85 0 0121.214 0" />
+              </svg>
+              {connected ? 'Pause Listener' : 'Reconnect WebSockets'}
+            </span>
           </Button>
         }
       />
@@ -139,7 +144,7 @@ export default function SupabaseRealtimePage() {
               </div>
 
               <Button type="submit" size="sm" loading={sending} className="w-full justify-center">
-                📡 Send Broadcast
+                Send Broadcast
               </Button>
             </form>
           </Card>

@@ -100,7 +100,12 @@ export default function SupabaseStoragePage() {
                 : 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]'
             }`}
           >
-            📦 {b.name} {b.public ? '(Public)' : '(Private)'}
+            <span className="inline-flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 01-2 2M5 8v10a2 2 0 002 2h14a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+              {b.name} {b.public ? '(Public)' : '(Private)'}
+            </span>
           </button>
         ))}
       </div>
