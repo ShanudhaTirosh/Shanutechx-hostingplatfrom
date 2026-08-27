@@ -37,8 +37,11 @@ services:
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8001}
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-sb_publishable_v1_live_key_shanutechx_001}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-sb_secret_v1_live_key_shanutechx_admin_001}
       AUTH_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
       ENABLED_FEATURES_LOGS_ALL: "false"
+
 
   kong-config:
     container_name: supabase-kong-config

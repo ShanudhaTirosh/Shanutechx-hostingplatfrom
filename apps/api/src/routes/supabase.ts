@@ -612,11 +612,11 @@ supabaseRouter.get('/supabase/integrations', requireAuth, requireAdminOrDev, asy
 
 // 15. System Config & Environment Credentials Endpoint
 supabaseRouter.get('/supabase/config', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://supabase.shanutechx.net';
-  const anonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkbWluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAxNTAwMDAwMH0.fake_anon_key';
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkbWluIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwMDAwMDAwMCwiZXhwIjoyMDE1MDAwMDAwfQ.fake_service_role_key';
-  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_v1_live_key_shanutechx_001';
-  const secretKey = process.env.SUPABASE_SECRET_KEY || 'sb_secret_v1_live_key_shanutechx_admin_001';
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.API_BASE_URL || '';
+  const anonKey = process.env.SUPABASE_ANON_KEY || '';
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || '';
+  const secretKey = process.env.SUPABASE_SECRET_KEY || '';
 
   res.json({
     supabaseUrl,
@@ -628,4 +628,5 @@ supabaseRouter.get('/supabase/config', requireAuth, requireAdminOrDev, async (_r
     smtpConfigured: !!process.env.SMTP_HOST
   });
 });
+
 

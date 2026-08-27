@@ -169,6 +169,9 @@ services:
       - SUPABASE_STUDIO_URL=http://localhost:3003
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}
+      - SUPABASE_SECRET_KEY=${SUPABASE_SECRET_KEY}
+
       # Self-hosted mail (see the "Self-Hosted Mail (Postal)" section
       # below).
       - POSTAL_API_URL=http://postal-web:5000
