@@ -17,6 +17,7 @@ import {
   PageHeader,
 } from '@/components/ui';
 import { DomainManagement } from '@/components/DomainManagement';
+import { ResourceScopeSelector } from '@/components/ResourceScopeSelector';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,6 +101,7 @@ export default function DeploymentsPage() {
 }
 
 function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
+  const [selectedScope, setSelectedScope] = useState('personal');
   const [serviceType, setServiceType] = useState(SERVICE_TYPES[0].value);
   const [gitProvider, setGitProvider] = useState<'github' | 'gitlab' | 'custom'>('github');
   const [accounts, setAccounts] = useState<ConnectedGitAccount[]>([]);
@@ -149,10 +151,6 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
     loadAccounts();
   }, [gitProvider]);
 
-  // After being redirected back from GitHub's App installation page or
-  // GitLab's OAuth authorize page (routes/gitConnect.ts's callback
-  // routes), the URL carries ?git_connect=success|error|pending. Surface
-  // that as a toast, then clean the query string.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const status = params.get('git_connect');
@@ -160,19 +158,14 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
     if (!status) return;
 
     if (status === 'success') {
-      toast(`${provider === 'gitlab' ? 'GitLab' : 'GitHub'} account connected!`, 'success');
+      toast(`Successfully connected ${provider === 'gitlab' ? 'GitLab' : 'GitHub'} account!`, 'success');
       loadAccounts();
-    } else if (status === 'pending') {
-      toast(`Installation requested — waiting for an organization owner to approve it.`, 'info');
     } else if (status === 'error') {
-      toast(`Failed to connect your ${provider === 'gitlab' ? 'GitLab' : 'GitHub'} account. Please try again.`, 'error');
+      const msg = params.get('message') || 'Connection failed';
+      toast(`Git connection error: ${msg}`, 'error');
     }
-
-    const url = new URL(window.location.href);
-    url.searchParams.delete('git_connect');
-    url.searchParams.delete('provider');
-    window.history.replaceState({}, '', url.toString());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
   }, []);
 
   function handleAccountSwitch(accId: string) {
@@ -194,10 +187,6 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
     }
   }
 
-  // No token is ever handled on the frontend — this just redirects the
-  // browser to GitHub's App installation page or GitLab's OAuth authorize
-  // page. The connection completes entirely server-side (see
-  // routes/gitConnect.ts's /start and /callback routes).
   async function handleConnectAccount() {
     if (gitProvider === 'custom') return;
     setConnecting(true);
@@ -238,8 +227,6 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
           repoUrl: gitProvider === 'custom' ? customGitUrl : repoUrl,
           branch: branch || 'main',
           gitProvider,
-          // The selected account's ID -- the server resolves this into a
-          // fresh, scoped token itself. No token is ever handled here.
           gitAccountId: gitProvider !== 'custom' ? selectedAccountId || undefined : undefined,
           preferredName,
           customSubdomain: customSubdomain.trim() || undefined,
@@ -247,6 +234,7 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
           startCommand: startCommand.trim() || undefined,
           entryFile: entryFile.trim() || undefined,
           exposureMode: exposureMode || 'ssl_with_proxy',
+          teamId: selectedScope === 'personal' ? null : selectedScope,
         },
         (event: BuildEvent) => {
           if (event.log) setLog((prev) => [...prev, event.log!]);
@@ -278,6 +266,11 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
       </p>
 
       {error && <div className="mb-4"><ErrorBanner message={error} /></div>}
+
+      {/* Resource Ownership Scope (Personal vs Team) */}
+      <div className="mb-5">
+        <ResourceScopeSelector value={selectedScope} onChange={setSelectedScope} />
+      </div>
 
       {/* Provider Selector & Multi-Account Switcher Bar */}
       <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] mb-6 space-y-4">

@@ -36,10 +36,15 @@ async function postInternal(url: string, secret: string, body: object): Promise<
  * failure never blocks the actual business action (payment approval,
  * deployment, etc.) that triggered it.
  */
-export async function notifyCustomer(user: NotifiableUser, message: string): Promise<void> {
+export async function notifyCustomer(
+  user: NotifiableUser,
+  message: string,
+  customHtml?: string,
+  customSubject?: string
+): Promise<void> {
   const sends: Promise<unknown>[] = [];
 
-  sends.push(sendEmailFallback(user.email, message));
+  sends.push(sendEmailFallback(user.email, message, customHtml, customSubject));
 
   if (user.phoneNumber) {
     sends.push(
@@ -62,7 +67,13 @@ export async function notifyCustomer(user: NotifiableUser, message: string): Pro
   await Promise.all(sends);
 }
 
-import { renderNotificationEmail, renderTeamInviteEmail } from './emailTemplates';
+import {
+  renderNotificationEmail,
+  renderTeamInviteEmail,
+  renderWelcomeEmail,
+  renderSubscriptionGracePeriodEmail,
+  renderDeploymentStatusEmail,
+} from './emailTemplates';
 import { sendSmtpEmail } from './smtpDispatcher';
 
 async function sendEmailFallback(email: string, message: string, customHtml?: string, customSubject?: string): Promise<void> {
@@ -129,6 +140,31 @@ export async function sendTeamInviteNotification({
 }): Promise<void> {
   const rendered = renderTeamInviteEmail({ teamName, inviterName, role, inviteLink });
   await sendEmailFallback(email, rendered.text, rendered.html, rendered.subject);
+}
+
+export async function sendWelcomeNotification(user: NotifiableUser & { name: string }): Promise<void> {
+  const rendered = renderWelcomeEmail({ customerName: user.name });
+  await notifyCustomer(user, rendered.text, rendered.html, rendered.subject);
+}
+
+export async function sendGracePeriodNotification(
+  user: NotifiableUser & { name: string },
+  serviceName: string,
+  gracePeriodEndsAt: string
+): Promise<void> {
+  const rendered = renderSubscriptionGracePeriodEmail({ serviceName, gracePeriodEndsAt });
+  await notifyCustomer(user, rendered.text, rendered.html, rendered.subject);
+}
+
+export async function sendDeploymentStatusNotification(
+  user: NotifiableUser,
+  deploymentName: string,
+  status: 'running' | 'failed' | 'stopped',
+  subdomain?: string | null,
+  errorMessage?: string
+): Promise<void> {
+  const rendered = renderDeploymentStatusEmail({ deploymentName, subdomain, status, errorMessage });
+  await notifyCustomer(user, rendered.text, rendered.html, rendered.subject);
 }
 
 /**

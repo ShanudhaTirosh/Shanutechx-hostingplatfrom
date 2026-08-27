@@ -4,11 +4,16 @@ const { getSocket } = require('./connection');
 // This is the "don't mass-blast" guardrail: even if the API enqueues 100
 // notifications at once, WhatsApp only ever sees them trickle out one by one.
 const queue = [];
-const MIN_GAP_MS = 3000; // at most ~20 messages/minute
+const MIN_GAP_MS = 2500; // at most ~24 messages/minute
 let processing = false;
 
 function toJid(phoneNumber) {
+  if (typeof phoneNumber !== 'string') return '';
+  if (phoneNumber.endsWith('@s.whatsapp.net') || phoneNumber.endsWith('@g.us')) {
+    return phoneNumber;
+  }
   const digitsOnly = phoneNumber.replace(/[^0-9]/g, '');
+  if (!digitsOnly) return '';
   return `${digitsOnly}@s.whatsapp.net`;
 }
 
@@ -17,13 +22,28 @@ async function processQueue() {
   processing = true;
 
   while (queue.length > 0) {
-    const { phoneNumber, message, resolve, reject } = queue.shift();
+    const item = queue[0];
+    const jid = toJid(item.phoneNumber);
+
+    if (!jid) {
+      queue.shift();
+      item.reject(new Error(`Invalid WhatsApp phone number: ${item.phoneNumber}`));
+      continue;
+    }
+
     try {
       const sock = getSocket();
-      await sock.sendMessage(toJid(phoneNumber), { text: message });
-      resolve();
+      await sock.sendMessage(jid, { text: item.message });
+      queue.shift();
+      item.resolve();
     } catch (err) {
-      reject(err);
+      if (err.message && err.message.includes('not connected')) {
+        // Socket temporarily reconnecting — pause queue and retry in 5s
+        await new Promise((r) => setTimeout(r, 5000));
+        continue;
+      }
+      queue.shift();
+      item.reject(err);
     }
     await new Promise((r) => setTimeout(r, MIN_GAP_MS));
   }
@@ -39,4 +59,4 @@ function sendNotification(phoneNumber, message) {
   });
 }
 
-module.exports = { sendNotification };
+module.exports = { sendNotification, toJid };

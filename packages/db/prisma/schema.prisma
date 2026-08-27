@@ -127,6 +127,9 @@ model User {
   phoneNumber String?  // for WhatsApp order/payment notifications
   discordUserId String? // for Discord DM notifications, if linked
   role        Role     @default(customer)
+  isBanned    Boolean  @default(false)
+  bannedAt    DateTime?
+  banReason   String?
   createdAt   DateTime @default(now())
 
   // Bcrypt hash of this user's "Settings Protection" PIN (see
@@ -311,6 +314,8 @@ model Order {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id])
+  teamId    String?
+  team      Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
   status    String   @default("draft") // draft | awaiting_payment | paid | cancelled
   total     Int      // in `currency`
   currency  Currency @default(LKR)
@@ -416,6 +421,8 @@ model Deployment {
   orderItem   OrderItem?       @relation(fields: [orderItemId], references: [id])
   userId      String
   user        User             @relation(fields: [userId], references: [id])
+  teamId      String?
+  team        Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   // Node assignment:
   // - Customer deployments: nodeId is set by selectNodeForDeployment() (auto only).
@@ -1342,8 +1349,10 @@ model Team {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  members   TeamMember[]
-  invites   TeamInvite[]
+  members     TeamMember[]
+  invites     TeamInvite[]
+  orders      Order[]
+  deployments Deployment[]
 }
 
 model TeamMember {

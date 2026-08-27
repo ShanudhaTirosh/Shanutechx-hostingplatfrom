@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
 import { AppUserProvider, useAppUser } from '@/lib/AppUserContext';
 import Sidebar from '@/components/Sidebar';
+import { NotificationChannelBanner } from '@/components/NotificationChannelBanner';
 import { ToastProvider } from '@/components/ui';
 
 function LoadingSpinner({ message = 'Loading...' }: { message?: string }) {
@@ -139,6 +140,7 @@ function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { childre
 
         {/* Main content */}
         <main className="flex-1 py-6 px-4 md:px-6 min-w-0 animate-fade-in">
+          <NotificationChannelBanner />
           <Suspense fallback={<DashboardSkeleton />}>
             {children}
           </Suspense>

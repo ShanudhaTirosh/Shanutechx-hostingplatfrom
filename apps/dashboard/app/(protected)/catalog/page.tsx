@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { CatalogTemplate } from '@/lib/types';
 import { useAppUser } from '@/lib/AppUserContext';
+import { ResourceScopeSelector } from '@/components/ResourceScopeSelector';
 
 // ── Category colour mapping ───────────────────────────────────────────────────
 const CAT_COLOR: Record<string, string> = {
@@ -249,6 +250,9 @@ function DeployModal({
   const [customValue, setCustomValue] = useState('');
   const [fetchingYaml, setFetchingYaml] = useState(true);
 
+  const [selectedScope, setSelectedScope] = useState<string>('personal');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const isAdminOrDev = apiUser?.role === 'admin' || apiUser?.role === 'dev';
 
   useEffect(() => {
@@ -270,6 +274,33 @@ function DeployModal({
     });
   }, [tpl.slug, isAdminOrDev]);
 
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (!content) return;
+      const lines = content.split(/\r?\n/);
+      const parsed: Record<string, string> = { ...envVars };
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const idx = trimmed.indexOf('=');
+        if (idx > 0) {
+          const k = trimmed.slice(0, idx).trim();
+          let v = trimmed.slice(idx + 1).trim();
+          if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+            v = v.slice(1, -1);
+          }
+          if (k) parsed[k] = v;
+        }
+      }
+      setEnvVars(parsed);
+    };
+    reader.readAsText(file);
+  }
+
   async function handleDeploy() {
     if (!nodeId && isAdminOrDev) { setError('Select a target node'); return; }
     setLoading(true);
@@ -280,6 +311,7 @@ function DeployModal({
         nodeId: nodeId || 'default', // fallback if node auto-select logic is used for customer
         projectName,
         envVars,
+        teamId: selectedScope === 'personal' ? null : selectedScope,
       });
       setSuccess({ deploymentId: res.deployment.id, project: res.deployment.subdomain ?? projectName });
     } catch (e: any) {
@@ -333,6 +365,11 @@ function DeployModal({
             </div>
           ) : (
             <>
+              {/* Ownership Scope Selector (Personal Account vs Team Workspace) */}
+              <div>
+                <ResourceScopeSelector value={selectedScope} onChange={setSelectedScope} />
+              </div>
+
               <div className="space-y-1">
                 <label className="text-xs font-medium text-text-muted">Project Name</label>
                 <input
@@ -365,7 +402,7 @@ function DeployModal({
                 </div>
               )}
 
-              {/* Editable Env Vars list */}
+              {/* Editable Env Vars list + File Upload */}
               {fetchingYaml ? (
                 <div className="flex items-center gap-2 text-xs text-text-faint py-2 animate-pulse">
                   <svg className="animate-spin w-3.5 h-3.5 text-text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -373,23 +410,44 @@ function DeployModal({
                   </svg>
                   Parsing template env vars…
                 </div>
-              ) : Object.keys(envVars).length > 0 ? (
+              ) : (
                 <div className="space-y-2 border-t border-white/[0.06] pt-3">
-                  <label className="text-xs font-medium text-text-muted block">Environment Variables</label>
-                  <div className="max-h-40 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-                    {Object.entries(envVars).map(([key, val]) => (
-                      <div key={key} className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-mono text-text-faint break-all">{key}</span>
-                        <input
-                          value={val}
-                          onChange={(e) => setEnvVars({ ...envVars, [key]: e.target.value })}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-surface text-xs text-text-primary border border-white/10 focus:outline-none focus:border-white/20"
-                        />
-                      </div>
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-text-muted">Environment Variables</label>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".env,.env.*,.txt,.config"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-2 py-1 rounded text-[11px] font-semibold bg-accent-violet/20 border border-accent-violet/40 text-accent-violet hover:bg-accent-violet/30 transition-all flex items-center gap-1"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+                      </svg>
+                      Upload .env
+                    </button>
                   </div>
+                  {Object.keys(envVars).length > 0 && (
+                    <div className="max-h-40 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                      {Object.entries(envVars).map(([key, val]) => (
+                        <div key={key} className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-mono text-text-faint break-all">{key}</span>
+                          <input
+                            value={val}
+                            onChange={(e) => setEnvVars({ ...envVars, [key]: e.target.value })}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-surface text-xs text-text-primary border border-white/10 focus:outline-none focus:border-white/20"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ) : null}
+              )}
 
               {/* Add Custom Env Var */}
               {!fetchingYaml && (

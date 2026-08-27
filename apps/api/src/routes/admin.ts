@@ -5,6 +5,8 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdmin, requireDev, AuthedRequest } from '../middleware/auth';
 import { parsePagination } from '../lib/pagination';
 
+import { banUserAndTeardownResources, unbanUser } from '../lib/abuseDetector';
+
 export const adminRouter = Router();
 
 adminRouter.use(requireAuth, requireAdmin);
@@ -42,6 +44,9 @@ adminRouter.get('/admin/customers', async (req: AuthedRequest, res) => {
     firebaseUid: c.firebaseUid,
     phoneNumber: c.phoneNumber,
     discordUserId: c.discordUserId,
+    isBanned: c.isBanned,
+    bannedAt: c.bannedAt,
+    banReason: c.banReason,
     createdAt: c.createdAt,
     orderCount: c._count.orders,
     totalSpent: c.orders.reduce((sum: number, o: { total: number }) => sum + o.total, 0),
@@ -246,4 +251,44 @@ adminRouter.patch('/admin/customers/:userId/assign', requireDev, async (req: Aut
   });
 
   res.json({ user: { id: updated.id, email: updated.email, assignedAdminId: updated.assignedAdminId } });
+});
+
+/** Ban a user account and stop all their running deployments. */
+const banUserSchema = z.object({ reason: z.string().optional() });
+
+adminRouter.post('/admin/users/:userId/ban', async (req: AuthedRequest, res) => {
+  const parsed = banUserSchema.safeParse(req.body);
+  const targetUser = await prisma.user.findUnique({ where: { id: req.params.userId } });
+  if (!targetUser) return res.status(404).json({ error: 'User not found' });
+
+  if (targetUser.role === 'dev') {
+    return res.status(403).json({ error: 'The platform dev account cannot be banned.' });
+  }
+
+  const result = await banUserAndTeardownResources({
+    userId: targetUser.id,
+    reason: parsed.success && parsed.data.reason ? parsed.data.reason : 'Suspended by Admin',
+    detectedBy: req.user!.email,
+  });
+
+  res.json({
+    ok: true,
+    message: `User ${targetUser.email} has been banned and ${result.stoppedDeploymentsCount} deployments stopped.`,
+  });
+});
+
+/** Unban a user account and restore access. */
+adminRouter.post('/admin/users/:userId/unban', async (req: AuthedRequest, res) => {
+  const targetUser = await prisma.user.findUnique({ where: { id: req.params.userId } });
+  if (!targetUser) return res.status(404).json({ error: 'User not found' });
+
+  await unbanUser({
+    userId: targetUser.id,
+    adminUserId: req.user!.id,
+  });
+
+  res.json({
+    ok: true,
+    message: `User ${targetUser.email} has been unbanned.`,
+  });
 });

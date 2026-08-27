@@ -68,6 +68,14 @@ export const api = {
       apiFetch(`/api/admin/customers/by-firebase-uid/${uid}`).then((r) =>
         asJson<{ customer: { id: string; email: string; displayName: string | null; firebaseUid: string } }>(r)
       ),
+    banUser: (userId: string, reason?: string) =>
+      apiFetch(`/api/admin/users/${userId}/ban`, { method: 'POST', body: JSON.stringify({ reason }) }).then((r) =>
+        asJson<{ ok: boolean; message: string }>(r)
+      ),
+    unbanUser: (userId: string) =>
+      apiFetch(`/api/admin/users/${userId}/unban`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; message: string }>(r)
+      ),
     staff: () =>
       apiFetch('/api/admin/staff').then((r) =>
         asJson<{ staff: Array<{ id: string; email: string; displayName: string | null; role: string; createdAt: string }> }>(r)
@@ -427,6 +435,7 @@ export const api = {
         exposureMode?: string;
         frameworkPreset?: string;
         publishedPort?: number;
+        teamId?: string | null;
       },
       onEvent: (event: BuildEvent) => void
     ): Promise<void> => {
@@ -1127,7 +1136,7 @@ export const api = {
       apiFetch(`/api/catalog/${slug}`, { method: 'DELETE' }).then((r) =>
         asJson<{ success: boolean; slug: string }>(r)
       ),
-    deploy: (body: { slug: string; nodeId: string; envVars?: Record<string, string>; projectName?: string }) =>
+    deploy: (body: { slug: string; nodeId: string; envVars?: Record<string, string>; projectName?: string; teamId?: string | null }) =>
       apiFetch('/api/catalog/deploy', { method: 'POST', body: JSON.stringify(body) }).then((r) =>
         asJson<{ deployment: Deployment; agent: Record<string, unknown> }>(r)
       ),
@@ -1201,5 +1210,4 @@ export const api = {
         }>(r)
       ),
   },
-
 };

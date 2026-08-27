@@ -42,6 +42,14 @@ export async function requireAuth(
       return res.status(401).json({ error: 'Invalid or revoked API key' });
     }
 
+    if (apiKey.user.isBanned) {
+      return res.status(403).json({
+        error: 'Account Banned',
+        message: `Your account has been suspended: ${apiKey.user.banReason || 'Policy Violation'}. Contact support.`,
+        isBanned: true,
+      });
+    }
+
     void prisma.apiKey.update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } }).catch(() => null);
 
     req.user = {
@@ -66,7 +74,7 @@ export async function requireAuth(
       return res.status(401).json({ error: 'Invalid or expired token', detail: firebaseErr.code ?? firebaseErr.message });
     }
 
-    let user: { id: string; firebaseUid: string; email: string; role: 'customer' | 'admin' | 'support' | 'dev' };
+    let user: { id: string; firebaseUid: string; email: string; role: 'customer' | 'admin' | 'support' | 'dev'; isBanned: boolean; banReason?: string | null };
     try {
       user = await prisma.user.upsert({
         where: { firebaseUid: decoded.uid },
@@ -79,6 +87,14 @@ export async function requireAuth(
       });
     } catch (dbErr: any) {
       return res.status(503).json({ error: 'Database unavailable — cannot authenticate. Please try again shortly.', detail: dbErr.message });
+    }
+
+    if (user.isBanned) {
+      return res.status(403).json({
+        error: 'Account Banned',
+        message: `Your account has been suspended: ${user.banReason || 'Policy Violation'}. Contact support.`,
+        isBanned: true,
+      });
     }
 
     req.user = {

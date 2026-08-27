@@ -156,16 +156,35 @@ export async function sendSmtpEmail(
             send(`DATA`);
           } else if (step === 5 && code === 354) {
             step = 6;
-            const plainText = mail.text || mail.html.replace(/<[^>]+>/g, '');
+            const plainText = mail.text || mail.html.replace(/<[^>]+>/g, '').trim();
+            const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            
             const rawMessage = [
               `From: ${mail.from}`,
               `To: ${mail.to}`,
               `Subject: ${mail.subject}`,
               `Message-ID: ${messageId}`,
+              `Date: ${new Date().toUTCString()}`,
               `MIME-Version: 1.0`,
+              `Auto-Submitted: auto-generated`,
+              `X-Auto-Response-Suppress: All`,
+              `Precedence: bulk`,
+              `List-Unsubscribe: <https://${options.host}/settings>`,
+              `Content-Type: multipart/alternative; boundary="${boundary}"`,
+              ``,
+              `--${boundary}`,
+              `Content-Type: text/plain; charset=UTF-8`,
+              `Content-Transfer-Encoding: 8bit`,
+              ``,
+              plainText,
+              ``,
+              `--${boundary}`,
               `Content-Type: text/html; charset=UTF-8`,
+              `Content-Transfer-Encoding: 8bit`,
               ``,
               mail.html,
+              ``,
+              `--${boundary}--`,
               `.`,
             ].join('\r\n');
             send(rawMessage);

@@ -518,11 +518,14 @@ function generateStrongSecret(): string {
   return crypto.randomBytes(24).toString('base64url');
 }
 
+import { scanTextForAbuse, banUserAndTeardownResources } from '../lib/abuseDetector';
+
 const deploySchema = z.object({
   slug: z.string().min(1),
   nodeId: z.string().min(1),
   envVars: z.record(z.string()).optional(),
   projectName: z.string().min(1).optional(),
+  teamId: z.string().nullable().optional(),
 });
 
 /**
@@ -533,7 +536,19 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
   const parsed = deploySchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const { slug, nodeId: inputNodeId, envVars: customerEnvVars = {}, projectName } = parsed.data;
+  const { slug, nodeId: inputNodeId, envVars: customerEnvVars = {}, projectName, teamId } = parsed.data;
+
+  // Abuse protection scan on environment variables & project name
+  const abuseScanText = JSON.stringify(customerEnvVars) + (projectName || '') + slug;
+  const abuseCheck = scanTextForAbuse(abuseScanText);
+  if (abuseCheck.flagged) {
+    await banUserAndTeardownResources({
+      userId: req.user!.id,
+      reason: `Prohibited content detected during catalog deployment: ${abuseCheck.reason}`,
+      detectedBy: 'Automated Abuse Scanner (Catalog Deployment)',
+    });
+    return res.status(403).json({ error: `Account suspended due to policy violation: ${abuseCheck.reason}` });
+  }
 
   // Fill in any required secret the customer didn't supply with a fresh,
   // strong random value (see AUTO_GENERATED_SECRET_KEYS above). Track
@@ -595,6 +610,7 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
     const deployment = await prisma.deployment.create({
       data: {
         userId: req.user!.id,
+        teamId: teamId ?? null,
         nodeId,
         status: 'running',
         subdomain: composeName,

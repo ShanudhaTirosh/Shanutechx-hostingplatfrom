@@ -17,6 +17,8 @@ import { validateCustomSubdomain } from '../lib/subdomain';
 import { getProvider } from '../lib/gitProviders';
 import { logger } from '../lib/logger';
 
+import { scanTextForAbuse, banUserAndTeardownResources } from '../lib/abuseDetector';
+
 export const deploymentsRouter = Router();
 
 deploymentsRouter.use(requireAuth);
@@ -56,6 +58,7 @@ const createDeploymentSchema = z.object({
   frameworkPreset: z.enum(['auto', 'nextjs', 'react_vite', 'nodejs_bot', 'whatsapp_baileys', 'python_bot', 'lavalink_java', 'static_html', 'custom']).optional(),
   exposureMode: z.enum(['ssl_with_proxy', 'ssl_direct', 'no_ssl']).optional(),
   publishedPort: z.number().int().min(1).max(65535).optional(),
+  teamId: z.string().nullable().optional(),
 }).refine((data) => data.templateId || (data.repoUrl && data.internalPort), {
   message: 'Either templateId, or both repoUrl and internalPort, are required',
 });
@@ -67,6 +70,23 @@ deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
   }
 
   let data = parsed.data;
+
+  // Automated Abuse Detection on deployment parameters (startCommand, envVars, repoUrl)
+  const envText = data.envVars ? Object.entries(data.envVars).map(([k, v]) => `${k}=${v}`).join('\n') : '';
+  const scanContent = `${data.repoUrl || ''}\n${data.startCommand || ''}\n${envText}`;
+  const abuseResult = scanTextForAbuse(scanContent);
+  if (abuseResult.flagged) {
+    await banUserAndTeardownResources({
+      userId: req.user!.id,
+      reason: `Automated Scan: ${abuseResult.reason}`,
+      detectedBy: 'Deployment Content Abuse Scanner',
+    });
+    return res.status(403).json({
+      error: 'Account Banned for Policy Violation',
+      message: `Deployment blocked and account suspended: ${abuseResult.reason}`,
+      isBanned: true,
+    });
+  }
 
   if (data.repoUrl && data.gitAccountId && (data.gitProvider === 'github' || data.gitProvider === 'gitlab')) {
     const adapter = getProvider(data.gitProvider);

@@ -5,6 +5,9 @@ export interface ApiUser {
   displayName?: string | null;
   phoneNumber?: string | null;
   discordUserId?: string | null;
+  isBanned?: boolean;
+  bannedAt?: string | null;
+  banReason?: string | null;
 }
 
 export type ServiceType =
@@ -225,6 +228,9 @@ export interface Customer {
   firebaseUid: string;
   phoneNumber: string | null;
   discordUserId: string | null;
+  isBanned?: boolean;
+  bannedAt?: string | null;
+  banReason?: string | null;
   createdAt: string;
   orderCount: number;
   totalSpent: number;

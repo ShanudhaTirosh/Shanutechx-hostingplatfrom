@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { api } from '@/lib/api';
-import { Button, Spinner, useToast } from '@/components/ui';
+import { Button, Spinner, Modal, useToast } from '@/components/ui';
 
 interface Props {
   deploymentId: string;
@@ -17,6 +17,8 @@ export function EnvVarsPanel({ deploymentId, isRunning }: Props) {
   const [saving, setSaving] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [showLog, setShowLog] = useState(false);
+  const [showBulkPasteModal, setShowBulkPasteModal] = useState(false);
+  const [bulkText, setBulkText] = useState('');
   const { toast } = useToast();
 
   function parseEnvString(envText: string): Array<{ key: string; value: string; masked: boolean }> {
@@ -78,7 +80,6 @@ export function EnvVarsPanel({ deploymentId, isRunning }: Props) {
           Object.entries(data.envVars).map(([key, value]) => ({ key, value, masked: true }))
         );
       } else {
-        // If DB has no env vars set yet, attempt auto-load from repo .env / .env.example
         setRows([]);
         fetchFromRepo();
       }
@@ -101,6 +102,48 @@ export function EnvVarsPanel({ deploymentId, isRunning }: Props) {
 
   function handleRemoveRow(i: number) {
     setRows((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  function handleApplyBulkPaste() {
+    const parsed = parseEnvString(bulkText);
+    if (parsed.length === 0) {
+      toast('No valid KEY=VALUE pairs found in text.', 'error');
+      return;
+    }
+
+    setRows((prev) => {
+      const existingKeys = new Set(prev.map((r) => r.key));
+      const updated = [...prev];
+      for (const item of parsed) {
+        if (existingKeys.has(item.key)) {
+          const idx = updated.findIndex((r) => r.key === item.key);
+          if (idx >= 0) updated[idx] = { ...updated[idx], value: item.value };
+        } else {
+          updated.push(item);
+        }
+      }
+      return updated;
+    });
+
+    toast(`Applied ${parsed.length} variables!`, 'success');
+    setShowBulkPasteModal(false);
+    setBulkText('');
+  }
+
+  function handleDownloadEnvFile() {
+    const envContent = rows
+      .filter((r) => r.key.trim())
+      .map((r) => `${r.key.trim()}=${r.value.includes(' ') ? `"${r.value}"` : r.value}`)
+      .join('\n');
+
+    const blob = new Blob([envContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `.env`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('.env file downloaded!', 'success');
   }
 
   async function handleSave() {
@@ -138,24 +181,92 @@ export function EnvVarsPanel({ deploymentId, isRunning }: Props) {
     }
   }
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = parseEnvString(text);
+      if (parsed.length === 0) {
+        toast(`No valid KEY=VALUE pairs found in ${file.name}.`, 'error');
+        return;
+      }
+
+      setRows((prev) => {
+        const existingKeys = new Set(prev.map((r) => r.key));
+        const updated = [...prev];
+        for (const item of parsed) {
+          if (existingKeys.has(item.key)) {
+            const idx = updated.findIndex((r) => r.key === item.key);
+            if (idx >= 0) updated[idx] = { ...updated[idx], value: item.value };
+          } else {
+            updated.push(item);
+          }
+        }
+        return updated;
+      });
+
+      toast(`Imported ${parsed.length} variables from ${file.name}!`, 'success');
+    } catch (err: any) {
+      toast(`Failed to read file: ${err.message}`, 'error');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
   if (loading) return <Spinner label="Loading environment variables..." />;
 
   return (
     <div className="space-y-5">
-      {/* Info Banner & Repository Sync Action */}
-      <div className="flex items-center justify-between gap-3 flex-wrap p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+      {/* Hidden file input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept=".env,.env.*,.txt,.config"
+        className="hidden"
+      />
+
+      {/* Info Banner & Repository Sync Actions */}
+      <div className="flex items-center justify-between gap-3 flex-wrap p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
         <div className="flex items-center gap-2 text-xs text-text-muted">
-          <span className="text-sm">🔐</span>
-          <span>Environment variables are stored securely in platform DB (encrypted with AES-256).</span>
+          <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 002-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          <span>Environment variables are encrypted at rest via AES-256 GCM.</span>
         </div>
-        <Button size="sm" variant="secondary" onClick={fetchFromRepo} loading={fetchingFromRepo}>
-          📥 Import Defaults from Repo (.env)
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button size="sm" variant="secondary" onClick={() => fileInputRef.current?.click()}>
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Upload .env File
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setShowBulkPasteModal(true)}>
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            Bulk Paste .env
+          </Button>
+          <Button size="sm" variant="secondary" onClick={handleDownloadEnvFile} disabled={rows.length === 0}>
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export .env
+          </Button>
+          <Button size="sm" variant="secondary" onClick={fetchFromRepo} loading={fetchingFromRepo}>
+            Import Repo Defaults
+          </Button>
+        </div>
       </div>
 
       {isRunning && (
         <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs flex items-start gap-2">
-          <span className="text-base leading-none">ℹ️</span>
+          <svg className="w-4 h-4 mt-0.5 text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
           <span>Saving will automatically restart the running container to apply your changes.</span>
         </div>
       )}
@@ -170,7 +281,7 @@ export function EnvVarsPanel({ deploymentId, isRunning }: Props) {
 
         {rows.length === 0 && (
           <p className="text-xs text-text-faint py-4 text-center border border-dashed border-white/10 rounded-xl">
-            No environment variables set yet. Click "Import Defaults from Repo" or "+ Add Variable" below.
+            No environment variables set yet. Click "Bulk Paste .env" or "+ Add Variable" below.
           </p>
         )}
 
@@ -194,17 +305,30 @@ export function EnvVarsPanel({ deploymentId, isRunning }: Props) {
               <button
                 type="button"
                 onClick={() => setRows((prev) => prev.map((r, idx) => idx === i ? { ...r, masked: !r.masked } : r))}
-                className="absolute right-2 text-text-faint hover:text-white transition-colors text-[10px]"
+                className="absolute right-2 text-text-faint hover:text-white transition-colors p-1"
+                title={row.masked ? 'Reveal value' : 'Hide value'}
               >
-                {row.masked ? '👁' : '🙈'}
+                {row.masked ? (
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858-5.908a8.98 8.98 0 013.682-.787c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21M3 3l18 18" />
+                  </svg>
+                )}
               </button>
             </div>
             <button
               type="button"
               onClick={() => handleRemoveRow(i)}
               className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors text-xs"
+              title="Remove variable"
             >
-              ✕
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
         ))}
@@ -218,6 +342,32 @@ export function EnvVarsPanel({ deploymentId, isRunning }: Props) {
           {isRunning ? 'Save & Restart Deployment' : 'Save Variables'}
         </Button>
       </div>
+
+      {/* Bulk Paste Modal */}
+      {showBulkPasteModal && (
+        <Modal open={true} onClose={() => setShowBulkPasteModal(false)} title="Bulk Paste .env File Content" width="max-w-2xl">
+          <div className="space-y-4">
+            <p className="text-xs text-text-muted">
+              Paste raw <code className="text-indigo-400 font-mono">KEY=VALUE</code> lines below. Existing keys will be updated with new values.
+            </p>
+            <textarea
+              rows={10}
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              placeholder={`PORT=3000\nDATABASE_URL=postgresql://user:pass@host:5432/db\nAPI_KEY="sk_live_sample"`}
+              className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-xs font-mono text-emerald-400 focus:outline-none focus:border-accent-violet placeholder:text-text-faint"
+            />
+            <div className="flex justify-end gap-3 pt-2">
+              <Button size="sm" variant="ghost" onClick={() => setShowBulkPasteModal(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleApplyBulkPaste}>
+                Apply Variables
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Rebuild/Restart Live Log */}
       {showLog && log.length > 0 && (

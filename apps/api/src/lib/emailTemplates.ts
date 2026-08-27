@@ -244,3 +244,114 @@ export function renderTeamInviteEmail({
 
   return { subject, html, text };
 }
+
+export function renderWelcomeEmail({
+  customerName,
+}: {
+  customerName: string;
+}): { subject: string; html: string; text: string } {
+  const safeName = escapeHtml(customerName);
+  const subject = `Welcome to ShanuTechX Cloud Hosting! 🎉`;
+
+  const html = baseEmailLayout(
+    subject,
+    `
+    <div class="status-badge status-success">Account Active</div>
+    <h1>Welcome to ShanuTechX, ${safeName}!</h1>
+    <p>We are excited to have you on board. ShanuTechX gives you full power over high-performance cloud deployments, managed databases, VPS servers, and custom bot hosting.</p>
+    
+    <div class="quote-box">
+      <strong>🚀 What you can do right now:</strong><br/>
+      • Connect your GitHub or GitLab account &amp; deploy in seconds.<br/>
+      • Host WhatsApp Baileys MD bots &amp; Discord bots with persistent state.<br/>
+      • Run Lavalink audio nodes with direct TCP port mapping.<br/>
+      • Provision high-speed NVMe VPS nodes &amp; PostgreSQL/Redis databases.
+    </div>
+
+    <a href="https://${env.rootDomain}/dashboard" class="btn">Launch Client Dashboard →</a>
+  `
+  );
+
+  const text = `Welcome to ShanuTechX, ${customerName}!\nYour account is active. Deploy applications, bots, databases, and VPS nodes at https://${env.rootDomain}/dashboard`;
+
+  return { subject, html, text };
+}
+
+export function renderSubscriptionGracePeriodEmail({
+  serviceName,
+  gracePeriodEndsAt,
+}: {
+  serviceName: string;
+  gracePeriodEndsAt: string;
+}): { subject: string; html: string; text: string } {
+  const safeService = escapeHtml(serviceName);
+  const safeEnds = escapeHtml(gracePeriodEndsAt);
+  const subject = `[Action Required] Grace Period Warning for ${serviceName}`;
+
+  const html = baseEmailLayout(
+    subject,
+    `
+    <div class="status-badge status-danger">Grace Period Active</div>
+    <h1>Subscription Expiry Notice</h1>
+    <p>Your subscription for <strong>${safeService}</strong> has entered its grace period due to an unpaid balance.</p>
+    
+    <div class="quote-box" style="border-left-color: #ef4444;">
+      <strong>Service:</strong> ${safeService}<br/>
+      <strong>Suspension Date:</strong> ${safeEnds}<br/>
+      <strong>Status:</strong> Active (Grace Period)
+    </div>
+
+    <p>Please renew your subscription before ${safeEnds} to avoid service interruption or container teardown.</p>
+
+    <a href="https://${env.rootDomain}/billing" class="btn" style="background: linear-gradient(135deg, #ef4444, #dc2626);">Renew Subscription Now →</a>
+  `
+  );
+
+  const text = `Subscription Warning: Your service "${serviceName}" is in its grace period and will be suspended on ${gracePeriodEndsAt} if unpaid.\nRenew at https://${env.rootDomain}/billing`;
+
+  return { subject, html, text };
+}
+
+export function renderDeploymentStatusEmail({
+  deploymentName,
+  subdomain,
+  status,
+  errorMessage,
+}: {
+  deploymentName: string;
+  subdomain?: string | null;
+  status: 'running' | 'failed' | 'stopped';
+  errorMessage?: string;
+}): { subject: string; html: string; text: string } {
+  const safeName = escapeHtml(deploymentName);
+  const isSuccess = status === 'running';
+  const subject = isSuccess
+    ? `Deployment Live: ${deploymentName}`
+    : `Deployment Alert: ${deploymentName} is ${status.toUpperCase()}`;
+
+  const statusBadge = isSuccess
+    ? `<div class="status-badge status-success">Deployment Live</div>`
+    : `<div class="status-badge status-danger">Deployment ${status.toUpperCase()}</div>`;
+
+  const safeMsg = errorMessage ? escapeHtml(errorMessage) : null;
+  const targetUrl = subdomain ? `https://${subdomain}.${env.rootDomain}` : `https://${env.rootDomain}/deployments`;
+
+  const html = baseEmailLayout(
+    subject,
+    `
+    ${statusBadge}
+    <h1>${isSuccess ? `${safeName} is Live! 🚀` : `Issue detected with ${safeName}`}</h1>
+    <p>${isSuccess ? `Your application container has been successfully deployed and is running.` : `Your deployment status changed to <strong>${status}</strong>.`}</p>
+    
+    ${safeMsg ? `<div class="quote-box"><strong>Log / Error Output:</strong><br/>${safeMsg}</div>` : ''}
+
+    <a href="${targetUrl}" class="btn">${isSuccess ? 'Open Live Application →' : 'Inspect Build Logs →'}</a>
+  `
+  );
+
+  const text = isSuccess
+    ? `${deploymentName} is live at ${targetUrl}`
+    : `Alert: ${deploymentName} status is ${status}. Log: ${errorMessage || 'N/A'}.\nInspect at https://${env.rootDomain}/deployments`;
+
+  return { subject, html, text };
+}
