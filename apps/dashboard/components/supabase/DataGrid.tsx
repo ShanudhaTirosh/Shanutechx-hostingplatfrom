@@ -19,13 +19,14 @@ export function DataGrid({ columns, rows, loading, onRowClick }: DataGridProps) 
     );
   }
 
-  if (!columns.length || !rows.length) {
+  if (!columns.length) {
     return (
       <div className="glass rounded-xl py-12 px-4 text-center border border-white/[0.06] text-text-muted text-xs">
-        No rows found in this table or query result set.
+        No columns or rows returned from this query.
       </div>
     );
   }
+
 
   return (
     <div className="glass rounded-xl border border-white/[0.06] overflow-hidden">
@@ -41,12 +42,20 @@ export function DataGrid({ columns, rows, loading, onRowClick }: DataGridProps) 
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.04]">
-            {rows.map((row, idx) => (
-              <tr
-                key={idx}
-                onClick={() => onRowClick && onRowClick(row)}
-                className={`hover:bg-white/[0.04] transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
-              >
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length} className="px-4 py-8 text-center text-text-faint italic font-sans text-xs">
+                  0 rows returned from this table / query result.
+                </td>
+              </tr>
+            ) : (
+              rows.map((row, idx) => (
+                <tr
+                  key={idx}
+                  onClick={() => onRowClick && onRowClick(row)}
+                  className={`hover:bg-white/[0.04] transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+                >
+
                 {columns.map((col) => {
                   const val = row[col];
                   const displayVal =
@@ -70,8 +79,10 @@ export function DataGrid({ columns, rows, loading, onRowClick }: DataGridProps) 
                   );
                 })}
               </tr>
-            ))}
+            ))
+            )}
           </tbody>
+
         </table>
       </div>
     </div>
