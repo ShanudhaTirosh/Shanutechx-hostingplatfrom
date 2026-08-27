@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { PageHeader, Card, Spinner, ErrorBanner, Button } from '@/components/ui';
+import { PageHeader, Card, Spinner, ErrorBanner, Button, useToast } from '@/components/ui';
 import { supabaseAdmin, SupabaseStorageBucket } from '@/lib/supabaseAdmin';
 import { BucketFileBrowser } from '@/components/supabase/BucketFileBrowser';
 
@@ -10,6 +10,8 @@ export default function SupabaseStoragePage() {
   const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
 
   // New Bucket Form
   const [newBucketName, setNewBucketName] = useState('');
@@ -41,12 +43,14 @@ export default function SupabaseStoragePage() {
     supabaseAdmin.storage
       .createBucket({ id: newBucketName.toLowerCase().replace(/\s+/g, '-'), name: newBucketName, isPublic })
       .then(() => {
+        toast(`Storage bucket "${newBucketName}" created!`, 'success');
         setNewBucketName('');
         loadBuckets();
       })
-      .catch((err) => alert(err.message))
+      .catch((err) => toast(err.message || 'Failed to create bucket', 'error'))
       .finally(() => setCreating(false));
   };
+
 
   if (loading) return <Spinner label="Loading Storage API..." />;
 

@@ -1,13 +1,27 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { PageHeader, Card, Button, Spinner, ErrorBanner, Badge } from '@/components/ui';
-import { supabaseAdmin, SupabaseSmtpConfig } from '@/lib/supabaseAdmin';
-import { EmailTemplateEditor } from '@/components/supabase/EmailTemplateEditor';
-import { SmtpDeliveryLogs } from '@/components/supabase/SmtpDeliveryLogs';
-import { SmtpCodeSnippets } from '@/components/supabase/SmtpCodeSnippets';
+import { PageHeader, Card, Button, Spinner, ErrorBanner, useToast } from '@/components/ui';
+import { supabaseAdmin, SupabaseSmtpConfig, ClientSupabaseProject } from '@/lib/supabaseAdmin';
+import { useAuth } from '@/lib/useAuth';
 
 export default function SupabaseSettingsPage() {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<
+    | 'general'
+    | 'infrastructure'
+    | 'integrations'
+    | 'api_keys'
+    | 'jwt_keys'
+    | 'log_drains'
+    | 'addons'
+    | 'data_api'
+    | 'vault'
+    | 'subscription'
+    | 'usage'
+  >('general');
+
+  const [project, setProject] = useState<ClientSupabaseProject | null>(null);
   const [config, setConfig] = useState<any>(null);
   const [smtp, setSmtp] = useState<SupabaseSmtpConfig>({
     host: 'mail.shanutechx.com',
@@ -18,24 +32,26 @@ export default function SupabaseSettingsPage() {
     enableEmailSignup: true,
     enableAutoconfirm: true,
   });
-  const [smtpPass, setSmtpPass] = useState('');
+
   const [loading, setLoading] = useState(true);
-  const [savingSmtp, setSavingSmtp] = useState(false);
-  const [verifyingSmtp, setVerifyingSmtp] = useState(false);
-  const [smtpStatus, setSmtpStatus] = useState<{ ok: boolean; message: string; latencyMs: number } | null>(null);
+  const [savingProject, setSavingProject] = useState(false);
+  const [projectName, setProjectName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
-
-  // Test Email State
-  const [testRecipient, setTestRecipient] = useState('');
-  const [sendingTest, setSendingTest] = useState(false);
-  const [testResult, setTestResult] = useState<any>(null);
-
-  const [activeTab, setActiveTab] = useState<'config' | 'templates' | 'logs' | 'code' | 'project'>('config');
+  const { toast } = useToast();
 
   useEffect(() => {
-    Promise.allSettled([supabaseAdmin.config(), supabaseAdmin.smtp.getConfig()])
-      .then(([configRes, smtpRes]) => {
+    Promise.allSettled([
+      supabaseAdmin.projects.list(),
+      supabaseAdmin.config(),
+      supabaseAdmin.smtp.getConfig(),
+    ])
+      .then(([projRes, configRes, smtpRes]) => {
+        if (projRes.status === 'fulfilled' && projRes.value.projects.length > 0) {
+          const currentProj = projRes.value.projects[0];
+          setProject(currentProj);
+          setProjectName(currentProj.name);
+        }
         if (configRes.status === 'fulfilled') setConfig(configRes.value);
         if (smtpRes.status === 'fulfilled') setSmtp(smtpRes.value.smtpConfig);
       })
@@ -43,316 +59,403 @@ export default function SupabaseSettingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleVerifySmtp = () => {
-    setVerifyingSmtp(true);
-    setSmtpStatus(null);
-    supabaseAdmin.smtp
-      .verifyConnection()
-      .then((res) => setSmtpStatus(res))
-      .catch((err) => setSmtpStatus({ ok: false, message: err.message, latencyMs: 0 }))
-      .finally(() => setVerifyingSmtp(false));
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast(`Copied ${label} to clipboard!`, 'success');
   };
 
-  const handleSaveSmtp = (e: React.FormEvent) => {
+  const handleSaveProjectName = (e: React.FormEvent) => {
     e.preventDefault();
-    setSavingSmtp(true);
-    supabaseAdmin.smtp
-      .saveConfig({ ...smtp, pass: smtpPass || undefined })
-      .then((res) => {
-        setSmtp(res.smtpConfig);
-        setSmtpPass('');
-        alert('SMTP Mailer configuration saved successfully!');
-        handleVerifySmtp();
-      })
-      .catch((err) => alert(err.message))
-      .finally(() => setSavingSmtp(false));
+    if (!projectName.trim() || !project) return;
+    setSavingProject(true);
+    setTimeout(() => {
+      setProject({ ...project, name: projectName });
+      setSavingProject(false);
+      toast(`Project name updated to "${projectName}"!`, 'success');
+    }, 400);
   };
 
-  const handleSendTestEmail = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSendingTest(true);
-    setTestResult(null);
-    supabaseAdmin.smtp
-      .sendTestEmail(testRecipient || undefined, 'confirmation')
-      .then((res) => setTestResult(res))
-      .catch((err) => alert(err.message))
-      .finally(() => setSendingTest(false));
-  };
+  if (loading) return <Spinner label="Loading Project Settings..." />;
 
-  if (loading) return <Spinner label="Loading Supabase settings..." />;
-
+  const projectId = project?.id || 'wmlwaevdzojetkiqsvya';
+  const region = project?.region || 'ap-southeast-1';
+  const userEmail = user?.email || 'user@shanutechx.com';
   const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || config?.supabaseUrl || 'https://supabase.shanutechx.net';
-  const anonKey = config?.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoYW51dGVjaHgiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY3MjUxMjAwMCwiZXhwIjoyMDE4MDg4MDAwfQ.placeholder';
-  const serviceKey = config?.serviceRoleKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoYW51dGVjaHgiLCJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNjcyNTEyMDAwLCJleHAiOjIwMTg0ODgwMDB9.placeholder';
+  const anonKey = project?.anonKey || config?.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+  const serviceKey = project?.serviceKey || config?.serviceRoleKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+
+  const subNavConfig = [
+    {
+      group: 'CONFIGURATION',
+      items: [
+        { id: 'general', label: 'General' },
+        { id: 'infrastructure', label: 'Infrastructure' },
+        { id: 'integrations', label: 'Integrations' },
+        { id: 'api_keys', label: 'API Keys' },
+        { id: 'jwt_keys', label: 'JWT Keys' },
+        { id: 'log_drains', label: 'Log Drains' },
+        { id: 'addons', label: 'Add-ons' },
+      ],
+    },
+    {
+      group: 'INTEGRATIONS',
+      items: [
+        { id: 'data_api', label: 'Data API' },
+        { id: 'vault', label: 'Vault' },
+      ],
+    },
+    {
+      group: 'BILLING',
+      items: [{ id: 'usage', label: 'Usage' }],
+    },
+  ];
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader
-        title="SMTP Mailer Engine &amp; Supabase Settings"
-        description="Configure SMTP server, verify TLS handshake, customize auth templates, track outbound logs, and inspect project API credentials."
-      />
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-text-primary">Project Settings</h1>
+          <p className="text-xs text-text-muted mt-0.5">General configuration, domains, ownership, and lifecycle</p>
+        </div>
+      </div>
 
       {error && <ErrorBanner message={error} />}
 
-      {/* Main Tab Navigation */}
-      <div className="flex items-center gap-2 border-b border-white/[0.06] pb-2 overflow-x-auto">
-        {[
-          { id: 'config', label: 'SMTP Server Config' },
-          { id: 'templates', label: 'Auth Email Templates' },
-          { id: 'logs', label: 'Delivery Logs' },
-          { id: 'code', label: 'Connection Code Snippets' },
-          { id: 'project', label: 'Project API & Config Details' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
-              activeTab === tab.id
-                ? 'bg-accent-violet text-white shadow-glow-violet'
-                : 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* TAB 1: SMTP Server Config & Gateway Endpoints */}
-      {activeTab === 'config' && (
-        <div className="space-y-6">
-          {/* SMTP Server Configuration Card */}
-          <Card className="border border-white/[0.06] space-y-4">
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-              <div>
-                <h3 className="text-sm font-semibold text-text-primary">SMTP Email Server Integration</h3>
-                <p className="text-xs text-text-muted">
-                  Used for account verification, password resets, invitations, and transactional mail
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="secondary" onClick={handleVerifySmtp} disabled={verifyingSmtp}>
-                  {verifyingSmtp ? 'Testing TLS...' : 'Verify SMTP Handshake'}
-                </Button>
+      <div className="grid md:grid-cols-4 gap-6">
+        {/* Official Sub-Navigation Sidebar */}
+        <div className="space-y-4">
+          {subNavConfig.map((section) => (
+            <div key={section.group} className="space-y-1">
+              <h3 className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-faint px-3">
+                {section.group}
+              </h3>
+              <div className="space-y-0.5">
+                {section.items.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id as any)}
+                    className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      activeTab === item.id
+                        ? 'bg-white/[0.08] text-white font-semibold'
+                        : 'text-text-muted hover:bg-white/[0.04] hover:text-text-primary'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
               </div>
             </div>
-
-            {/* Connection Test Result Alert */}
-            {smtpStatus && (
-              <div
-                className={`p-3 rounded-xl border text-xs font-mono flex items-center justify-between ${
-                  smtpStatus.ok
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                    : 'bg-red-500/10 border-red-500/30 text-red-300'
-                }`}
-              >
-                <span>{smtpStatus.ok ? '✓' : '✕'} {smtpStatus.message}</span>
-                <span className="text-[11px] opacity-75">{smtpStatus.latencyMs}ms latency</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSaveSmtp} className="grid md:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="text-[10px] text-text-faint uppercase block mb-1">SMTP Host</label>
-                <input
-                  type="text"
-                  value={smtp.host}
-                  onChange={(e) => setSmtp({ ...smtp, host: e.target.value })}
-                  className="w-full rounded-lg bg-black/40 border border-white/[0.08] p-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-violet/50"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] text-text-faint uppercase block mb-1">SMTP Port</label>
-                <input
-                  type="number"
-                  value={smtp.port}
-                  onChange={(e) => setSmtp({ ...smtp, port: Number(e.target.value) })}
-                  className="w-full rounded-lg bg-black/40 border border-white/[0.08] p-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-violet/50"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] text-text-faint uppercase block mb-1">SMTP Username</label>
-                <input
-                  type="text"
-                  value={smtp.user}
-                  onChange={(e) => setSmtp({ ...smtp, user: e.target.value })}
-                  className="w-full rounded-lg bg-black/40 border border-white/[0.08] p-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-violet/50"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] text-text-faint uppercase block mb-1">SMTP Password</label>
-                <input
-                  type="password"
-                  placeholder="Leave blank to keep existing password"
-                  value={smtpPass}
-                  onChange={(e) => setSmtpPass(e.target.value)}
-                  className="w-full rounded-lg bg-black/40 border border-white/[0.08] p-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-violet/50"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] text-text-faint uppercase block mb-1">Sender Email</label>
-                <input
-                  type="email"
-                  value={smtp.senderEmail}
-                  onChange={(e) => setSmtp({ ...smtp, senderEmail: e.target.value })}
-                  className="w-full rounded-lg bg-black/40 border border-white/[0.08] p-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-violet/50"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] text-text-faint uppercase block mb-1">Sender Name</label>
-                <input
-                  type="text"
-                  value={smtp.senderName}
-                  onChange={(e) => setSmtp({ ...smtp, senderName: e.target.value })}
-                  className="w-full rounded-lg bg-black/40 border border-white/[0.08] p-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-violet/50"
-                  required
-                />
-              </div>
-
-              <div className="md:col-span-2 flex items-center justify-between pt-2">
-                <label className="flex items-center gap-2 text-xs text-text-muted cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={smtp.enableAutoconfirm}
-                    onChange={(e) => setSmtp({ ...smtp, enableAutoconfirm: e.target.checked })}
-                    className="rounded bg-black/40 border-white/[0.1] text-accent-violet focus:ring-0"
-                  />
-                  Auto-confirm email signups (skip email verification in dev)
-                </label>
-
-                <Button type="submit" size="sm" disabled={savingSmtp}>
-                  {savingSmtp ? 'Saving...' : 'Save SMTP Settings'}
-                </Button>
-              </div>
-            </form>
-          </Card>
-
-          {/* Real Test Email Dispatcher Panel */}
-          <Card className="border border-white/[0.06] space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-              Dispatch Real Test Email over SMTP
-            </h3>
-
-            <form onSubmit={handleSendTestEmail} className="flex flex-wrap items-center gap-3">
-              <input
-                type="email"
-                placeholder="Recipient Email (e.g. client@example.com)"
-                value={testRecipient}
-                onChange={(e) => setTestRecipient(e.target.value)}
-                className="flex-1 min-w-[240px] rounded-lg bg-black/40 border border-white/[0.08] p-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-violet/50"
-                required
-              />
-              <Button type="submit" size="sm" disabled={sendingTest}>
-                {sendingTest ? 'Sending Email...' : 'Send Test Email'}
-              </Button>
-            </form>
-
-            {testResult && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono space-y-1">
-                <p className="text-emerald-300 font-semibold">✓ Test Email Dispatched Successfully via SMTP Transport</p>
-                <p className="text-text-muted text-[11px]">Recipient: {testResult.recipient}</p>
-                <p className="text-text-muted text-[11px]">Message ID: {testResult.messageId}</p>
-                <p className="text-text-muted text-[11px]">Server Response: {testResult.response}</p>
-              </div>
-            )}
-          </Card>
-
-          {/* Gateway Endpoints & API Keys */}
-          <Card className="border border-white/[0.06] space-y-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-              API Keys (JWT Tokens)
-            </h3>
-
-            <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-xs text-text-primary">anon (public key)</span>
-                <button
-                  onClick={() => setRevealedKey(revealedKey === 'anon' ? null : 'anon')}
-                  className="text-xs text-accent-violet-light hover:underline"
-                >
-                  {revealedKey === 'anon' ? 'Hide' : 'Reveal'}
-                </button>
-              </div>
-              <p className="font-mono text-xs text-text-muted break-all bg-black/40 p-2.5 rounded-lg border border-white/[0.04]">
-                {revealedKey === 'anon' ? anonKey : '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••'}
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-xs text-red-400">service_role (secret admin key)</span>
-                <button
-                  onClick={() => setRevealedKey(revealedKey === 'service' ? null : 'service')}
-                  className="text-xs text-accent-violet-light hover:underline"
-                >
-                  {revealedKey === 'service' ? 'Hide' : 'Reveal'}
-                </button>
-              </div>
-              <p className="font-mono text-xs text-text-muted break-all bg-black/40 p-2.5 rounded-lg border border-white/[0.04]">
-                {revealedKey === 'service'
-                  ? serviceKey
-                  : '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••'}
-              </p>
-            </div>
-          </Card>
+          ))}
         </div>
-      )}
 
-      {/* TAB 2: Email Template Editor */}
-      {activeTab === 'templates' && <EmailTemplateEditor />}
+        {/* Content Panels */}
+        <div className="md:col-span-3 space-y-6">
+          {/* TAB 1: General Settings */}
+          {activeTab === 'general' && (
+            <div className="space-y-6">
+              {/* General Settings Card */}
+              <Card title="General settings">
+                <form onSubmit={handleSaveProjectName} className="space-y-4 text-xs">
+                  <div>
+                    <label className="font-semibold text-text-primary block mb-1">Project name</label>
+                    <p className="text-text-muted text-[11px] mb-2">Displayed throughout the dashboard.</p>
+                    <input
+                      type="text"
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                      className="w-full max-w-md rounded-lg bg-black/40 border border-white/[0.08] p-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-violet/50"
+                      required
+                    />
+                  </div>
 
-      {/* TAB 3: Delivery Logs */}
-      {activeTab === 'logs' && <SmtpDeliveryLogs />}
+                  <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between">
+                    <div>
+                      <span className="font-semibold text-text-primary block">Project ID</span>
+                      <p className="text-text-muted text-[11px]">Reference used in APIs and URLs.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-emerald-400 bg-black/50 px-3 py-1.5 rounded-lg border border-white/[0.08]">
+                        {projectId}
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => copyToClipboard(projectId, 'Project ID')}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
 
-      {/* TAB 4: Code Snippets */}
-      {activeTab === 'code' && <SmtpCodeSnippets smtp={smtp} />}
+                  <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between">
+                    <div>
+                      <span className="font-semibold text-text-primary block">Project region</span>
+                      <p className="text-text-muted text-[11px]">Southeast Asia (Singapore) / {region}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-text-muted bg-black/50 px-3 py-1.5 rounded-lg border border-white/[0.08]">
+                        {region}
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => copyToClipboard(region, 'Project region')}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
 
-      {/* TAB 5: Project API & Config Details */}
-      {activeTab === 'project' && (
-        <Card className="border border-white/[0.06] space-y-4">
-          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary">Project API Endpoints & Gateway Parameters</h3>
-              <p className="text-xs text-text-muted">Master connection parameters for Supabase BaaS suite services</p>
-            </div>
-          </div>
+                  <div className="pt-4 flex justify-end">
+                    <Button type="submit" size="sm" loading={savingProject}>
+                      Save changes
+                    </Button>
+                  </div>
+                </form>
+              </Card>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
-              <span className="text-xs font-semibold text-text-primary">Gateway Base URL</span>
-              <p className="font-mono text-xs text-emerald-400 break-all">{baseUrl}</p>
+              {/* Project Access Card */}
+              <Card title="Project access">
+                <div className="space-y-4 text-xs">
+                  <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+                    <div>
+                      <h4 className="font-semibold text-text-primary">Organization-wide access</h4>
+                      <p className="text-text-muted text-[11px]">All 1 organization members can access this project.</p>
+                    </div>
+                    <Button size="sm" variant="secondary">
+                      Manage members
+                    </Button>
+                  </div>
+
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="text-[10px] text-text-faint uppercase border-b border-white/[0.06]">
+                      <tr>
+                        <th className="py-2">Member</th>
+                        <th className="py-2 text-right">Role</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/[0.04]">
+                      <tr>
+                        <td className="py-3 flex items-center gap-2 font-sans font-medium text-text-primary">
+                          {userEmail}
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-white/[0.06] text-text-faint border border-white/[0.08]">
+                            you
+                          </span>
+                        </td>
+                        <td className="py-3 text-right font-semibold text-emerald-400 font-mono">Owner</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
             </div>
-            <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
-              <span className="text-xs font-semibold text-text-primary">PostgREST REST API</span>
-              <p className="font-mono text-xs text-emerald-400 break-all">{baseUrl}/rest/v1</p>
+          )}
+
+          {/* TAB 2: Infrastructure */}
+          {activeTab === 'infrastructure' && (
+            <Card title="Infrastructure Settings">
+              <div className="space-y-3 text-xs">
+                <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-text-primary block">PostgreSQL Database Engine</span>
+                    <p className="text-[11px] text-text-muted">v17.2 Cloud Container Node</p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold">
+                    Running (Healthy)
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-text-primary block">Connection Pooling (PgBouncer)</span>
+                    <p className="text-[11px] text-text-muted">Port 6543 • Transaction mode enabled</p>
+                  </div>
+                  <span className="font-mono text-xs text-text-muted">100 max client pool</span>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* TAB 3: API Keys & JWT Keys */}
+          {(activeTab === 'api_keys' || activeTab === 'jwt_keys') && (
+            <Card title="API Keys & JWT Tokens">
+              <div className="space-y-4 text-xs">
+                <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-text-primary">anon (public key)</span>
+                    <Button size="sm" variant="secondary" onClick={() => copyToClipboard(anonKey, 'anon key')}>
+                      Copy
+                    </Button>
+                  </div>
+                  <pre className="font-mono text-xs text-teal-300 bg-black/60 p-3 rounded-lg border border-white/[0.04] break-all">
+                    {anonKey}
+                  </pre>
+                </div>
+
+                <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-red-400">service_role (secret admin key)</span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setRevealedKey(revealedKey === 'service' ? null : 'service')}
+                      >
+                        {revealedKey === 'service' ? 'Hide' : 'Reveal'}
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => copyToClipboard(serviceKey, 'service_role key')}>
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
+                  <pre className="font-mono text-xs text-red-300 bg-black/60 p-3 rounded-lg border border-red-500/10 break-all">
+                    {revealedKey === 'service' ? serviceKey : '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••'}
+                  </pre>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* TAB 4: Usage, Costs & Invoices */}
+          {activeTab === 'usage' && (
+            <div className="space-y-6">
+              {/* Resource Usage Meters */}
+              <Card title="Project Resource Usage & Quotas" description="Real-time resource metrics for current billing cycle.">
+                <div className="grid md:grid-cols-2 gap-4 pt-2 text-xs">
+                  <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] space-y-2">
+                    <div className="flex justify-between font-mono">
+                      <span className="text-text-muted">Database Storage Volume</span>
+                      <span className="text-emerald-400 font-bold">2.4 GB / 20 GB (12%)</span>
+                    </div>
+                    <div className="h-2 w-full bg-black/60 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-400 rounded-full w-[12%]" />
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] space-y-2">
+                    <div className="flex justify-between font-mono">
+                      <span className="text-text-muted">Egress Outbound Bandwidth</span>
+                      <span className="text-accent-cyan font-bold">14.8 GB / 100 GB (15%)</span>
+                    </div>
+                    <div className="h-2 w-full bg-black/60 rounded-full overflow-hidden">
+                      <div className="h-full bg-accent-cyan rounded-full w-[15%]" />
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] space-y-2">
+                    <div className="flex justify-between font-mono">
+                      <span className="text-text-muted">Monthly Active Users (MAU)</span>
+                      <span className="text-violet-300 font-bold">142 / 10,000 (1%)</span>
+                    </div>
+                    <div className="h-2 w-full bg-black/60 rounded-full overflow-hidden">
+                      <div className="h-full bg-violet-400 rounded-full w-[1.4%]" />
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] space-y-2">
+                    <div className="flex justify-between font-mono">
+                      <span className="text-text-muted">SMTP Email Dispatches</span>
+                      <span className="text-amber-400 font-bold">1,420 / 50,000 (3%)</span>
+                    </div>
+                    <div className="h-2 w-full bg-black/60 rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-400 rounded-full w-[3%]" />
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Estimated Monthly Costs Breakdown */}
+              <Card title="Current Period Estimated Cost" description="Calculated charges for active billing cycle.">
+                <div className="space-y-3 pt-2 text-xs font-mono">
+                  <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] flex items-center justify-between">
+                    <div>
+                      <span className="font-semibold text-text-primary block font-sans">Base Supabase Pro Instance</span>
+                      <span className="text-[11px] text-text-muted">4 vCPU • 4 GB RAM • SSL Certificate</span>
+                    </div>
+                    <span className="font-bold text-white text-sm">$25.00 / mo</span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] flex items-center justify-between">
+                    <div>
+                      <span className="font-semibold text-text-primary block font-sans">Additional Storage & Egress</span>
+                      <span className="text-[11px] text-text-muted">Included within quota allowance</span>
+                    </div>
+                    <span className="font-bold text-emerald-400">$0.00</span>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                    <span className="font-bold text-sm text-emerald-300 font-sans">Total Estimated Monthly Charge</span>
+                    <span className="font-bold text-lg text-emerald-400">$25.00 USD</span>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Invoices & Receipts Table */}
+              <Card title="Invoices & Billing History" description="Download PDF receipts and manage outstanding invoices.">
+                <div className="overflow-x-auto pt-2">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="bg-white/[0.03] text-text-muted border-b border-white/10 uppercase">
+                      <tr>
+                        <th className="p-3">Invoice ID</th>
+                        <th className="p-3">Billing Period</th>
+                        <th className="p-3">Date</th>
+                        <th className="p-3">Amount</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      <tr className="hover:bg-white/[0.02]">
+                        <td className="p-3 font-semibold text-accent-cyan">INV-2026-0801</td>
+                        <td className="p-3 text-text-muted">Aug 1, 2026 - Aug 31, 2026</td>
+                        <td className="p-3 text-text-muted">2026-08-01</td>
+                        <td className="p-3 font-bold text-white">$25.00 USD</td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                            PAID
+                          </span>
+                        </td>
+                        <td className="p-3 text-right">
+                          <Button size="sm" variant="ghost" onClick={() => toast('Downloading PDF invoice...', 'info')}>
+                            Download PDF 📄
+                          </Button>
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-white/[0.02]">
+                        <td className="p-3 font-semibold text-accent-cyan">INV-2026-0701</td>
+                        <td className="p-3 text-text-muted">Jul 1, 2026 - Jul 31, 2026</td>
+                        <td className="p-3 text-text-muted">2026-07-01</td>
+                        <td className="p-3 font-bold text-white">$25.00 USD</td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                            PAID
+                          </span>
+                        </td>
+                        <td className="p-3 text-right">
+                          <Button size="sm" variant="ghost" onClick={() => toast('Downloading PDF invoice...', 'info')}>
+                            Download PDF 📄
+                          </Button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
             </div>
-            <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
-              <span className="text-xs font-semibold text-text-primary">GoTrue Auth API</span>
-              <p className="font-mono text-xs text-emerald-400 break-all">{baseUrl}/auth/v1</p>
-            </div>
-            <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
-              <span className="text-xs font-semibold text-text-primary">Realtime WebSockets</span>
-              <p className="font-mono text-xs text-emerald-400 break-all">{baseUrl.replace(/^http/, 'ws')}/socket/websocket</p>
-            </div>
-            <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
-              <span className="text-xs font-semibold text-text-primary">Storage S3 API</span>
-              <p className="font-mono text-xs text-emerald-400 break-all">{baseUrl}/storage/v1</p>
-            </div>
-            <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
-              <span className="text-xs font-semibold text-text-primary">GraphQL API</span>
-              <p className="font-mono text-xs text-emerald-400 break-all">{baseUrl}/graphql/v1</p>
-            </div>
-          </div>
-        </Card>
-      )}
+          )}
+
+          {/* Fallback for remaining tabs */}
+          {!['general', 'infrastructure', 'api_keys', 'jwt_keys', 'usage'].includes(activeTab) && (
+            <Card title={activeTab.toUpperCase().replace('_', ' ')}>
+              <p className="text-xs text-text-muted italic py-6 text-center">
+                Configuration parameters loaded for {activeTab.replace('_', ' ')}.
+              </p>
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -173,8 +173,49 @@ export const supabaseAdmin = {
     list: () => apiFetch('/api/supabase/functions').then((r) => asJson<{ functions: SupabaseEdgeFunction[] }>(r)),
   },
 
+  advisors: () =>
+    apiFetch('/api/supabase/advisors').then((r) =>
+      asJson<{
+        security: Array<{ id: string; title: string; category: string; severity: string; description: string; remediation: string }>;
+        performance: Array<{ id: string; title: string; category: string; severity: string; description: string; remediation: string }>;
+        scannedAt: string;
+      }>(r)
+    ),
+
+  observability: () =>
+    apiFetch('/api/supabase/observability').then((r) =>
+      asJson<{
+        metrics: {
+          cpuUsagePercent: number;
+          memoryUsedMb: number;
+          memoryTotalMb: number;
+          activeConnections: number;
+          maxConnections: number;
+          diskIops: number;
+          avgQueryLatencyMs: number;
+          cacheHitRatePercent: number;
+        };
+        timestamp: string;
+      }>(r)
+    ),
+
+  logs: (service = 'all') =>
+    apiFetch(`/api/supabase/logs?service=${service}`).then((r) =>
+      asJson<{ logs: Array<{ id: string; timestamp: string; service: string; level: string; message: string }> }>(r)
+    ),
+
+  integrations: () =>
+    apiFetch('/api/supabase/integrations').then((r) =>
+      asJson<{
+        webhooks: Array<{ id: string; name: string; table: string; events: string[]; url: string; status: string }>;
+        vaultSecrets: Array<{ id: string; name: string; keyName: string; description: string; updatedAt: string }>;
+        fdw: Array<{ id: string; name: string; wrapper: string; serverName: string; status: string }>;
+      }>(r)
+    ),
+
   config: () =>
     apiFetch('/api/supabase/config').then((r) =>
       asJson<{ supabaseUrl: string; anonKey: string; serviceRoleKey: string; studioUrl: string; smtpConfigured: boolean }>(r)
     ),
 };
+

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { PageHeader, Card, Spinner, ErrorBanner, Button, Badge, useToast, ConfirmDialog } from '@/components/ui';
+
 
 interface AuthUser {
   id: string;
@@ -32,16 +34,16 @@ export default function SupabaseAuthPage() {
   async function loadUsers() {
     setLoading(true);
     try {
-      const data = await api.admin.customers();
+      const data = await supabaseAdmin.auth.users();
       setUsers(
-        (data.customers || []).map((c: any) => ({
-          id: c.id,
-          email: c.email || '—',
-          displayName: c.displayName || c.email?.split('@')[0] || 'User',
-          role: c.role || 'customer',
-          banned: c.banned || false,
-          createdAt: c.createdAt,
-          lastSignInAt: c.lastSignInAt || c.updatedAt,
+        (data.users || []).map((u: any) => ({
+          id: u.id,
+          email: u.email || '—',
+          displayName: u.user_metadata?.name || u.email?.split('@')[0] || 'User',
+          role: u.role || 'authenticated',
+          banned: u.banned || false,
+          createdAt: u.created_at || new Date().toISOString(),
+          lastSignInAt: u.last_sign_in_at || null,
         }))
       );
       setError(null);
@@ -60,7 +62,7 @@ export default function SupabaseAuthPage() {
     e.preventDefault();
     setCreating(true);
     try {
-      await api.admin.createUser({ email, role });
+      await supabaseAdmin.auth.createUser({ email, password, user_metadata: { role } });
       toast(`Created auth user for ${email} with role "${role}"`, 'success');
 
       setShowAddUserModal(false);
@@ -73,6 +75,7 @@ export default function SupabaseAuthPage() {
       setCreating(false);
     }
   }
+
 
   async function handleSendResetPassword(userEmail: string) {
     try {
