@@ -22,7 +22,21 @@ emailRouter.use(requireAuth);
  */
 emailRouter.get('/email/mailboxes', async (req: AuthedRequest, res) => {
   try {
-    const where = await ownedResourceWhere(req);
+    let where: any = {};
+    if (req.user!.role === 'dev') {
+      where = {};
+    } else if (req.user!.role === 'admin') {
+      where = {
+        OR: [
+          { userId: req.user!.id },
+          { allowedAdminIds: { has: req.user!.id } },
+          { user: { assignedAdminId: req.user!.id } },
+        ],
+      };
+    } else {
+      where = { userId: req.user!.id };
+    }
+
     const accounts = await prisma.smtpAccount.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -124,13 +138,20 @@ const adminProvisionSchema = z.object({
   dailySendLimit: z.number().int().positive().default(1000),
   maxAliases: z.number().int().positive().default(10),
   allowedAdminIds: z.array(z.string()).optional(),
+  isInternal: z.boolean().optional().default(false),
 });
 
-emailRouter.post('/admin/email/provision', requireAdminOrDev, async (req: AuthedRequest, res) => {
+emailRouter.post('/admin/email/provision', async (req: AuthedRequest, res) => {
+  if (req.user!.role !== 'dev') {
+    return res.status(403).json({
+      error: 'Access denied: Only dev administrators can manually provision new email user accounts. Admins can only manage or be assigned access to existing mailboxes.',
+    });
+  }
+
   const parse = adminProvisionSchema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: 'Invalid provisioning data', details: parse.error.format() });
 
-  const { targetUserId, username, domain, password, storageQuotaMb, dailySendLimit, maxAliases, allowedAdminIds } = parse.data;
+  const { targetUserId, username, domain, password, storageQuotaMb, dailySendLimit, maxAliases, allowedAdminIds, isInternal } = parse.data;
 
   // Verify target user exists
   const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
@@ -140,7 +161,6 @@ emailRouter.post('/admin/email/provision', requireAdminOrDev, async (req: Authed
   const smtpHost = `mail.${domainStr}`;
   const credentialRef = encryptSecret(password, env.secretsEncryptionKey);
   const webmailUrl = process.env.NODE_ENV === 'production' ? `https://mail.${domainStr}` : 'http://localhost:3001/email';
-  // Dev/Admin assigned mailboxes have permanent access (expiresAt: null)
   const expiresAt = null;
 
   try {
@@ -153,13 +173,15 @@ emailRouter.post('/admin/email/provision', requireAdminOrDev, async (req: Authed
         smtpUsername: username,
         credentialRef,
         webmailUrl,
-        storageQuotaMb,
-        dailySendLimit,
-        maxAliases,
+        storageQuotaMb: isInternal ? 999999 : storageQuotaMb,
+        dailySendLimit: isInternal ? 999999 : dailySendLimit,
+        maxAliases: isInternal ? 100 : maxAliases,
         allowedAdminIds: allowedAdminIds || [],
         customDomain: domainStr,
         expiresAt,
         isSuspended: false,
+        isInternal: !!isInternal,
+        billingModel: isInternal ? 'permanent_free' : 'permanent_free',
         storageUsedMb: 0,
         dailySendCount: 0,
       },
@@ -172,11 +194,11 @@ emailRouter.post('/admin/email/provision', requireAdminOrDev, async (req: Authed
       data: {
         adminId: req.user!.id,
         action: 'email.admin_provision',
-        target: `Provisioned mail account ${username}@${domainStr} for ${targetUser.email} (Quota: ${storageQuotaMb}MB, Limit: ${dailySendLimit}/day, Assigned by Dev/Admin)`,
+        target: `Provisioned mail account ${username}@${domainStr} for ${targetUser.email} (Quota: ${storageQuotaMb}MB, Limit: ${dailySendLimit}/day, Assigned by Dev)`,
       },
     });
 
-    logger.info({ adminId: req.user!.id, targetUserId, username }, 'Admin provisioned new SMTP account with permanent dev assignment');
+    logger.info({ adminId: req.user!.id, targetUserId, username }, 'Dev provisioned new SMTP account');
 
     res.status(201).json({
       mailbox: {
@@ -187,10 +209,10 @@ emailRouter.post('/admin/email/provision', requireAdminOrDev, async (req: Authed
         smtpPort: 587,
         sslPort: 465,
         storageUsedMb: 0,
-        storageQuotaMb,
+        storageQuotaMb: isInternal ? 999999 : storageQuotaMb,
         dailySendCount: 0,
-        dailySendLimit,
-        maxAliases,
+        dailySendLimit: isInternal ? 999999 : dailySendLimit,
+        maxAliases: isInternal ? 100 : maxAliases,
         allowedAdminIds: newAccount.allowedAdminIds,
         expiresAt: null,
         isExpired: false,
@@ -202,17 +224,17 @@ emailRouter.post('/admin/email/provision', requireAdminOrDev, async (req: Authed
         userEmail: targetUser.email,
         userDisplayName: targetUser.displayName,
       },
-      message: `Mail account ${username}@${domainStr} provisioned successfully for ${targetUser.email} (Assigned by Dev).`,
+      message: `Mail account ${username}@${domainStr} provisioned successfully for ${targetUser.email}.`,
     });
   } catch (err: any) {
-    logger.error({ err }, 'Failed to admin-provision mail account');
+    logger.error({ err }, 'Failed to dev-provision mail account');
     res.status(500).json({ error: err.message || 'Failed to provision mail account' });
   }
 });
 
 /**
  * POST /api/email/mailboxes
- * Customer mailbox alias creation — customers MUST have an active SMTP subscription.
+ * Customer mailbox creation — customers MUST have an active SMTP subscription.
  */
 const createMailboxSchema = z.object({
   email: z.string().email(),
@@ -222,10 +244,16 @@ const createMailboxSchema = z.object({
 });
 
 emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
+  const role = req.user!.role as string;
+  if (role === 'admin') {
+    return res.status(403).json({
+      error: 'Admins are not permitted to create new email accounts within client spaces. Only clients via catalog purchase or dev users can provision accounts.',
+    });
+  }
   const parse = createMailboxSchema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: 'Invalid mailbox data', details: parse.error.format() });
 
-  const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
+  const isStaff = role === 'admin' || role === 'dev';
 
   if (!isStaff) {
     // Check if customer has an active paid SMTP subscription
@@ -833,5 +861,287 @@ emailRouter.get('/admin/email/stats', requireAdminOrDev, async (_req: AuthedRequ
   } catch (err: any) {
     logger.error({ err }, 'Failed to get email stats');
     res.status(500).json({ error: err.message || 'Failed to get stats' });
+  }
+});
+
+/**
+ * GET /api/email/contacts
+ * Fetch user's saved email contacts.
+ */
+emailRouter.get('/email/contacts', async (req: AuthedRequest, res) => {
+  try {
+    const contacts = await prisma.emailContact.findMany({
+      where: { userId: req.user!.id },
+      orderBy: { name: 'asc' },
+    });
+    res.json({ contacts });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to list contacts');
+    res.status(500).json({ error: err.message || 'Failed to list contacts' });
+  }
+});
+
+/**
+ * POST /api/email/contacts
+ * Create a new email contact.
+ */
+const contactSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  phone: z.string().optional(),
+  company: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+emailRouter.post('/email/contacts', async (req: AuthedRequest, res) => {
+  const parse = contactSchema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: 'Invalid contact data', details: parse.error.format() });
+
+  try {
+    const newContact = await prisma.emailContact.create({
+      data: {
+        userId: req.user!.id,
+        ...parse.data,
+      },
+    });
+    res.status(201).json({ contact: newContact });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to create contact');
+    res.status(500).json({ error: err.message || 'Failed to create contact' });
+  }
+});
+
+/**
+ * PUT /api/email/contacts/:id
+ * Update an existing email contact.
+ */
+emailRouter.put('/email/contacts/:id', async (req: AuthedRequest, res) => {
+  const parse = contactSchema.partial().safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: 'Invalid contact update', details: parse.error.format() });
+
+  try {
+    const contact = await prisma.emailContact.findUnique({ where: { id: req.params.id } });
+    if (!contact || contact.userId !== req.user!.id) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    const updated = await prisma.emailContact.update({
+      where: { id: contact.id },
+      data: parse.data,
+    });
+    res.json({ contact: updated });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to update contact');
+    res.status(500).json({ error: err.message || 'Failed to update contact' });
+  }
+});
+
+/**
+ * DELETE /api/email/contacts/:id
+ * Delete an email contact.
+ */
+emailRouter.delete('/email/contacts/:id', async (req: AuthedRequest, res) => {
+  try {
+    const contact = await prisma.emailContact.findUnique({ where: { id: req.params.id } });
+    if (!contact || contact.userId !== req.user!.id) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    await prisma.emailContact.delete({ where: { id: contact.id } });
+    res.json({ ok: true, id: req.params.id });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to delete contact');
+    res.status(500).json({ error: err.message || 'Failed to delete contact' });
+  }
+});
+
+/**
+ * PATCH /api/email/messages/:id
+ * Update message properties (folder, isRead, isStarred, tag).
+ */
+emailRouter.patch('/email/messages/:id', async (req: AuthedRequest, res) => {
+  try {
+    const { folder, isRead, isStarred, tag } = req.body || {};
+    const msg = await prisma.webmailMessage.findUnique({ where: { id: req.params.id } });
+    
+    if (msg && msg.userId === req.user!.id) {
+      const updated = await prisma.webmailMessage.update({
+        where: { id: msg.id },
+        data: {
+          ...(folder !== undefined ? { folder } : {}),
+          ...(isRead !== undefined ? { isRead: !!isRead } : {}),
+          ...(isStarred !== undefined ? { isStarred: !!isStarred } : {}),
+          ...(tag !== undefined ? { tag } : {}),
+        },
+      });
+      return res.json({ message: updated });
+    }
+
+    // Fallback for legacy EmailMessage table
+    const legacyMsg = await prisma.emailMessage.findUnique({ where: { id: req.params.id } });
+    if (legacyMsg && legacyMsg.userId === req.user!.id) {
+      const updatedLegacy = await prisma.emailMessage.update({
+        where: { id: legacyMsg.id },
+        data: {
+          ...(folder !== undefined ? { folder } : {}),
+          ...(isRead !== undefined ? { isRead: !!isRead } : {}),
+        },
+      });
+      return res.json({ message: updatedLegacy });
+    }
+
+    res.status(404).json({ error: 'Message not found' });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to update email message');
+    res.status(500).json({ error: err.message || 'Failed to update message' });
+  }
+});
+
+/**
+ * DELETE /api/email/messages/:id
+ * Move email message to trash, or permanently delete if already in trash.
+ */
+emailRouter.delete('/email/messages/:id', async (req: AuthedRequest, res) => {
+  try {
+    const msg = await prisma.webmailMessage.findUnique({ where: { id: req.params.id } });
+    if (msg && msg.userId === req.user!.id) {
+      if (msg.folder === 'trash') {
+        await prisma.webmailMessage.delete({ where: { id: msg.id } });
+        return res.json({ ok: true, action: 'deleted', id: msg.id });
+      } else {
+        const trashed = await prisma.webmailMessage.update({
+          where: { id: msg.id },
+          data: { folder: 'trash' },
+        });
+        return res.json({ ok: true, action: 'moved_to_trash', message: trashed });
+      }
+    }
+
+    const legacy = await prisma.emailMessage.findUnique({ where: { id: req.params.id } });
+    if (legacy && legacy.userId === req.user!.id) {
+      await prisma.emailMessage.delete({ where: { id: legacy.id } });
+      return res.json({ ok: true, action: 'deleted', id: legacy.id });
+    }
+
+    res.status(404).json({ error: 'Message not found' });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to delete message');
+    res.status(500).json({ error: err.message || 'Failed to delete message' });
+  }
+});
+
+/**
+ * POST /api/admin/email/send-renewal-reminders
+ * Scan for expiring accounts (within 7 days) and send automated renewal reminder emails.
+ */
+emailRouter.post('/admin/email/send-renewal-reminders', requireAdminOrDev, async (_req: AuthedRequest, res) => {
+  try {
+    const now = new Date();
+    const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const expiringAccounts = await prisma.smtpAccount.findMany({
+      where: {
+        isInternal: false,
+        expiresAt: {
+          not: null,
+          gte: now,
+          lte: sevenDaysFromNow,
+        },
+        isSuspended: false,
+      },
+      include: { user: true },
+    });
+
+    let sentCount = 0;
+    for (const acc of expiringAccounts) {
+      const daysLeft = Math.ceil((new Date(acc.expiresAt!).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      const webmailUrl = acc.webmailUrl || `https://mail.${env.rootDomain}`;
+
+      void sendSmtpEmail(
+        {
+          host: process.env.SMTP_HOST || `mail.${env.rootDomain}`,
+          port: Number(process.env.SMTP_PORT) || 587,
+          user: process.env.SMTP_USER || `no-reply@${env.rootDomain}`,
+          pass: process.env.SMTP_PASS || '',
+        },
+        {
+          from: `"ShanuTechX Email Billing" <no-reply@${env.rootDomain}>`,
+          to: acc.user.email,
+          subject: `[Renewal Notice] Your Business Email subscription expires in ${daysLeft} day${daysLeft > 1 ? 's' : ''}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 24px; background: #0f172a; color: #f8fafc; border-radius: 16px;">
+              <h2 style="color: #38bdf8; margin-top: 0;">Subscription Renewal Reminder</h2>
+              <p>Hi ${acc.user.displayName || acc.user.email},</p>
+              <p>Your Business Email mailbox (<strong>${acc.smtpUsername}@${acc.customDomain || env.rootDomain}</strong>) is scheduled to expire in <strong>${daysLeft} day${daysLeft > 1 ? 's' : ''}</strong> on <strong>${new Date(acc.expiresAt!).toLocaleDateString()}</strong>.</p>
+              <p>Please renew your subscription to maintain uninterrupted email sending, receiving, and webmail access.</p>
+              <div style="margin-top: 20px;">
+                <a href="${webmailUrl}" style="background: #0284c7; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold; text-decoration: none;">Renew Subscription Now →</a>
+              </div>
+            </div>
+          `,
+        }
+      ).catch((err) => logger.error({ err, userId: acc.userId }, 'Failed to dispatch renewal reminder email'));
+      sentCount++;
+    }
+
+    res.json({ ok: true, reminderCount: sentCount, expiringAccountsFound: expiringAccounts.length });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to send renewal reminders');
+    res.status(500).json({ error: err.message || 'Failed to send renewal reminders' });
+  }
+});
+
+/**
+ * GET /api/email/domains/:id/dns
+ * Get dynamic DNS record list & Knowledge Base guide links for a domain.
+ */
+emailRouter.get('/email/domains/:id/dns', async (req: AuthedRequest, res) => {
+  try {
+    const domainRecord = await prisma.emailDomain.findUnique({ where: { id: req.params.id } });
+    if (!domainRecord) {
+      return res.status(404).json({ error: 'Domain record not found' });
+    }
+
+    const domain = domainRecord.domain;
+    const serverIp = process.env.SERVER_IP || '154.53.56.88';
+    const rootHost = `mail.${env.rootDomain}`;
+
+    res.json({
+      domain,
+      status: domainRecord.status,
+      serverIp,
+      rootHost,
+      guideUrl: `https://${env.rootDomain}/knowledgebase/email-custom-domain-dns-setup`,
+      dnsRecords: [
+        {
+          type: 'MX',
+          name: '@',
+          value: rootHost,
+          priority: 10,
+          purpose: 'Mail Exchange - routes incoming email to ShanuTechX email servers',
+        },
+        {
+          type: 'TXT (SPF)',
+          name: '@',
+          value: `v=spf1 mx ip4:${serverIp} include:_spf.${env.rootDomain} ~all`,
+          purpose: 'Sender Policy Framework - prevents email spoofing',
+        },
+        {
+          type: 'TXT (DKIM)',
+          name: 'default._domainkey',
+          value: `v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQ${domainRecord.id.slice(0, 10)}...`,
+          purpose: 'DomainKeys Identified Mail - cryptographic signature for outbound email',
+        },
+        {
+          type: 'TXT (DMARC)',
+          name: '_dmarc',
+          value: `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${domain}`,
+          purpose: 'Domain-based Message Authentication - instructs mail receivers on policy enforcement',
+        },
+      ],
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to fetch domain DNS details');
+    res.status(500).json({ error: err.message || 'Failed to fetch DNS details' });
   }
 });

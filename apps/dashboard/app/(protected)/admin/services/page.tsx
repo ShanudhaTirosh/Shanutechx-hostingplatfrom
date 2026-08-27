@@ -58,8 +58,10 @@ export default function AdminProductsPage() {
   const [initialPlanBilling, setInitialPlanBilling] = useState<PlanBillingType>('monthly');
 
   // SMTP specific fields
-  const [smtpStorageGb, setSmtpStorageGb] = useState('5');
-  const [smtpMaxAliases, setSmtpMaxAliases] = useState('3');
+  const [smtpMailboxesCount, setSmtpMailboxesCount] = useState('1');
+  const [smtpStorageGb, setSmtpStorageGb] = useState('1');
+  const [smtpForwardingRules, setSmtpForwardingRules] = useState('1');
+  const [smtpMaxAliases, setSmtpMaxAliases] = useState('2');
   const [smtpDailyQuota, setSmtpDailyQuota] = useState('500');
 
   // VPS specific fields
@@ -131,17 +133,32 @@ export default function AdminProductsPage() {
 
   function buildSpecsJson(category: ProductCategory) {
     if (category === 'smtp_hosting') {
-      const storageLimitGb = parseInt(smtpStorageGb, 10) || 5;
-      const maxAliases = parseInt(smtpMaxAliases, 10) || 3;
+      const mailboxesCount = parseInt(smtpMailboxesCount, 10) || 1;
+      const storageLimitGb = parseInt(smtpStorageGb, 10);
+      const storageQuotaMb = storageLimitGb === -1 ? -1 : ((isNaN(storageLimitGb) ? 1 : storageLimitGb) * 1024);
+      const forwardingRules = parseInt(smtpForwardingRules, 10);
+      const maxAliases = parseInt(smtpMaxAliases, 10);
       const dailyQuota = parseInt(smtpDailyQuota, 10) || 500;
       return {
-        storageLimitGb,
-        maxAliases,
+        mailboxesCount,
+        storageLimitGb: isNaN(storageLimitGb) ? 1 : storageLimitGb,
+        storageQuotaMb,
+        forwardingRules: isNaN(forwardingRules) ? 1 : forwardingRules,
+        emailAliases: isNaN(maxAliases) ? 2 : maxAliases,
+        maxAliases: isNaN(maxAliases) ? 2 : maxAliases,
         dailyQuota,
-        storage: `${storageLimitGb} GB Mailbox Storage`,
-        aliases: `${maxAliases} Custom Domain Aliases`,
+        minCommitmentMonths: 3,
+        storage: storageLimitGb === -1 ? 'Unlimited Storage' : `${storageLimitGb} GB Storage per Mailbox`,
+        aliases: maxAliases === -1 ? 'Unlimited Email Aliases' : `${maxAliases} Custom Domain Aliases`,
+        forwarding: forwardingRules === -1 ? 'Unlimited Forwarding Rules' : `${forwardingRules} Forwarding Rules`,
         sendLimit: `${dailyQuota} emails/day`,
-        features: ['Custom Domain (DKIM/SPF/DMARC)', 'IMAP/SMTP SSL/TLS Access', 'Webmail Client Access'],
+        features: [
+          `${mailboxesCount === -1 ? 'Unlimited' : mailboxesCount} Mailbox${mailboxesCount !== 1 ? 'es' : ''} Included`,
+          storageLimitGb === -1 ? 'Unlimited Storage' : `${storageLimitGb} GB Storage per Mailbox`,
+          forwardingRules === -1 ? 'Unlimited Forwarding Rules' : `${forwardingRules} Forwarding Rule${forwardingRules !== 1 ? 's' : ''}`,
+          maxAliases === -1 ? 'Unlimited Email Aliases' : `${maxAliases} Email Alias${maxAliases !== 1 ? 'es' : ''}`,
+          'Webmail & SMTP/IMAP Access',
+        ],
       };
     }
 
@@ -229,10 +246,12 @@ export default function AdminProductsPage() {
     setActivePlan(null);
     setPlName('');
     setPlPrice('');
-    setPlBilling('monthly');
-    setSmtpStorageGb('10');
-    setSmtpMaxAliases('5');
-    setSmtpDailyQuota('1000');
+    setPlBilling('quarterly');
+    setSmtpMailboxesCount('1');
+    setSmtpStorageGb('1');
+    setSmtpForwardingRules('1');
+    setSmtpMaxAliases('2');
+    setSmtpDailyQuota('500');
     setVpsCpu('4');
     setVpsRamGb('8');
     setVpsStorageGb('100');
@@ -250,9 +269,11 @@ export default function AdminProductsPage() {
     
     // Fill specific specs if available
     const specs: any = plan.specsJson || {};
-    if (specs.storageLimitGb) setSmtpStorageGb(specs.storageLimitGb.toString());
-    if (specs.maxAliases) setSmtpMaxAliases(specs.maxAliases.toString());
-    if (specs.dailyQuota) setSmtpDailyQuota(specs.dailyQuota.toString());
+    setSmtpMailboxesCount(specs.mailboxesCount !== undefined ? specs.mailboxesCount.toString() : '1');
+    setSmtpStorageGb(specs.storageLimitGb !== undefined ? specs.storageLimitGb.toString() : '1');
+    setSmtpForwardingRules(specs.forwardingRules !== undefined ? specs.forwardingRules.toString() : '1');
+    setSmtpMaxAliases((specs.maxAliases !== undefined ? specs.maxAliases : (specs.emailAliases !== undefined ? specs.emailAliases : '2')).toString());
+    setSmtpDailyQuota(specs.dailyQuota ? specs.dailyQuota.toString() : '500');
     if (specs.cpuCores) setVpsCpu(specs.cpuCores.toString());
     if (specs.ramGb) setVpsRamGb(specs.ramGb.toString());
     if (specs.storageGb) setVpsStorageGb(specs.storageGb.toString());
@@ -362,7 +383,11 @@ export default function AdminProductsPage() {
                   </Button>
                   <Button variant="secondary" size="sm" onClick={() => openEditProduct(product)}>Edit Details</Button>
                   <Button variant="danger" size="sm" onClick={() => setDeleteProduct(product)}>Delete</Button>
-                  <span className="text-text-faint text-xs ml-1 font-mono">{expanded ? '▲' : '▼'}</span>
+                  <span className="text-text-faint text-xs ml-1 font-mono">
+                    <svg className={`w-4 h-4 inline transform transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
                 </div>
               </div>
 
@@ -410,28 +435,66 @@ export default function AdminProductsPage() {
                             {/* Render Category Specifications */}
                             {product.category === 'smtp_hosting' && (
                               <div className="flex gap-2 flex-wrap pt-1 text-[11px] text-text-muted font-mono">
-                                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-emerald-300">
-                                  💾 {specs.storageLimitGb || specs.storageQuotaMb ? `${specs.storageLimitGb || (specs.storageQuotaMb/1024)} GB` : '5 GB'} Storage
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white">
+                                  <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                  </svg>
+                                  {specs.mailboxesCount === -1 ? '∞' : (specs.mailboxesCount || 1)} Mailbox{(specs.mailboxesCount || 1) !== 1 ? 'es' : ''}
                                 </span>
-                                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-accent-cyan">
-                                  🏷 {specs.maxAliases || 3} Aliases
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-emerald-300">
+                                  <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                                  </svg>
+                                  {specs.storageLimitGb === -1 ? '∞ Unlimited' : `${specs.storageLimitGb || 1} GB`} Storage
                                 </span>
-                                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-amber-300">
-                                  ⚡ {specs.dailyQuota || 500} emails/day
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-purple-300">
+                                  <svg className="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                  </svg>
+                                  {specs.forwardingRules === -1 ? '∞' : (specs.forwardingRules || 1)} Forwarding Rule{(specs.forwardingRules || 1) !== 1 ? 's' : ''}
                                 </span>
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-accent-cyan">
+                                  <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                  </svg>
+                                  {specs.maxAliases === -1 || specs.emailAliases === -1 ? '∞' : (specs.maxAliases || specs.emailAliases || 2)} Aliases
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-amber-300">
+                                  <svg className="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                  </svg>
+                                  {specs.dailyQuota || 500} emails/day
+                                </span>
+                                {(plan.billingType === 'quarterly' || specs.minCommitmentMonths === 3) && (
+                                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold">
+                                    <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                    3-Mo Commitment
+                                  </span>
+                                )}
                               </div>
                             )}
 
                             {product.category === 'vps' && (
                               <div className="flex gap-2 flex-wrap pt-1 text-[11px] text-text-muted font-mono">
-                                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white">
-                                  💻 {specs.cpuCores || 2} vCPU
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white">
+                                  <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m14-6h2m-2 6h2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                                  </svg>
+                                  {specs.cpuCores || 2} vCPU
                                 </span>
-                                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-accent-cyan">
-                                  🧠 {specs.ramGb || 4} GB RAM
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-accent-cyan">
+                                  <svg className="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                  </svg>
+                                  {specs.ramGb || 4} GB RAM
                                 </span>
-                                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-emerald-300">
-                                  💾 {specs.storageGb || 50} GB NVMe
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-emerald-300">
+                                  <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                                  </svg>
+                                  {specs.storageGb || 50} GB NVMe
                                 </span>
                               </div>
                             )}
@@ -658,36 +721,64 @@ export default function AdminProductsPage() {
 
           {/* SMTP Specific Quota Inputs */}
           {planCategory === 'smtp_hosting' && (
-            <div className="p-3 bg-black/60 border border-white/10 rounded-2xl space-y-2">
-              <p className="text-xs font-bold text-accent-cyan font-mono">📬 SMTP Resource Limits</p>
-              <div className="grid grid-cols-3 gap-2">
+            <div className="p-3 bg-black/60 border border-white/10 rounded-2xl space-y-3">
+              <p className="text-xs font-bold text-accent-cyan font-mono flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Email Hosting Package Limits (-1 = Unlimited)
+              </p>
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[11px] text-text-muted block mb-1">Storage Quota (GB)</label>
+                  <label className="text-[11px] text-text-muted block mb-1">Mailboxes Included</label>
+                  <input
+                    type="number"
+                    value={smtpMailboxesCount}
+                    onChange={(e) => setSmtpMailboxesCount(e.target.value)}
+                    placeholder="1 or -1"
+                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-xs font-mono text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-text-muted block mb-1">Storage per Mailbox (GB)</label>
                   <input
                     type="number"
                     value={smtpStorageGb}
                     onChange={(e) => setSmtpStorageGb(e.target.value)}
+                    placeholder="1, 5, 20, 50, -1"
                     className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-xs font-mono text-white"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-text-muted block mb-1">Max Aliases</label>
+                  <label className="text-[11px] text-text-muted block mb-1">Forwarding Rules</label>
+                  <input
+                    type="number"
+                    value={smtpForwardingRules}
+                    onChange={(e) => setSmtpForwardingRules(e.target.value)}
+                    placeholder="1, 5, 20, 50, -1"
+                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-xs font-mono text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-text-muted block mb-1">Max Email Aliases</label>
                   <input
                     type="number"
                     value={smtpMaxAliases}
                     onChange={(e) => setSmtpMaxAliases(e.target.value)}
+                    placeholder="2, 5, 10, 30, -1"
                     className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-xs font-mono text-white"
                   />
                 </div>
-                <div>
-                  <label className="text-[11px] text-text-muted block mb-1">Daily Send Limit</label>
-                  <input
-                    type="number"
-                    value={smtpDailyQuota}
-                    onChange={(e) => setSmtpDailyQuota(e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-xs font-mono text-white"
-                  />
-                </div>
+              </div>
+              <div>
+                <label className="text-[11px] text-text-muted block mb-1">Daily Send Limit (emails/day)</label>
+                <input
+                  type="number"
+                  value={smtpDailyQuota}
+                  onChange={(e) => setSmtpDailyQuota(e.target.value)}
+                  placeholder="500, 2500, 5000, 10000"
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-1.5 text-xs font-mono text-white"
+                />
               </div>
             </div>
           )}
@@ -695,7 +786,12 @@ export default function AdminProductsPage() {
           {/* VPS Specific Resource Inputs */}
           {planCategory === 'vps' && (
             <div className="p-3 bg-black/60 border border-white/10 rounded-2xl space-y-2">
-              <p className="text-xs font-bold text-accent-cyan font-mono">💻 VPS Specs & Leaseweb Margin</p>
+              <p className="text-xs font-bold text-accent-cyan font-mono flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                </svg>
+                VPS Specs & Leaseweb Margin
+              </p>
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="text-[11px] text-text-muted block mb-1">vCPU Cores</label>

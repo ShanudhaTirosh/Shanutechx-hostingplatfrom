@@ -231,7 +231,12 @@ export default function AdminEmailPage() {
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-bg border border-white/10 rounded-3xl p-6 w-full max-w-lg space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="font-bold text-sm text-white">✉ Provision Customer Mail Account</h3>
+              <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Provision Customer Mail Account
+              </h3>
               <button
                 onClick={() => setShowProvisionModal(false)}
                 className="text-text-muted hover:text-white text-xs"

@@ -105,6 +105,14 @@ export const api = {
 
   email: {
     mailboxes: () => apiFetch('/api/email/mailboxes').then((r) => asJson<{ mailboxes: any[]; total: number }>(r)),
+    credentials: (id: string) =>
+      apiFetch(`/api/email/mailboxes/${id}/credentials`).then((r) =>
+        asJson<{ smtpHost: string; smtpPort: number; username: string; password?: string; imapHost: string; imapPort: number }>(r)
+      ),
+    renew: (id: string) =>
+      apiFetch(`/api/email/mailboxes/${id}/renew`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; message: string; expiresAt: string }>(r)
+      ),
     createMailbox: (data: { email: string; password: string; storageQuotaMb?: number; dailySendLimit?: number }) =>
       apiFetch('/api/email/mailboxes', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ mailbox: any }>(r)),
     deleteMailbox: (id: string) => apiFetch(`/api/email/mailboxes/${id}`, { method: 'DELETE' }).then((r) => asJson<{ success: boolean }>(r)),
@@ -124,6 +132,7 @@ export const api = {
       password: string;
       storageQuotaMb?: number;
       dailySendLimit?: number;
+      isInternal?: boolean;
     }) =>
       apiFetch('/api/admin/email/provision', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<{ mailbox: any; message: string }>(r)

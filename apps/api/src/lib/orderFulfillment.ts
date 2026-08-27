@@ -98,6 +98,15 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
           const aliases = generateDefaultAliases(env.rootDomain, tier.maxAliases);
           const credentialRef = encryptSecret(autoPassword, env.secretsEncryptionKey);
 
+          const specs: any = item.plan?.specsJson || {};
+          const storageQuotaMb = specs.storageQuotaMb !== undefined ? specs.storageQuotaMb : (specs.storageLimitGb ? (specs.storageLimitGb === -1 ? -1 : specs.storageLimitGb * 1024) : 1024);
+          const maxAliases = specs.maxAliases !== undefined ? specs.maxAliases : (specs.emailAliases !== undefined ? specs.emailAliases : 2);
+          const dailySendLimit = specs.dailyQuota !== undefined ? specs.dailyQuota : (specs.dailySendLimit !== undefined ? specs.dailySendLimit : 1000);
+
+          // Default 3-month (90 days) commitment expiration from payment approval date
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + (specs.minCommitmentMonths ? specs.minCommitmentMonths * 30 : 90));
+
           await prisma.smtpAccount.create({
             data: {
               userId: order.userId,
@@ -108,6 +117,11 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
               smtpUsername: username,
               credentialRef,
               webmailUrl,
+              storageQuotaMb,
+              maxAliases,
+              dailySendLimit,
+              expiresAt,
+              planTier: item.plan?.name || tier.name,
             },
           });
 

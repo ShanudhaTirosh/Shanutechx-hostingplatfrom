@@ -32,6 +32,10 @@ const createSmtpAccountSchema = z.object({
   planTier: z.enum(['starter', 'pro', 'enterprise']).default('starter'),
   customAliases: z.array(z.string()).optional(),
   allowedAdminIds: z.array(z.string()).optional(),
+  isInternal: z.boolean().optional().default(false),
+  billingModel: z.enum(['free_trial_first_month', 'paid_upfront', 'permanent_free']).optional().default('permanent_free'),
+  storageQuotaMb: z.number().optional(),
+  dailySendLimit: z.number().optional(),
 });
 
 /**
@@ -239,21 +243,23 @@ smtpRouter.post('/smtp-accounts', requireDev, async (req: AuthedRequest, res) =>
   const parsed = createSmtpAccountSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const { smtpPassword, planTier, domain: inputDomain, customAliases, allowedAdminIds, ...rest } = parsed.data;
+  const { smtpPassword, planTier, domain: inputDomain, customAliases, allowedAdminIds, isInternal, billingModel, storageQuotaMb, dailySendLimit, ...rest } = parsed.data;
   const targetUser = await prisma.user.findUnique({ where: { id: rest.userId } });
 
-  const domain = inputDomain || (targetUser?.role === 'admin' || targetUser?.role === 'dev' ? env.rootDomain : 'clientdomain.com');
+  const domain = inputDomain || (targetUser?.role === 'admin' || targetUser?.role === 'dev' || isInternal ? env.rootDomain : 'clientdomain.com');
 
-  // Enforce Domain Routing Check
-  const domainCheck = validateDomainForUser(targetUser?.role || 'customer', domain, env.rootDomain);
-  if (!domainCheck.valid) {
-    return res.status(400).json({ error: domainCheck.error });
+  // Enforce Domain Routing Check (Dev/Internal can use root domain)
+  if (!isInternal && targetUser?.role === 'customer' && (domain.toLowerCase() === env.rootDomain.toLowerCase() || domain.toLowerCase().endsWith(`.${env.rootDomain.toLowerCase()}`))) {
+    const domainCheck = validateDomainForUser(targetUser?.role || 'customer', domain, env.rootDomain);
+    if (!domainCheck.valid) {
+      return res.status(400).json({ error: domainCheck.error });
+    }
   }
 
   const credentialRef = encryptSecret(smtpPassword, env.secretsEncryptionKey);
   const tier = SMTP_PLAN_TIERS[planTier] || SMTP_PLAN_TIERS.starter;
   const aliases = customAliases || generateDefaultAliases(domain, tier.maxAliases);
-  const expiresAt = null; // Dev assigned mailbox: permanent access, exempt from 1-month trial expiry
+  const expiresAt = isInternal ? null : null; // Dev assigned & internal mailboxes have permanent access
 
   const account = await prisma.smtpAccount.create({
     data: {
@@ -262,10 +268,14 @@ smtpRouter.post('/smtp-accounts', requireDev, async (req: AuthedRequest, res) =>
       customDomain: domain,
       aliases,
       planTier: tier.id,
-      maxAliases: tier.maxAliases,
+      maxAliases: isInternal ? 100 : tier.maxAliases,
+      storageQuotaMb: isInternal ? 999999 : (storageQuotaMb || tier.storageLimitGb * 1024),
+      dailySendLimit: isInternal ? 999999 : (dailySendLimit || tier.dailyQuota),
       allowedAdminIds: allowedAdminIds || [],
       expiresAt,
       isSuspended: false,
+      isInternal: !!isInternal,
+      billingModel: isInternal ? 'permanent_free' : (billingModel || 'permanent_free'),
     },
     include: { user: true },
   });

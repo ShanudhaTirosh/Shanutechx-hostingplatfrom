@@ -316,16 +316,69 @@ export default function ServicesPage() {
                         
                         {/* SMTP Specs */}
                         {product.category === 'smtp_hosting' && (
-                          <p className="text-[10px] text-emerald-400 font-mono">
-                            💾 {specs.storageLimitGb || 5}GB · 🏷 {specs.maxAliases || 3} Aliases · ⚡ {specs.dailyQuota || 500}/day
-                          </p>
+                          <div className="space-y-1 pt-1">
+                            <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono">
+                              <span className="inline-flex items-center gap-1 text-slate-200">
+                                <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                                {specs.mailboxesCount === -1 ? '∞' : (specs.mailboxesCount || 1)} Mailbox{(specs.mailboxesCount || 1) !== 1 ? 'es' : ''}
+                              </span>
+                              <span className="text-white/20">•</span>
+                              <span className="inline-flex items-center gap-1 text-emerald-300">
+                                <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                                </svg>
+                                {specs.storageLimitGb === -1 ? '∞ Unlimited' : `${specs.storageLimitGb || 1}GB`} Storage
+                              </span>
+                              <span className="text-white/20">•</span>
+                              <span className="inline-flex items-center gap-1 text-purple-300">
+                                <svg className="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                </svg>
+                                {specs.forwardingRules === -1 ? '∞' : (specs.forwardingRules || 1)} Forwarding
+                              </span>
+                              <span className="text-white/20">•</span>
+                              <span className="inline-flex items-center gap-1 text-accent-cyan">
+                                <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                </svg>
+                                {specs.maxAliases === -1 || specs.emailAliases === -1 ? '∞' : (specs.maxAliases || specs.emailAliases || 2)} Aliases
+                              </span>
+                            </div>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                              <svg className="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                              </svg>
+                              Minimum 3-Month Commitment Required
+                            </span>
+                          </div>
                         )}
 
                         {/* VPS Specs */}
                         {product.category === 'vps' && (
-                          <p className="text-[10px] text-sky-400 font-mono">
-                            💻 {specs.cpuCores || 2} vCPU · 🧠 {specs.ramGb || 4}GB RAM · 💾 {specs.storageGb || 50}GB NVMe
-                          </p>
+                          <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono text-sky-400 pt-1">
+                            <span className="inline-flex items-center gap-1">
+                              <svg className="w-3 h-3 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m14-6h2m-2 6h2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                              </svg>
+                              {specs.cpuCores || 2} vCPU
+                            </span>
+                            <span className="text-white/20">•</span>
+                            <span className="inline-flex items-center gap-1">
+                              <svg className="w-3 h-3 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                              </svg>
+                              {specs.ramGb || 4}GB RAM
+                            </span>
+                            <span className="text-white/20">•</span>
+                            <span className="inline-flex items-center gap-1">
+                              <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                              </svg>
+                              {specs.storageGb || 50}GB NVMe
+                            </span>
+                          </div>
                         )}
                       </div>
                       <Button

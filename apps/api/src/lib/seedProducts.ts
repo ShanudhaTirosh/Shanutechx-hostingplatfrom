@@ -11,65 +11,127 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
 
     logger.info('No products found in catalog. Seeding default platform products and plans...');
 
-    // 1. SMTP Mail Hosting Product & Plans
-    const smtpProduct = await prisma.product.create({
-      data: {
-        category: 'smtp_hosting',
-        name: 'Enterprise Outbound SMTP & Mail Hosting',
-        slug: 'smtp-mail-hosting',
-        description: 'Self-hosted high-reputation SMTP mailer with webmail, custom domain support, DKIM/SPF signatures, and auto-aliases.',
-        isActive: true,
-        plans: {
-          create: [
-            {
-              name: 'Starter Mail Hosting',
-              price: 150000, // LKR 1,500.00
-              currency: 'LKR',
-              billingType: 'monthly',
-              specsJson: {
-                storageGB: 5,
-                dailyQuota: 500,
-                maxAliases: 3,
-                customDomain: true,
-                webmail: true,
-                ssl: true,
-              },
-              isActive: true,
-            },
-            {
-              name: 'Professional Mail Hosting',
-              price: 350000, // LKR 3,500.00
-              currency: 'LKR',
-              billingType: 'monthly',
-              specsJson: {
-                storageGB: 25,
-                dailyQuota: 2500,
-                maxAliases: 5,
-                customDomain: true,
-                webmail: true,
-                ssl: true,
-              },
-              isActive: true,
-            },
-            {
-              name: 'Enterprise Mail Hosting',
-              price: 750000, // LKR 7,500.00
-              currency: 'LKR',
-              billingType: 'monthly',
-              specsJson: {
-                storageGB: 100,
-                dailyQuota: 10000,
-                maxAliases: 10,
-                customDomain: true,
-                webmail: true,
-                ssl: true,
-              },
-              isActive: true,
-            },
-          ],
+    // 1. SMTP Mail Hosting Product & Plans (5 Configurable Tiers)
+    let smtpProduct = await prisma.product.findFirst({ where: { category: 'smtp_hosting' } });
+    if (!smtpProduct) {
+      smtpProduct = await prisma.product.create({
+        data: {
+          category: 'smtp_hosting',
+          name: 'Enterprise Outbound SMTP & Business Email Hosting',
+          slug: 'smtp-mail-hosting',
+          description: 'High-reputation SMTP mailer with webmail client, custom domain support, DKIM/SPF signatures, forwarding rules, and email aliases. Minimum 3-month commitment.',
+          isActive: true,
         },
+      });
+    }
+
+    // Seed/Update 5 Standard Email Hosting Plans
+    const defaultEmailPlans = [
+      {
+        name: 'Starter Email (1GB)',
+        price: 450000, // LKR 4,500 (LKR 1,500/mo x 3 months)
+        currency: 'LKR' as const,
+        billingType: 'quarterly' as const,
+        specsJson: {
+          mailboxesCount: 1,
+          storageLimitGb: 1,
+          storageQuotaMb: 1024,
+          forwardingRules: 1,
+          emailAliases: 2,
+          maxAliases: 2,
+          dailyQuota: 500,
+          minCommitmentMonths: 3,
+          features: ['1 Mailbox Included', '1 GB Storage', '1 Forwarding Rule', '2 Email Aliases', 'Webmail & SMTP/IMAP Access'],
+        },
+        isActive: true,
       },
-    });
+      {
+        name: 'Standard Email (5GB)',
+        price: 1050000, // LKR 10,500 (LKR 3,500/mo x 3 months)
+        currency: 'LKR' as const,
+        billingType: 'quarterly' as const,
+        specsJson: {
+          mailboxesCount: 1,
+          storageLimitGb: 5,
+          storageQuotaMb: 5120,
+          forwardingRules: 5,
+          emailAliases: 5,
+          maxAliases: 5,
+          dailyQuota: 2500,
+          minCommitmentMonths: 3,
+          features: ['1 Mailbox Included', '5 GB Storage', '5 Forwarding Rules', '5 Email Aliases', 'Webmail & SMTP/IMAP Access'],
+        },
+        isActive: true,
+      },
+      {
+        name: 'Pro Email (20GB)',
+        price: 2250000, // LKR 22,500 (LKR 7,500/mo x 3 months)
+        currency: 'LKR' as const,
+        billingType: 'quarterly' as const,
+        specsJson: {
+          mailboxesCount: 1,
+          storageLimitGb: 20,
+          storageQuotaMb: 20480,
+          forwardingRules: 20,
+          emailAliases: 10,
+          maxAliases: 10,
+          dailyQuota: 5000,
+          minCommitmentMonths: 3,
+          features: ['1 Mailbox Included', '20 GB Storage', '20 Forwarding Rules', '10 Email Aliases', 'Webmail & SMTP/IMAP Access'],
+        },
+        isActive: true,
+      },
+      {
+        name: 'Enterprise Email (50GB)',
+        price: 4500000, // LKR 45,000 (LKR 15,000/mo x 3 months)
+        currency: 'LKR' as const,
+        billingType: 'quarterly' as const,
+        specsJson: {
+          mailboxesCount: 1,
+          storageLimitGb: 50,
+          storageQuotaMb: 51200,
+          forwardingRules: 50,
+          emailAliases: 30,
+          maxAliases: 30,
+          dailyQuota: 10000,
+          minCommitmentMonths: 3,
+          features: ['1 Mailbox Included', '50 GB Storage', '50 Forwarding Rules', '30 Email Aliases', 'Webmail & SMTP/IMAP Access'],
+        },
+        isActive: true,
+      },
+      {
+        name: 'Enterprise Ultimate (Custom / Unlimited)',
+        price: 9000000, // LKR 90,000 (LKR 30,000/mo x 3 months)
+        currency: 'LKR' as const,
+        billingType: 'quarterly' as const,
+        specsJson: {
+          mailboxesCount: -1,
+          storageLimitGb: -1,
+          storageQuotaMb: -1,
+          forwardingRules: -1,
+          emailAliases: -1,
+          maxAliases: -1,
+          dailyQuota: 50000,
+          minCommitmentMonths: 3,
+          features: ['Unlimited Mailboxes', 'Unlimited Storage', 'Unlimited Forwarding Rules', 'Unlimited Email Aliases', 'Dedicated IP & VIP Support'],
+        },
+        isActive: true,
+      },
+    ];
+
+    for (const p of defaultEmailPlans) {
+      const existing = await prisma.plan.findFirst({
+        where: { productId: smtpProduct.id, name: p.name },
+      });
+      if (!existing) {
+        await prisma.plan.create({
+          data: {
+            productId: smtpProduct.id,
+            ...p,
+          },
+        });
+      }
+    }
 
     // 2. High-Performance VPS Hosting
     await prisma.product.create({

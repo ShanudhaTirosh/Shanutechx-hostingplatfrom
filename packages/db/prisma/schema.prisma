@@ -175,6 +175,7 @@ model User {
   ownedTeams           Team[]               @relation("TeamOwner")
   teamMemberships      TeamMember[]
   sentTeamInvites      TeamInvite[]
+  emailContacts        EmailContact[]
 }
 
 // Real Expo push tokens, registered by the mobile admin app
@@ -525,19 +526,39 @@ model WebmailMessage {
   // sent before any SmtpAccount existed) may not be tied to one yet.
   smtpAccountId  String?
   smtpAccount    SmtpAccount? @relation(fields: [smtpAccountId], references: [id], onDelete: SetNull)
-  folder         String   // 'inbox' | 'sent' | 'drafts' | 'trash'
+  folder         String   // 'inbox' | 'sent' | 'drafts' | 'spam' | 'trash'
   senderName     String
   senderEmail    String
   recipientEmail String
   subject        String
   snippet        String
   htmlBody       String
+  replyTo        String?
+  inReplyTo      String?
+  tag            String?
   isRead         Boolean  @default(false)
   isStarred      Boolean  @default(false)
   hasAttachments Boolean  @default(false)
+  attachmentsJson Json?
   createdAt      DateTime @default(now())
 
   @@index([userId, folder])
+}
+
+// Contacts saved per user in Webmail.
+model EmailContact {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  email     String
+  phone     String?
+  company   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model SmtpAccount {
@@ -563,6 +584,8 @@ model SmtpAccount {
   createdAt     DateTime @default(now())
   expiresAt     DateTime?
   isSuspended   Boolean  @default(false)
+  isInternal    Boolean  @default(false) // True for dev/system accounts (free, unlimited quota, permanent)
+  billingModel  String   @default("paid_upfront") // "free_trial_first_month" | "paid_upfront" | "permanent_free"
   webmailMessages WebmailMessage[]
 
   // Per-account custom domain + alias list + plan tier

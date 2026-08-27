@@ -146,7 +146,12 @@ function NodeCard({ node }: { node: Node }) {
 
       <div className="pt-2 border-t border-white/[0.04] flex justify-between items-center">
         <Button size="sm" variant={showCockpit ? 'secondary' : 'primary'} onClick={() => setShowCockpit(!showCockpit)}>
-          {showCockpit ? 'Hide Cockpit' : '🖥️ Open Cockpit Dashboard'}
+          <span className="flex items-center gap-1.5">
+            <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            {showCockpit ? 'Hide Cockpit' : 'Open Cockpit Dashboard'}
+          </span>
         </Button>
       </div>
 
@@ -157,8 +162,11 @@ function NodeCard({ node }: { node: Node }) {
       )}
 
       {stale && (
-        <p className="text-[10px] text-orange-300 bg-orange-500/5 border border-orange-500/10 rounded-lg px-2.5 py-1.5 mt-2">
-          ⚠️ {node.lastSeenAt ? `Stats are stale (Last seen: ${new Date(node.lastSeenAt).toLocaleString()})` : 'No stats reported yet'}
+        <p className="text-[10px] text-amber-300 bg-amber-500/5 border border-amber-500/10 rounded-lg px-2.5 py-1.5 mt-2 flex items-center gap-1.5">
+          <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          {node.lastSeenAt ? `Stats are stale (Last seen: ${new Date(node.lastSeenAt).toLocaleString()})` : 'No stats reported yet'}
         </p>
       )}
     </Card>
@@ -275,13 +283,13 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
             if (event.type === 'step') {
               setProvisionLog((p) => [...p, event.message]);
             } else if (event.type === 'done') {
-              setProvisionLog((p) => [...p, '🎉 Node provisioned and registered successfully!']);
+              setProvisionLog((p) => [...p, '[SUCCESS] Node provisioned and registered successfully!']);
               setProvisionDone(true);
               toast('Node provisioned and connected via SSH successfully!', 'success');
               onCreated();
             } else if (event.type === 'error') {
               setSshError(event.error || 'Provisioning failed');
-              setProvisionLog((p) => [...p, `❌ Error: ${event.error}`]);
+              setProvisionLog((p) => [...p, `[ERROR] Error: ${event.error}`]);
             }
           } catch { /* skip malformed lines */ }
         }
@@ -413,7 +421,12 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
           </div>
 
           <div className="bg-white/[0.02] p-4 rounded-xl border border-white/[0.04] text-xs space-y-2 text-text-muted">
-            <p className="font-semibold text-text-primary">📋 Quick Onboarding Guide:</p>
+            <p className="font-semibold text-text-primary flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Quick Onboarding Guide:
+            </p>
             <ol className="list-decimal list-inside space-y-1">
               <li>SSH into any fresh Ubuntu / Debian / CentOS VPS as <code className="text-emerald-400">root</code>.</li>
               <li>Paste and run the generated command above.</li>
@@ -497,7 +510,7 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
 
           <div className="pt-2">
             <Button type="submit" loading={sshBusy} disabled={sshBusy || !sshIp}>
-              {sshBusy ? '⏳ Provisioning Node...' : '🚀 Connect & Provision Node (6-Step Auto Setup)'}
+              {sshBusy ? 'Provisioning Node...' : 'Connect & Provision Node (6-Step Auto Setup)'}
             </Button>
           </div>
 
@@ -507,7 +520,7 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
               <div className="flex items-center gap-2">
                 <div className={`h-2 w-2 rounded-full animate-pulse ${provisionDone ? 'bg-emerald-400' : sshError ? 'bg-red-400' : 'bg-amber-400'}`} />
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-                  {provisionDone ? '✅ Provisioning Complete' : sshError ? '❌ Provisioning Failed' : '⏳ Live Provisioning Log...'}
+                  {provisionDone ? 'Provisioning Complete' : sshError ? 'Provisioning Failed' : 'Live Provisioning Log...'}
                 </p>
               </div>
               <pre
@@ -516,10 +529,9 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
               >
                 {provisionLog.map((line, i) => (
                   <span key={i} className={`block ${
-                    line.startsWith('❌') ? 'text-red-400' :
-                    line.startsWith('🎉') ? 'text-emerald-400 font-bold' :
-                    line.startsWith('[stderr]') ? 'text-orange-300' :
-                    line.startsWith('✅') ? 'text-emerald-400' :
+                    line.startsWith('[ERROR]') ? 'text-red-400' :
+                    line.startsWith('[SUCCESS]') ? 'text-emerald-400 font-bold' :
+                    line.startsWith('[stderr]') ? 'text-amber-300' :
                     'text-emerald-300'
                   }`}>{line}</span>
                 ))}
