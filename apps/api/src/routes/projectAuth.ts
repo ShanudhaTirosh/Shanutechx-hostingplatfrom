@@ -6,6 +6,7 @@ import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/aut
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { env } from '../env';
 import { sendViaPostal } from '../lib/postal';
+import { authRateLimiter } from '../middleware/rateLimit';
 import {
   signProjectAuthToken,
   verifyProjectAuthToken,
@@ -27,7 +28,7 @@ const emailPasswordSchema = z.object({
   password: z.string().min(8).max(200),
 });
 
-projectAuthRouter.post('/projects/:id/auth/signup', async (req, res) => {
+projectAuthRouter.post('/projects/:id/auth/signup', authRateLimiter, async (req, res) => {
   const parsed = emailPasswordSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -49,7 +50,7 @@ projectAuthRouter.post('/projects/:id/auth/signup', async (req, res) => {
   res.status(201).json({ token, user: { id: user.id, email: user.email, emailVerified: user.emailVerified } });
 });
 
-projectAuthRouter.post('/projects/:id/auth/login', async (req, res) => {
+projectAuthRouter.post('/projects/:id/auth/login', authRateLimiter, async (req, res) => {
   const parsed = emailPasswordSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -161,7 +162,11 @@ projectAuthRouter.post('/projects/:id/auth/magic-link', async (req, res) => {
     mailError = err.message;
   }
 
-  res.status(202).json({ sent: true, mailError });
+  res.status(202).json({
+    sent: !mailError,
+    mailError,
+    debugLink: process.env.NODE_ENV === 'development' ? link : undefined,
+  });
 });
 
 const magicLinkVerifySchema = z.object({ token: z.string().min(1) });

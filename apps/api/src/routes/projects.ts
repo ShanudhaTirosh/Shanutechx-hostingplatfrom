@@ -288,19 +288,23 @@ async function proxyToAgent(
   const node = await prisma.node.findUnique({ where: { id: proj.nodeId } });
   if (!node) return res.status(500).json({ error: 'Node not found' });
 
-  const { env } = await import('../env');
-  const url = `http://${node.ip}:${env.nodeAgentPort}${agentPath}`;
-  const headers: Record<string, string> = { 'x-agent-secret': env.nodeAgentSecret };
-  const payload = body ? { ...body, dbName: proj.dbName } : undefined;
-  if (payload) headers['Content-Type'] = 'application/json';
+  try {
+    const { env } = await import('../env');
+    const url = `http://${node.ip}:${env.nodeAgentPort}${agentPath}`;
+    const headers: Record<string, string> = { 'x-agent-secret': env.nodeAgentSecret };
+    const payload = body ? { ...body, dbName: proj.dbName } : undefined;
+    if (payload) headers['Content-Type'] = 'application/json';
 
-  const agentRes = await fetch(url, {
-    method,
-    headers,
-    body: payload ? JSON.stringify(payload) : undefined,
-  });
-  const data = await agentRes.json().catch(() => ({}));
-  res.status(agentRes.ok ? 200 : agentRes.status || 500).json(data);
+    const agentRes = await fetch(url, {
+      method,
+      headers,
+      body: payload ? JSON.stringify(payload) : undefined,
+    });
+    const data = await agentRes.json().catch(() => ({}));
+    res.status(agentRes.ok ? 200 : agentRes.status || 500).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to communicate with node agent' });
+  }
 }
 
 projectsRouter.get('/projects/:id/tables/:table/rows', async (req: AuthedRequest, res) => {
@@ -310,11 +314,15 @@ projectsRouter.get('/projects/:id/tables/:table/rows', async (req: AuthedRequest
   const node = await prisma.node.findUnique({ where: { id: proj.nodeId } });
   if (!node) return res.status(500).json({ error: 'Node not found' });
 
-  const { env } = await import('../env');
-  const url = `http://${node.ip}:${env.nodeAgentPort}/agent/projects/${proj.id}/tables/${req.params.table}/rows?page=${page}&limit=${limit}&dbName=${proj.dbName}`;
-  const agentRes = await fetch(url, { headers: { 'x-agent-secret': env.nodeAgentSecret } });
-  const data = await agentRes.json().catch(() => ({}));
-  res.status(agentRes.ok ? 200 : agentRes.status || 500).json(data);
+  try {
+    const { env } = await import('../env');
+    const url = `http://${node.ip}:${env.nodeAgentPort}/agent/projects/${proj.id}/tables/${req.params.table}/rows?page=${page}&limit=${limit}&dbName=${proj.dbName}`;
+    const agentRes = await fetch(url, { headers: { 'x-agent-secret': env.nodeAgentSecret } });
+    const data = await agentRes.json().catch(() => ({}));
+    res.status(agentRes.ok ? 200 : agentRes.status || 500).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to communicate with node agent' });
+  }
 });
 
 projectsRouter.post('/projects/:id/tables/:table/rows', async (req: AuthedRequest, res) => {

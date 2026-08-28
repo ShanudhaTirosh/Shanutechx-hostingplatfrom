@@ -25,7 +25,7 @@ const updateProfileSchema = z.object({
     .regex(/^[0-9]{15,25}$/)
     .nullable()
     .optional(),
-});
+}).strict();
 
 /**
  * Lets a customer link the contact channels notifyCustomer() actually uses.

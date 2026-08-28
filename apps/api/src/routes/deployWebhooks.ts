@@ -105,10 +105,12 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
   let verified = false;
 
   if (githubSignature) {
-    // GitHub: HMAC-SHA256 of the raw request body, hex-encoded, prefixed "sha256=".
+    const rawPayload = (req as any).rawBody
+      ? (Buffer.isBuffer((req as any).rawBody) ? (req as any).rawBody : String((req as any).rawBody))
+      : JSON.stringify(req.body || {});
     const expected =
       'sha256=' +
-      crypto.createHmac('sha256', deployment.deployWebhookSecret).update((req as any).rawBody ?? '').digest('hex');
+      crypto.createHmac('sha256', deployment.deployWebhookSecret).update(rawPayload).digest('hex');
     try {
       verified =
         expected.length === githubSignature.length &&

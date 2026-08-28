@@ -265,8 +265,12 @@ app.get('/agent/deployments/:containerId/logs/stream', async (req, res) => {
   let logStream;
   
   try {
-    logStream = await streamLogs(containerId);
-    
+    req.on('close', () => {
+      if (logStream && typeof logStream.destroy === 'function') {
+        logStream.destroy();
+      }
+    });
+
     logStream.on('data', (chunk) => {
       // Each chunk is plain text log data (already demultiplexed)
       // Split by newlines and send each line as a separate SSE event
@@ -845,7 +849,7 @@ app.post('/agent/compose/up', async (req, res) => {
 
   try {
     // Create project directory
-    await execFileAsync('mkdir', ['-p', projectDir]);
+    fs.mkdirSync(projectDir, { recursive: true });
 
     // Write env vars with auto-generated secrets
     const resolvedEnv = resolveEnvVars(composeYaml, envVars || {});
@@ -853,7 +857,6 @@ app.post('/agent/compose/up', async (req, res) => {
       .map(([k, v]) => `${k}="${String(v ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`)
       .join('\n');
 
-    const fs = require('fs');
     fs.writeFileSync(`${projectDir}/docker-compose.yml`, composeYaml, 'utf8');
     if (envFileContent) fs.writeFileSync(`${projectDir}/.env`, envFileContent, 'utf8');
 
@@ -923,5 +926,27 @@ app.listen(PORT, BIND_HOST, () => {
         'and firewall this port at the OS/cloud level.'
     );
   }
+
+  // Periodic autonomous stats reporting loop back to control plane API
+  const API_URL = process.env.API_URL;
+  const NODE_ID = process.env.NODE_ID;
+  if (API_URL && NODE_ID) {
+    setInterval(async () => {
+      try {
+        const stats = await collectStats();
+        await fetch(`${API_URL}/api/nodes/${NODE_ID}/stats`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-agent-secret': AGENT_SECRET,
+          },
+          body: JSON.stringify(stats),
+        });
+      } catch (err) {
+        logger.debug({ err }, 'Periodic node stats reporting failed');
+      }
+    }, 60_000);
+  }
 });
+
 

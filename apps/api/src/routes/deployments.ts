@@ -23,6 +23,17 @@ export const deploymentsRouter = Router();
 
 deploymentsRouter.use(requireAuth);
 
+function getDecryptedEnvVars(deployment: any): Record<string, string> | undefined {
+  if (!deployment.envVarsEncrypted) return undefined;
+  try {
+    const json = decryptSecret(deployment.envVarsEncrypted, env.secretsEncryptionKey);
+    return JSON.parse(json);
+  } catch (err) {
+    logger.error({ deploymentId: deployment.id, err }, 'Failed to decrypt deployment envVars');
+    return undefined;
+  }
+}
+
 const createDeploymentSchema = z.object({
   serviceType: z.enum([
     'web_hosting',
@@ -666,6 +677,17 @@ deploymentsRouter.patch('/deployments/:id/subdomain', async (req: AuthedRequest,
     data: { subdomain: newSubdomain },
   });
 
+function getDecryptedEnvVars(deployment: { envVarsEncrypted?: string | null }): Record<string, string> | undefined {
+  if (!deployment.envVarsEncrypted) return undefined;
+  try {
+    const rawJson = decryptSecret(deployment.envVarsEncrypted, env.secretsEncryptionKey);
+    return JSON.parse(rawJson);
+  } catch (err) {
+    logger.error({ err }, 'Failed to decrypt deployment envVarsEncrypted');
+    return undefined;
+  }
+}
+
   // Re-apply container Traefik labels on node if running
   if (deployment.status === 'running' && deployment.containerId && deployment.repoUrl && deployment.internalPort) {
     try {
@@ -676,6 +698,7 @@ deploymentsRouter.patch('/deployments/:id/subdomain', async (req: AuthedRequest,
           repoUrl: deployment.repoUrl,
           subdomain: newSubdomain,
           internalPort: deployment.internalPort,
+          envVars: getDecryptedEnvVars(deployment),
           backupRepoUrl: deployment.backupRepoFullName ?? undefined,
         },
         () => {}
@@ -718,6 +741,7 @@ deploymentsRouter.post('/deployments/:id/redeploy', async (req: AuthedRequest, r
         branch: parsed.data.branch,
         subdomain: deployment.subdomain ?? undefined,
         internalPort: deployment.internalPort,
+        envVars: getDecryptedEnvVars(deployment),
         backupRepoUrl: deployment.backupRepoFullName ?? undefined,
       },
       (event) => res.write(JSON.stringify(event) + '\n')
@@ -851,6 +875,7 @@ deploymentsRouter.patch('/deployments/:id/limits', async (req: AuthedRequest, re
           cpuLimit: updated.cpuLimit ?? undefined,
           memoryLimit: updated.memoryLimit ?? undefined,
           storageLimit: updated.storageLimit ?? undefined,
+          envVars: getDecryptedEnvVars(deployment),
           backupRepoUrl: deployment.backupRepoFullName ?? undefined,
         },
         (event) => res.write(JSON.stringify(event) + '\n')

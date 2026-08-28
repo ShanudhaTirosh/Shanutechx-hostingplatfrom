@@ -151,7 +151,7 @@ function NavGroup({ group, pathname }: { group: NavGroup; pathname: string }) {
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { apiUser } = useAppUser();
   const [signingOut, setSigningOut] = useState(false);
@@ -160,15 +160,6 @@ export default function Sidebar() {
   const isAdmin  = apiUser?.role === 'admin';
   const isSupport = apiUser?.role === 'support';
   const isCustomer = apiUser?.role === 'customer';
-  
-  // Staff has access to support tools
-  const isStaff = isAdmin || isSupport || isDev;
-  
-  // Infra has access to infrastructure tools
-  const isInfra = isDev;
-  
-  // Admin has access to admin tools (but not dev/infra unless they're also dev)
-  const hasAdminAccess = isAdmin || isDev;
 
   const initials = apiUser?.email
     ? apiUser.email.slice(0, 2).toUpperCase()
@@ -180,7 +171,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-56 shrink-0 flex flex-col py-6 pr-4 gap-1 border-r border-white/[0.05] min-h-screen">
+    <aside className="w-64 md:w-56 shrink-0 flex flex-col py-6 px-4 gap-1 border-r border-white/[0.05] min-h-screen bg-bg">
       {/* Logo */}
       <div className="flex items-center gap-2 px-3 mb-6">
         <span className="inline-flex h-7 w-7 rounded-lg bg-brand-gradient items-center justify-center shadow-glow-violet shrink-0">

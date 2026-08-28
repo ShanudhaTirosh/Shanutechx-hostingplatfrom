@@ -11,9 +11,16 @@ export const internalBotRouter = Router();
 // Middleware: Verify internal secret from either Discord or WhatsApp bot
 internalBotRouter.use((req: Request, res: Response, next) => {
   const secret = req.headers['x-internal-secret'];
-  if (typeof secret !== 'string') return res.status(401).json({ error: 'Unauthorized' });
+  if (typeof secret !== 'string' || !secret) return res.status(401).json({ error: 'Unauthorized' });
 
-  const validSecrets = [env.whatsappInternalSecret, env.discordInternalSecret].filter(Boolean);
+  const validSecrets = [env.whatsappInternalSecret, env.discordInternalSecret].filter(
+    (s): s is string => typeof s === 'string' && s.length > 0
+  );
+
+  if (validSecrets.length === 0) {
+    return res.status(401).json({ error: 'Unauthorized: Bot secrets not configured' });
+  }
+
   const key = 'shanutechx-bot-internal';
 
   const isValid = validSecrets.some((s) =>
@@ -35,11 +42,13 @@ internalBotRouter.get('/internal/customer-summary', async (req: Request, res: Re
   const phone = typeof req.query.phone === 'string' ? req.query.phone.replace(/[^0-9]/g, '') : '';
   if (!phone) return res.status(400).json({ error: 'Phone number is required' });
 
+  const last9 = phone.slice(-9);
   const user = await prisma.user.findFirst({
     where: {
       OR: [
         { phoneNumber: phone },
         { phoneNumber: `+${phone}` },
+        { phoneNumber: { endsWith: last9 } },
       ],
     },
   });
@@ -56,23 +65,41 @@ internalBotRouter.get('/internal/customer-summary', async (req: Request, res: Re
     }),
     prisma.ticket.findMany({
       where: { userId: user.id, status: { in: ['open', 'pending'] } },
-      select: { id: true, subject: true, status: true, updatedAt: true },
+      select: { id: true, subject: true, status: true, priority: true },
       take: 10,
     }),
   ]);
 
-  const formattedDeployments = deployments.map((d) => ({
+  res.json({ user: { id: user.id, email: user.email, displayName: user.displayName }, deployments, tickets });
+});
+
+/**
+ * GET /api/internal/deployments-summary?email=customer@example.com
+ * Retrieve deployments for a customer matched by email
+ */
+internalBotRouter.get('/internal/deployments-summary', async (req: Request, res: Response) => {
+  const email = typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return res.status(404).json({ error: 'Customer not found' });
+
+  const deployments = await prisma.deployment.findMany({
+    where: { userId: user.id },
+    select: { id: true, subdomain: true, status: true, customDomain: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+
+  const formatted = deployments.map((d) => ({
     id: d.id,
-    name: d.subdomain ? `${d.subdomain}.${env.rootDomain}` : d.id,
+    name: d.subdomain || d.id,
+    subdomain: d.subdomain,
     status: d.status,
-    publicUrl: d.customDomain ? `https://${d.customDomain}` : (d.subdomain ? `https://${d.subdomain}.${env.rootDomain}` : null),
+    url: d.customDomain ? `https://${d.customDomain}` : (d.subdomain ? `https://${d.subdomain}.${env.rootDomain}` : null),
   }));
 
-  res.json({
-    user: { id: user.id, email: user.email, displayName: user.displayName },
-    deployments: formattedDeployments,
-    tickets,
-  });
+  res.json({ deployments: formatted });
 });
 
 /**
@@ -128,13 +155,8 @@ internalBotRouter.post('/internal/review-payment', async (req: Request, res: Res
     return res.status(400).json({ error: 'orderId and approve (boolean) are required' });
   }
 
-  const order = await prisma.order.findFirst({
-    where: {
-      OR: [
-        { id: orderId },
-        { id: { startsWith: orderId } },
-      ],
-    },
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
     include: {
       payments: true,
       user: true,

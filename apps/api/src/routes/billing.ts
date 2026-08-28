@@ -76,9 +76,9 @@ billingRouter.post('/subscriptions/:id/renew', requireAuth, async (req: AuthedRe
     return res.status(409).json({ error: 'Cannot renew a cancelled subscription' });
   }
 
-  // Determine renewal amount from original plan price
-  const planPrice = subscription.orderItem.plan?.price ?? 0;
-  const currency = (subscription.orderItem.plan?.currency ?? 'LKR') as Currency;
+  // Determine renewal amount from original plan or legacy service price
+  const planPrice = subscription.orderItem.plan?.price ?? subscription.orderItem.service?.price ?? 0;
+  const currency = (subscription.orderItem.plan?.currency ?? subscription.orderItem.service?.currency ?? 'LKR') as Currency;
   const totalLkr = convertToLkr(planPrice, currency);
 
   // Create a renewal Order
@@ -94,6 +94,7 @@ billingRouter.post('/subscriptions/:id/renew', requireAuth, async (req: AuthedRe
           planId: subscription.orderItem.planId,
           serviceId: subscription.orderItem.serviceId,
           quantity: 1,
+          configJson: { renewalSubscriptionId: subscription.id },
         },
       },
     },

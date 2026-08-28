@@ -210,23 +210,23 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
               data: { userId: order.userId, nodeId: node.id, type: dbType, status: 'pending', credentialRef },
             });
 
-            void provisionDatabaseContainer(node, { databaseId: db.id, type: dbType, password: rawPassword })
-              .then(async (result) => {
-                await prisma.managedDatabase.update({
-                  where: { id: db.id },
-                  data: {
-                    status: 'running',
-                    containerId: result.containerId,
-                    internalHost: result.containerName,
-                    internalPort: result.internalPort,
-                  },
-                });
-              })
-              .catch(async () => {
-                await prisma.managedDatabase.update({ where: { id: db.id }, data: { status: 'failed' } });
+            try {
+              const result = await provisionDatabaseContainer(node, { databaseId: db.id, type: dbType, password: rawPassword });
+              await prisma.managedDatabase.update({
+                where: { id: db.id },
+                data: {
+                  status: 'running',
+                  containerId: result.containerId,
+                  internalHost: result.containerName,
+                  internalPort: result.internalPort,
+                },
               });
-
-            fulfilledItems.push(`Managed ${dbType.toUpperCase()} Database`);
+              fulfilledItems.push(`Managed ${dbType.toUpperCase()} Database`);
+            } catch (provErr: any) {
+              logger.error({ dbId: db.id, err: provErr }, 'Database container provisioning failed');
+              await prisma.managedDatabase.update({ where: { id: db.id }, data: { status: 'failed' } });
+              throw provErr;
+            }
           }
         }
       } catch (err) {

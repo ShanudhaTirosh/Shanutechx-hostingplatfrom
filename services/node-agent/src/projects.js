@@ -112,11 +112,12 @@ async function execSql({ projectId, dbName, sql, dbUsername }) {
   if (dbUsername) validateIdentifier(dbUsername, 'dbUsername');
 
   const targetUser = dbUsername || POSTGRES_SUPERUSER;
+  const guardedSql = `SET statement_timeout = 5000;\n${sql}`;
 
   const { stdout } = await execFileAsync(
     'docker',
     ['exec', '-i', POSTGRES_CONTAINER, 'psql', '-U', targetUser, '-d', dbName, '--csv'],
-    { input: sql, maxBuffer: 10 * 1024 * 1024 }
+    { input: guardedSql, maxBuffer: 10 * 1024 * 1024 }
   );
 
   const lines = stdout.trim().split('\n').filter(Boolean);

@@ -6,6 +6,7 @@ export const globalLimiter = rateLimit({
   limit: 300, // Increased from 120 to 300 for better user experience
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false },
   message: { error: 'Too many requests, please try again later' },
 });
 
@@ -19,6 +20,7 @@ export const smsWebhookLimiter = rateLimit({
   limit: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false },
   message: { error: 'Too many requests' },
 });
 
@@ -28,5 +30,16 @@ export const paymentUploadLimiter = rateLimit({
   limit: 20, // Increased from 10 to 20
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false },
   message: { error: 'Too many upload attempts, please wait a moment and try again' },
+});
+
+/** Sensitive auth endpoints (project signup, login, magic-link, password reset) to prevent brute-force attacks. */
+export const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minute window
+  limit: 15, // max 15 attempts per IP per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { trustProxy: false },
+  message: { error: 'Too many authentication attempts, please try again in 15 minutes' },
 });

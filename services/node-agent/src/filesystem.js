@@ -17,8 +17,20 @@ const WORKSPACE_ROOT = process.env.AGENT_WORKSPACES_DIR || process.env.WORKSPACE
  * escape the workspace root — protection against directory traversal.
  */
 function resolveSafe(deploymentId, relPath = '') {
-  const base = path.resolve(WORKSPACE_ROOT, deploymentId);
-  const target = path.resolve(base, relPath.replace(/^\/+/, ''));
+  const safeDepId = path.basename(String(deploymentId || ''));
+  if (!safeDepId || safeDepId === '.' || safeDepId === '..') {
+    throw Object.assign(new Error('Invalid deployment ID'), { statusCode: 400 });
+  }
+
+  const rootResolved = path.resolve(WORKSPACE_ROOT);
+  const base = path.resolve(rootResolved, safeDepId);
+
+  if (base !== rootResolved && !base.startsWith(rootResolved + path.sep)) {
+    throw Object.assign(new Error('Path escape detected'), { statusCode: 400 });
+  }
+
+  const cleanRel = String(relPath || '').replace(/^[/\\]+/, '');
+  const target = path.resolve(base, cleanRel);
   if (target !== base && !target.startsWith(base + path.sep)) {
     throw Object.assign(new Error('Path escape detected'), { statusCode: 400 });
   }

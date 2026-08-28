@@ -35,17 +35,28 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhos
  * so the browser can attach its own multipart boundary — setting it manually
  * to 'application/json' here would silently corrupt the upload.
  */
-export async function apiFetch(path: string, init: RequestInit = {}) {
-  const user = firebaseAuth.currentUser;
+export async function getAuthToken(): Promise<string> {
+  let user = firebaseAuth.currentUser;
+  if (!user && typeof window !== 'undefined') {
+    await new Promise<void>((resolve) => {
+      const unsubscribe = onAuthStateChanged(firebaseAuth, (u) => {
+        user = u;
+        unsubscribe();
+        resolve();
+      });
+    });
+  }
   if (!user) {
-    // Firebase session expired or not signed in — redirect to login
     if (typeof window !== 'undefined') {
       window.location.replace('/login');
     }
     throw new Error('Not signed in');
   }
+  return user.getIdToken();
+}
 
-  const token = await user.getIdToken();
+export async function apiFetch(path: string, init: RequestInit = {}) {
+  const token = await getAuthToken();
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
 
   return fetch(`${API_BASE}${path}`, {

@@ -135,7 +135,7 @@ function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { childre
           fixed md:relative top-0 left-0 z-40 h-full transition-transform duration-300
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}>
-          <Sidebar />
+          <Sidebar onNavigate={() => setSidebarOpen(false)} />
         </div>
 
         {/* Main content */}

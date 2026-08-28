@@ -15,12 +15,15 @@ const IV_LENGTH = 12;
  * Swapping in a real vault later means changing this one module, not every
  * caller.
  */
-export function encryptSecret(plaintext: string, masterKeyHex: string): string {
-  const key = Buffer.from(masterKeyHex, 'hex');
-  if (key.length !== 32) {
-    throw new Error('SECRETS_ENCRYPTION_KEY must be 32 bytes (64 hex characters)');
+function getCipherKey(masterKey: string): Buffer {
+  if (typeof masterKey === 'string' && /^[0-9a-fA-F]{64}$/.test(masterKey)) {
+    return Buffer.from(masterKey, 'hex');
   }
+  return crypto.createHash('sha256').update(String(masterKey)).digest();
+}
 
+export function encryptSecret(plaintext: string, masterKeyHex: string): string {
+  const key = getCipherKey(masterKeyHex);
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
@@ -33,7 +36,7 @@ export function encryptSecret(plaintext: string, masterKeyHex: string): string {
 }
 
 export function decryptSecret(encrypted: string, masterKeyHex: string): string {
-  const key = Buffer.from(masterKeyHex, 'hex');
+  const key = getCipherKey(masterKeyHex);
   const [ivB64, authTagB64, ciphertextB64] = encrypted.split(':');
 
   if (!ivB64 || !authTagB64 || !ciphertextB64) {

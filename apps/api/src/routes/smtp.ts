@@ -359,15 +359,20 @@ smtpRouter.get('/smtp-accounts/:id/reveal-password', async (req: AuthedRequest, 
     return;
   }
 
-  const password = decryptSecret(account.credentialRef, env.secretsEncryptionKey);
+  try {
+    const password = decryptSecret(account.credentialRef, env.secretsEncryptionKey);
 
-  if (isStaff && account.userId !== req.user!.id) {
-    await prisma.auditLog.create({
-      data: { adminId: req.user!.id, action: 'smtp.reveal_password', target: account.id },
-    });
+    if (isStaff && account.userId !== req.user!.id) {
+      await prisma.auditLog.create({
+        data: { adminId: req.user!.id, action: 'smtp.reveal_password', target: account.id },
+      });
+    }
+
+    res.json({ password });
+  } catch (err: any) {
+    logger.error({ accountId: account.id, err }, 'Failed to decrypt SMTP password');
+    res.status(500).json({ error: 'Failed to decrypt password' });
   }
-
-  res.json({ password });
 });
 
 // 5. Self-Service Password Change

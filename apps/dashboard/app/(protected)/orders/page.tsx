@@ -239,10 +239,16 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
         )}
 
         {order.status === 'paid' && (
-          <Button variant="secondary" size="sm" onClick={handleDownloadInvoice} loading={downloading}>
-            <DownloadIcon />
-            {downloading ? 'Preparing...' : 'Download invoice'}
-          </Button>
+          order.total === 0 ? (
+            <span className="text-xs font-medium text-emerald-400/90 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
+              ✓ Free Order (No Invoice Required)
+            </span>
+          ) : (
+            <Button variant="secondary" size="sm" onClick={handleDownloadInvoice} loading={downloading}>
+              <DownloadIcon />
+              {downloading ? 'Preparing...' : 'Download invoice'}
+            </Button>
+          )
         )}
       </div>
     </Card>

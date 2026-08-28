@@ -155,17 +155,10 @@ paymentsRouter.post('/payments/:id/review', requireAdmin, async (req: AuthedRequ
     let isRenewal = false;
     if (orderWithItems?.items) {
       for (const item of orderWithItems.items) {
-        if (!item.planId) continue;
-        const existingSub = await prisma.subscription.findFirst({
-          where: {
-            userId: payment.order.userId,
-            status: { in: ['active', 'past_due'] },
-            orderItem: { planId: item.planId },
-          },
-        });
-        if (existingSub) {
+        const config = item.configJson as { renewalSubscriptionId?: string } | null;
+        if (config?.renewalSubscriptionId) {
           isRenewal = true;
-          await extendSubscription(existingSub.id);
+          await extendSubscription(config.renewalSubscriptionId);
         }
       }
     }

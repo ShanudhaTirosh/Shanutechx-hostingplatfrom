@@ -48,11 +48,12 @@ async function runContainer({
     // Proxied Routing via Traefik
     const activeSubdomain = subdomain || `app-${deploymentId.slice(0, 8)}`;
     const routerName = `deploy-${deploymentId}`;
+    const targetPort = internalPort && Number(internalPort) > 0 ? Number(internalPort) : 3000;
 
     labels['traefik.enable'] = 'true';
     labels['traefik.docker.network'] = PUBLIC_NETWORK;
     labels[`traefik.http.routers.${routerName}.rule`] = `Host(\`${activeSubdomain}.${rootDomain}\`)`;
-    labels[`traefik.http.services.${routerName}.loadbalancer.server.port`] = String(internalPort);
+    labels[`traefik.http.services.${routerName}.loadbalancer.server.port`] = String(targetPort);
 
     if (effectiveMode === 'ssl_direct') {
       labels[`traefik.http.routers.${routerName}.entrypoints`] = 'websecure';

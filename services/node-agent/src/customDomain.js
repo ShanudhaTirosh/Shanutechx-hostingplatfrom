@@ -25,6 +25,7 @@ async function addDomainRoute(deploymentId, domain, internalPort, rootDomain) {
   // Container name follows the same convention runContainer() in docker.js
   // uses, so this can point at it without needing the container ID.
   const containerName = `deploy-${deploymentId}`;
+  const targetPort = internalPort && Number(internalPort) > 0 ? Number(internalPort) : 3000;
 
   const config = {
     http: {
@@ -38,14 +39,17 @@ async function addDomainRoute(deploymentId, domain, internalPort, rootDomain) {
       },
       services: {
         [routerName]: {
-          loadBalancer: { servers: [{ url: `http://${containerName}:${internalPort}` }] },
+          loadBalancer: { servers: [{ url: `http://${containerName}:${targetPort}` }] },
         },
       },
     },
   };
 
+  const targetPath = configPath(deploymentId, domain);
+  const tmpPath = `${targetPath}.${Date.now()}.tmp`;
   await fs.mkdir(DYNAMIC_DIR, { recursive: true });
-  await fs.writeFile(configPath(deploymentId, domain), yaml.dump(config), 'utf-8');
+  await fs.writeFile(tmpPath, yaml.dump(config), 'utf-8');
+  await fs.rename(tmpPath, targetPath);
 }
 
 async function removeDomainRoute(deploymentId, domain) {

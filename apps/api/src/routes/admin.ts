@@ -202,14 +202,25 @@ adminRouter.patch('/admin/staff/:userId/role', async (req: AuthedRequest, res) =
 adminRouter.get('/admin/audit-log', async (req: AuthedRequest, res) => {
   const { take, skip } = parsePagination(req.query);
 
+  const where =
+    req.user!.role === 'admin'
+      ? {
+          OR: [
+            { adminId: req.user!.id },
+            { admin: { assignedAdminId: req.user!.id } },
+          ],
+        }
+      : {};
+
   const [entries, total] = await Promise.all([
     prisma.auditLog.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       take,
       skip,
       include: { admin: { select: { email: true } } },
     }),
-    prisma.auditLog.count(),
+    prisma.auditLog.count({ where }),
   ]);
 
   res.json({ entries, total, take, skip });

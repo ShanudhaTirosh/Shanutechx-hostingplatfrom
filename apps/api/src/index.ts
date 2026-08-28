@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import pinoHttp from 'pino-http';
 import { env } from './env';
 import { logger } from './lib/logger';
+import { prisma } from './lib/prisma';
 import { attachSshTerminalGateway } from './lib/sshTerminalGateway';
 import { healthRouter } from './routes/health';
 import { meRouter } from './routes/me';
@@ -196,45 +197,51 @@ app.use((req, res) => {
 });
 
 // Global error handler with sanitized error messages
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   logger.error({ err }, 'Unhandled error');
-  
-  let statusCode = err.statusCode || err.status || 500;
+
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  let statusCode = typeof err?.statusCode === 'number' ? err.statusCode : (typeof err?.status === 'number' ? err.status : 500);
   let message = 'Internal server error';
-  
+
   // Client errors (4xx) - safe to show message
   if (statusCode >= 400 && statusCode < 500) {
-    message = err.message || message;
+    message = err?.message || message;
   }
-  
+
   // Sanitize Prisma errors (hide database internals)
-  if (err.code && err.code.startsWith('P')) {
+  if (err?.code && typeof err.code === 'string' && err.code.startsWith('P')) {
     statusCode = 400;
     switch (err.code) {
-      case 'P2002': // Unique constraint violation
-        const field = err.meta?.target?.[0] || 'field';
+      case 'P2002': {
+        const target = err.meta?.target;
+        const field = Array.isArray(target) ? target[0] : (typeof target === 'string' ? target : 'field');
         message = `A record with this ${field} already exists`;
         break;
-      case 'P2025': // Record not found
+      }
+      case 'P2025':
         message = 'The requested resource was not found';
         break;
-      case 'P2003': // Foreign key constraint violation
+      case 'P2003':
         message = 'This action cannot be completed due to related records';
         break;
-      case 'P2014': // Relation violation
+      case 'P2014':
         message = 'Cannot delete this record because it has associated data';
         break;
       default:
         message = 'Database operation failed. Please try again.';
     }
   }
-  
+
   // Sanitize validation errors (Zod)
-  if (err.name === 'ZodError') {
+  if (err?.name === 'ZodError') {
     statusCode = 400;
     message = 'Invalid request data';
   }
-  
+
   res.status(statusCode).json({ error: message });
 });
 
@@ -245,3 +252,22 @@ server.listen(env.port, () => {
   logger.info({ port: env.port }, 'SHANUTECHX API listening (HTTP + /ws/vps-ssh)');
   void ensureDefaultProductsSeeded();
 });
+
+async function gracefulShutdown(signal: string) {
+  logger.info({ signal }, 'Received termination signal. Closing HTTP server and database pool...');
+  server.close(async () => {
+    try {
+      await prisma.$disconnect();
+    } catch {}
+    logger.info('API server shut down gracefully.');
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    logger.error('Forced shutdown after 10s timeout.');
+    process.exit(1);
+  }, 10_000).unref();
+}
+
+process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => void gracefulShutdown('SIGINT'));

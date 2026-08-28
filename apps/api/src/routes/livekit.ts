@@ -98,15 +98,19 @@ livekitRouter.post('/livekit/projects/:id/token', async (req: AuthedRequest, res
   const parsed = tokenSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const apiSecret = decryptSecret(project.apiSecretRef, env.secretsEncryptionKey);
-  const token = await createRoomAccessToken({
-    apiKey: project.apiKey,
-    apiSecret,
-    roomName: parsed.data.roomName,
-    identity: parsed.data.identity,
-  });
-
-  res.json({ token });
+  try {
+    const apiSecret = decryptSecret(project.apiSecretRef, env.secretsEncryptionKey);
+    const token = await createRoomAccessToken({
+      apiKey: project.apiKey,
+      apiSecret,
+      roomName: parsed.data.roomName,
+      identity: parsed.data.identity,
+    });
+    res.json({ token });
+  } catch (err: any) {
+    logger.error({ projectId: project.id, err }, 'Failed to create LiveKit room token');
+    res.status(500).json({ error: 'Failed to generate room token' });
+  }
 });
 
 /**

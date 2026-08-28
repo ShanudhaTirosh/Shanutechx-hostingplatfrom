@@ -54,103 +54,112 @@ const commands = [
 async function handleInteraction(interaction) {
   if (!interaction.isChatInputCommand()) return;
 
-  const { commandName } = interaction;
+  try {
+    const { commandName } = interaction;
 
-  if (commandName === 'status') {
-    await interaction.deferReply();
-    const health = await apiFetch('/api/health');
+    if (commandName === 'status') {
+      await interaction.deferReply();
+      const health = await apiFetch('/api/health');
 
-    const embed = new EmbedBuilder()
-      .setTitle('⚡ ShanuTechX System Status')
-      .setColor(health?.ok ? 0x22c55e : 0xef4444)
-      .addFields(
-        { name: 'Cluster Health', value: health?.ok ? '🟢 ONLINE' : '🔴 DEGRADED', inline: true },
-        { name: 'Environment', value: process.env.NODE_ENV || 'production', inline: true },
-        { name: 'Checked At', value: new Date().toLocaleString(), inline: false }
-      )
-      .setFooter({ text: 'ShanuTechX Operations Console' });
+      const embed = new EmbedBuilder()
+        .setTitle('⚡ ShanuTechX System Status')
+        .setColor(health?.ok ? 0x22c55e : 0xef4444)
+        .addFields(
+          { name: 'Cluster Health', value: health?.ok ? '🟢 ONLINE' : '🔴 DEGRADED', inline: true },
+          { name: 'Environment', value: process.env.NODE_ENV || 'production', inline: true },
+          { name: 'Checked At', value: new Date().toLocaleString(), inline: false }
+        )
+        .setFooter({ text: 'ShanuTechX Operations Console' });
 
-    await interaction.editReply({ embeds: [embed] });
-  } else if (commandName === 'deployments') {
-    await interaction.deferReply();
-    const data = await apiFetch('/api/internal/all-deployments');
+      await interaction.editReply({ embeds: [embed] });
+    } else if (commandName === 'deployments') {
+      await interaction.deferReply();
+      const data = await apiFetch('/api/internal/all-deployments');
 
-    if (!data || !data.deployments || data.deployments.length === 0) {
-      await interaction.editReply('🚀 No active deployments found in cluster.');
-      return;
+      if (!data || !data.deployments || data.deployments.length === 0) {
+        await interaction.editReply('🚀 No active deployments found in cluster.');
+        return;
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle('🚀 Active Cluster Deployments')
+        .setColor(0x7c3aed)
+        .setDescription(
+          data.deployments
+            .slice(0, 15)
+            .map((d) => `• **${d.name}** [${d.status.toUpperCase()}] — ${d.node?.label || 'Node unassigned'}`)
+            .join('\n')
+        )
+        .setFooter({ text: `Showing top 15 of ${data.deployments.length} deployments` });
+
+      await interaction.editReply({ embeds: [embed] });
+    } else if (commandName === 'tickets') {
+      await interaction.deferReply();
+      const data = await apiFetch('/api/internal/open-tickets');
+
+      if (!data || !data.tickets || data.tickets.length === 0) {
+        await interaction.editReply('🎫 No open support tickets right now! 🎉');
+        return;
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle('🎫 Open Support Tickets')
+        .setColor(0x06b6d4)
+        .setDescription(
+          data.tickets
+            .map((t) => `• **#${t.id.slice(0, 8).toUpperCase()}**: ${t.subject} (${t.user?.email || 'Unknown'})`)
+            .join('\n')
+        );
+
+      await interaction.editReply({ embeds: [embed] });
+    } else if (commandName === 'review-payment') {
+      await interaction.deferReply({ ephemeral: true });
+      const orderId = interaction.options.getString('order_id');
+      const action = interaction.options.getString('action');
+      const reason = interaction.options.getString('reason');
+
+      if (action === 'decline' && !reason) {
+        await interaction.editReply('⚠️ A decline reason is required when declining a payment proof.');
+        return;
+      }
+
+      const userLabel = interaction.user.username || interaction.user.tag;
+
+      const reviewRes = await apiFetch(`/api/internal/review-payment`, {
+        method: 'POST',
+        body: JSON.stringify({
+          orderId,
+          approve: action === 'approve',
+          reason,
+          reviewedBy: userLabel,
+        }),
+      });
+
+      if (!reviewRes || !reviewRes.ok) {
+        await interaction.editReply(`❌ Payment review failed: ${reviewRes?.error || 'Order or payment not found'}`);
+        return;
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle(action === 'approve' ? '✅ Payment Approved via Discord' : '❌ Payment Declined via Discord')
+        .setColor(action === 'approve' ? 0x22c55e : 0xef4444)
+        .addFields(
+          { name: 'Order ID', value: `#${orderId.slice(0, 8).toUpperCase()}`, inline: true },
+          { name: 'Action', value: action.toUpperCase(), inline: true },
+          { name: 'Staff Reviewer', value: userLabel, inline: true }
+        );
+
+      if (reason) embed.addFields({ name: 'Reason', value: reason, inline: false });
+
+      await interaction.editReply({ embeds: [embed] });
     }
-
-    const embed = new EmbedBuilder()
-      .setTitle('🚀 Active Cluster Deployments')
-      .setColor(0x7c3aed)
-      .setDescription(
-        data.deployments
-          .slice(0, 15)
-          .map((d) => `• **${d.name}** [${d.status.toUpperCase()}] — ${d.node?.label || 'Node unassigned'}`)
-          .join('\n')
-      )
-      .setFooter({ text: `Showing top 15 of ${data.deployments.length} deployments` });
-
-    await interaction.editReply({ embeds: [embed] });
-  } else if (commandName === 'tickets') {
-    await interaction.deferReply();
-    const data = await apiFetch('/api/internal/open-tickets');
-
-    if (!data || !data.tickets || data.tickets.length === 0) {
-      await interaction.editReply('🎫 No open support tickets right now! 🎉');
-      return;
+  } catch (err) {
+    console.error('Failed to handle Discord interaction:', err);
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ content: '⚠️ An error occurred processing this command.' }).catch(() => {});
+    } else {
+      await interaction.reply({ content: '⚠️ An error occurred processing this command.', ephemeral: true }).catch(() => {});
     }
-
-    const embed = new EmbedBuilder()
-      .setTitle('🎫 Open Support Tickets')
-      .setColor(0x06b6d4)
-      .setDescription(
-        data.tickets
-          .map((t) => `• **#${t.id.slice(0, 8).toUpperCase()}**: ${t.subject} (${t.user?.email || 'Unknown'})`)
-          .join('\n')
-      );
-
-    await interaction.editReply({ embeds: [embed] });
-  } else if (commandName === 'review-payment') {
-    await interaction.deferReply({ ephemeral: true });
-    const orderId = interaction.options.getString('order_id');
-    const action = interaction.options.getString('action');
-    const reason = interaction.options.getString('reason');
-
-    if (action === 'decline' && !reason) {
-      await interaction.editReply('⚠️ A decline reason is required when declining a payment proof.');
-      return;
-    }
-
-    const userLabel = interaction.user.username || interaction.user.tag;
-
-    const reviewRes = await apiFetch(`/api/internal/review-payment`, {
-      method: 'POST',
-      body: JSON.stringify({
-        orderId,
-        approve: action === 'approve',
-        reason,
-        reviewedBy: userLabel,
-      }),
-    });
-
-    if (!reviewRes || !reviewRes.ok) {
-      await interaction.editReply(`❌ Payment review failed: ${reviewRes?.error || 'Order or payment not found'}`);
-      return;
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle(action === 'approve' ? '✅ Payment Approved via Discord' : '❌ Payment Declined via Discord')
-      .setColor(action === 'approve' ? 0x22c55e : 0xef4444)
-      .addFields(
-        { name: 'Order ID', value: `#${orderId.slice(0, 8).toUpperCase()}`, inline: true },
-        { name: 'Action', value: action.toUpperCase(), inline: true },
-        { name: 'Staff Reviewer', value: userLabel, inline: true }
-      );
-
-    if (reason) embed.addFields({ name: 'Reason', value: reason, inline: false });
-
-    await interaction.editReply({ embeds: [embed] });
   }
 }
 

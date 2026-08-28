@@ -106,7 +106,7 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
 
         // Decrypt the SSH key from the vault if it's an encrypted ref,
         // or use as a password if it starts with 'ssh://'
-        let connectOpts: any = { host: ip, port: 22, readyTimeout: 15_000 };
+        let connectOpts: any = { host: ip, port: 22, readyTimeout: 15_000, keepaliveInterval: 10_000 };
 
         if (sshKeyRef.startsWith('ssh://')) {
           fail('This node was registered using password authentication without a stored private key. Browser SSH terminal requires an SSH private key reference.');
@@ -124,9 +124,10 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
         }
 
         ssh!.on('ready', () => {
+          if (!ssh || closed) return;
           sendStatus('Connected. Opening shell…');
-          ssh!.shell({ term: 'xterm-256color' }, (err, stream) => {
-            if (err || closed) {
+          ssh.shell({ term: 'xterm-256color' }, (err, stream) => {
+            if (err || closed || !ssh) {
               fail(`Failed to open shell: ${err?.message ?? 'connection closed'}`);
               return;
             }
@@ -145,7 +146,14 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
             });
             stream.on('data', (chunk: Buffer) => { if (ws.readyState === WebSocket.OPEN) ws.send(chunk); });
             stream.on('close', () => { ws.close(); });
-            ws.on('close', () => { closed = true; stream.close(); ssh?.end(); });
+            ws.on('close', () => {
+              closed = true;
+              try {
+                if (typeof (stream as any).close === 'function') (stream as any).close();
+                else stream.end();
+              } catch {}
+              ssh?.end();
+            });
           });
         });
 
@@ -164,12 +172,15 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
       const ip = instance.ips?.[0]?.ip;
       if (!ip) return fail('No IP address found for this VPS.');
 
+      if (closed || !ssh) return;
+
       sendStatus(`Connecting to ${ip}…`);
 
-      ssh!.on('ready', () => {
+      ssh.on('ready', () => {
+        if (!ssh || closed) return;
         sendStatus('Connected. Opening shell…');
-        ssh!.shell({ term: 'xterm-256color' }, (err, stream) => {
-          if (err || closed) {
+        ssh.shell({ term: 'xterm-256color' }, (err, stream) => {
+          if (err || closed || !ssh) {
             fail(`Failed to open shell: ${err?.message ?? 'connection closed'}`);
             return;
           }
@@ -199,24 +210,28 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
             ws.close();
           });
 
-          ws.on('close', () => {
-            closed = true;
-            stream.close();
-            ssh?.end();
-          });
+            ws.on('close', () => {
+              closed = true;
+              try {
+                if (typeof (stream as any).close === 'function') (stream as any).close();
+                else stream.end();
+              } catch {}
+              ssh?.end();
+            });
         });
       });
 
-      ssh!.on('error', (err) => {
+      ssh.on('error', (err) => {
         fail(`SSH connection failed: ${err.message}`);
       });
 
-      ssh!.connect({
+      ssh.connect({
         host: ip,
         port: 22,
         username: credentials.username || 'root',
         password: credentials.password,
         readyTimeout: 15_000,
+        keepaliveInterval: 10_000,
       });
     } catch (err) {
       const message =
@@ -230,7 +245,9 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
 
   ws.on('close', () => {
     closed = true;
-    ssh?.end();
-    ssh = null;
+    if (ssh) {
+      ssh.end();
+      ssh = null;
+    }
   });
 }

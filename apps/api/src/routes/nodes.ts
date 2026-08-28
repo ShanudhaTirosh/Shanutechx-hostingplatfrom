@@ -123,7 +123,7 @@ docker run -d \\
   -v /var/run/docker.sock:/var/run/docker.sock \\
   -v /srv/compose:/srv/compose \\
   -v /var/lib/shanutechx:/var/lib/shanutechx \\
-  "\$AGENT_IMAGE" sh -c "if [ -f /repo/services/node-agent/src/index.js ]; then node /repo/services/node-agent/src/index.js; else while true; do sleep 10; done; fi"
+  "$AGENT_IMAGE" sh -c "if [ -f /opt/shanutechx/services/node-agent/src/index.js ]; then node /opt/shanutechx/services/node-agent/src/index.js; elif [ -f /repo/services/node-agent/src/index.js ]; then node /repo/services/node-agent/src/index.js; else echo 'Node Agent entry file not found'; exit 1; fi"
 
 echo "============================================================"
 echo "🎉 SUCCESS: Compute Node is onboarded & ONLINE in ShanuTechX!"
