@@ -14,6 +14,7 @@ import {
 } from '../lib/smtpProvisioner';
 import { logger } from '../lib/logger';
 import dns from 'dns';
+import { getServerIp, buildSpfRecord } from '../lib/mailAuth';
 
 export const smtpRouter = Router();
 
@@ -54,7 +55,7 @@ async function getGlobalSmtpConfig() {
       host: process.env.SMTP_HOST || 'mail.shanutechx.com',
       port: Number(process.env.SMTP_PORT) || 587,
       user: process.env.SMTP_USER || 'no-reply@shanutechx.com',
-      passwordEnc: encryptSecret(process.env.SMTP_PASS || 'smtp_secret_pass', env.secretsEncryptionKey),
+      passwordEnc: encryptSecret(process.env.SMTP_PASS || '', env.secretsEncryptionKey),
       senderEmail: process.env.SMTP_USER || 'no-reply@shanutechx.com',
       senderName: 'ShanuTechX Cloud Mailer',
       secure: false,
@@ -134,7 +135,7 @@ smtpRouter.post('/smtp/verify-dns', async (req: AuthedRequest, res) => {
   }
 
   const cleanDomain = domain.toLowerCase().trim();
-  const serverIp = process.env.SERVER_IP || '154.53.56.88';
+  const serverIp = getServerIp();
   const rootHost = `mail.${env.rootDomain}`;
 
   try {
@@ -187,8 +188,8 @@ smtpRouter.post('/smtp/verify-dns', async (req: AuthedRequest, res) => {
       },
       expectedDns: [
         { type: 'MX', name: '@', value: `${rootHost}`, priority: 10, status: mxVerified ? 'verified' : 'pending' },
-        { type: 'TXT (SPF)', name: '@', value: `v=spf1 mx ip4:${serverIp} include:_spf.${env.rootDomain} ~all`, status: spfVerified ? 'verified' : 'pending' },
-        { type: 'TXT (DKIM)', name: 'default._domainkey', value: `v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GN...`, status: 'active' },
+        { type: 'TXT (SPF)', name: '@', value: buildSpfRecord(env.rootDomain), status: spfVerified ? 'verified' : 'pending' },
+        { type: 'TXT (DKIM)', name: 'default._domainkey', value: `v=DKIM1; k=rsa; p=<managed by mail server>`, status: 'active' },
         { type: 'TXT (DMARC)', name: '_dmarc', value: `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${cleanDomain}`, status: dmarcVerified ? 'verified' : 'pending' },
       ],
     });
@@ -327,7 +328,7 @@ smtpRouter.get('/smtp-accounts', async (req: AuthedRequest, res) => {
     const tier = SMTP_PLAN_TIERS[acc.planTier || 'pro'];
     const aliases = (acc.aliases && acc.aliases.length > 0) ? acc.aliases : generateDefaultAliases(domain, tier.maxAliases);
 
-    const serverIp = process.env.SERVER_IP || '154.53.56.88';
+    const serverIp = getServerIp();
     return {
       ...omitCredentialRef(acc),
       domain,
@@ -340,8 +341,8 @@ smtpRouter.get('/smtp-accounts', async (req: AuthedRequest, res) => {
       aliases,
       expectedDns: [
         { type: 'MX', name: '@', value: `mail.${env.rootDomain}`, priority: 10 },
-        { type: 'TXT (SPF)', name: '@', value: `v=spf1 mx ip4:${serverIp} include:_spf.${env.rootDomain} ~all` },
-        { type: 'TXT (DKIM)', name: 'default._domainkey', value: `v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GN...` },
+        { type: 'TXT (SPF)', name: '@', value: buildSpfRecord(env.rootDomain) },
+        { type: 'TXT (DKIM)', name: 'default._domainkey', value: `v=DKIM1; k=rsa; p=<managed by mail server; see account setup>` },
         { type: 'TXT (DMARC)', name: '_dmarc', value: `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${domain}` },
       ],
     };

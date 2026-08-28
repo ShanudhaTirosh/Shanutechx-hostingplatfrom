@@ -9,6 +9,7 @@ import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { sendSmtpReleaseEmail, getTierFromPlanName } from '../lib/smtpProvisioner';
 import { sendSmtpEmail } from '../lib/smtpDispatcher';
 import dns from 'dns';
+import { getServerIp, buildSpfRecord } from '../lib/mailAuth';
 
 export const emailRouter = Router();
 
@@ -357,6 +358,18 @@ emailRouter.post('/email/mailboxes/:id/renew', async (req: AuthedRequest, res) =
     const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
     if (!isOwner && !isStaff) return res.status(403).json({ error: 'Access denied' });
 
+    // Self-serve renewal must not indefinitely extend a free trial. Only staff,
+    // internal/system mailboxes, and genuine paid (paid_upfront) accounts may
+    // renew — a customer still on a free trial cannot renew to get endless free
+    // months; they must pay (billing model flips to paid_upfront on purchase).
+    const isPaid = account.billingModel === 'paid_upfront';
+    const isInternal = account.isInternal || account.billingModel === 'permanent_free';
+    if (!isStaff && !isPaid && !isInternal) {
+      return res.status(403).json({
+        error: 'This mailbox is on a free trial and cannot be renewed. Upgrade to a paid plan to continue.',
+      });
+    }
+
     const newExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days renewal
     const updated = await prisma.smtpAccount.update({
       where: { id: account.id },
@@ -498,7 +511,7 @@ emailRouter.delete('/email/mailboxes/:id/aliases/:prefix', async (req: AuthedReq
 emailRouter.get('/email/domains', async (req: AuthedRequest, res) => {
   try {
     const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
-    const serverIp = process.env.SERVER_IP || '154.53.56.88';
+    const serverIp = getServerIp();
     const mailHost = `mail.${env.rootDomain}`;
 
     const where = isStaff ? {} : { userId: req.user!.id };
@@ -518,9 +531,11 @@ emailRouter.get('/email/domains', async (req: AuthedRequest, res) => {
           id: `smtp-${acc.id}`,
           domain,
           status: 'verified',
-          mxRecord: `10 ${mailHost}`,
-          spfRecord: `v=spf1 mx ip4:${serverIp} include:_spf.${env.rootDomain} ~all`,
-          dkimRecord: `v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQ${acc.id.slice(0, 8)}...`,
+                    mxRecord: `10 ${mailHost}`,
+          spfRecord: buildSpfRecord(env.rootDomain),
+          dkimRecord: `v=DKIM1; k=rsa; p=<managed by mail server>`,
+
+
           dmarcRecord: `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${domain}`,
           createdAt: acc.createdAt.toISOString(),
         });
@@ -583,7 +598,7 @@ emailRouter.post('/email/domains', async (req: AuthedRequest, res) => {
   }
 
   const domainStr = parse.data.domain.toLowerCase().trim();
-  const serverIp = process.env.SERVER_IP || '154.53.56.88';
+  const serverIp = getServerIp();
   const mailHost = `mail.${env.rootDomain}`;
 
   const existing = await prisma.emailDomain.findUnique({ where: { domain: domainStr } });
@@ -601,8 +616,8 @@ emailRouter.post('/email/domains', async (req: AuthedRequest, res) => {
       domain: domainStr,
       status: 'pending_dns',
       mxRecord: `10 ${mailHost}`,
-      spfRecord: `v=spf1 mx ip4:${serverIp} include:_spf.${env.rootDomain} ~all`,
-      dkimRecord: `v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQ...`,
+      spfRecord: buildSpfRecord(env.rootDomain),
+      dkimRecord: `v=DKIM1; k=rsa; p=<managed by mail server>`,
       dmarcRecord: `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${domainStr}`,
       createdAt: newRecord.createdAt,
     },
@@ -1103,7 +1118,7 @@ emailRouter.get('/email/domains/:id/dns', async (req: AuthedRequest, res) => {
     }
 
     const domain = domainRecord.domain;
-    const serverIp = process.env.SERVER_IP || '154.53.56.88';
+    const serverIp = getServerIp();
     const rootHost = `mail.${env.rootDomain}`;
 
     res.json({
@@ -1123,13 +1138,13 @@ emailRouter.get('/email/domains/:id/dns', async (req: AuthedRequest, res) => {
         {
           type: 'TXT (SPF)',
           name: '@',
-          value: `v=spf1 mx ip4:${serverIp} include:_spf.${env.rootDomain} ~all`,
+          value: buildSpfRecord(env.rootDomain),
           purpose: 'Sender Policy Framework - prevents email spoofing',
         },
         {
           type: 'TXT (DKIM)',
           name: 'default._domainkey',
-          value: `v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQ${domainRecord.id.slice(0, 10)}...`,
+          value: `v=DKIM1; k=rsa; p=<managed by mail server>`,
           purpose: 'DomainKeys Identified Mail - cryptographic signature for outbound email',
         },
         {

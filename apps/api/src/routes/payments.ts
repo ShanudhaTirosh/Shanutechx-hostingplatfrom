@@ -48,6 +48,10 @@ paymentsRouter.post(
     const order = await loadOwnedOrder(req, orderId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
+    if (order.status === 'paid') {
+      return res.status(409).json({ error: 'This order is already paid — no further proof is required.' });
+    }
+
     uploadPaymentProof(req, res, async (uploadErr) => {
       if (uploadErr) {
         return res.status(400).json({ error: uploadErr.message });
@@ -127,23 +131,40 @@ paymentsRouter.post('/payments/:id/review', requireAdmin, async (req: AuthedRequ
 
   const newStatus = parsed.data.approve ? 'manually_approved' : 'rejected';
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const updatedPayment = await tx.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: newStatus,
-        reviewedById: req.user!.id,
-        reviewedAt: new Date(),
-        rejectionReason: parsed.data.approve ? null : parsed.data.reason,
-      },
-    });
-
-    if (parsed.data.approve) {
-      await tx.order.update({ where: { id: payment.orderId }, data: { status: 'paid' } });
-    }
-
-    return updatedPayment;
+  // Atomic compare-and-swap: claim this payment for review by updating only
+  // if it is still in an unreviewed state. If another admin (or a retried
+  // request) already reviewed it, the claim updates 0 rows and we bail —
+  // preventing double approval / double fulfillment.
+  const claim = await prisma.payment.updateMany({
+    where: { id: payment.id, status: { in: ['manual_review', 'pending'] } },
+    data: {
+      status: newStatus,
+      reviewedById: req.user!.id,
+      reviewedAt: new Date(),
+      rejectionReason: parsed.data.approve ? null : parsed.data.reason,
+    },
   });
+  if (claim.count === 0) {
+    const latest = await prisma.payment.findUnique({ where: { id: payment.id }, select: { status: true } });
+    return res.status(409).json({ error: `Payment already reviewed (status: ${latest?.status ?? 'unknown'})` });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (parsed.data.approve) {
+      await tx.order.updateMany({
+        where: { id: payment.orderId, status: { not: 'paid' } },
+        data: { status: 'paid' },
+      });
+    }
+  });
+
+  const updated = {
+    ...payment,
+    status: newStatus as typeof payment.status,
+    reviewedById: req.user!.id,
+    reviewedAt: new Date(),
+    rejectionReason: parsed.data.approve ? null : parsed.data.reason,
+  };
 
   if (parsed.data.approve) {
     // Check if renewal

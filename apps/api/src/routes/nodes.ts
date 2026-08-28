@@ -6,17 +6,17 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 import { env } from '../env';
 import { encryptSecret } from '../lib/secretsVault';
+import { verifySharedSecret } from '../lib/gateAuth';
 
 export const nodesRouter = Router();
 
 const CLUSTER_SECRET = env.nodeAgentSecret;
 
 function clusterSecretMatches(submitted: string): boolean {
-  // Timing-safe comparison -- HMAC both sides first so we're always comparing equal-length buffers
-  const key = 'shanutechx-cluster-secret-gate';
-  const a = crypto.createHmac('sha256', key).update(submitted).digest();
-  const b = crypto.createHmac('sha256', key).update(CLUSTER_SECRET).digest();
-  return crypto.timingSafeEqual(a, b);
+  // Constant-time comparison of the submitted secret against the env-provided
+  // cluster secret. No public-literal HMAC key is used — the secret itself is
+  // the only thing being compared.
+  return verifySharedSecret(submitted, CLUSTER_SECRET);
 }
 
 // ── 1. PUBLIC / SCRIPT ENDPOINTS (No user session required, authenticated via Cluster Secret) ──

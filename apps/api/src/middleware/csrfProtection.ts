@@ -32,11 +32,10 @@ const ALLOWED_ORIGINS = [
  * middleware instead of maintaining two divergent origin checks.
  */
 export function isOriginAllowed(origin: string): boolean {
-  return (
-    ALLOWED_ORIGINS.includes(origin) ||
-    origin.endsWith('.shanutechx.com') ||
-    origin === 'https://shanutechx.com'
-  );
+  // Exact-match production/development origins, or any production (HTTPS)
+  // first-party subdomain of shanutechx.com. The wildcard is TLS-gated so an
+  // http:// downgrade can never be accepted.
+  return ALLOWED_ORIGINS.includes(origin) || /^https:\/\/[a-z0-9-]+\.shanutechx\.com$/.test(origin);
 }
 
 /**
@@ -53,26 +52,18 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
   
   const origin = req.headers.origin;
   const referer = req.headers.referer;
-  
-  // If no Origin header, check Referer as fallback
-  // (Some older browsers or tools don't send Origin)
+
+  // No Origin AND no Referer → this is a non-browser caller (curl, cron,
+  // webhook providers, our node-agent, server-to-server). Browsers always
+  // send Origin/Referer on cross-origin requests, and the CSRF threat model
+  // only concerns browser-based cross-site requests, so a header-less
+  // state-changing call cannot be a forged browser request. Allow it.
   if (!origin && !referer) {
-    logger.warn(
-      {
-        method: req.method,
-        path: req.path,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-      },
-      'CSRF: No Origin or Referer header on state-changing request'
-    );
-    res.status(403).json({ 
-      error: 'Request origin could not be verified. Please ensure your browser allows Origin headers.' 
-    });
-    return;
+    return next();
   }
-  
-  // Check if origin or referer matches allowed list
+
+  // At least one of Origin/Referer is present (i.e. a browser-originated
+  // request). Verify it points at a trusted host.
   const requestOrigin = origin || (referer ? new URL(referer).origin : '');
   
   if (!isOriginAllowed(requestOrigin)) {

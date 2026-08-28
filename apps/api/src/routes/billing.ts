@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { env } from '../env';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
@@ -8,6 +7,7 @@ import { runBillingChecks } from '../lib/billing';
 import { convertToLkr, Currency } from '../lib/currency';
 import { notifyAdmins } from '../lib/notifications';
 import { notifyDiscordChannel } from '../lib/discordWebhooks';
+import { verifySharedSecret } from '../lib/gateAuth';
 
 export const billingRouter = Router();
 
@@ -30,13 +30,7 @@ billingRouter.get('/subscriptions', requireAuth, async (req: AuthedRequest, res)
  * this in production on a schedule. Neither path requires the other.
  */
 billingRouter.post('/billing/run-checks', async (req, res) => {
-  const cronSecret = req.headers['x-cron-secret'];
-  const isCronAuthed = (() => {
-    if (typeof cronSecret !== 'string') return false;
-    const submitted = crypto.createHmac('sha256', 'shanutechx-cron-gate').update(cronSecret).digest();
-    const expected = crypto.createHmac('sha256', 'shanutechx-cron-gate').update(env.billingCronSecret).digest();
-    return crypto.timingSafeEqual(submitted, expected);
-  })();
+  const isCronAuthed = verifySharedSecret(req.headers['x-cron-secret'], env.billingCronSecret);
 
   if (!isCronAuthed) {
     // Fall back to normal Firebase admin auth rather than just rejecting —

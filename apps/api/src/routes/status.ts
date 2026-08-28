@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdmin, AuthedRequest } from '../middleware/auth';
 import { runUptimeChecks } from '../lib/uptimeMonitor';
 import { env } from '../env';
+import { verifySharedSecret } from '../lib/gateAuth';
 
 export const statusRouter = Router();
 
@@ -314,13 +315,7 @@ statusRouter.put('/status/components/:id', requireAuth, requireAdmin, async (req
 });
 
 statusRouter.post('/status/run-checks', async (req, res) => {
-  const cronSecret = req.headers['x-cron-secret'];
-  const isCronAuthed = (() => {
-    if (typeof cronSecret !== 'string') return false;
-    const submitted = crypto.createHmac('sha256', 'shanutechx-cron-gate').update(cronSecret).digest();
-    const expected = crypto.createHmac('sha256', 'shanutechx-cron-gate').update(env.billingCronSecret).digest();
-    return crypto.timingSafeEqual(submitted, expected);
-  })();
+  const isCronAuthed = verifySharedSecret(req.headers['x-cron-secret'], env.billingCronSecret);
 
   if (!isCronAuthed) {
     return requireAuth(req as AuthedRequest, res, async () => {

@@ -1,8 +1,9 @@
 /**
  * Cloudflare API client module
  * 
- * Provides DNS CNAME record management and SSL certificate provisioning
- * for custom domain attachment with automatic rate limit handling.
+ * Provides DNS CNAME record management for custom domain attachment with
+ * automatic rate limit handling. SSL is provided by Traefik + Let's Encrypt,
+ * so no Cloudflare certificate-pack code is exposed here.
  */
 
 export {
@@ -10,7 +11,5 @@ export {
   cloudflareClient,
   CloudflareClientError,
   type DNSRecord,
-  type SSLCertificate,
   type DNSVerificationResult,
-  type SSLStatusResult,
 } from './client';

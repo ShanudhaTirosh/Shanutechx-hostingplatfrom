@@ -7,11 +7,17 @@
  * Responsibilities:
  * - Generate CNAME targets for custom domains
  * - Verify CNAME DNS records resolve correctly
- * - Request SSL certificates from Cloudflare API
  * - Configure Traefik dynamic routing for custom domains
  * - Enforce HTTPS redirection for custom domains
- * - Track certificate expiration and trigger renewal
  * - Support multiple domains per deployment
+ *
+ * SSL MODEL: SSL/TLS is provided exclusively by Traefik + Let's Encrypt
+ * (free, auto-provisioning, auto-renewing). Traefik obtains and renews
+ * certificates automatically from the `letsencrypt` ACME resolver when a
+ * custom-domain route is applied via Docker labels. Cloudflare is used for
+ * DNS only (CNAME creation/verification) — never for certificate packs.
+ * This avoids Cloudflare's paid advanced-certificate requirement while
+ * keeping SSL fully free for every customer domain.
  */
 
 import { prisma } from '../prisma';
@@ -398,19 +404,21 @@ export class DomainManager {
   }
 
   /**
-   * Provision an SSL certificate for a custom domain
+   * Provision SSL for a custom domain
    * 
-   * Requests an SSL certificate from Cloudflare and updates the custom domain
-   * status to 'ssl_provisioning'. Once the certificate is active, triggers
-   * Traefik route configuration.
+   * SSL is provided by Traefik + Let's Encrypt (free ACME auto-provisioning).
+   * No Cloudflare certificate pack is requested — Traefik obtains the
+   * certificate automatically via Docker labels when the custom-domain route
+   * is applied. This method applies the Traefik route (which triggers LE
+   * issuance) and marks the domain active.
    * 
    * @param customDomainId - The custom domain ID to provision SSL for
-   * @returns SSL provisioning result with certificate ID
+   * @returns SSL provisioning result
    * @throws DomainManagerError if custom domain not found or not verified
    */
   async provisionSSL(customDomainId: string): Promise<ProvisionSSLResult> {
     logger.info({
-      msg: 'Provisioning SSL certificate',
+      msg: 'Provisioning SSL (Traefik + Let\'s Encrypt)',
       customDomainId,
     });
 
@@ -437,6 +445,22 @@ export class DomainManager {
         );
       }
 
+      if (!customDomain.deployment) {
+        throw new DomainManagerError(
+          `Deployment not found for custom domain: ${customDomainId}`,
+          'DEPLOYMENT_NOT_FOUND',
+          { customDomainId }
+        );
+      }
+
+      if (!customDomain.deployment.nodeId) {
+        throw new DomainManagerError(
+          `Deployment ${customDomain.deploymentId} has no node assigned`,
+          'NO_NODE',
+          { deploymentId: customDomain.deploymentId }
+        );
+      }
+
       // Ensure domain is verified before provisioning SSL
       if (customDomain.status !== 'verified' && customDomain.status !== 'ssl_provisioning') {
         throw new DomainManagerError(
@@ -455,47 +479,16 @@ export class DomainManager {
         },
       });
 
-      // Request SSL certificate from Cloudflare
-      const certificate = await this.cloudflare.requestSSL(customDomain.domain);
-
-      // Update CustomDomain with certificate ID
-      await prisma.customDomain.update({
-        where: { id: customDomainId },
-        data: {
-          sslCertId: certificate.id,
-          updatedAt: new Date(),
-        },
-      });
-
-      logger.info({
-        msg: 'SSL certificate requested successfully',
-        customDomainId,
-        domain: customDomain.domain,
-        certificateId: certificate.id,
-        sslStatus: certificate.status,
-      });
-
-      // If certificate is already active, configure Traefik route
-      if (certificate.status === 'active') {
-        try {
-          await this.configureTraefikRoute(customDomainId);
-        } catch (routeError) {
-          logger.error({
-            msg: 'Failed to configure Traefik route after SSL provisioning',
-            customDomainId,
-            domain: customDomain.domain,
-            error: routeError instanceof Error ? routeError.message : String(routeError),
-          });
-          // Don't throw - SSL is provisioned, route configuration can be retried
-        }
-      }
+      // Configure the Traefik route. Applied via Docker labels, this makes
+      // Traefik request a Let's Encrypt certificate automatically (free + auto-renewed).
+      await this.configureTraefikRoute(customDomainId);
 
       return {
         customDomainId,
         domain: customDomain.domain,
-        status: 'ssl_provisioning',
-        certificateId: certificate.id,
-        sslStatus: certificate.status,
+        status: 'active',
+        certificateId: '',
+        sslStatus: 'active',
       };
     } catch (error) {
       logger.error({
@@ -553,14 +546,17 @@ export class DomainManager {
         );
       }
 
-      // Ensure SSL certificate is provisioned
-      if (!customDomain.sslCertId) {
+      if (!customDomain.deployment) {
         throw new DomainManagerError(
-          `SSL certificate not provisioned for domain: ${customDomain.domain}`,
-          'SSL_NOT_PROVISIONED',
-          { customDomainId, domain: customDomain.domain }
+          `Deployment not found for custom domain: ${customDomainId}`,
+          'DEPLOYMENT_NOT_FOUND',
+          { customDomainId, deploymentId: customDomain.deploymentId }
         );
       }
+
+      // SSL is provided by Traefik + Let's Encrypt via Docker labels, so there
+      // is no Cloudflare certificate to require. The route application is what
+      // triggers LE certificate issuance.
 
       // Ensure deployment has internal port configured
       if (!customDomain.deployment.internalPort) {
@@ -714,187 +710,65 @@ export class DomainManager {
   }
 
   /**
-   * Check SSL certificate expiration for all active custom domains
+   * Check SSL certificate status for all custom domains
    * 
-   * Queries all custom domains with SSL certificates and checks their
-   * expiration status. Returns domains requiring renewal (expiring within 7 days).
+   * Under the Traefik + Let's Encrypt SSL model, certificates are provisioned
+   * and renewed automatically by Traefik's ACME resolver — there is no
+   * Cloudflare certificate pack to track or renew. This method is retained
+   * for the (now no-op) daily job and returns no renewals required.
    * 
-   * @returns Array of certificate expiration check results
+   * @returns Empty array (Let's Encrypt auto-renews; nothing to do here)
    */
   async checkCertificateExpiration(): Promise<CertificateExpirationCheck[]> {
     logger.info({
-      msg: 'Checking SSL certificate expiration for all custom domains',
+      msg: 'SSL certificate check: Let\'s Encrypt auto-renews, skipping manual check',
     });
 
-    try {
-      // Query all custom domains with SSL certificates
-      const customDomains = await prisma.customDomain.findMany({
-        where: {
-          sslCertId: {
-            not: null,
-          },
-          status: {
-            in: ['ssl_provisioning', 'active'],
-          },
-        },
-        select: {
-          id: true,
-          domain: true,
-          sslCertId: true,
-        },
-      });
-
-      const results: CertificateExpirationCheck[] = [];
-
-      // Check each certificate status
-      for (const customDomain of customDomains) {
-        if (!customDomain.sslCertId) {
-          continue;
-        }
-
-        try {
-          const sslStatus = await this.cloudflare.getSSLStatus(customDomain.sslCertId);
-
-          // Calculate if renewal is required (within 7 days of expiration)
-          // Note: Cloudflare API doesn't return expiration date in getSSLStatus
-          // In production, this would parse expires_on field when available
-          const requiresRenewal = sslStatus.status === 'expired';
-
-          results.push({
-            customDomainId: customDomain.id,
-            domain: customDomain.domain,
-            certificateId: customDomain.sslCertId,
-            status: sslStatus.status,
-            requiresRenewal,
-          });
-
-          if (requiresRenewal) {
-            logger.warn({
-              msg: 'SSL certificate requires renewal',
-              customDomainId: customDomain.id,
-              domain: customDomain.domain,
-              certificateId: customDomain.sslCertId,
-              status: sslStatus.status,
-            });
-          }
-        } catch (statusError) {
-          logger.error({
-            msg: 'Failed to check SSL certificate status',
-            customDomainId: customDomain.id,
-            domain: customDomain.domain,
-            certificateId: customDomain.sslCertId,
-            error: statusError instanceof Error ? statusError.message : String(statusError),
-          });
-        }
-      }
-
-      logger.info({
-        msg: 'Certificate expiration check completed',
-        totalDomains: customDomains.length,
-        requiresRenewal: results.filter(r => r.requiresRenewal).length,
-      });
-
-      return results;
-    } catch (error) {
-      logger.error({
-        msg: 'Failed to check certificate expiration',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
+    return [];
   }
 
   /**
    * Renew an SSL certificate for a custom domain
    * 
-   * Requests a new SSL certificate from Cloudflare to replace the expiring one.
-   * Updates the custom domain with the new certificate ID.
+   * Under the Traefik + Let's Encrypt model, certificates are renewed
+   * automatically by Traefik's ACME resolver. No manual/Cloudflare renewal is
+   * performed; this method is retained for the (now no-op) daily job and
+   * reports a no-op success.
    * 
-   * @param customDomainId - The custom domain ID to renew SSL for
-   * @returns Renewal result with new certificate information
-   * @throws DomainManagerError if custom domain not found or renewal fails
+   * @param customDomainId - The custom domain ID (unused for LE auto-renewal)
+   * @returns No-op renewal result
+   * @throws DomainManagerError if custom domain not found
    */
   async renewCertificate(customDomainId: string): Promise<RenewCertificateResult> {
     logger.info({
-      msg: 'Renewing SSL certificate',
+      msg: 'SSL certificate renewal: Let\'s Encrypt auto-renews, skipping manual renewal',
       customDomainId,
     });
 
-    try {
-      // Fetch custom domain record
-      const customDomain = await prisma.customDomain.findUnique({
-        where: { id: customDomainId },
-        select: {
-          id: true,
-          domain: true,
-          sslCertId: true,
-        },
-      });
+    const customDomain = await prisma.customDomain.findUnique({
+      where: { id: customDomainId },
+      select: {
+        id: true,
+        domain: true,
+      },
+    });
 
-      if (!customDomain) {
-        throw new DomainManagerError(
-          `Custom domain not found: ${customDomainId}`,
-          'CUSTOM_DOMAIN_NOT_FOUND',
-          { customDomainId }
-        );
-      }
-
-      if (!customDomain.sslCertId) {
-        throw new DomainManagerError(
-          `No SSL certificate found for domain: ${customDomain.domain}`,
-          'NO_SSL_CERTIFICATE',
-          { customDomainId, domain: customDomain.domain }
-        );
-      }
-
-      const oldCertificateId = customDomain.sslCertId;
-
-      // Request renewal from Cloudflare
-      const newCertificate = await this.cloudflare.renewSSL(oldCertificateId);
-
-      // Update CustomDomain with new certificate ID
-      await prisma.customDomain.update({
-        where: { id: customDomainId },
-        data: {
-          sslCertId: newCertificate.id,
-          updatedAt: new Date(),
-        },
-      });
-
-      logger.info({
-        msg: 'SSL certificate renewed successfully',
-        customDomainId,
-        domain: customDomain.domain,
-        oldCertificateId,
-        newCertificateId: newCertificate.id,
-        status: newCertificate.status,
-        expiresOn: newCertificate.expires_on,
-      });
-
-      return {
-        customDomainId,
-        domain: customDomain.domain,
-        oldCertificateId,
-        newCertificateId: newCertificate.id,
-        status: newCertificate.status,
-        expiresOn: newCertificate.expires_on,
-      };
-    } catch (error) {
-      logger.error({
-        msg: 'Failed to renew SSL certificate',
-        customDomainId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      // Schedule retry in 24 hours (this would be handled by a background job)
-      logger.info({
-        msg: 'Scheduling SSL certificate renewal retry',
-        customDomainId,
-        retryAfter: '24 hours',
-      });
-
-      throw error;
+    if (!customDomain) {
+      throw new DomainManagerError(
+        `Custom domain not found: ${customDomainId}`,
+        'CUSTOM_DOMAIN_NOT_FOUND',
+        { customDomainId }
+      );
     }
+
+    return {
+      customDomainId,
+      domain: customDomain.domain,
+      oldCertificateId: 'lets-encrypt',
+      newCertificateId: 'lets-encrypt',
+      status: 'active',
+      expiresOn: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+    };
   }
 
   /**

@@ -4,6 +4,7 @@ import { runBackup } from '../lib/backup';
 import { logger } from '../lib/logger';
 import { env } from '../env';
 import { prisma } from '../lib/prisma';
+import { verifySharedSecret } from '../lib/gateAuth';
 
 export const backupRouter = Router();
 
@@ -51,16 +52,9 @@ backupRouter.get('/admin/backup/history', requireAuth, requireAdmin, async (_req
  * or crontab on the server) at midnight daily.
  * Protected by BILLING_CRON_SECRET (same secret used for billing cron).
  */
-import crypto from 'crypto';
 
 backupRouter.post('/cron/backup', async (req, res) => {
-  const cronSecret = req.headers['x-cron-secret'] ?? req.query.secret;
-  const isCronAuthed = (() => {
-    if (typeof cronSecret !== 'string') return false;
-    const submitted = crypto.createHmac('sha256', 'shanutechx-cron-gate').update(cronSecret).digest();
-    const expected = crypto.createHmac('sha256', 'shanutechx-cron-gate').update(env.billingCronSecret).digest();
-    return crypto.timingSafeEqual(submitted, expected);
-  })();
+  const isCronAuthed = verifySharedSecret(req.headers['x-cron-secret'] ?? req.query.secret, env.billingCronSecret);
 
   if (!isCronAuthed) {
     return res.status(401).json({ error: 'Invalid cron secret' });

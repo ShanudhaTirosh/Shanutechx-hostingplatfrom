@@ -33,36 +33,20 @@ export interface DNSRecord {
 /**
  * SSL Certificate response from Cloudflare API
  */
-export interface SSLCertificate {
-  id: string;
-  type: string;
-  method: string;
-  status: 'pending' | 'active' | 'expired';
-  hosts: string[];
-  expires_on: string;
-  issued_on?: string;
-}
-
-/**
- * DNS verification result
- */
 export interface DNSVerificationResult {
   verified: boolean;
   resolvedTarget: string;
 }
 
 /**
- * SSL certificate status result
- */
-export interface SSLStatusResult {
-  status: 'pending' | 'active' | 'expired';
-}
-
-/**
- * Cloudflare API client for DNS and SSL management
+ * Cloudflare API client for DNS management
  * 
- * Implements DNS CNAME record creation/verification and SSL certificate
- * management with automatic rate limit handling using exponential backoff.
+ * Implements DNS CNAME record creation/verification with automatic rate
+ * limit handling using exponential backoff.
+ * 
+ * NOTE: SSL/TLS is provided by Traefik + Let's Encrypt (free ACME), NOT by
+ * Cloudflare certificate packs. Cloudflare advanced certificates require a
+ * paid plan and are intentionally not used. This client is DNS-only.
  */
 export class CloudflareClient {
   private readonly apiToken: string;
@@ -251,97 +235,6 @@ export class CloudflareClient {
       // DNS verification failed
       return { verified: false, resolvedTarget: '' };
     }
-  }
-
-  /**
-   * Request an SSL certificate for a domain
-   * 
-   * Uses Cloudflare's Universal SSL or Advanced Certificate Manager
-   * 
-   * @param domain - The fully qualified domain name
-   * @returns The requested SSL certificate
-   */
-  async requestSSL(domain: string): Promise<SSLCertificate> {
-    const url = `${CF_API_BASE}/zones/${this.zoneId}/ssl/certificate_packs/order`;
-    
-    const response = await this.fetchWithRetry<{
-      success: boolean;
-      result: SSLCertificate;
-      errors?: Array<{ message: string }>;
-    }>(url, {
-      method: 'POST',
-      headers: this.headers(),
-      body: JSON.stringify({
-        type: 'advanced',
-        hosts: [domain],
-        validation_method: 'txt',
-        validity_days: 90,
-        certificate_authority: 'lets_encrypt',
-      }),
-    });
-
-    return response.result;
-  }
-
-  /**
-   * Get the status of an SSL certificate
-   * 
-   * @param certificateId - The certificate ID from Cloudflare
-   * @returns Certificate status information
-   */
-  async getSSLStatus(certificateId: string): Promise<SSLStatusResult> {
-    const url = `${CF_API_BASE}/zones/${this.zoneId}/ssl/certificate_packs/${certificateId}`;
-    
-    const response = await this.fetchWithRetry<{
-      success: boolean;
-      result: SSLCertificate;
-      errors?: Array<{ message: string }>;
-    }>(url, {
-      method: 'GET',
-      headers: this.headers(),
-    });
-
-    return {
-      status: response.result.status,
-    };
-  }
-
-  /**
-   * Renew an SSL certificate
-   * 
-   * @param certificateId - The certificate ID to renew
-   * @returns The renewed SSL certificate
-   */
-  async renewSSL(certificateId: string): Promise<SSLCertificate> {
-    // First, get the current certificate details
-    const currentCert = await this.fetchWithRetry<{
-      success: boolean;
-      result: SSLCertificate;
-    }>(`${CF_API_BASE}/zones/${this.zoneId}/ssl/certificate_packs/${certificateId}`, {
-      method: 'GET',
-      headers: this.headers(),
-    });
-
-    // Request a new certificate with the same hosts
-    const url = `${CF_API_BASE}/zones/${this.zoneId}/ssl/certificate_packs/order`;
-    
-    const response = await this.fetchWithRetry<{
-      success: boolean;
-      result: SSLCertificate;
-      errors?: Array<{ message: string }>;
-    }>(url, {
-      method: 'POST',
-      headers: this.headers(),
-      body: JSON.stringify({
-        type: currentCert.result.type,
-        hosts: currentCert.result.hosts,
-        validation_method: currentCert.result.method,
-        validity_days: 90,
-        certificate_authority: 'lets_encrypt',
-      }),
-    });
-
-    return response.result;
   }
 }
 

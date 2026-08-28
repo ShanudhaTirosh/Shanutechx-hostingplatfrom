@@ -16,6 +16,7 @@ import { env } from '../env';
 import { validateCustomSubdomain } from '../lib/subdomain';
 import { getProvider } from '../lib/gitProviders';
 import { logger } from '../lib/logger';
+import { redactRepoUrl } from '../lib/redact';
 
 import { scanTextForAbuse, banUserAndTeardownResources } from '../lib/abuseDetector';
 
@@ -209,7 +210,12 @@ deploymentsRouter.get('/deployments', async (req: AuthedRequest, res) => {
     prisma.deployment.count({ where }),
   ]);
 
-  res.json({ deployments, total, take, skip });
+  res.json({
+    deployments: deployments.map((d) => ({ ...d, repoUrl: redactRepoUrl(d.repoUrl) })),
+    total,
+    take,
+    skip,
+  });
 });
 
 async function loadOwnedDeployment(req: AuthedRequest, id: string) {
@@ -387,7 +393,7 @@ deploymentsRouter.get('/deployments/:id', async (req: AuthedRequest, res) => {
       id: deployment.id,
       userId: deployment.userId,
       nodeId: deployment.nodeId,
-      repoUrl: deployment.repoUrl,
+      repoUrl: redactRepoUrl(deployment.repoUrl),
       subdomain: deployment.subdomain,
       internalPort: deployment.internalPort,
       status: deployment.status,
