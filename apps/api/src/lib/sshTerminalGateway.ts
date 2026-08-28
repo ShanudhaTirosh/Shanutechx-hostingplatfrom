@@ -123,7 +123,10 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
           }
         }
 
-        ssh!.on('ready', () => {
+        const currentSsh = ssh;
+        if (!currentSsh) return;
+
+        currentSsh.on('ready', () => {
           if (!ssh || closed) return;
           sendStatus('Connected. Opening shell…');
           ssh.shell({ term: 'xterm-256color' }, (err, stream) => {
@@ -152,13 +155,16 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
                 if (typeof (stream as any).close === 'function') (stream as any).close();
                 else stream.end();
               } catch {}
-              ssh?.end();
+              if (ssh) {
+                ssh.end();
+                ssh = null;
+              }
             });
           });
         });
 
-        ssh!.on('error', (err) => fail(`SSH connection failed: ${err.message}`));
-        ssh!.connect(connectOpts);
+        currentSsh.on('error', (err) => fail(`SSH connection failed: ${err.message}`));
+        currentSsh.connect(connectOpts);
         return;
       }
 
@@ -176,7 +182,8 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
 
       sendStatus(`Connecting to ${ip}…`);
 
-      ssh.on('ready', () => {
+      const currentSsh = ssh;
+      currentSsh.on('ready', () => {
         if (!ssh || closed) return;
         sendStatus('Connected. Opening shell…');
         ssh.shell({ term: 'xterm-256color' }, (err, stream) => {
@@ -210,22 +217,25 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
             ws.close();
           });
 
-            ws.on('close', () => {
-              closed = true;
-              try {
-                if (typeof (stream as any).close === 'function') (stream as any).close();
-                else stream.end();
-              } catch {}
-              ssh?.end();
-            });
+          ws.on('close', () => {
+            closed = true;
+            try {
+              if (typeof (stream as any).close === 'function') (stream as any).close();
+              else stream.end();
+            } catch {}
+            if (ssh) {
+              ssh.end();
+              ssh = null;
+            }
+          });
         });
       });
 
-      ssh.on('error', (err) => {
+      currentSsh.on('error', (err) => {
         fail(`SSH connection failed: ${err.message}`);
       });
 
-      ssh.connect({
+      currentSsh.connect({
         host: ip,
         port: 22,
         username: credentials.username || 'root',
