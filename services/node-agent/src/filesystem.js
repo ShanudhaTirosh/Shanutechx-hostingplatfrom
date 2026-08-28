@@ -29,7 +29,7 @@ function resolveSafe(deploymentId, relPath = '') {
     throw Object.assign(new Error('Path escape detected'), { statusCode: 400 });
   }
 
-  const cleanRel = String(relPath || '').replace(/^[/\\]+/, '');
+  const cleanRel = String(relPath || '').replace(/\\/g, '/').replace(/^\/+/, '');
   const target = path.resolve(base, cleanRel);
   if (target !== base && !target.startsWith(base + path.sep)) {
     throw Object.assign(new Error('Path escape detected'), { statusCode: 400 });

@@ -19,6 +19,9 @@ function getCipherKey(masterKey: string): Buffer {
   if (typeof masterKey === 'string' && /^[0-9a-fA-F]{64}$/.test(masterKey)) {
     return Buffer.from(masterKey, 'hex');
   }
+  if (!masterKey || masterKey.length < 32) {
+    throw new Error('SECRETS_ENCRYPTION_KEY must be at least 32 characters or 64 hex characters');
+  }
   return crypto.createHash('sha256').update(String(masterKey)).digest();
 }
 
