@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const express = require('express');
-const { connect, getSocket, getTelemetryState, logger } = require('./connection');
+const { connect, getSocket, getTelemetryState, onMessageUpsert, logger } = require('./connection');
 const { sendNotification } = require('./sendNotification');
 const { handleCommand } = require('./commandHandler');
 
@@ -66,30 +66,29 @@ app.listen(PORT, () => {
   logger.info({ port: PORT }, 'WhatsApp bot internal API listening');
 });
 
-connect()
-  .then((sock) => {
-    // Register interactive incoming command listener
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-      if (type !== 'notify') return;
+// Register interactive incoming command listener with reconnect persistence
+onMessageUpsert(async ({ messages, type }) => {
+  if (type !== 'notify') return;
 
-      for (const msg of messages) {
-        if (!msg.message || msg.key.fromMe) continue;
-        const sender = msg.key.remoteJid;
-        const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
+  for (const msg of messages) {
+    if (!msg.message || msg.key.fromMe) continue;
+    const sender = msg.key.remoteJid;
+    const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
 
-        if (sender && text) {
-          try {
-            const reply = await handleCommand(sender, text);
-            if (reply) {
-              await sendNotification(sender.split('@')[0], reply);
-            }
-          } catch (err) {
-            logger.error({ sender, err }, 'Error handling WhatsApp incoming command');
-          }
+    if (sender && text) {
+      try {
+        const reply = await handleCommand(sender, text);
+        if (reply) {
+          await sendNotification(sender.split('@')[0], reply);
         }
+      } catch (err) {
+        logger.error({ sender, err }, 'Error handling WhatsApp incoming command');
       }
-    });
-  })
+    }
+  }
+});
+
+connect()
   .catch((err) => {
     logger.fatal({ err }, 'Failed to connect WhatsApp socket');
     process.exit(1);

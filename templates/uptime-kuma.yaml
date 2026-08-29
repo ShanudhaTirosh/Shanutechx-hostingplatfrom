@@ -16,6 +16,11 @@ services:
       - "${PORT:-3001}:3001"
     volumes:
       - kuma-data:/app/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
 volumes:
   kuma-data:

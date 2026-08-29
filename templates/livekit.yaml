@@ -9,6 +9,11 @@ services:
     image: redis:7-alpine
     command: redis-server --save 60 1
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
   livekit:
     image: livekit/livekit-server:v1.7
@@ -22,6 +27,11 @@ services:
     depends_on:
       - redis
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1G
 
 volumes:
   livekit_data:

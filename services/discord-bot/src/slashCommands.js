@@ -51,6 +51,22 @@ const commands = [
     .addStringOption((opt) => opt.setName('reason').setDescription('Decline reason (required if declining)').setRequired(false)),
 ];
 
+const ALLOWED_DISCORD_ROLES = process.env.ALLOWED_DISCORD_ROLES ? process.env.ALLOWED_DISCORD_ROLES.split(',').map(s => s.trim()) : [];
+const ALLOWED_DISCORD_USERS = process.env.ALLOWED_DISCORD_USERS ? process.env.ALLOWED_DISCORD_USERS.split(',').map(s => s.trim()) : [];
+
+function isStaffAuthorized(member, user) {
+  if (ALLOWED_DISCORD_USERS.length > 0 && ALLOWED_DISCORD_USERS.includes(user.id)) {
+    return true;
+  }
+  if (ALLOWED_DISCORD_ROLES.length > 0 && member?.roles?.cache) {
+    return member.roles.cache.some((role) => ALLOWED_DISCORD_ROLES.includes(role.id) || ALLOWED_DISCORD_ROLES.includes(role.name));
+  }
+  if (member?.permissions?.has && (member.permissions.has('Administrator') || member.permissions.has('ManageGuild'))) {
+    return true;
+  }
+  return ALLOWED_DISCORD_USERS.length === 0 && ALLOWED_DISCORD_ROLES.length === 0;
+}
+
 async function handleInteraction(interaction) {
   if (!interaction.isChatInputCommand()) return;
 
@@ -113,6 +129,10 @@ async function handleInteraction(interaction) {
 
       await interaction.editReply({ embeds: [embed] });
     } else if (commandName === 'review-payment') {
+      if (!isStaffAuthorized(interaction.member, interaction.user)) {
+        await interaction.reply({ content: '🚫 Unauthorized: You do not have staff permissions to review payments.', ephemeral: true });
+        return;
+      }
       await interaction.deferReply({ ephemeral: true });
       const orderId = interaction.options.getString('order_id');
       const action = interaction.options.getString('action');

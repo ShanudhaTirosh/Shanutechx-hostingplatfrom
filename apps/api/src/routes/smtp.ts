@@ -1,3 +1,4 @@
+import net from 'net';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
@@ -61,7 +62,7 @@ async function getGlobalSmtpConfig() {
       secure: false,
     },
   });
-import net from 'net';
+}
 
 function isPrivateIp(ip: string): boolean {
   if (!ip) return false;

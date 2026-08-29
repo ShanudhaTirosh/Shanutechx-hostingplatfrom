@@ -17,6 +17,11 @@ services:
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       - POSTGRES_DB=postgres
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
 
   supabase-studio:
     image: supabase/studio:20240415-4e782e2
@@ -29,3 +34,8 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     depends_on:
       - supabase-db
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M

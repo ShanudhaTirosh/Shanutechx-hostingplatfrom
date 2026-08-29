@@ -38,6 +38,7 @@ enum DeploymentStatus {
   running
   failed
   stopped
+  deleted
 }
 
 enum PaymentStatus {
@@ -117,6 +118,7 @@ enum ManagedDatabaseStatus {
   running
   stopped
   failed
+  terminated
 }
 
 model User {

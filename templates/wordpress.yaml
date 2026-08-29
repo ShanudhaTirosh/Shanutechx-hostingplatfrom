@@ -20,6 +20,11 @@ services:
       timeout: 5s
       retries: 5
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
   wordpress:
     image: wordpress:latest
@@ -36,6 +41,11 @@ services:
       db:
         condition: service_healthy
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
 
 volumes:
   wordpress_db_data:

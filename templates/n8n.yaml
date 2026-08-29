@@ -19,6 +19,11 @@ services:
       timeout: 5s
       retries: 5
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
@@ -42,6 +47,11 @@ services:
       postgres:
         condition: service_healthy
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
 
 volumes:
   n8n_postgres_storage:

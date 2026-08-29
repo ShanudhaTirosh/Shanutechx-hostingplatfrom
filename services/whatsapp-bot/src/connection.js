@@ -55,6 +55,10 @@ async function connect() {
 
   sock.ev.on('creds.update', saveCreds);
 
+  for (const listener of messageListeners) {
+    sock.ev.on('messages.upsert', listener);
+  }
+
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
 
@@ -89,6 +93,15 @@ async function connect() {
   return sock;
 }
 
+let messageListeners = [];
+
+function onMessageUpsert(listener) {
+  messageListeners.push(listener);
+  if (sock) {
+    sock.ev.on('messages.upsert', listener);
+  }
+}
+
 function getSocket() {
   if (!sock) {
     throw new Error('WhatsApp socket not connected yet');
@@ -104,4 +117,4 @@ function getTelemetryState() {
   };
 }
 
-module.exports = { connect, getSocket, getTelemetryState, logger: appLogger };
+module.exports = { connect, getSocket, getTelemetryState, onMessageUpsert, logger: appLogger };
