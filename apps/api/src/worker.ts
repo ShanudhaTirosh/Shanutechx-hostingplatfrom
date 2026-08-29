@@ -48,6 +48,8 @@ logger.info('SSL renewal worker started');
       {
         repeat: { pattern: '0 0 * * *' },
         jobId: 'ssl-renewal-daily',
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
       }
     );
   } catch (error) {
@@ -78,6 +80,8 @@ workspaceCleanupWorker.on('failed', (job, err) => {
       {
         repeat: { pattern: '0 * * * *' }, // Every hour
         jobId: 'workspace-cleanup-hourly',
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
       }
     );
     logger.info({ msg: 'Workspace retention cleanup job scheduled successfully', pattern: '0 * * * *' });
@@ -109,6 +113,8 @@ billingSweepWorker.on('failed', (job, err) => {
       {
         repeat: { pattern: '0 1 * * *' }, // Daily at 01:00, after SSL renewal
         jobId: 'billing-sweep-daily',
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
       }
     );
     logger.info({ msg: 'Billing sweep job scheduled successfully', pattern: '0 1 * * *' });
@@ -141,6 +147,8 @@ uptimeSweepWorker.on('failed', (job, err) => {
       {
         repeat: { every: 5 * 60 * 1000 }, // Every 5 minutes
         jobId: 'uptime-sweep-recurring',
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
       }
     );
     logger.info({ msg: 'Uptime sweep job scheduled successfully', interval: '5 minutes' });

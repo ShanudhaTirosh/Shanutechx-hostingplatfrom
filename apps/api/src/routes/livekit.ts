@@ -124,7 +124,10 @@ livekitRouter.delete('/livekit/projects/:id', async (req: AuthedRequest, res) =>
     return res.status(404).json({ error: 'Project not found' });
   }
 
-  await prisma.liveKitProject.delete({ where: { id: project.id } });
+  await prisma.liveKitProject.update({
+    where: { id: project.id },
+    data: { isActive: false },
+  });
 
   await prisma.auditLog.create({
     data: { adminId: req.user!.id, action: 'livekit.delete_project', target: project.id },

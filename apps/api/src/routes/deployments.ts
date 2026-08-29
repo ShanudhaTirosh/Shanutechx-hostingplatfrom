@@ -5,7 +5,7 @@ import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { ownedResourceWhere, canAccessResource } from '../middleware/rbac';
 import { deployService } from '../lib/deployPipeline';
 import { NodeSelectionError } from '../lib/nodeSelector';
-import { fetchLogs, stopDeployment, startDeployment, restartDeployment, buildAndRun, addCustomDomainRoute, removeCustomDomainRoute, getResourceUsage, ResourceMetrics } from '../lib/nodeAgentClient';
+import { fetchLogs, stopDeployment, stopComposeProject, startDeployment, restartDeployment, buildAndRun, addCustomDomainRoute, removeCustomDomainRoute, getResourceUsage, ResourceMetrics } from '../lib/nodeAgentClient';
 import { parsePagination } from '../lib/pagination';
 import { verifyCnameTarget } from '../lib/customDomain';
 import { createSubdomainRecord, deleteSubdomainRecord } from '../lib/cloudflare';
@@ -453,14 +453,27 @@ deploymentsRouter.delete('/deployments/:id', async (req: AuthedRequest, res) => 
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
 
   try {
-    if (deployment.containerId) {
-      await stopDeployment(deployment.node, deployment.containerId).catch(() => {});
+    const isCompose = deployment.repoUrl?.startsWith('template:') || false;
+    if (isCompose) {
+      const projectName = deployment.containerId || deployment.subdomain;
+      if (projectName) {
+        await stopComposeProject(deployment.node, projectName).catch((err) => {
+          logger.warn({ err, deploymentId: deployment.id }, 'Failed to stop compose project on node (continuing deletion)');
+        });
+      }
+    } else if (deployment.containerId) {
+      await stopDeployment(deployment.node, deployment.containerId).catch((err) => {
+        logger.warn({ err, deploymentId: deployment.id }, 'Failed to stop container on node (continuing deletion)');
+      });
     }
 
     // Teardown shadow backup repo if non-Git deployment
     void deleteShadowRepo(deployment.id);
 
-    await prisma.deployment.delete({ where: { id: deployment.id } });
+    await prisma.deployment.update({
+      where: { id: deployment.id },
+      data: { status: 'deleted' },
+    });
     res.json({ ok: true, message: 'Deployment deleted successfully' });
   } catch (err: any) {
     logger.error({ err, deploymentId: req.params.id }, 'Failed to delete deployment');

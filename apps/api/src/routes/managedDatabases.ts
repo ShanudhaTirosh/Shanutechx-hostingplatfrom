@@ -193,9 +193,11 @@ managedDatabasesRouter.delete('/managed-databases/:id', async (req: AuthedReques
   try {
     if (db.containerId && db.node) {
       const { containerAction } = await import('../lib/nodeAgentClient');
-      await containerAction(db.node, db.containerId, 'stop').catch(() => {});
+      await containerAction(db.node, db.containerId, 'stop').catch((err) => {
+        console.warn(`[ManagedDB Delete] Could not stop container ${db.containerId}: ${err?.message}`);
+      });
     }
-    await prisma.managedDatabase.delete({ where: { id: db.id } });
+    await prisma.managedDatabase.update({ where: { id: db.id }, data: { status: 'terminated' } });
 
     await prisma.auditLog.create({
       data: { adminId: req.user!.id, action: 'managed_database.delete', target: db.id },

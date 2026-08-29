@@ -106,6 +106,14 @@ export async function stopDeployment(node: Node, containerId: string) {
   if (!res.ok) throw new Error(`Failed to stop deployment (${res.status})`);
 }
 
+export async function stopComposeProject(node: Node, projectName: string) {
+  const res = await fetch(agentUrl(node, `/agent/compose/${encodeURIComponent(projectName)}`), {
+    method: 'DELETE',
+    headers: agentHeaders(),
+  });
+  if (!res.ok) throw new Error(`Failed to stop compose project (${res.status})`);
+}
+
 export async function startDeployment(node: Node, containerId: string) {
   const res = await fetch(agentUrl(node, `/agent/deployments/${containerId}/start`), {
     method: 'POST',

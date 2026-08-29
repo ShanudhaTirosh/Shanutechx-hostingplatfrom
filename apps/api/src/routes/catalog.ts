@@ -613,6 +613,7 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
         teamId: teamId ?? null,
         nodeId,
         status: 'running',
+        containerId: composeName,
         subdomain: composeName,
         repoUrl: `template:${slug}`,
         internalPort: meta.port ?? 80,
@@ -638,7 +639,7 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
     }
 
     for (const dbMeta of templateDbTypes) {
-      const dbPassword = envVars[dbMeta.secretKey ?? ''] || generatedSecrets[dbMeta.secretKey ?? ''] || 'default-secret';
+      const dbPassword = (dbMeta.secretKey && envVars[dbMeta.secretKey]) || (dbMeta.secretKey && generatedSecrets[dbMeta.secretKey]) || generateStrongSecret();
       const encCred = encryptSecret(dbPassword, env.secretsEncryptionKey);
       const mDb = await prisma.managedDatabase.create({
         data: {

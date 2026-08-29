@@ -352,6 +352,7 @@ model OrderItem {
   smtpAccount         SmtpAccount?
   liveKitProject      LiveKitProject?
   vpsProvision        VpsProvision?
+  managedDatabase     ManagedDatabase?
   subscription        Subscription?
   aiSubscriptionRequest AiSubscriptionRequest?
 }
@@ -621,6 +622,7 @@ model LiveKitProject {
   apiKey       String
   apiSecretRef String   // encrypted API secret — see lib/secretsVault.ts
   nodeId       String?
+  isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 }
 
@@ -1010,6 +1012,8 @@ model ManagedDatabase {
   id            String                @id @default(cuid())
   userId        String
   user          User                  @relation(fields: [userId], references: [id])
+  orderItemId   String?               @unique
+  orderItem     OrderItem?            @relation(fields: [orderItemId], references: [id])
   nodeId        String
   node          Node                  @relation(fields: [nodeId], references: [id])
   type          ManagedDatabaseType

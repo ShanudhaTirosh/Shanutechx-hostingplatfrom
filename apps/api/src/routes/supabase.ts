@@ -431,6 +431,16 @@ supabaseRouter.post('/supabase/db/query', requireAuth, requireAdminOrDev, async 
   const { sql } = req.body;
   if (!sql) return res.status(400).json({ error: 'SQL query parameter is required' });
 
+  if (req.user) {
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user.id,
+        action: 'supabase.db_raw_query',
+        target: String(sql).slice(0, 250),
+      },
+    }).catch(() => {});
+  }
+
   const result = await fetchJson(`${SUPABASE_META_URL}/query`, {
     method: 'POST',
     body: JSON.stringify({ query: sql }),
@@ -493,16 +503,6 @@ supabaseRouter.get('/supabase/functions', requireAuth, requireAdminOrDev, async 
       { id: 'func_01', name: 'hello-world', status: 'ACTIVE', version: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
       { id: 'func_02', name: 'generate-ai-completion', status: 'ACTIVE', version: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
     ],
-  });
-});
-
-supabaseRouter.get('/supabase/config', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
-  res.json({
-    supabaseUrl: SUPABASE_KONG_URL,
-    anonKey: SUPABASE_ANON_KEY,
-    serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
-    studioUrl: process.env.SUPABASE_STUDIO_URL || 'http://localhost:8000',
-    smtpConfigured: true,
   });
 });
 

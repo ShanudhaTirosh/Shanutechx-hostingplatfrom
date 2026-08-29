@@ -176,20 +176,24 @@ internalBotRouter.post('/internal/review-payment', async (req: Request, res: Res
   const newOrderStatus = approve ? 'paid' : 'failed';
   const paymentStatus = approve ? 'manually_approved' : 'rejected';
 
-  await prisma.$transaction([
-    prisma.payment.update({
-      where: { id: targetPayment.id },
-      data: {
-        status: paymentStatus,
-        reviewedAt: new Date(),
-        rejectionReason: approve ? null : reason || 'Declined via Discord review',
-      },
-    }),
-    prisma.order.update({
-      where: { id: order.id },
-      data: { status: newOrderStatus },
-    }),
-  ]);
+  const claim = await prisma.payment.updateMany({
+    where: { id: targetPayment.id, status: { in: ['manual_review', 'pending'] } },
+    data: {
+      status: paymentStatus,
+      reviewedAt: new Date(),
+      rejectionReason: approve ? null : reason || 'Declined via Discord review',
+    },
+  });
+
+  if (claim.count === 0) {
+    const latest = await prisma.payment.findUnique({ where: { id: targetPayment.id }, select: { status: true } });
+    return res.status(409).json({ error: `Payment already reviewed (status: ${latest?.status ?? 'unknown'})` });
+  }
+
+  await prisma.order.update({
+    where: { id: order.id },
+    data: { status: newOrderStatus },
+  });
 
   if (approve) {
     try {

@@ -12,9 +12,19 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: "postgresql://shanutechx:SecurePass@localhost:5432/shanutechx?schema=public"
-      JWT_SECRET: "ci-dummy-jwt-secret-key-minimum-32-chars-long"
-      ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      SKIP_ENV_VALIDATION: "true"
+      FIREBASE_PROJECT_ID: "shanutechx-demo-project"
+      FIREBASE_CLIENT_EMAIL: "firebase-adminsdk@shanutechx-demo-project.iam.gserviceaccount.com"
+      FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\\nci-dummy-key\\n-----END PRIVATE KEY-----"
+      WHATSAPP_INTERNAL_SECRET: "ci-dummy-whatsapp-internal-secret-32-chars"
+      CLOUDFLARE_API_TOKEN: "ci-dummy-cloudflare-api-token-value"
+      CLOUDFLARE_ZONE_ID: "ci-dummy-cloudflare-zone-id-value"
+      ROOT_DOMAIN: "shanutechx.com"
+      NODE_AGENT_SECRET: "ci-dummy-node-agent-secret-32-chars-long"
+      SMS_WEBHOOK_SECRET: "ci-dummy-sms-webhook-secret-32-chars"
+      DISCORD_INTERNAL_SECRET: "ci-dummy-discord-internal-secret-32-chars"
+      SECRETS_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      PROJECT_AUTH_JWT_SECRET: "ci-dummy-project-auth-jwt-secret-key-32-chars"
+      BILLING_CRON_SECRET: "ci-dummy-billing-cron-secret-32-chars"
 
     steps:
       - name: Checkout Source Code

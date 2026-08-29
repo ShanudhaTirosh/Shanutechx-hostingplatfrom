@@ -61,14 +61,56 @@ async function getGlobalSmtpConfig() {
       secure: false,
     },
   });
+import net from 'net';
+
+function isPrivateIp(ip: string): boolean {
+  if (!ip) return false;
+  const normalized = ip.toLowerCase().trim();
+
+  if (normalized.startsWith('::ffff:')) {
+    return isPrivateIp(normalized.substring(7));
+  }
+
+  if (net.isIPv4(normalized)) {
+    const parts = normalized.split('.').map(Number);
+    if (parts.length !== 4 || parts.some(isNaN)) return true;
+    const [a, b] = parts;
+    if (a === 127 || a === 10 || a === 0) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+    return false;
+  }
+
+  if (net.isIPv6(normalized)) {
+    if (normalized === '::1' || normalized === '::') return true;
+    if (normalized.startsWith('fe80:') || normalized.startsWith('fe8') || normalized.startsWith('fe9') || normalized.startsWith('fea') || normalized.startsWith('feb')) return true;
+    if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
+    return false;
+  }
+
+  return false;
+}
+
+export async function isSsrfTargetAsync(host: string): Promise<boolean> {
+  if (!host) return false;
+  const h = host.toLowerCase().trim();
+  if (h === 'localhost' || isPrivateIp(h)) return true;
+  if (/^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.|127\.|169\.254\.)/.test(h)) return true;
+
+  try {
+    const records = await dns.promises.lookup(h, { all: true });
+    if (!records || records.length === 0) return true;
+    return records.some((r) => isPrivateIp(r.address));
+  } catch {
+    return true;
+  }
 }
 
 function isSsrfTarget(host: string): boolean {
   if (!host) return false;
   const h = host.toLowerCase().trim();
-  if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '0.0.0.0' || h === '169.254.169.254') return true;
-  if (/^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(h)) return true;
-  return false;
+  return h === 'localhost' || isPrivateIp(h) || /^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.|127\.|169\.254\.)/.test(h);
 }
 
 // 1. General Outbound Global SMTP Configuration
@@ -104,7 +146,7 @@ smtpRouter.post('/smtp/global-config', requireDev, async (req: AuthedRequest, re
 smtpRouter.post('/smtp/verify', requireDev, async (req: AuthedRequest, res) => {
   const { host, port, user, pass, secure } = req.body;
 
-  if (host && isSsrfTarget(host)) {
+  if (host && (await isSsrfTargetAsync(host))) {
     return res.status(400).json({ error: 'Verification target host is not allowed (SSRF protection)' });
   }
 
