@@ -4,8 +4,8 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 const LINKS = [
-  { label: 'Cloud Hosting', href: '#features' },
-  { label: 'V2Ray Proxy', href: '/v2ray' },
+  { label: 'Cloud VPS', href: '#features' },
+  { label: 'V2Ray & Digital Store', href: 'https://store.shanutechx.com' },
   { label: 'Pricing', href: '/pricing' },
   { label: 'Docs', href: '/docs' },
   { label: 'Status', href: '/status' },
@@ -36,11 +36,11 @@ export default function Navbar() {
       >
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-2.5 font-extrabold text-white tracking-tight text-base group">
-          <span className="h-8 w-8 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-pink-500 flex items-center justify-center text-white font-black text-xs shadow-glow-violet group-hover:scale-105 transition-transform">
-            W
+          <span className="h-8 w-8 rounded-xl bg-gradient-to-tr from-emerald-500 via-cyan-500 to-indigo-500 flex items-center justify-center text-white font-black text-xs shadow-glow-violet group-hover:scale-105 transition-transform">
+            STX
           </span>
           <span className="tracking-tighter font-extrabold text-white">
-            SHANUTECHX <span className="text-purple-400 font-bold">.CLOUD</span>
+            STX SOLUTIONS <span className="text-emerald-400 font-bold">.CLOUD</span>
           </span>
         </Link>
 
