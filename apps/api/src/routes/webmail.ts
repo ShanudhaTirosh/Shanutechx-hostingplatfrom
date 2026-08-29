@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { decryptSecret } from '../lib/secretsVault';
 import { sendSmtpEmail } from '../lib/smtpDispatcher';
+import { wildduckClient } from '../lib/wildduckClient';
 import { logger } from '../lib/logger';
 import { env } from '../env';
 
@@ -39,18 +40,54 @@ webmailRouter.get('/webmail/messages', async (req: AuthedRequest, res: Response)
   // Find all mailboxes accessible to this user
   let accessibleAccounts: any[] = [];
   if (role === 'dev') {
-    accessibleAccounts = await prisma.smtpAccount.findMany({ select: { id: true, userId: true } });
+    accessibleAccounts = await prisma.smtpAccount.findMany({ select: { id: true, userId: true, wildduckUserId: true, smtpUsername: true, customDomain: true, smtpHost: true } });
   } else {
     accessibleAccounts = await prisma.smtpAccount.findMany({
       where: {
         OR: [{ userId }, { allowedAdminIds: { has: userId } }],
       },
-      select: { id: true, userId: true },
+      select: { id: true, userId: true, wildduckUserId: true, smtpUsername: true, customDomain: true, smtpHost: true },
     });
   }
 
+  const targetAccount = smtpAccountId ? accessibleAccounts.find((a) => a.id === smtpAccountId) : accessibleAccounts[0];
+
+  if (targetAccount && targetAccount.wildduckUserId) {
+    try {
+      const wdResult = await wildduckClient.listMessages(targetAccount.wildduckUserId, {
+        folder: folder.toUpperCase(),
+        query: search || undefined,
+      });
+
+      const domain = targetAccount.customDomain || targetAccount.smtpHost.replace(/^mail\./, '');
+      const defaultEmail = `${targetAccount.smtpUsername}@${domain}`;
+
+      const messages = wdResult.messages.map((m) => ({
+        id: m.id,
+        userId: targetAccount.userId,
+        smtpAccountId: targetAccount.id,
+        folder: folder,
+        senderName: m.from.name || m.from.address.split('@')[0],
+        senderEmail: m.from.address,
+        recipientEmail: m.to[0]?.address || defaultEmail,
+        subject: m.subject,
+        snippet: m.intro || '',
+        htmlBody: '',
+        isRead: m.seen,
+        isStarred: m.flagged,
+        hasAttachments: Array.isArray(m.attachments) && m.attachments.length > 0,
+        createdAt: m.date,
+        updatedAt: m.date,
+      }));
+
+      const unreadCount = messages.filter((m) => !m.isRead).length;
+      return res.json({ messages, unreadCount, total: wdResult.total });
+    } catch (err: any) {
+      logger.warn({ err: err.message, userId }, 'WildDuck listMessages failed — falling back to DB');
+    }
+  }
+
   const accessibleAccountIds = accessibleAccounts.map((a) => a.id);
-  const accessibleOwnerUserIds = [...new Set(accessibleAccounts.map((a) => a.userId))];
 
   const where: any = {
     folder,
@@ -169,16 +206,27 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
   });
 
   try {
-    const password = decryptSecret(account.credentialRef, env.secretsEncryptionKey);
-    const sendResult = await sendSmtpEmail(
-      { host: account.smtpHost, port: account.smtpPort, user: account.smtpUsername, pass: password },
-      { from: `"${senderName}" <${senderEmail}>`, to: recipientEmail, subject, html: htmlBody }
-    );
-    logger.info({ recipientEmail, messageId: sendResult.messageId, senderUserId: userId }, 'Delegated webmail message delivered');
+    if (account.wildduckUserId) {
+      await wildduckClient.submitMessage(account.wildduckUserId, {
+        from: `"${senderName}" <${senderEmail}>`,
+        to: [recipientEmail],
+        subject,
+        html: htmlBody,
+        text: htmlBody.replace(/<[^>]+>/g, ''),
+      });
+      logger.info({ recipientEmail, senderUserId: userId }, 'WildDuck API webmail message submitted');
+    } else {
+      const password = decryptSecret(account.credentialRef, env.secretsEncryptionKey);
+      const sendResult = await sendSmtpEmail(
+        { host: account.smtpHost, port: account.smtpPort, user: account.smtpUsername, pass: password },
+        { from: `"${senderName}" <${senderEmail}>`, to: recipientEmail, subject, html: htmlBody }
+      );
+      logger.info({ recipientEmail, messageId: sendResult.messageId, senderUserId: userId }, 'Delegated webmail message delivered via SMTP');
+    }
   } catch (err: any) {
-    logger.error({ err: err.message, recipientEmail }, 'Webmail SMTP delivery failed');
+    logger.error({ err: err.message, recipientEmail }, 'Webmail email delivery failed');
     return res.status(502).json({
-      error: 'Message was saved, but delivery failed: ' + (err.message || 'SMTP error'),
+      error: 'Message was saved, but delivery failed: ' + (err.message || 'Mail server error'),
       message,
     });
   }
@@ -200,12 +248,28 @@ webmailRouter.patch('/webmail/messages/:id', async (req: AuthedRequest, res: Res
   const parsed = patchSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
+  const account = await prisma.smtpAccount.findFirst({
+    where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+  });
+
+  if (account && account.wildduckUserId) {
+    try {
+      await wildduckClient.updateMessageFlags(account.wildduckUserId, id, {
+        seen: parsed.data.isRead,
+        flagged: parsed.data.isStarred,
+      });
+      return res.json({ ok: true, message: { id, ...parsed.data } });
+    } catch (err: any) {
+      logger.warn({ err: err.message, id }, 'WildDuck updateMessageFlags failed — trying DB');
+    }
+  }
+
   const existing = await prisma.webmailMessage.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Message not found' });
 
   if (existing.smtpAccountId) {
-    const account = await prisma.smtpAccount.findUnique({ where: { id: existing.smtpAccountId } });
-    if (!(await canAccessMailbox(account, userId, role))) return res.status(404).json({ error: 'Message not found' });
+    const acc = await prisma.smtpAccount.findUnique({ where: { id: existing.smtpAccountId } });
+    if (!(await canAccessMailbox(acc, userId, role))) return res.status(404).json({ error: 'Message not found' });
   } else if (existing.userId !== userId && role !== 'dev') {
     return res.status(404).json({ error: 'Message not found' });
   }
@@ -219,6 +283,19 @@ webmailRouter.delete('/webmail/messages/:id', async (req: AuthedRequest, res: Re
   const { id } = req.params;
   const userId = req.user!.id;
   const role = req.user!.role;
+
+  const account = await prisma.smtpAccount.findFirst({
+    where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+  });
+
+  if (account && account.wildduckUserId) {
+    try {
+      await wildduckClient.deleteMessage(account.wildduckUserId, id);
+      return res.json({ ok: true, deletedId: id });
+    } catch (err: any) {
+      logger.warn({ err: err.message, id }, 'WildDuck deleteMessage failed — trying DB');
+    }
+  }
 
   const existing = await prisma.webmailMessage.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Message not found' });

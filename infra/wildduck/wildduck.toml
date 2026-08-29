@@ -1,0 +1,15 @@
+# WildDuck Core Configuration
+[mongo]
+host = "mongodb"
+port = 27017
+db = "wildduck"
+
+[redis]
+host = "redis"
+port = 6379
+
+[dkim]
+selector = "wildduck"
+
+[dmarc]
+enabled = true

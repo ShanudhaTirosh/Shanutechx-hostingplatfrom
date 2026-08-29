@@ -8,6 +8,7 @@ import { env } from '../env';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { sendSmtpReleaseEmail, getTierFromPlanName } from '../lib/smtpProvisioner';
 import { sendSmtpEmail } from '../lib/smtpDispatcher';
+import { wildduckClient } from '../lib/wildduckClient';
 import dns from 'dns';
 import { getServerIp, buildSpfRecord } from '../lib/mailAuth';
 
@@ -164,11 +165,34 @@ emailRouter.post('/admin/email/provision', async (req: AuthedRequest, res) => {
   const webmailUrl = process.env.NODE_ENV === 'production' ? `https://mail.${domainStr}` : 'http://localhost:3001/email';
   const expiresAt = null;
 
+  let wildduckUserId: string | undefined;
+  let wildduckAddressId: string | undefined;
+
+  try {
+    const fullEmail = `${username}@${domainStr}`;
+    const wdUser = await wildduckClient.createUser({
+      username: fullEmail,
+      password,
+      name: targetUser.displayName || targetUser.email,
+      quotaGb: Math.max(1, Math.ceil(storageQuotaMb / 1024)),
+    }).catch(() => null);
+
+    if (wdUser) {
+      wildduckUserId = wdUser.id;
+      const addr = await wildduckClient.createAddress(wdUser.id, fullEmail, targetUser.displayName || undefined).catch(() => null);
+      if (addr) wildduckAddressId = addr.id;
+    }
+  } catch (err: any) {
+    logger.warn({ err: err.message }, 'WildDuck API user provision failed — proceeding with DB record');
+  }
+
   try {
     const newAccount = await prisma.smtpAccount.create({
       data: {
         userId: targetUserId,
         postalOrgId: 'shanutechx',
+        wildduckUserId,
+        wildduckAddressId,
         smtpHost,
         smtpPort: 587,
         smtpUsername: username,
@@ -278,11 +302,34 @@ emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
   const webmailUrl = process.env.NODE_ENV === 'production' ? `https://mail.${domainStr}` : 'http://localhost:3001/email';
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // First month free trial for customer self-created mailboxes
 
+  let wildduckUserId: string | undefined;
+  let wildduckAddressId: string | undefined;
+
+  try {
+    const fullEmail = `${username}@${domainStr}`;
+    const wdUser = await wildduckClient.createUser({
+      username: fullEmail,
+      password,
+      name: (req.user as any)?.displayName || req.user?.email,
+      quotaGb: Math.max(1, Math.ceil(storageQuotaMb / 1024)),
+    }).catch(() => null);
+
+    if (wdUser) {
+      wildduckUserId = wdUser.id;
+      const addr = await wildduckClient.createAddress(wdUser.id, fullEmail, (req.user as any)?.displayName || undefined).catch(() => null);
+      if (addr) wildduckAddressId = addr.id;
+    }
+  } catch (err: any) {
+    logger.warn({ err: err.message }, 'WildDuck API user provision failed for customer mailbox');
+  }
+
   try {
     const newAccount = await prisma.smtpAccount.create({
       data: {
         userId: req.user!.id,
         postalOrgId: 'shanutechx',
+        wildduckUserId,
+        wildduckAddressId,
         smtpHost,
         smtpPort: 587,
         smtpUsername: username,

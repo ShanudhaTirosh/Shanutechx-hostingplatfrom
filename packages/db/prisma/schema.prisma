@@ -570,7 +570,9 @@ model SmtpAccount {
   user          User     @relation(fields: [userId], references: [id])
   orderItemId   String?  @unique
   orderItem     OrderItem? @relation(fields: [orderItemId], references: [id])
-  postalOrgId   String
+  postalOrgId   String?
+  wildduckUserId String?
+  wildduckAddressId String?
   smtpHost      String
   smtpPort      Int      @default(587)
   smtpUsername  String
@@ -1201,6 +1203,8 @@ model CustomDomain {
   status        CustomDomainStatus  @default(pending)
   sslCertId     String?             // Cloudflare certificate ID
   verifiedAt    DateTime?
+  wildduckDkimKey String?
+  wildduckDkimSelector String?
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   

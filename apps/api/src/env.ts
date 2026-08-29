@@ -41,9 +41,9 @@ export const env = {
   // from any platform-level auth secret — a leak here can't be used to
   // forge platform admin/dev sessions, only project-scoped end-user tokens.
   projectAuthJwtSecret: required('PROJECT_AUTH_JWT_SECRET'),
-  postalApiUrl: process.env.POSTAL_API_URL ?? '',
-  postalApiKey: process.env.POSTAL_API_KEY ?? '',
-  postalFromAddress: process.env.POSTAL_FROM_ADDRESS ?? 'no-reply@shanutechx.com',
+  wildduckApiUrl: process.env.WILDDUCK_API_URL ?? 'http://wildduck-api:8080',
+  wildduckApiKey: process.env.WILDDUCK_API_KEY ?? '',
+  wildduckFromAddress: process.env.WILDDUCK_FROM_ADDRESS ?? 'no-reply@shanutechx.com',
   redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6379',
   firebaseDatabaseUrl: process.env.FIREBASE_DATABASE_URL ?? '',
   billingCronSecret: required('BILLING_CRON_SECRET'),

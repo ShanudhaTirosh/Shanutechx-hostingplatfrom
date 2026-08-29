@@ -1,5 +1,4 @@
 import { env } from '../env';
-import { sendViaPostal, PostalError } from './postal';
 import { logger } from './logger';
 import { sendPushToAllStaff } from './pushNotifications';
 
@@ -81,23 +80,7 @@ async function sendEmailFallback(email: string, message: string, customHtml?: st
     ? { subject: customSubject || 'ShanuTechX Notification', html: customHtml, text: message }
     : renderNotificationEmail({ title: 'ShanuTechX Alert', message });
 
-  // 1. Try Postal first if configured
-  if (env.postalApiUrl && env.postalApiKey) {
-    try {
-      await sendViaPostal({
-        to: [email],
-        from: env.postalFromAddress,
-        subject: rendered.subject,
-        html: rendered.html,
-        plainBody: rendered.text,
-      });
-      return;
-    } catch (err) {
-      if (!(err instanceof PostalError)) logger.warn({ err }, 'Postal email failed — attempting SMTP fallback');
-    }
-  }
-
-  // 2. Dual Transport Fallback: Try System Default SMTP
+  // Try System Outbound SMTP / WildDuck mail delivery
   try {
     const smtpHost = process.env.SMTP_HOST || 'mail.shanutechx.com';
     const smtpUser = process.env.SMTP_USER;
@@ -112,13 +95,14 @@ async function sendEmailFallback(email: string, message: string, customHtml?: st
           pass: smtpPass,
         },
         {
-          from: `"${env.rootDomain} Platform" <${env.postalFromAddress}>`,
+          from: `"${env.rootDomain} Platform" <${env.wildduckFromAddress}>`,
           to: email,
           subject: rendered.subject,
           html: rendered.html,
           text: rendered.text,
         }
       );
+      return;
     }
   } catch (smtpErr) {
     logger.error({ smtpErr, email }, 'All email delivery mechanisms failed for customer notification');

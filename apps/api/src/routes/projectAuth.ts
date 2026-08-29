@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { env } from '../env';
-import { sendViaPostal } from '../lib/postal';
+import { sendSmtpEmail } from '../lib/smtpDispatcher';
 import { authRateLimiter } from '../middleware/rateLimit';
 import {
   signProjectAuthToken,
@@ -149,16 +149,28 @@ projectAuthRouter.post('/projects/:id/auth/magic-link', async (req, res) => {
 
   let mailError: string | undefined;
   try {
-    await sendViaPostal({
-      to: [parsed.data.email],
-      from: env.postalFromAddress,
-      subject: `Sign in to ${project.name}`,
-      html: `<p>Click below to sign in. This link expires in 15 minutes and can only be used once.</p><p><a href="${link}">${link}</a></p>`,
-      plainBody: `Sign in to ${project.name}: ${link} (expires in 15 minutes, single use)`,
-    });
+    const smtpHost = process.env.SMTP_HOST || 'mail.shanutechx.com';
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (smtpUser && smtpPass) {
+      await sendSmtpEmail(
+        {
+          host: smtpHost,
+          port: Number(process.env.SMTP_PORT || 587),
+          user: smtpUser,
+          pass: smtpPass,
+        },
+        {
+          from: `"${project.name}" <${env.wildduckFromAddress}>`,
+          to: parsed.data.email,
+          subject: `Sign in to ${project.name}`,
+          html: `<p>Click below to sign in. This link expires in 15 minutes and can only be used once.</p><p><a href="${link}">${link}</a></p>`,
+          text: `Sign in to ${project.name}: ${link} (expires in 15 minutes, single use)`,
+        }
+      );
+    }
   } catch (err: any) {
-    // Don't fail the request just because email delivery isn't configured —
-    // still respond 202 so the frontend flow works in dev without Postal.
     mailError = err.message;
   }
 

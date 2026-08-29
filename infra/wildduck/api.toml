@@ -1,0 +1,14 @@
+# WildDuck REST API Configuration
+[api]
+port = 8080
+host = "0.0.0.0"
+accessToken = "secret-wildduck-api-token"
+
+[mongo]
+host = "mongodb"
+port = 27017
+db = "wildduck"
+
+[redis]
+host = "redis"
+port = 6379

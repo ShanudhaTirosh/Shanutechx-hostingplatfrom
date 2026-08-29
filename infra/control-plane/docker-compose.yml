@@ -564,89 +564,80 @@ services:
       - traefik.http.routers.supabase-studio.tls.certresolver=le
       - traefik.http.services.supabase-studio.loadbalancer.server.port=3000
 
-  # ── Self-Hosted Mail (Postal) — Business Email / SMTP module ─────────────
-  # Stores messages in MariaDB (postal-db-data volume), not S3 — that's
-  # Postal's own supported, durable design, not local container disk.
-  #
-  # ONE-TIME SETUP (can't be automated — inherent to running a real mail
-  # server):
-  #   1. openssl genrsa -out infra/postal/signing.key 2048
-  #   2. Real DNS: A/AAAA + reverse-DNS(PTR) for mail.${ROOT_DOMAIN} ->
-  #      this server's public IP, plus SPF/DKIM/DMARC once Postal gives
-  #      you the DKIM key after step 3.
-  #   3. After first `docker compose up -d`:
-  #        docker compose exec postal-web postal initialize
-  #        docker compose exec postal-web postal make-user
-  #      Then create an Organization + Mail Server in Postal's own UI at
-  #      postal.${ROOT_DOMAIN}, and put its API key in apps/api/.env as
-  #      POSTAL_API_KEY, then `docker compose restart api`.
-  # Only postal-web is public (its own admin UI + REST API, which the
-  # platform API calls). postal-smtp needs ports 25/587 published
-  # directly (Traefik doesn't proxy raw SMTP), not routed through Traefik.
-
-  postal-db:
-    image: mariadb:11
-    container_name: shanutechx-postal-db
+  # ── Self-Hosted Mail (WildDuck Mail Server) ─────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: shanutechx-wildduck-mongo
     restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${POSTAL_DB_ROOT_PASSWORD}
     volumes:
-      - postal-db-data:/var/lib/mysql
+      - mongo-mail-data:/data/db
     networks: [shanutechx-internal]
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
 
-  postal-web:
-    image: ghcr.io/postalserver/postal:latest
-    container_name: shanutechx-postal-web
+  wildduck-api:
+    image: wildduck/wildduck-api:latest
+    container_name: shanutechx-wildduck-api
     restart: unless-stopped
-    command: ["postal", "web-server"]
     depends_on:
-      postal-db:
+      mongodb:
         condition: service_healthy
     volumes:
-      - ../postal/postal.yml:/config/postal.yml:ro
-      - ../postal/signing.key:/config/signing.key:ro
+      - ../wildduck/api.toml:/etc/wildduck/api.toml:ro
+    environment:
+      - WILDDUCK_API_TOKEN=${WILDDUCK_API_KEY:-secret-wildduck-api-token}
     networks: [shanutechx-internal, shanutechx-public]
     labels:
       - traefik.enable=true
       - traefik.docker.network=control-plane_shanutechx-public
-      - traefik.http.routers.postal-web.rule=Host(`postal.${ROOT_DOMAIN}`)
-      - traefik.http.routers.postal-web.entrypoints=websecure
-      - traefik.http.routers.postal-web.tls.certresolver=le
-      - traefik.http.services.postal-web.loadbalancer.server.port=5000
+      - traefik.http.routers.wildduck-api.rule=Host(`mail-api.${ROOT_DOMAIN}`)
+      - traefik.http.routers.wildduck-api.entrypoints=websecure
+      - traefik.http.routers.wildduck-api.tls.certresolver=le
+      - traefik.http.services.wildduck-api.loadbalancer.server.port=8080
 
-  postal-smtp:
-    image: ghcr.io/postalserver/postal:latest
-    container_name: shanutechx-postal-smtp
+  wildduck:
+    image: wildduck/wildduck:latest
+    container_name: shanutechx-wildduck-engine
     restart: unless-stopped
-    command: ["postal", "smtp-server"]
     depends_on:
-      postal-db:
+      mongodb:
         condition: service_healthy
     volumes:
-      - ../postal/postal.yml:/config/postal.yml:ro
-      - ../postal/signing.key:/config/signing.key:ro
-    # Raw SMTP isn't HTTP -- Traefik can't proxy it (without its separate
-    # TCP-router feature, not configured here), so these ports are
-    # published directly to the host instead.
+      - ../wildduck/wildduck.toml:/etc/wildduck/wildduck.toml:ro
+    networks: [shanutechx-internal]
+
+  haraka:
+    image: wildduck/haraka-app:latest
+    container_name: shanutechx-haraka-smtp
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
     ports:
       - "25:25"
       - "587:587"
+      - "465:465"
     networks: [shanutechx-internal]
 
-  postal-worker:
-    image: ghcr.io/postalserver/postal:latest
-    container_name: shanutechx-postal-worker
+  wildduck-imap:
+    image: wildduck/wildduck-imap:latest
+    container_name: shanutechx-wildduck-imap
     restart: unless-stopped
-    command: ["postal", "worker"]
     depends_on:
-      postal-db:
+      mongodb:
         condition: service_healthy
-    volumes:
-      - ../postal/postal.yml:/config/postal.yml:ro
-      - ../postal/signing.key:/config/signing.key:ro
+    ports:
+      - "993:993"
+      - "143:143"
     networks: [shanutechx-internal]
+
+volumes:
+  traefik-certs:
+  minio-data:
+  postgres-data:
+  redis-data:
+  mongo-mail-data:
+  supabase-kong-config:
