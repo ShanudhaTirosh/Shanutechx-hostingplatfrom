@@ -20,7 +20,7 @@ volumes:
   minio-data:
   supabase-db-data:
   supabase-kong-config:
-  postal-db-data:
+  mongo-mail-data:
 
 services:
   postgres:
@@ -634,10 +634,3 @@ services:
       - "143:143"
     networks: [shanutechx-internal]
 
-volumes:
-  traefik-certs:
-  minio-data:
-  postgres-data:
-  redis-data:
-  mongo-mail-data:
-  supabase-kong-config:
