@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
+import { Ionicons } from '@expo/vector-icons';
 import { DashboardScreen } from '@/screens/DashboardScreen';
 import { DeploymentsScreen } from '@/screens/DeploymentsScreen';
 import { TicketsScreen } from '@/screens/TicketsScreen';
@@ -13,18 +14,25 @@ import type { MainTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-const ICONS: Record<keyof MainTabParamList, string> = {
-  Dashboard: '🏠',
-  Deployments: '🚀',
-  Tickets: '🎫',
-  Nodes: '🖥',
-  Analytics: '📈',
-  Profile: '👤',
+const ICONS: Record<keyof MainTabParamList, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
+  Dashboard: { active: 'grid', inactive: 'grid-outline' },
+  Deployments: { active: 'rocket', inactive: 'rocket-outline' },
+  Tickets: { active: 'ticket', inactive: 'ticket-outline' },
+  Nodes: { active: 'server', inactive: 'server-outline' },
+  Analytics: { active: 'stats-chart', inactive: 'stats-chart-outline' },
+  Profile: { active: 'person', inactive: 'person-outline' },
 };
 
 function TabIcon({ label, focused }: { label: keyof MainTabParamList; focused: boolean }) {
+  const icon = ICONS[label];
   return (
-    <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>{ICONS[label]}</Text>
+    <View style={focused ? styles.iconActiveWrapper : null}>
+      <Ionicons
+        name={focused ? icon.active : icon.inactive}
+        size={20}
+        color={focused ? colors.primary : colors.muted}
+      />
+    </View>
   );
 }
 
@@ -57,9 +65,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderTopWidth: 1,
     borderTopColor: colors.glassBorder,
-    backgroundColor: 'rgba(20,18,24,0.7)',
+    backgroundColor: 'rgba(20,18,24,0.85)',
     height: 82,
     paddingTop: 8,
     paddingBottom: 20,
+  },
+  iconActiveWrapper: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    backgroundColor: 'rgba(207,188,255,0.12)',
   },
 });

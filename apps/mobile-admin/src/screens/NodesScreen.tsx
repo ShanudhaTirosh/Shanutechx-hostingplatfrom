@@ -7,12 +7,15 @@ import {
   RefreshControl,
   Pressable,
   Alert,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassCard } from '@/components/GlassCard';
+import { Button } from '@/components/Button';
 import { api, Node } from '@/lib/api';
-import { colors, fontFamily, spacing, statusStyle } from '@/theme/tokens';
+import { colors, fontFamily, radius, statusStyle } from '@/theme/tokens';
 
 function UsageBar({ pct, color }: { pct: number | null; color: string }) {
   const val = pct ?? 0;
@@ -31,7 +34,15 @@ function UsageBar({ pct, color }: { pct: number | null; color: string }) {
   );
 }
 
-function NodeCard({ node, onToggleActive }: { node: Node; onToggleActive: (node: Node) => void }) {
+function NodeCard({
+  node,
+  onToggleActive,
+  onOpenCockpit,
+}: {
+  node: Node;
+  onToggleActive: (node: Node) => void;
+  onOpenCockpit: (node: Node) => void;
+}) {
   const s = statusStyle(node.status);
   return (
     <GlassCard style={styles.nodeCard}>
@@ -54,12 +65,17 @@ function NodeCard({ node, onToggleActive }: { node: Node; onToggleActive: (node:
         <GaugeRow label="Disk" pct={node.diskUsedPct} color={colors.success} suffix={node.totalDiskGb ? `/ ${node.totalDiskGb} GB` : undefined} />
       </View>
 
-      {/* Footer meta & Staff Action */}
+      {/* Footer meta & Staff Actions */}
       <View style={styles.footerMeta}>
         <Text style={styles.metaText}>🚀 {node.deploymentCount} deployment{node.deploymentCount !== 1 ? 's' : ''}</Text>
-        <Pressable onPress={() => onToggleActive(node)} style={styles.actionBtn}>
-          <Text style={styles.actionBtnText}>{node.status === 'online' ? 'Pause Node' : 'Activate Node'}</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Pressable onPress={() => onOpenCockpit(node)} style={styles.cockpitBtn}>
+            <Text style={styles.cockpitBtnText}>⚡ Cockpit</Text>
+          </Pressable>
+          <Pressable onPress={() => onToggleActive(node)} style={styles.actionBtn}>
+            <Text style={styles.actionBtnText}>{node.status === 'online' ? 'Pause' : 'Activate'}</Text>
+          </Pressable>
+        </View>
       </View>
     </GlassCard>
   );
@@ -93,6 +109,11 @@ export function NodesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Cockpit Modal
+  const [cockpitNode, setCockpitNode] = useState<Node | null>(null);
+  const [cockpitData, setCockpitData] = useState<any>(null);
+  const [cockpitLoading, setCockpitLoading] = useState(false);
+
   const load = useCallback(async () => {
     try {
       const { nodes: list } = await api.nodes.list();
@@ -109,6 +130,20 @@ export function NodesScreen() {
     setRefreshing(true);
     await load();
     setRefreshing(false);
+  }
+
+  async function handleOpenCockpit(node: Node) {
+    setCockpitNode(node);
+    setCockpitLoading(true);
+    setCockpitData(null);
+    try {
+      const res = await api.nodes.cockpitMonitoring(node.id);
+      setCockpitData(res);
+    } catch (err: any) {
+      setCockpitData({ error: err.message || 'Cockpit telemetry unavailable' });
+    } finally {
+      setCockpitLoading(false);
+    }
   }
 
   async function handleToggleActive(target: Node) {
@@ -166,8 +201,40 @@ export function NodesScreen() {
       )}
 
       {nodes.map((node) => (
-        <NodeCard key={node.id} node={node} onToggleActive={handleToggleActive} />
+        <NodeCard
+          key={node.id}
+          node={node}
+          onToggleActive={handleToggleActive}
+          onOpenCockpit={handleOpenCockpit}
+        />
       ))}
+
+      {/* Cockpit Modal */}
+      <Modal visible={!!cockpitNode} transparent animationType="slide" onRequestClose={() => setCockpitNode(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={styles.modalTitle}>⚡ Cockpit Telemetry</Text>
+              <Pressable onPress={() => setCockpitNode(null)}>
+                <Text style={{ color: colors.muted, fontSize: 18 }}>✕</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.modalSubtitle}>{cockpitNode?.label} ({cockpitNode?.ip})</Text>
+
+            {cockpitLoading ? (
+              <ActivityIndicator color={colors.primary} style={{ marginVertical: 30 }} />
+            ) : cockpitData?.error ? (
+              <Text style={{ color: colors.error, fontFamily: fontFamily.body, marginVertical: 14 }}>{cockpitData.error}</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 300, marginVertical: 10 }}>
+                <Text style={styles.telemetryJson}>{JSON.stringify(cockpitData, null, 2)}</Text>
+              </ScrollView>
+            )}
+
+            <Button label="Close" variant="glass" size="sm" onPress={() => setCockpitNode(null)} style={{ marginTop: 12 }} />
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -225,7 +292,14 @@ const styles = StyleSheet.create({
   gaugePct: { fontFamily: 'monospace', fontSize: 11, color: colors.onSurfaceVariant, width: 70, textAlign: 'right' },
   footerMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   metaText: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted },
-  actionBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(207,188,255,0.15)', borderWidth: 1, borderColor: 'rgba(207,188,255,0.25)' },
+  actionBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(207,188,255,0.15)', borderWidth: 1, borderColor: 'rgba(207,188,255,0.25)' },
   actionBtnText: { fontFamily: fontFamily.bodyMedium, fontSize: 11, color: colors.primary },
+  cockpitBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(6,182,212,0.15)', borderWidth: 1, borderColor: 'rgba(6,182,212,0.3)' },
+  cockpitBtnText: { fontFamily: fontFamily.bodyMedium, fontSize: 11, color: colors.cyan },
   muted: { fontFamily: fontFamily.body, color: colors.muted, fontSize: 13 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 20 },
+  modalCard: { backgroundColor: colors.bgScreen2, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.glassBorder, padding: 20 },
+  modalTitle: { fontFamily: fontFamily.headSemibold, fontSize: 16, color: colors.onSurface },
+  modalSubtitle: { fontFamily: 'monospace', fontSize: 12, color: colors.muted },
+  telemetryJson: { fontFamily: 'monospace', fontSize: 11, color: colors.onSurfaceVariant, backgroundColor: 'rgba(0,0,0,0.4)', padding: 12, borderRadius: radius.sm },
 });

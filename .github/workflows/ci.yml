@@ -45,8 +45,8 @@ jobs:
       - name: Run Unit Test Suite
         run: npm run test:unit
 
-      - name: Build Developer SDK (@shanutechx/client)
-        run: npm run build --workspace=packages/client
+      - name: Build Developer SDKs (@shanutechx/*)
+        run: npm run build:sdk
 
       - name: Build Core REST API (apps/api)
         run: npm run build --workspace=apps/api

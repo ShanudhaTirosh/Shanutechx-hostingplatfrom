@@ -1,12 +1,12 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, Pressable, TextInput } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassCard } from '@/components/GlassCard';
 import { Badge } from '@/components/Badge';
 import { api, Ticket } from '@/lib/api';
-import { colors, fontFamily } from '@/theme/tokens';
+import { colors, fontFamily, radius } from '@/theme/tokens';
 import type { RootStackParamList } from '@/navigation/types';
 
 const FILTERS: Array<{ label: string; value: string | undefined }> = [
@@ -16,10 +16,10 @@ const FILTERS: Array<{ label: string; value: string | undefined }> = [
   { label: 'All', value: undefined },
 ];
 
-const PRIORITY_COLOR: Record<string, string> = {
-  high: colors.error,
-  medium: colors.warning,
-  low: colors.muted,
+const PRIORITY_STYLE: Record<string, { bg: string; text: string }> = {
+  high: { bg: 'rgba(239,68,68,0.15)', text: colors.error },
+  medium: { bg: 'rgba(245,158,11,0.15)', text: colors.warning },
+  low: { bg: 'rgba(148,142,156,0.15)', text: colors.muted },
 };
 
 export function TicketsScreen() {
@@ -27,6 +27,7 @@ export function TicketsScreen() {
   const insets = useSafeAreaInsets();
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
   const [filter, setFilter] = useState<string | undefined>('open');
+  const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,9 +49,31 @@ export function TicketsScreen() {
     setRefreshing(false);
   }
 
+  const visibleTickets = (tickets ?? []).filter((t) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      t.subject.toLowerCase().includes(q) ||
+      (t.user?.email && t.user.email.toLowerCase().includes(q)) ||
+      t.id.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <View style={styles.screen}>
       <Text style={[styles.title, { paddingTop: insets.top + 12 }]}>Support Tickets</Text>
+
+      {/* Search Bar */}
+      <View style={styles.searchRow}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by subject, customer email…"
+          placeholderTextColor={colors.muted}
+          value={search}
+          onChangeText={setSearch}
+        />
+      </View>
 
       <View style={styles.filters}>
         {FILTERS.map((f) => (
@@ -65,7 +88,7 @@ export function TicketsScreen() {
       </View>
 
       <FlatList
-        data={tickets ?? []}
+        data={visibleTickets}
         keyExtractor={(t) => t.id}
         contentContainerStyle={{ padding: 20, paddingTop: 8, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
@@ -75,26 +98,31 @@ export function TicketsScreen() {
           ) : error ? (
             <Text style={{ color: colors.error }}>{error}</Text>
           ) : (
-            <GlassCard><Text style={styles.muted}>No tickets here.</Text></GlassCard>
+            <GlassCard><Text style={styles.muted}>No tickets found.</Text></GlassCard>
           )
         }
-        renderItem={({ item }) => (
-          <Pressable onPress={() => navigation.navigate('TicketChat', { ticketId: item.id, subject: item.subject })}>
-            <GlassCard style={{ marginBottom: 10 }}>
-              <View style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.subject} numberOfLines={1}>{item.subject}</Text>
-                  <Text style={styles.customer}>{item.user?.email ?? 'Unknown'}</Text>
+        renderItem={({ item }) => {
+          const prio = PRIORITY_STYLE[item.priority] ?? PRIORITY_STYLE.low;
+          return (
+            <Pressable onPress={() => navigation.navigate('TicketChat', { ticketId: item.id, subject: item.subject })}>
+              <GlassCard style={{ marginBottom: 10 }}>
+                <View style={styles.row}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.subject} numberOfLines={1}>{item.subject}</Text>
+                    <Text style={styles.customer}>{item.user?.email ?? 'Unknown'}</Text>
+                  </View>
+                  <View style={[styles.prioBadge, { backgroundColor: prio.bg }]}>
+                    <Text style={[styles.prioText, { color: prio.text }]}>{item.priority.toUpperCase()}</Text>
+                  </View>
                 </View>
-                <View style={[styles.priorityDot, { backgroundColor: PRIORITY_COLOR[item.priority] }]} />
-              </View>
-              <View style={styles.metaRow}>
-                <Badge status={item.status} />
-                <Text style={styles.date}>{new Date(item.updatedAt).toLocaleDateString()}</Text>
-              </View>
-            </GlassCard>
-          </Pressable>
-        )}
+                <View style={styles.metaRow}>
+                  <Badge status={item.status} />
+                  <Text style={styles.date}>{new Date(item.updatedAt).toLocaleDateString()}</Text>
+                </View>
+              </GlassCard>
+            </Pressable>
+          );
+        }}
       />
     </View>
   );
@@ -103,16 +131,36 @@ export function TicketsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bgBase },
   title: { fontFamily: fontFamily.head, fontSize: 20, color: colors.onSurface, paddingHorizontal: 20, paddingTop: 0 },
-  filters: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, marginTop: 14 },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.glass,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginHorizontal: 20,
+    marginTop: 12,
+  },
+  searchIcon: { fontSize: 14, marginRight: 8 },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontFamily: fontFamily.body,
+    fontSize: 14,
+    color: colors.onSurface,
+  },
+  filters: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, marginTop: 12, marginBottom: 4 },
   filterPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.glassBorder },
   filterPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   filterLabel: { fontFamily: fontFamily.bodyMedium, fontSize: 12, color: colors.muted },
   filterLabelActive: { color: '#1a0f33' },
   muted: { fontFamily: fontFamily.body, color: colors.muted, fontSize: 13, textAlign: 'center', marginTop: 30 },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  row: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   subject: { fontFamily: fontFamily.bodySemibold, fontSize: 14, color: colors.onSurface },
   customer: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted, marginTop: 2 },
-  priorityDot: { width: 8, height: 8, borderRadius: 4, marginLeft: 10 },
+  prioBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginLeft: 8 },
+  prioText: { fontFamily: fontFamily.bodyMedium, fontSize: 10 },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
   date: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted },
 });

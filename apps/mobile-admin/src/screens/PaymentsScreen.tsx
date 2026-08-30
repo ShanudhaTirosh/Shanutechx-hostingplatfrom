@@ -23,10 +23,9 @@ export function PaymentsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Decline always requires a reason, enforced client-side and server-side —
-  // matches the exact rule in apps/api/src/routes/payments.ts.
   const [declineTarget, setDeclineTarget] = useState<Payment | null>(null);
   const [declineReason, setDeclineReason] = useState('');
+  const [previewProofUrl, setPreviewProofUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; kind: 'success' | 'error' } | null>(null);
 
   const load = useCallback(async () => {
@@ -130,7 +129,12 @@ export function PaymentsScreen() {
             </View>
 
             {item.proofUrl && (
-              <Image source={{ uri: item.proofUrl }} style={styles.proof} resizeMode="cover" />
+              <Pressable onPress={() => setPreviewProofUrl(item.proofUrl)} style={styles.proofContainer}>
+                <Image source={{ uri: item.proofUrl }} style={styles.proof} resizeMode="cover" />
+                <View style={styles.zoomHint}>
+                  <Text style={styles.zoomHintText}>🔍 Tap to inspect slip</Text>
+                </View>
+              </Pressable>
             )}
 
             <View style={styles.metaRow}>
@@ -179,6 +183,24 @@ export function PaymentsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Full-screen Proof Slip Image Preview Modal */}
+      <Modal visible={!!previewProofUrl} transparent animationType="fade" onRequestClose={() => setPreviewProofUrl(null)}>
+        <View style={styles.imageModalContainer}>
+          <Pressable style={styles.imageModalOverlay} onPress={() => setPreviewProofUrl(null)} />
+          {previewProofUrl && (
+            <View style={styles.imageCard}>
+              <View style={styles.imageHeader}>
+                <Text style={styles.imageModalTitle}>Payment Proof Slip</Text>
+                <Pressable onPress={() => setPreviewProofUrl(null)} style={styles.closeBtn}>
+                  <Text style={{ color: colors.onSurface, fontSize: 18, fontWeight: 'bold' }}>✕</Text>
+                </Pressable>
+              </View>
+              <Image source={{ uri: previewProofUrl }} style={styles.fullProofImage} resizeMode="contain" />
+            </View>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -195,7 +217,10 @@ const styles = StyleSheet.create({
   customer: { fontFamily: fontFamily.bodySemibold, fontSize: 14, color: colors.onSurface },
   orderRef: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted, marginTop: 2 },
   amount: { fontFamily: fontFamily.headSemibold, fontSize: 15, color: colors.primary },
-  proof: { width: '100%', height: 160, borderRadius: radius.sm, marginTop: 12, backgroundColor: colors.bgScreen2 },
+  proofContainer: { position: 'relative', marginTop: 12 },
+  proof: { width: '100%', height: 160, borderRadius: radius.sm, backgroundColor: colors.bgScreen2 },
+  zoomHint: { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  zoomHintText: { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.onSurface },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
   method: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted, textTransform: 'capitalize' },
   actions: { flexDirection: 'row', gap: 10, marginTop: 14 },
@@ -216,4 +241,11 @@ const styles = StyleSheet.create({
     minHeight: 90,
     textAlignVertical: 'top',
   },
+  imageModalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.85)', padding: 16 },
+  imageModalOverlay: { ...StyleSheet.absoluteFillObject },
+  imageCard: { width: '100%', maxHeight: '80%', backgroundColor: colors.bgScreen, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.glassBorder, overflow: 'hidden', padding: 16 },
+  imageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  imageModalTitle: { fontFamily: fontFamily.headSemibold, fontSize: 15, color: colors.onSurface },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center' },
+  fullProofImage: { width: '100%', height: 400, borderRadius: radius.sm },
 });
