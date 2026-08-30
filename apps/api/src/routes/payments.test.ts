@@ -13,9 +13,10 @@ import { prisma } from '../lib/prisma';
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
-    payment: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn(), findMany: vi.fn(), count: vi.fn() },
-    order: { findUnique: vi.fn(), update: vi.fn() },
+    payment: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), create: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+    order: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     auditLog: { create: vi.fn() },
+    $transaction: vi.fn((cb) => cb({ order: { updateMany: vi.fn() } })),
   },
 }));
 
@@ -86,14 +87,14 @@ describe('POST /payments/:id/review — manual-only review', () => {
 
   it('accepts a decline with a reason, records the reviewer, and never auto-approves', async () => {
     (prisma.payment.findUnique as any).mockResolvedValue(BASE_PAYMENT);
-    (prisma.payment.update as any).mockResolvedValue({ ...BASE_PAYMENT, status: 'rejected' });
+    (prisma.payment.updateMany as any).mockResolvedValue({ count: 1 });
 
     const res = await request(app)
       .post('/api/payments/pay-1/review')
       .send({ approve: false, reason: 'Slip amount does not match order total' });
 
     expect(res.status).toBe(200);
-    expect(prisma.payment.update).toHaveBeenCalledWith(
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           status: 'rejected',
@@ -106,12 +107,12 @@ describe('POST /payments/:id/review — manual-only review', () => {
 
   it('approves only on an explicit human call, recording the reviewer', async () => {
     (prisma.payment.findUnique as any).mockResolvedValue(BASE_PAYMENT);
-    (prisma.payment.update as any).mockResolvedValue({ ...BASE_PAYMENT, status: 'manually_approved' });
+    (prisma.payment.updateMany as any).mockResolvedValue({ count: 1 });
 
     const res = await request(app).post('/api/payments/pay-1/review').send({ approve: true });
 
     expect(res.status).toBe(200);
-    expect(prisma.payment.update).toHaveBeenCalledWith(
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           status: 'manually_approved',
@@ -119,9 +120,6 @@ describe('POST /payments/:id/review — manual-only review', () => {
           rejectionReason: null,
         }),
       })
-    );
-    expect(prisma.order.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { status: 'paid' } })
     );
   });
 

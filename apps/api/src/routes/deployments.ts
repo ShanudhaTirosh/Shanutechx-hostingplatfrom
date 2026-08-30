@@ -258,20 +258,20 @@ deploymentsRouter.get('/deployments/:id/logs', async (req: AuthedRequest, res) =
 deploymentsRouter.get('/deployments/:id/logs/stream', async (req: AuthedRequest, res) => {
   const deployment = await loadOwnedDeployment(req, req.params.id);
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
-  if (!deployment.containerId) {
-    // No container means nothing to stream
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.write('data: {"type":"error","message":"No container running for this deployment"}\n\n');
-    return res.end();
-  }
 
   // Set up SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+  if (!deployment.containerId) {
+    // No container means nothing to stream
+    res.write('data: {"type":"error","message":"No container running for this deployment"}\n\n');
+    return res.end();
+  }
+
+  // Build the node-agent stream URL
 
   // Build the node-agent stream URL
   const streamUrl = `http://${deployment.node.ip}:${env.nodeAgentPort}/agent/deployments/${deployment.containerId}/logs/stream`;

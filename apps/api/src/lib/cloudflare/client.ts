@@ -195,6 +195,70 @@ export class CloudflareClient {
   }
 
   /**
+   * Request an SSL certificate pack for a custom domain
+   * 
+   * @param domain - The fully qualified domain name
+   * @returns SSL certificate order details
+   */
+  async requestSSL(domain: string): Promise<any> {
+    const url = `${CF_API_BASE}/zones/${this.zoneId}/ssl/certificate_packs/order`;
+    
+    const response = await this.fetchWithRetry<{
+      success: boolean;
+      result: any;
+      errors?: Array<{ message: string }>;
+    }>(url, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({
+        type: 'advanced',
+        hosts: [domain],
+        validation_method: 'txt',
+        validity_days: 90,
+        certificate_authority: 'lets_encrypt',
+      }),
+    });
+
+    return response.result;
+  }
+
+  /**
+   * Get status of an SSL certificate pack
+   * 
+   * @param certificateId - The certificate pack ID
+   * @returns SSL certificate status details
+   */
+  async getSSLStatus(certificateId: string): Promise<any> {
+    const url = `${CF_API_BASE}/zones/${this.zoneId}/ssl/certificate_packs/${certificateId}`;
+    
+    const response = await this.fetchWithRetry<{
+      success: boolean;
+      result: any;
+      errors?: Array<{ message: string }>;
+    }>(url, {
+      method: 'GET',
+      headers: this.headers(),
+    });
+
+    return response.result;
+  }
+
+  /**
+   * Renew an existing SSL certificate pack
+   * 
+   * @param certificateId - The certificate pack ID to renew
+   * @returns New SSL certificate order details
+   */
+  async renewSSL(certificateId: string): Promise<any> {
+    const current = await this.getSSLStatus(certificateId);
+    const domain = current.hosts?.[0];
+    if (!domain) {
+      throw new CloudflareClientError('Could not determine domain for certificate renewal');
+    }
+    return this.requestSSL(domain);
+  }
+
+  /**
    * Verify that a DNS record exists and resolves correctly
    * 
    * Uses DNS-over-HTTPS to verify the CNAME record

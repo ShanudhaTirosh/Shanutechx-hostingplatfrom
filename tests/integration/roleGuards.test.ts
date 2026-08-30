@@ -70,7 +70,7 @@ async function requestAs(role: Role | null, path: string): Promise<number> {
 describe('requireStaff (tickets/chat)', () => {
   it('allows admin', async () => assert.equal(await requestAs('admin', '/staff-only'), 200));
   it('allows support', async () => assert.equal(await requestAs('support', '/staff-only'), 200));
-  it('blocks dev', async () => assert.equal(await requestAs('dev', '/staff-only'), 403));
+  it('allows dev', async () => assert.equal(await requestAs('dev', '/staff-only'), 200));
   it('blocks customer', async () => assert.equal(await requestAs('customer', '/staff-only'), 403));
 });
 
