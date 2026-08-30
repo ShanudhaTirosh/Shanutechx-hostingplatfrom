@@ -72,7 +72,7 @@ containersRouter.post('/nodes/:nodeId/containers/:containerId/exec-ticket', asyn
   if (!node) return res.status(404).json({ error: 'Node not found' });
 
   const { issueContainerExecTicket } = await import('../lib/containerExecGateway');
-  const ticketInfo = issueContainerExecTicket(node.id, req.params.containerId, req.user!.id);
+  const ticketInfo = await issueContainerExecTicket(node.id, req.params.containerId, req.user!.id);
   res.json(ticketInfo);
 });
 

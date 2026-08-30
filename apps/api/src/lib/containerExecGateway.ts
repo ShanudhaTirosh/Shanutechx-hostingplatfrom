@@ -1,6 +1,7 @@
 import crypto from 'crypto';
+import { storeState, consumeState } from './redis';
 
-interface ExecTicket {
+export interface ExecTicket {
   ticketId: string;
   nodeId: string;
   containerId: string;
@@ -8,27 +9,24 @@ interface ExecTicket {
   expiresAt: number;
 }
 
-const activeTickets = new Map<string, ExecTicket>();
-
 /**
  * Issues a short-lived (60 second) ticket token for real-time WebSocket container docker exec session.
  */
-export function issueContainerExecTicket(nodeId: string, containerId: string, userId: string): { ticket: string; expiresAt: number } {
+export async function issueContainerExecTicket(nodeId: string, containerId: string, userId: string): Promise<{ ticket: string; expiresAt: number }> {
   const ticket = crypto.randomBytes(24).toString('hex');
   const expiresAt = Date.now() + 60 * 1000;
 
-  activeTickets.set(ticket, { ticketId: ticket, nodeId, containerId, userId, expiresAt });
+  const data: ExecTicket = { ticketId: ticket, nodeId, containerId, userId, expiresAt };
+  await storeState('exec_ticket', ticket, data, 60);
   return { ticket, expiresAt };
 }
 
 /**
  * Validates and consumes an exec ticket.
  */
-export function consumeContainerExecTicket(ticket: string): ExecTicket | null {
-  const data = activeTickets.get(ticket);
+export async function consumeContainerExecTicket(ticket: string): Promise<ExecTicket | null> {
+  const data = await consumeState<ExecTicket>('exec_ticket', ticket);
   if (!data) return null;
-  activeTickets.delete(ticket);
-
   if (Date.now() > data.expiresAt) return null;
   return data;
 }

@@ -271,3 +271,11 @@ async function gracefulShutdown(signal: string) {
 
 process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error({ reason, promise }, 'Unhandled Promise Rejection caught at process level');
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error({ error }, 'Uncaught Exception caught at process level');
+});

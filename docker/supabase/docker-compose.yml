@@ -8,7 +8,7 @@ services:
     image: supabase/studio:2026.08.03-sha-022b374
     restart: unless-stopped
     ports:
-      - "3003:3000"
+      - "127.0.0.1:3003:3000"
     healthcheck:
       test:
         [
@@ -195,7 +195,7 @@ services:
     image: supabase/postgres-meta:v0.96.6
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       db:
         condition: service_healthy
@@ -229,7 +229,7 @@ services:
     image: supabase/postgres:17.6.1.136
     restart: unless-stopped
     ports:
-      - "${POSTGRES_PORT:-5435}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5435}:5432"
     volumes:
       - supabase-db-data:/var/lib/postgresql/data
     healthcheck:

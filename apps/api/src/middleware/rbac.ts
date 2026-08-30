@@ -131,7 +131,28 @@ export async function canAccessResource(resourceOwnerId: string, req: AuthedRequ
     if (!owner) return true;
     return owner.assignedAdminId === req.user.id || owner.assignedAdminId == null;
   }
-  return req.user?.id === resourceOwnerId;
+  if (req.user?.id === resourceOwnerId) return true;
+
+  if (req.user?.id) {
+    const membership = await prisma.teamMember.findFirst({
+      where: {
+        userId: req.user.id,
+        team: { ownerId: resourceOwnerId },
+      },
+      include: { permissions: true },
+    });
+
+    if (membership) {
+      if (['owner', 'admin', 'developer'].includes(membership.role)) {
+        return true;
+      }
+      if (membership.permissions && membership.permissions.some((p) => p.permission !== 'none')) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 /**

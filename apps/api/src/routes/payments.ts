@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { requireAuth, requireAdmin, AuthedRequest } from '../middleware/auth';
+import { requireAuth, requireAdmin, requireFullAdmin, AuthedRequest } from '../middleware/auth';
 import { paymentReviewVisibilityWhere, canReviewPayment } from '../middleware/rbac';
 import { uploadPaymentProof } from '../lib/uploads';
 import { notifyCustomer, notifyAdmins } from '../lib/notifications';
@@ -87,7 +87,7 @@ paymentsRouter.post(
 );
 
 /** Admin queue of payments awaiting human review. */
-paymentsRouter.get('/payments/review-queue', requireAdmin, async (req: AuthedRequest, res) => {
+paymentsRouter.get('/payments/review-queue', requireFullAdmin, async (req: AuthedRequest, res) => {
   const { take, skip } = parsePagination(req.query);
   const visibility = await paymentReviewVisibilityWhere(req);
   const where = { status: 'manual_review' as const, ...visibility };
@@ -113,7 +113,7 @@ const reviewSchema = z
     path: ['reason'],
   });
 
-paymentsRouter.post('/payments/:id/review', requireAdmin, async (req: AuthedRequest, res) => {
+paymentsRouter.post('/payments/:id/review', requireFullAdmin, async (req: AuthedRequest, res) => {
   const parsed = reviewSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 

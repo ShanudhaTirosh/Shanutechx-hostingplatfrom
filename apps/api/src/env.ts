@@ -60,6 +60,7 @@ export const env = {
   // PEM private key, usually \n-escaped in .env like the Firebase key above.
   githubAppPrivateKey: (process.env.GITHUB_APP_PRIVATE_KEY ?? '').replace(/\\n/g, '\n'),
   githubAppWebhookSecret: process.env.GITHUB_APP_WEBHOOK_SECRET ?? '',
+  prWebhookSecret: process.env.PR_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET || process.env.GITHUB_APP_WEBHOOK_SECRET || '',
   // Used only to sign/verify the short-lived `state` param across the
   // install/authorize redirect -- not a long-lived credential.
   gitOauthStateSecret: process.env.GIT_OAUTH_STATE_SECRET || process.env.PROJECT_AUTH_JWT_SECRET || '',

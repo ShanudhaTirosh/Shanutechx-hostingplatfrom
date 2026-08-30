@@ -32,12 +32,13 @@ export default function Contact() {
         setStatus('success');
         setName(''); setEmail(''); setMessage('');
       } else {
-        // Graceful fallback — still show success if API isn't wired
-        setStatus('success');
+        const data = await res.json().catch(() => ({}));
+        setStatus('error');
+        setErrorMsg(data.error || 'Failed to send message. Please try again.');
       }
     } catch {
-      // API not available — graceful fallback
-      setStatus('success');
+      setStatus('error');
+      setErrorMsg('Network error. Unable to reach server.');
     }
   }
 

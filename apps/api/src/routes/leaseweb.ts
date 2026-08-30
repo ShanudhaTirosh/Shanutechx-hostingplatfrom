@@ -441,7 +441,7 @@ leasewebRouter.post('/leaseweb/instances/:kind/:id/ssh-ticket', async (req: Auth
   const vpsId = await resolveLeasewebVpsId(req, kind.data, req.params.id);
   if (!vpsId) return res.status(404).json({ error: 'Not found' });
 
-  const ticket = issueSshTicket(vpsId, req.user!.id);
+  const ticket = await issueSshTicket(vpsId, req.user!.id);
   await prisma.auditLog.create({
     data: {
       adminId: req.user!.id,

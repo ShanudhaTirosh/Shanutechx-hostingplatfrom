@@ -2,14 +2,14 @@ import crypto from 'crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { requireAuth, requireAdmin, requireDev, AuthedRequest } from '../middleware/auth';
+import { requireAuth, requireFullAdmin, requireDev, AuthedRequest } from '../middleware/auth';
 import { parsePagination } from '../lib/pagination';
 
 import { banUserAndTeardownResources, unbanUser } from '../lib/abuseDetector';
 
 export const adminRouter = Router();
 
-adminRouter.use(requireAuth, requireAdmin);
+adminRouter.use(requireAuth, requireFullAdmin);
 
 adminRouter.get('/admin/customers', async (req: AuthedRequest, res) => {
   const { take, skip } = parsePagination(req.query);

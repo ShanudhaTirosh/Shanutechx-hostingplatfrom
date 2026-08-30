@@ -16,30 +16,33 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
 
   const githubSignature = req.headers['x-hub-signature-256'] as string | undefined;
   const gitlabToken = req.headers['x-gitlab-token'] as string | undefined;
-  const webhookSecret = process.env.PR_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET || env.nodeAgentSecret;
+  const webhookSecret = env.prWebhookSecret;
 
-  if (webhookSecret) {
-    let verified = false;
-    if (githubSignature) {
-      const rawBody = (req as any).rawBody || JSON.stringify(payload);
-      const expected = 'sha256=' + crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
-      try {
-        verified =
-          expected.length === githubSignature.length &&
-          crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(githubSignature));
-      } catch {
-        verified = false;
-      }
-    } else if (gitlabToken) {
+  if (!webhookSecret) {
+    logger.warn({ eventType }, 'PR webhook secret not configured on server');
+    return res.status(500).json({ error: 'PR Webhook secret is not configured' });
+  }
+
+  let verified = false;
+  if (githubSignature) {
+    const rawBody = (req as any).rawBody || JSON.stringify(payload);
+    const expected = 'sha256=' + crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+    try {
       verified =
-        gitlabToken.length === webhookSecret.length &&
-        crypto.timingSafeEqual(Buffer.from(gitlabToken), Buffer.from(webhookSecret));
+        expected.length === githubSignature.length &&
+        crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(githubSignature));
+    } catch {
+      verified = false;
     }
+  } else if (gitlabToken) {
+    verified =
+      gitlabToken.length === webhookSecret.length &&
+      crypto.timingSafeEqual(Buffer.from(gitlabToken), Buffer.from(webhookSecret));
+  }
 
-    if (!verified) {
-      logger.warn({ eventType }, 'PR webhook signature verification failed');
-      return res.status(401).json({ error: 'Invalid webhook signature or token' });
-    }
+  if (!verified) {
+    logger.warn({ eventType }, 'PR webhook signature verification failed');
+    return res.status(401).json({ error: 'Invalid webhook signature or token' });
   }
 
   logger.info({ eventType }, 'Received PR preview deployment webhook payload');

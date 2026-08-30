@@ -691,10 +691,17 @@ deploymentsRouter.patch('/deployments/:id/subdomain', async (req: AuthedRequest,
     logger.warn({ deploymentId: deployment.id, err }, 'Failed to create Cloudflare DNS record for new subdomain');
   }
 
-  await prisma.deployment.update({
-    where: { id: deployment.id },
-    data: { subdomain: newSubdomain },
-  });
+  try {
+    await prisma.deployment.update({
+      where: { id: deployment.id },
+      data: { subdomain: newSubdomain },
+    });
+  } catch (err: any) {
+    if (err?.code === 'P2002') {
+      return res.status(409).json({ error: 'This subdomain is already taken. Please choose another.' });
+    }
+    throw err;
+  }
 
 function getDecryptedEnvVars(deployment: { envVarsEncrypted?: string | null }): Record<string, string> | undefined {
   if (!deployment.envVarsEncrypted) return undefined;

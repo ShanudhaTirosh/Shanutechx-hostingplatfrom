@@ -388,7 +388,7 @@ cockpitRouter.post('/nodes/:nodeId/cockpit/ssh-ticket', async (req: AuthedReques
 
   try {
     const sshKeyRef = 'sshKeyRef' in node ? (node as any).sshKeyRef || 'default' : 'default';
-    const ticket = issueSshTicket(`node:${node.ip}:${sshKeyRef}`, req.user!.id);
+    const ticket = await issueSshTicket(`node:${node.ip}:${sshKeyRef}`, req.user!.id);
 
     await prisma.auditLog.create({
       data: {

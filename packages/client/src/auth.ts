@@ -15,7 +15,7 @@ export class AuthResource extends BaseClient {
   }
 
   async me(): Promise<User> {
-    return this.httpGet<User>('/api/auth/me');
+    return this.httpGet<User>('/api/me');
   }
 
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {

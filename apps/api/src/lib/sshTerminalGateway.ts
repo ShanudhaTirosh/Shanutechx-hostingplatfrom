@@ -25,45 +25,37 @@ import { env } from '../env';
  * long enough to be replayable if it leaked into a log somewhere.
  */
 
-interface SshTicket {
+import { storeState, consumeState } from './redis';
+
+export interface SshTicket {
   vpsId: string;
   userId: string;
   expiresAt: number;
 }
 
-const tickets = new Map<string, SshTicket>();
-
-export function issueSshTicket(vpsId: string, userId: string): string {
+export async function issueSshTicket(vpsId: string, userId: string): Promise<string> {
   const ticket = crypto.randomUUID();
-  tickets.set(ticket, { vpsId, userId, expiresAt: Date.now() + 30_000 });
+  const entry: SshTicket = { vpsId, userId, expiresAt: Date.now() + 30_000 };
+  await storeState('ssh_ticket', ticket, entry, 30);
   return ticket;
 }
 
-function consumeSshTicket(ticket: string): SshTicket | null {
-  const entry = tickets.get(ticket);
+async function consumeSshTicket(ticket: string): Promise<SshTicket | null> {
+  const entry = await consumeState<SshTicket>('ssh_ticket', ticket);
   if (!entry) return null;
-  tickets.delete(ticket); // single-use regardless of outcome
   if (entry.expiresAt < Date.now()) return null;
   return entry;
 }
 
-// Sweep expired-but-unused tickets periodically so the map never grows unbounded.
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of tickets) {
-    if (entry.expiresAt < now) tickets.delete(key);
-  }
-}, 60_000).unref();
-
 export function attachSshTerminalGateway(server: HttpServer): void {
   const wss = new WebSocketServer({ noServer: true });
 
-  server.on('upgrade', (req, socket, head) => {
+  server.on('upgrade', async (req, socket, head) => {
     const url = new URL(req.url ?? '', 'http://internal');
     if (url.pathname !== '/ws/vps-ssh') return; // let other upgrade handlers (if any) take it
 
     const ticket = url.searchParams.get('ticket');
-    const entry = ticket ? consumeSshTicket(ticket) : null;
+    const entry = ticket ? await consumeSshTicket(ticket) : null;
 
     if (!entry) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');

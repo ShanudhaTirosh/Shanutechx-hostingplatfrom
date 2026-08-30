@@ -8,11 +8,11 @@ services:
     container_name: infisical-db
     restart: unless-stopped
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       - infisical-postgres-data:/var/lib/postgresql/data
     environment:
-      POSTGRES_PASSWORD: infisical_dev_secret
+      POSTGRES_PASSWORD: ${INFISICAL_POSTGRES_PASSWORD:-infisical_dev_secret}
       POSTGRES_USER: infisical
       POSTGRES_DB: infisical
 
@@ -21,9 +21,10 @@ services:
     container_name: infisical-redis
     restart: unless-stopped
     environment:
-      - ALLOW_EMPTY_PASSWORD=yes
+      - ALLOW_EMPTY_PASSWORD=no
+      - REDIS_PASSWORD=${INFISICAL_REDIS_PASSWORD:-infisical_redis_secret}
     ports:
-      - "6380:6379"
+      - "127.0.0.1:6380:6379"
     volumes:
       - infisical-redis-data:/data
 

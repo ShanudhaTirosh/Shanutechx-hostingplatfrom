@@ -17,7 +17,7 @@ export default function RequireFullAdmin({ children }: { children: React.ReactNo
   const { apiUser, loading } = useAppUser();
   const router = useRouter();
 
-  const allowed = apiUser?.role === 'admin' || apiUser?.role === 'dev';
+  const allowed = apiUser?.role === 'admin';
 
   useEffect(() => {
     if (!loading && apiUser && !allowed) {

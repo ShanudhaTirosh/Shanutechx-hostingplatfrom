@@ -17,7 +17,7 @@ export function sanitizeHtml(html: string): string {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
 
-    const FORBIDDEN_TAGS = ['script', 'iframe', 'embed', 'object', 'form', 'base', 'meta', 'link', 'applet'];
+    const FORBIDDEN_TAGS = ['script', 'iframe', 'embed', 'object', 'form', 'base', 'meta', 'link', 'applet', 'style', 'svg', 'math'];
 
     // Remove forbidden tags
     FORBIDDEN_TAGS.forEach((tag) => {
@@ -39,6 +39,13 @@ export function sanitizeHtml(html: string): string {
         if (['href', 'src', 'action', 'data'].includes(lowerName)) {
           const val = (el.getAttribute(attrName) || '').trim().toLowerCase();
           if (val.startsWith('javascript:') || val.startsWith('vbscript:') || (lowerName === 'src' && val.startsWith('data:text/html'))) {
+            el.removeAttribute(attrName);
+          }
+        }
+        // Sanitize inline style attribute against CSS exfiltration/tracking vectors
+        if (lowerName === 'style') {
+          const val = (el.getAttribute(attrName) || '').toLowerCase();
+          if (val.includes('url(') || val.includes('expression(') || val.includes('@import') || val.includes('-moz-binding')) {
             el.removeAttribute(attrName);
           }
         }

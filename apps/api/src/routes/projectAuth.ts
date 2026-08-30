@@ -17,6 +17,7 @@ import {
   findOrCreateVerifiedUser,
 } from '../lib/projectAuthService';
 import { OAUTH_PROVIDERS, OAuthProviderName } from '../lib/oauthProviders';
+import { storeState, consumeState } from '../lib/redis';
 
 export const projectAuthRouter = Router();
 
@@ -113,12 +114,34 @@ async function validateProjectRedirectUrl(
     return true;
   }
 
-  const rootDomain = process.env.ROOT_DOMAIN || 'shanutechx.com';
-  const isLocalhost = parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1';
-  const isPlatformDomain = parsedUrl.hostname === rootDomain || parsedUrl.hostname.endsWith(`.${rootDomain}`);
+  const isLocalhost = (parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1') &&
+    (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test');
 
-  if (isLocalhost || isPlatformDomain) {
+  if (isLocalhost) {
     return true;
+  }
+
+  // Check if redirect matches any deployments owned by the project's user
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { userId: true },
+  });
+
+  if (project?.userId) {
+    const userDeployments = await prisma.deployment.findMany({
+      where: { userId: project.userId },
+      select: { subdomain: true, customDomain: true },
+    });
+
+    const rootDomain = env.rootDomain || 'shanutechx.com';
+    for (const d of userDeployments) {
+      if (d.subdomain && parsedUrl.hostname === `${d.subdomain}.${rootDomain}`) {
+        return true;
+      }
+      if (d.customDomain && parsedUrl.hostname === d.customDomain) {
+        return true;
+      }
+    }
   }
 
   return false;
@@ -212,12 +235,14 @@ projectAuthRouter.get('/projects/:id/auth/me', async (req, res) => {
 
 // ── OAuth (Google / GitHub / Discord) ───────────────────────────────────────
 
-const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
-const oauthStates = new Map<string, { projectId: string; provider: OAuthProviderName; redirectUrl: string; expiresAt: number }>();
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of oauthStates) if (entry.expiresAt < now) oauthStates.delete(key);
-}, 60_000).unref();
+const OAUTH_STATE_TTL_SECONDS = 10 * 60; // 10 minutes
+
+interface OAuthStateData {
+  projectId: string;
+  provider: OAuthProviderName;
+  redirectUrl: string;
+  expiresAt: number;
+}
 
 projectAuthRouter.get('/projects/:id/auth/oauth/:provider/start', async (req, res) => {
   const provider = req.params.provider as OAuthProviderName;
@@ -238,7 +263,13 @@ projectAuthRouter.get('/projects/:id/auth/oauth/:provider/start', async (req, re
   }
 
   const state = crypto.randomUUID();
-  oauthStates.set(state, { projectId: req.params.id, provider, redirectUrl, expiresAt: Date.now() + OAUTH_STATE_TTL_MS });
+  const stateData: OAuthStateData = {
+    projectId: req.params.id,
+    provider,
+    redirectUrl,
+    expiresAt: Date.now() + OAUTH_STATE_TTL_SECONDS * 1000,
+  };
+  await storeState('oauth_state', state, stateData, OAUTH_STATE_TTL_SECONDS);
 
   const url = new URL(providerDef.authorizeUrl);
   url.searchParams.set('client_id', config.clientId);
@@ -260,8 +291,7 @@ projectAuthRouter.get('/projects/:id/auth/oauth/:provider/callback', async (req,
     return res.status(400).json({ error: 'Missing code or state' });
   }
 
-  const stateEntry = oauthStates.get(state);
-  oauthStates.delete(state); // single-use regardless of outcome
+  const stateEntry = await consumeState<OAuthStateData>('oauth_state', state);
   if (!stateEntry || stateEntry.projectId !== req.params.id || stateEntry.provider !== provider || stateEntry.expiresAt < Date.now()) {
     return res.status(401).json({ error: 'Invalid or expired OAuth state' });
   }

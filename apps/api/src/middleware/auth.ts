@@ -131,6 +131,18 @@ export function requireAdmin(
   next();
 }
 
+/** Restricts a route strictly to full admin role (excludes dev role). */
+export function requireFullAdmin(
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Full admin access required' });
+  }
+  next();
+}
+
 /** Restricts a route to admins OR support staff — tickets, chat, the customer directory. */
 export function requireStaff(
   req: AuthedRequest,

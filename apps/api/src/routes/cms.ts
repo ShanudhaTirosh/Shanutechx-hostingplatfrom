@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { requireAuth, requireAdmin, AuthedRequest } from '../middleware/auth';
+import { requireAuth, requireFullAdmin, AuthedRequest } from '../middleware/auth';
 
 export const cmsRouter = Router();
 
@@ -26,7 +26,7 @@ const upsertSchema = z.object({
 });
 
 /** Admin-only — replaces (or creates) one or more keys for a page in one call. */
-cmsRouter.put('/cms/:page', requireAuth, requireAdmin, async (req: AuthedRequest, res) => {
+cmsRouter.put('/cms/:page', requireAuth, requireFullAdmin, async (req: AuthedRequest, res) => {
   const parsed = upsertSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -52,3 +52,35 @@ cmsRouter.put('/cms/:page', requireAuth, requireAdmin, async (req: AuthedRequest
 
   res.json({ page, content });
 });
+
+const contactSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  message: z.string().min(1),
+});
+
+/**
+ * Public — Receives contact form submissions from the marketing website.
+ */
+cmsRouter.post('/cms/contact', async (req, res) => {
+  const parsed = contactSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid contact form data', details: parsed.error.flatten() });
+  }
+
+  const { name, email, message } = parsed.data;
+  const submissionKey = `submission_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  try {
+    await prisma.contentBlock.create({
+      data: {
+        page: 'contact_submission',
+        key: submissionKey,
+        valueJson: { name, email: email.toLowerCase(), message, submittedAt: new Date().toISOString() },
+      },
+    });
+  } catch {}
+
+  res.status(201).json({ ok: true, message: 'Thank you for reaching out. We will get back to you shortly.' });
+});
+

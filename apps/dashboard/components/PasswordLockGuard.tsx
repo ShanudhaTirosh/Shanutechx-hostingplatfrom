@@ -118,10 +118,6 @@ export default function PasswordLockGuard({
               Unlock Settings
             </Button>
           </form>
-
-          <p className="text-[11px] text-text-faint">
-            Default security PIN: <code className="bg-white/10 px-1.5 py-0.5 rounded font-mono">123456</code> (or your account password)
-          </p>
         </div>
       </Card>
     </div>
