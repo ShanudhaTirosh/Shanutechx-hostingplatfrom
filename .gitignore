@@ -27,6 +27,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 logs/
+ci-logs*/
+ci-logs-1/
 
 # Storage & Temporary Files
 services/whatsapp-bot/auth/
