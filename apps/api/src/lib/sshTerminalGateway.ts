@@ -121,7 +121,8 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
         currentSsh.on('ready', () => {
           if (!ssh || closed) return;
           sendStatus('Connected. Opening shell…');
-          ssh.shell({ term: 'xterm-256color' }, (err, stream) => {
+          const sshInst = ssh;
+          sshInst.shell({ term: 'xterm-256color' }, (err, stream) => {
             if (err || closed || !ssh) {
               fail(`Failed to open shell: ${err?.message ?? 'connection closed'}`);
               return;
@@ -148,14 +149,16 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
                 else stream.end();
               } catch {}
               if (ssh) {
-                ssh.end();
+                try { ssh.end(); } catch {}
                 ssh = null;
               }
             });
           });
         });
 
-        currentSsh.on('error', (err) => fail(`SSH connection failed: ${err.message}`));
+        currentSsh.on('error', (err) => {
+          if (!closed) fail(`SSH connection failed: ${err.message}`);
+        });
         currentSsh.connect(connectOpts);
         return;
       }
@@ -178,7 +181,8 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
       currentSsh.on('ready', () => {
         if (!ssh || closed) return;
         sendStatus('Connected. Opening shell…');
-        ssh.shell({ term: 'xterm-256color' }, (err, stream) => {
+        const sshInst = ssh;
+        sshInst.shell({ term: 'xterm-256color' }, (err, stream) => {
           if (err || closed || !ssh) {
             fail(`Failed to open shell: ${err?.message ?? 'connection closed'}`);
             return;
@@ -216,7 +220,7 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
               else stream.end();
             } catch {}
             if (ssh) {
-              ssh.end();
+              try { ssh.end(); } catch {}
               ssh = null;
             }
           });
@@ -224,7 +228,7 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
       });
 
       currentSsh.on('error', (err) => {
-        fail(`SSH connection failed: ${err.message}`);
+        if (!closed) fail(`SSH connection failed: ${err.message}`);
       });
 
       currentSsh.connect({
