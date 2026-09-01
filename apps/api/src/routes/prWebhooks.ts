@@ -86,7 +86,7 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
           repoUrl: cloneUrl || parent.repoUrl,
           branch: headBranch || `pr-${prNumber}`,
           preferredName: previewSubdomain,
-          internalPort: parent.internalPort,
+          internalPort: parent.internalPort || 3000,
           isPreview: true,
           parentDeploymentId: parent.id,
         });
@@ -158,7 +158,7 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
           repoUrl: cloneUrl || parent.repoUrl,
           branch: headBranch || `mr-${mrIid}`,
           preferredName: previewSubdomain,
-          internalPort: parent.internalPort,
+          internalPort: parent.internalPort || 3000,
           isPreview: true,
           parentDeploymentId: parent.id,
         });
