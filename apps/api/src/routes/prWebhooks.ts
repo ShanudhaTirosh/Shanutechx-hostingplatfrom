@@ -2,6 +2,9 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { logger } from '../lib/logger';
 import { env } from '../env';
+import { prisma } from '../lib/prisma';
+import { deployService } from '../lib/deployPipeline';
+import { stopDeployment } from '../lib/nodeAgentClient';
 
 export const prWebhooksRouter = Router();
 
@@ -54,19 +57,73 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
       const prNumber = payload.number;
       const repoFullName = payload.repository?.full_name;
       const headBranch = payload.pull_request?.head?.ref;
+      const cloneUrl = payload.repository?.clone_url || payload.repository?.html_url;
 
       if (!repoFullName || !prNumber) {
         return res.status(400).json({ error: 'Invalid pull request payload' });
       }
 
       if (['opened', 'synchronize', 'reopened'].includes(action)) {
-        logger.info({ repoFullName, prNumber, headBranch }, 'Received PR preview deployment webhook payload');
-        return res.status(501).json({ ok: false, error: `Automated PR preview deployments for PR #${prNumber} are not yet implemented` });
+        logger.info({ repoFullName, prNumber, headBranch }, 'Triggering automated PR preview deployment');
+
+        const parent = await prisma.deployment.findFirst({
+          where: {
+            repoUrl: { contains: repoFullName },
+            isPreview: false,
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (!parent) {
+          return res.status(404).json({ error: `No parent deployment registered for repository ${repoFullName}` });
+        }
+
+        const previewSubdomain = `${parent.subdomain || 'pr'}-pr-${prNumber}`.slice(0, 40);
+
+        const { deployment, subdomain } = await deployService({
+          userId: parent.userId,
+          serviceType: 'node_hosting',
+          repoUrl: cloneUrl || parent.repoUrl,
+          branch: headBranch || `pr-${prNumber}`,
+          preferredName: previewSubdomain,
+          internalPort: parent.internalPort,
+          isPreview: true,
+          parentDeploymentId: parent.id,
+        });
+
+        return res.status(201).json({
+          ok: true,
+          message: `Automated PR preview deployment triggered for PR #${prNumber}`,
+          deploymentId: deployment.id,
+          subdomain,
+        });
       }
 
       if (action === 'closed') {
-        logger.info({ repoFullName, prNumber }, 'Received PR preview teardown webhook payload');
-        return res.status(501).json({ ok: false, error: `Automated PR preview teardowns for PR #${prNumber} are not yet implemented` });
+        logger.info({ repoFullName, prNumber }, 'Triggering automated PR preview teardown');
+
+        const previews = await prisma.deployment.findMany({
+          where: {
+            isPreview: true,
+            repoUrl: { contains: repoFullName },
+            branch: headBranch || `pr-${prNumber}`,
+          },
+          include: { node: true },
+        });
+
+        for (const prev of previews) {
+          if (prev.containerId && prev.node) {
+            await stopDeployment(prev.node, prev.containerId).catch((err) => {
+              logger.warn({ err, deploymentId: prev.id }, 'Failed to stop container on PR preview teardown');
+            });
+          }
+          await prisma.deployment.update({
+            where: { id: prev.id },
+            data: { status: 'deleted' },
+          });
+        }
+
+        return res.json({ ok: true, message: `PR #${prNumber} preview environment cleaned up` });
       }
     }
 
@@ -74,13 +131,71 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
     if (eventType === 'Merge Request Hook' || payload.object_kind === 'merge_request') {
       const action = payload.object_attributes?.action;
       const mrIid = payload.object_attributes?.iid;
+      const repoFullName = payload.project?.path_with_namespace;
+      const headBranch = payload.object_attributes?.source_branch;
+      const cloneUrl = payload.project?.http_url;
 
       if (['open', 'update', 'reopen'].includes(action)) {
-        return res.status(501).json({ ok: false, error: `Automated MR preview deployments for MR !${mrIid} are not yet implemented` });
+        logger.info({ repoFullName, mrIid, headBranch }, 'Triggering automated MR preview deployment');
+
+        const parent = await prisma.deployment.findFirst({
+          where: {
+            repoUrl: { contains: repoFullName || '' },
+            isPreview: false,
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (!parent) {
+          return res.status(404).json({ error: `No parent deployment registered for project ${repoFullName}` });
+        }
+
+        const previewSubdomain = `${parent.subdomain || 'mr'}-mr-${mrIid}`.slice(0, 40);
+
+        const { deployment, subdomain } = await deployService({
+          userId: parent.userId,
+          serviceType: 'node_hosting',
+          repoUrl: cloneUrl || parent.repoUrl,
+          branch: headBranch || `mr-${mrIid}`,
+          preferredName: previewSubdomain,
+          internalPort: parent.internalPort,
+          isPreview: true,
+          parentDeploymentId: parent.id,
+        });
+
+        return res.status(201).json({
+          ok: true,
+          message: `Automated MR preview deployment triggered for MR !${mrIid}`,
+          deploymentId: deployment.id,
+          subdomain,
+        });
       }
 
       if (action === 'close' || action === 'merge') {
-        return res.status(501).json({ ok: false, error: `Automated MR preview teardowns for MR !${mrIid} are not yet implemented` });
+        logger.info({ repoFullName, mrIid }, 'Triggering automated MR preview teardown');
+
+        const previews = await prisma.deployment.findMany({
+          where: {
+            isPreview: true,
+            repoUrl: { contains: repoFullName || '' },
+            branch: headBranch || `mr-${mrIid}`,
+          },
+          include: { node: true },
+        });
+
+        for (const prev of previews) {
+          if (prev.containerId && prev.node) {
+            await stopDeployment(prev.node, prev.containerId).catch((err) => {
+              logger.warn({ err, deploymentId: prev.id }, 'Failed to stop container on MR preview teardown');
+            });
+          }
+          await prisma.deployment.update({
+            where: { id: prev.id },
+            data: { status: 'deleted' },
+          });
+        }
+
+        return res.json({ ok: true, message: `MR !${mrIid} preview environment cleaned up` });
       }
     }
 

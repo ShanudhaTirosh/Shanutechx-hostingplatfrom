@@ -124,6 +124,17 @@ export const api = {
     messages: (folder = 'inbox') => apiFetch(`/api/email/messages?folder=${folder}`).then((r) => asJson<{ messages: any[]; total: number }>(r)),
     send: (data: { from: string; to: string; subject: string; body: string }) =>
       apiFetch('/api/email/send', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ message: any; delivered: boolean }>(r)),
+    patchMessage: (id: string, data: any) =>
+      apiFetch(`/api/email/messages/${id}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) => asJson<{ ok: boolean }>(r)),
+    deleteMessage: (id: string) =>
+      apiFetch(`/api/email/messages/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    contacts: () => apiFetch('/api/email/contacts').then((r) => asJson<{ contacts: any[] }>(r)),
+    createContact: (data: { name: string; email: string; phone?: string; company?: string }) =>
+      apiFetch('/api/email/contacts', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ contact: any }>(r)),
+    todos: () => apiFetch('/api/email/todos').then((r) => asJson<{ todos: any[] }>(r)),
+    createTodo: (title: string) =>
+      apiFetch('/api/email/todos', { method: 'POST', body: JSON.stringify({ title }) }).then((r) => asJson<{ todo: any }>(r)),
+    events: () => apiFetch('/api/email/events').then((r) => asJson<{ events: any[] }>(r)),
     adminStats: () => apiFetch('/api/admin/email/stats').then((r) => asJson<any>(r)),
     adminProvision: (data: {
       targetUserId: string;

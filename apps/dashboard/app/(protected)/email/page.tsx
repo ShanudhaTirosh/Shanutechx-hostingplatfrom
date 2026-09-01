@@ -206,10 +206,10 @@ export default function RedesignedMailboxStudioPage() {
     fetchDomains();
     fetchContacts();
 
-    fetch('/api/email/todos').then((r) => r.json()).then((d) => {
+    api.email.todos().then((d) => {
       if (d.todos) setTodos(d.todos);
     }).catch(() => {});
-    fetch('/api/email/events').then((r) => r.json()).then((d) => {
+    api.email.events().then((d) => {
       if (d.events) setEvents(d.events);
     }).catch(() => {});
   }, []);
@@ -229,8 +229,7 @@ export default function RedesignedMailboxStudioPage() {
   };
 
   const fetchContacts = () => {
-    fetch('/api/email/contacts')
-      .then((r) => r.json())
+    api.email.contacts()
       .then((res) => setContacts(res.contacts || []))
       .catch(() => {});
 
@@ -319,17 +318,13 @@ export default function RedesignedMailboxStudioPage() {
     setMessages((prev) =>
       prev.map((m) => (m.id === id ? { ...m, isStarred: nextStarred } : m))
     );
-    fetch(`/api/email/messages/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isStarred: nextStarred }),
-    }).catch(() => {});
+    api.email.patchMessage(id, { isStarred: nextStarred }).catch(() => {});
   };
 
   const handleDeleteMessage = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     try {
-      await fetch(`/api/email/messages/${id}`, { method: 'DELETE' });
+      await api.email.deleteMessage(id);
       toast('Message moved to Trash', 'info');
       setMessages((prev) => prev.filter((m) => m.id !== id));
       if (selectedMessage?.id === id) {
@@ -400,18 +395,12 @@ export default function RedesignedMailboxStudioPage() {
   const handleCreateContact = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/email/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newContactName,
-          email: newContactEmail,
-          phone: newContactPhone,
-          company: newContactCompany,
-        }),
+      const data = await api.email.createContact({
+        name: newContactName,
+        email: newContactEmail,
+        phone: newContactPhone,
+        company: newContactCompany,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to save contact');
       toast(`Contact ${newContactName} saved successfully!`, 'success');
       setContacts((prev) => [...prev, data.contact]);
       setShowAddContactModal(false);
