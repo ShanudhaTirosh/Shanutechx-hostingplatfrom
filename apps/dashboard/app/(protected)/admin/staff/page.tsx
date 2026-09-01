@@ -29,10 +29,17 @@ interface StaffMember {
 
 export default function AdminStaffPage() {
   const [staff, setStaff] = useState<StaffMember[] | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string>('admin');
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   function load() {
+    api.me()
+      .then((data) => {
+        if (data.user?.role) setCurrentUserRole(data.user.role);
+      })
+      .catch(() => {});
+
     api.admin
       .staff()
       .then((data) => setStaff(data.staff as StaffMember[]))
@@ -53,7 +60,7 @@ export default function AdminStaffPage() {
 
       {error && <ErrorBanner message={error} />}
 
-      <PromoteForm onChanged={load} />
+      <PromoteForm onChanged={load} isDevUser={currentUserRole === 'dev'} />
 
       <div>
         <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">Active Staff Members</h2>
@@ -64,7 +71,7 @@ export default function AdminStaffPage() {
         {staff && staff.length > 0 && (
           <Table headers={['Staff Member', 'Role', 'Status / Control Actions']}>
             {staff.map((member) => (
-              <StaffRow key={member.id} member={member} onChanged={load} />
+              <StaffRow key={member.id} member={member} onChanged={load} isDevUser={currentUserRole === 'dev'} />
             ))}
           </Table>
         )}
@@ -73,7 +80,7 @@ export default function AdminStaffPage() {
   );
 }
 
-function StaffRow({ member, onChanged }: { member: StaffMember; onChanged: () => void }) {
+function StaffRow({ member, onChanged, isDevUser }: { member: StaffMember; onChanged: () => void; isDevUser: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -122,7 +129,7 @@ function StaffRow({ member, onChanged }: { member: StaffMember; onChanged: () =>
               Make Support
             </Button>
           )}
-          {member.role !== 'dev' && (
+          {isDevUser && member.role !== 'dev' && (
             <Button variant="secondary" size="sm" disabled={busy} onClick={() => handleChange('dev')}>
               Make Dev
             </Button>
@@ -136,7 +143,7 @@ function StaffRow({ member, onChanged }: { member: StaffMember; onChanged: () =>
   );
 }
 
-function PromoteForm({ onChanged }: { onChanged: () => void }) {
+function PromoteForm({ onChanged, isDevUser }: { onChanged: () => void; isDevUser: boolean }) {
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<Array<{ id: string; email: string; displayName: string | null }>>([]);
   const [busy, setBusy] = useState(false);
@@ -203,9 +210,11 @@ function PromoteForm({ onChanged }: { onChanged: () => void }) {
                 <Button variant="secondary" size="sm" disabled={busy} onClick={() => handlePromote(r.id, 'support')}>
                   Support
                 </Button>
-                <Button variant="secondary" size="sm" disabled={busy} onClick={() => handlePromote(r.id, 'dev')}>
-                  Dev
-                </Button>
+                {isDevUser && (
+                  <Button variant="secondary" size="sm" disabled={busy} onClick={() => handlePromote(r.id, 'dev')}>
+                    Dev
+                  </Button>
+                )}
                 <Button variant="secondary" size="sm" disabled={busy} onClick={() => handlePromote(r.id, 'admin')}>
                   Admin
                 </Button>

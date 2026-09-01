@@ -265,7 +265,8 @@ export const api = {
       apiFetch(`/api/discord-webhooks/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }).then((r) =>
         asJson<{ config: { id: string; event: string; isActive: boolean } }>(r)
       ),
-    delete: (id: string) => apiFetch(`/api/discord-webhooks/${id}`, { method: 'DELETE' }),
+    delete: (id: string) =>
+      apiFetch(`/api/discord-webhooks/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
     test: (webhookUrl: string) =>
       apiFetch('/api/discord-webhooks/test', { method: 'POST', body: JSON.stringify({ webhookUrl }) }).then((r) =>
         asJson<{ ok: boolean; status?: number; error?: string }>(r)
@@ -396,6 +397,10 @@ export const api = {
     },
     redeploy: async (id: string, onEvent: (event: BuildEvent) => void): Promise<void> => {
       const res = await apiFetch(`/api/deployments/${id}/redeploy`, { method: 'POST', body: JSON.stringify({}) });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}: ${res.statusText}` }));
+        throw new Error(errData.error || errData.message || `HTTP ${res.status}`);
+      }
       if (!res.body) throw new Error('No response stream from server');
 
       const reader = res.body.getReader();
@@ -418,7 +423,7 @@ export const api = {
         asJson<{ secret: string; webhookUrl: string; instructions: { github: string; gitlab: string } }>(r)
       ),
     disableDeployWebhook: (id: string) =>
-      apiFetch(`/api/deployments/${id}/webhook-secret`, { method: 'DELETE' }),
+      apiFetch(`/api/deployments/${id}/webhook-secret`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
     webhookInfo: (id: string) =>
       apiFetch(`/api/deployments/${id}/webhook-info`).then((r) =>
         asJson<{ webhookUrl: string; hasSecret: boolean; repoUrl: string | null; instructions: { github: string; gitlab: string } }>(r)
@@ -449,6 +454,10 @@ export const api = {
       onEvent: (event: BuildEvent) => void
     ): Promise<void> => {
       const res = await apiFetch('/api/deployments', { method: 'POST', body: JSON.stringify(data) });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}: ${res.statusText}` }));
+        throw new Error(errData.error || errData.message || `HTTP ${res.status}`);
+      }
       if (!res.body) throw new Error('No response stream from server');
 
       const reader = res.body.getReader();

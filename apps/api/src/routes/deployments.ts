@@ -974,6 +974,18 @@ const updateEnvVarsSchema = z.object({
  * 3. Restart deployment to apply new environment variables
  * 4. Return updated deployment with success confirmation
  */
+/**
+ * GET /api/deployments/:id/env
+ * Fetches decrypted environment variables for a deployment.
+ */
+deploymentsRouter.get('/deployments/:id/env', async (req: AuthedRequest, res) => {
+  const deployment = await loadOwnedDeployment(req, req.params.id);
+  if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
+
+  const envVars = getDecryptedEnvVars(deployment) || {};
+  res.json({ envVars });
+});
+
 deploymentsRouter.patch('/deployments/:id/env', async (req: AuthedRequest, res) => {
   const deployment = await loadOwnedDeployment(req, req.params.id);
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });

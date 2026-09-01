@@ -32,6 +32,9 @@ services:
     environment:
       - STUDIO_PG_META_URL=http://supabase-db:5432
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - SUPABASE_PUBLIC_URL=http://localhost:${PORT:-8000}
+      - STUDIO_DEFAULT_ORGANIZATION=ShanuTechX Studio
+      - STUDIO_DEFAULT_PROJECT=Default Project
     depends_on:
       - supabase-db
     deploy:

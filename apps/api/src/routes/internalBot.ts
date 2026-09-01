@@ -150,7 +150,7 @@ internalBotRouter.get('/internal/all-deployments', async (_req: Request, res: Re
  * Review manual payment proof (Approve or Decline) right inside Discord
  */
 internalBotRouter.post('/internal/review-payment', async (req: Request, res: Response) => {
-  const { orderId, approve, reason, reviewedBy } = req.body || {};
+  const { orderId, paymentId, approve, reason, reviewedBy } = req.body || {};
   if (!orderId || typeof approve !== 'boolean') {
     return res.status(400).json({ error: 'orderId and approve (boolean) are required' });
   }
@@ -158,7 +158,7 @@ internalBotRouter.post('/internal/review-payment', async (req: Request, res: Res
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
-      payments: true,
+      payments: { orderBy: { createdAt: 'desc' } },
       user: true,
       items: { include: { plan: { include: { product: true } } } },
     },
@@ -172,7 +172,7 @@ internalBotRouter.post('/internal/review-payment', async (req: Request, res: Res
     return res.status(400).json({ error: 'Order is already marked as paid' });
   }
 
-  const targetPayment = order.payments[0];
+  const targetPayment = paymentId ? order.payments.find((p) => p.id === paymentId) || order.payments[0] : order.payments[0];
   const newOrderStatus = approve ? 'paid' : 'failed';
   const paymentStatus = approve ? 'manually_approved' : 'rejected';
 

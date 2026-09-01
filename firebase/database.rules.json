@@ -11,7 +11,7 @@
               ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length < 4000"
             },
             "senderRole": {
-              ".validate": "newData.val() === 'customer' || newData.val() === 'staff'"
+              ".validate": "newData.val() === 'customer' || (newData.val() === 'staff' && root.child('staff').child(auth.uid).exists())"
             }
           }
         }
@@ -21,7 +21,8 @@
     "chatIndex": {
       ".read": "auth != null && root.child('staff').child(auth.uid).exists()",
       "$uid": {
-        ".write": "auth != null && (auth.uid === $uid || root.child('staff').child(auth.uid).exists())"
+        ".write": "auth != null && (auth.uid === $uid || root.child('staff').child(auth.uid).exists())",
+        ".validate": "newData.hasChildren(['userEmail', 'lastMessage', 'lastMessageTime']) && newData.child('userEmail').isString() && newData.child('lastMessage').isString() && newData.child('lastMessageTime').isNumber()"
       }
     },
 

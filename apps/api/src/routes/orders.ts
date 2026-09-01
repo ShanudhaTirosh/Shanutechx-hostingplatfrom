@@ -50,6 +50,15 @@ async function recalculateTotal(orderId: string) {
   const total = items.reduce((sum: number, item: ItemWithPricing) => sum + priceOf(item).price * item.quantity, 0);
   const totalLkr = convertToLkr(total, currency);
 
+  for (const item of items) {
+    const p = priceOf(item);
+    const itemLkr = convertToLkr(p.price, p.currency);
+    await prisma.orderItem.update({
+      where: { id: item.id },
+      data: { priceLkr: itemLkr },
+    });
+  }
+
   await prisma.order.update({ where: { id: orderId }, data: { total, totalLkr, currency } });
   return { total, totalLkr, currency };
 }

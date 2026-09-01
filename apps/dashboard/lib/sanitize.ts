@@ -6,11 +6,8 @@
 export function sanitizeHtml(html: string): string {
   if (!html) return '';
   if (typeof window === 'undefined') {
-    // SSR fallback: remove script tags and inline event attributes via regex
-    return html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/\s*on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-      .replace(/javascript:/gi, 'javascript_disabled:');
+    // SSR fallback: strip all HTML tags to prevent XSS during SSR
+    return html.replace(/<[^>]*>/g, '');
   }
 
   try {
@@ -35,10 +32,16 @@ export function sanitizeHtml(html: string): string {
         if (lowerName.startsWith('on')) {
           el.removeAttribute(attrName);
         }
-        // Remove javascript: or data: URIs in href, src, action, data
-        if (['href', 'src', 'action', 'data'].includes(lowerName)) {
-          const val = (el.getAttribute(attrName) || '').trim().toLowerCase();
-          if (val.startsWith('javascript:') || val.startsWith('vbscript:') || (lowerName === 'src' && val.startsWith('data:text/html'))) {
+        // Remove javascript:, vbscript:, or dangerous data: URIs in href, src, action, data
+        if (['href', 'src', 'action', 'data', 'xlink:href'].includes(lowerName)) {
+          const rawVal = el.getAttribute(attrName) || '';
+          const normalizedVal = rawVal.replace(/[\x00-\x20\s]/g, '').toLowerCase();
+          if (
+            normalizedVal.startsWith('javascript:') ||
+            normalizedVal.startsWith('vbscript:') ||
+            normalizedVal.startsWith('data:text/html') ||
+            normalizedVal.startsWith('data:text/javascript')
+          ) {
             el.removeAttribute(attrName);
           }
         }

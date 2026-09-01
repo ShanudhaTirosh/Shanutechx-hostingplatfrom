@@ -347,6 +347,7 @@ model OrderItem {
   service    Service? @relation(fields: [serviceId], references: [id])
   planId     String?
   plan       Plan?    @relation(fields: [planId], references: [id])
+  priceLkr   Int?     @default(0)
   quantity   Int      @default(1)
   configJson Json?    // e.g. { repoUrl, runtime, envVars }
 

@@ -38,7 +38,7 @@ analyticsRouter.get('/admin/analytics', async (_req, res) => {
     prisma.node.findMany({
       select: { label: true, cpuUsedPct: true, ramUsedMb: true, ramMb: true, diskUsedGb: true, diskGb: true },
     }),
-    prisma.orderItem.groupBy({ by: ['serviceId'], _count: true }),
+    prisma.orderItem.groupBy({ by: ['planId', 'serviceId'], _count: true }),
   ]);
 
   const revenueLast30dLkr = paidOrders30dAggregate._sum.totalLkr ?? 0;
@@ -49,22 +49,34 @@ analyticsRouter.get('/admin/analytics', async (_req, res) => {
     revenueByMonth[key] = (revenueByMonth[key] ?? 0) + order.totalLkr;
   }
 
-  const serviceIds = servicesByType.map((s: { serviceId: string | null; _count: number }) => s.serviceId).filter((id: string | null): id is string => id !== null);
-  const services = await prisma.service.findMany({
-    where: { id: { in: serviceIds } },
-    select: { id: true, name: true, type: true },
-  });
-  const serviceMap = new Map<string, { id: string; name: string; type: string }>(services.map((s: { id: string; name: string; type: string }) => [s.id, s]));
+  const planIds = servicesByType.map((s) => s.planId).filter((id): id is string => id !== null);
+  const serviceIds = servicesByType.map((s) => s.serviceId).filter((id): id is string => id !== null);
+
+  const [plans, services] = await Promise.all([
+    prisma.plan.findMany({
+      where: { id: { in: planIds } },
+      select: { id: true, name: true, product: { select: { category: true, name: true } } },
+    }),
+    prisma.service.findMany({
+      where: { id: { in: serviceIds } },
+      select: { id: true, name: true, type: true },
+    }),
+  ]);
+
+  const planMap = new Map(plans.map((p) => [p.id, p]));
+  const serviceMap = new Map(services.map((s) => [s.id, s]));
 
   const topServices = servicesByType
-    .sort((a: { _count: number }, b: { _count: number }) => b._count - a._count)
+    .sort((a, b) => b._count - a._count)
     .slice(0, 10)
-    .map((item: { serviceId: string | null; _count: number }) => {
+    .map((item) => {
+      const p = item.planId ? planMap.get(item.planId) : undefined;
       const s = item.serviceId ? serviceMap.get(item.serviceId) : undefined;
       return {
+        planId: item.planId,
         serviceId: item.serviceId,
-        name: s?.name ?? 'Unknown Service',
-        type: s?.type ?? 'unknown',
+        name: p ? `${p.product.name} — ${p.name}` : (s?.name ?? 'Unknown Plan'),
+        type: p?.product.category ?? s?.type ?? 'unknown',
         count: item._count,
       };
     });

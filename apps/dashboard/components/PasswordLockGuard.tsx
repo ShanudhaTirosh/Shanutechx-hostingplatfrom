@@ -24,13 +24,13 @@ export default function PasswordLockGuard({
 
   useEffect(() => {
     // Check if session is currently unlocked
-    const storedUnlockTime = localStorage.getItem(UNLOCK_STORAGE_KEY);
+    const storedUnlockTime = sessionStorage.getItem(UNLOCK_STORAGE_KEY);
     if (storedUnlockTime) {
       const until = parseInt(storedUnlockTime, 10);
       if (until > Date.now()) {
         setUnlocked(true);
       } else {
-        localStorage.removeItem(UNLOCK_STORAGE_KEY);
+        sessionStorage.removeItem(UNLOCK_STORAGE_KEY);
       }
     }
   }, []);
@@ -49,9 +49,9 @@ export default function PasswordLockGuard({
       const res = await api.settings.verifyPassword(password.trim());
       if (res.ok && res.unlocked) {
         setUnlocked(true);
-        // Keep unlocked for 30 minutes
+        // Keep unlocked for 30 minutes in current browser session
         const expireAt = Date.now() + 30 * 60 * 1000;
-        localStorage.setItem(UNLOCK_STORAGE_KEY, expireAt.toString());
+        sessionStorage.setItem(UNLOCK_STORAGE_KEY, expireAt.toString());
         setPassword('');
       } else {
         setError(res.message || 'Incorrect password or PIN.');
@@ -65,7 +65,7 @@ export default function PasswordLockGuard({
 
   function handleLock() {
     setUnlocked(false);
-    localStorage.removeItem(UNLOCK_STORAGE_KEY);
+    sessionStorage.removeItem(UNLOCK_STORAGE_KEY);
   }
 
   if (unlocked) {
