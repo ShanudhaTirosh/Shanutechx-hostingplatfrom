@@ -398,14 +398,7 @@ supabaseRouter.delete('/supabase/auth/users/:id', requireAuth, requireAdminOrDev
 supabaseRouter.get('/supabase/db/schemas', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
   const result = await fetchJson(`${SUPABASE_META_URL}/schemas`);
   if (!result.ok) {
-    try {
-      const dbSchemas: any = await prisma.$queryRawUnsafe(`SELECT schema_name AS name, schema_owner AS owner FROM information_schema.schemata;`);
-      return res.json({ schemas: dbSchemas });
-    } catch {
-      return res.json({
-        schemas: [{ name: 'public', owner: 'postgres' }, { name: 'auth', owner: 'supabase_auth_admin' }],
-      });
-    }
+    return res.status(503).json({ error: 'Supabase Meta service is unreachable', isFallback: true, schemas: [] });
   }
   res.json({ schemas: result.data });
 });
@@ -413,16 +406,7 @@ supabaseRouter.get('/supabase/db/schemas', requireAuth, requireAdminOrDev, async
 supabaseRouter.get('/supabase/db/tables', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
   const result = await fetchJson(`${SUPABASE_META_URL}/tables`);
   if (!result.ok) {
-    try {
-      const dbTables: any = await prisma.$queryRawUnsafe(
-        `SELECT tablename AS name, schemaname AS schema FROM pg_tables WHERE schemaname IN ('public', 'auth', 'storage');`
-      );
-      return res.json({ tables: dbTables });
-    } catch {
-      return res.json({
-        tables: [{ name: 'users', schema: 'public', rows_count: 24, bytes: 16384 }],
-      });
-    }
+    return res.status(503).json({ error: 'Supabase Meta service is unreachable', isFallback: true, tables: [] });
   }
   res.json({ tables: result.data });
 });
@@ -447,13 +431,7 @@ supabaseRouter.post('/supabase/db/query', requireAuth, requireAdminOrDev, async 
   });
 
   if (!result.ok) {
-    try {
-      const rawRows: any = await prisma.$queryRawUnsafe(sql);
-      const rowsArray = Array.isArray(rawRows) ? rawRows : [rawRows];
-      return res.json({ rows: rowsArray, rowCount: rowsArray.length });
-    } catch (err: any) {
-      return res.status(400).json({ error: err.message || 'SQL execution failed' });
-    }
+    return res.status(result.status || 503).json({ error: result.error || 'Supabase Meta query execution failed' });
   }
   res.json(result.data);
 });
@@ -462,12 +440,7 @@ supabaseRouter.post('/supabase/db/query', requireAuth, requireAdminOrDev, async 
 supabaseRouter.get('/supabase/storage/buckets', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
   const result = await fetchJson(`${SUPABASE_KONG_URL}/storage/v1/bucket`);
   if (!result.ok) {
-    return res.json({
-      buckets: [
-        { id: 'avatars', name: 'avatars', public: true, created_at: new Date().toISOString() },
-        { id: 'documents', name: 'documents', public: false, created_at: new Date().toISOString() }
-      ],
-    });
+    return res.status(503).json({ error: 'Supabase Storage service is unreachable', isFallback: true, buckets: [] });
   }
   const bucketList = Array.isArray(result.data) ? result.data : ((result.data as any)?.buckets || []);
   res.json({ buckets: bucketList });

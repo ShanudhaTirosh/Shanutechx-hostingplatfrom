@@ -235,7 +235,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
     }
 
     // 4. AI Subscriptions
-    const isAiSub = productCategory === 'ai_subscription' || productName.includes('ai');
+    const isAiSub = productCategory === 'ai_subscription' || /\bai\b/i.test(productName) || productName.includes('gemini') || productName.includes('gpt');
     if (isAiSub) {
       fulfilledItems.push(`AI Subscription (${item.plan?.name || 'AI Access'})`);
       void notifyCustomer(

@@ -384,6 +384,12 @@ emailRouter.delete('/email/mailboxes/:id', async (req: AuthedRequest, res) => {
     const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
     if (!isOwner && !isStaff) return res.status(403).json({ error: 'Access denied' });
 
+    if (account.wildduckUserId) {
+      await wildduckClient.deleteUser(account.wildduckUserId).catch((err: any) => {
+        logger.warn({ err: err.message, wildduckUserId: account.wildduckUserId }, 'Failed to delete WildDuck mail user on mailbox removal');
+      });
+    }
+
     await prisma.smtpAccount.delete({ where: { id: req.params.id } });
     res.json({ success: true, id: req.params.id });
   } catch (err: any) {

@@ -272,14 +272,19 @@ adminRouter.post('/admin/users/:userId/ban', async (req: AuthedRequest, res) => 
   const targetUser = await prisma.user.findUnique({ where: { id: req.params.userId } });
   if (!targetUser) return res.status(404).json({ error: 'User not found' });
 
-  if (targetUser.role === 'dev') {
-    return res.status(403).json({ error: 'The platform dev account cannot be banned.' });
+  if (targetUser.id === req.user!.id) {
+    return res.status(400).json({ error: 'Cannot ban your own user account.' });
+  }
+
+  if ((targetUser.role === 'dev' || targetUser.role === 'admin') && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'Only the platform dev account can ban administrative staff.' });
   }
 
   const result = await banUserAndTeardownResources({
     userId: targetUser.id,
     reason: parsed.success && parsed.data.reason ? parsed.data.reason : 'Suspended by Admin',
     detectedBy: req.user!.email,
+    actorId: req.user!.id,
   });
 
   res.json({

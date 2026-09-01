@@ -9,6 +9,7 @@ import { prisma } from './lib/prisma';
 import { attachSshTerminalGateway } from './lib/sshTerminalGateway';
 import { healthRouter } from './routes/health';
 import { meRouter } from './routes/me';
+import { authRouter } from './routes/auth';
 import { nodesRouter } from './routes/nodes';
 import { deploymentsRouter } from './routes/deployments';
 import { ordersRouter } from './routes/orders';
@@ -136,6 +137,7 @@ app.use(csrfProtection);
 
 app.use('/api', healthRouter);
 app.use('/api', meRouter);
+app.use('/api', authRouter);
 app.use('/api', nodesRouter);
 app.use('/api', deploymentsRouter);
 app.use('/api', ordersRouter);

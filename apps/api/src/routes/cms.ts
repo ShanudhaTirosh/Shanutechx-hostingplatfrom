@@ -79,8 +79,11 @@ cmsRouter.post('/cms/contact', async (req, res) => {
         valueJson: { name, email: email.toLowerCase(), message, submittedAt: new Date().toISOString() },
       },
     });
-  } catch {}
-
-  res.status(201).json({ ok: true, message: 'Thank you for reaching out. We will get back to you shortly.' });
+    res.status(201).json({ ok: true, message: 'Thank you for reaching out. We will get back to you shortly.' });
+  } catch (err: any) {
+    const { logger } = await import('../lib/logger');
+    logger.error({ err, email }, 'Failed to record contact form submission');
+    res.status(500).json({ error: 'Failed to process contact submission. Please try again later.' });
+  }
 });
 

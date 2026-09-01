@@ -35,10 +35,12 @@ export async function banUserAndTeardownResources({
   userId,
   reason,
   detectedBy = 'Automated Abuse Detector',
+  actorId,
 }: {
   userId: string;
   reason: string;
   detectedBy?: string;
+  actorId?: string;
 }): Promise<{ ok: boolean; stoppedDeploymentsCount: number }> {
   try {
     // 1. Update user ban status
@@ -82,7 +84,7 @@ export async function banUserAndTeardownResources({
     // 4. Log Audit Log event
     await prisma.auditLog.create({
       data: {
-        adminId: userId,
+        adminId: actorId || userId,
         action: 'USER_SUSPENDED_ABUSE',
         target: `User:${updatedUser.email} (Stopped:${stoppedCount}, Reason:${reason})`,
       },
