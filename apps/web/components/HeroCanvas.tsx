@@ -39,8 +39,13 @@ export default function HeroCanvas() {
   }
 
   return (
-    <div className="absolute inset-0 scale-125 sm:scale-110">
-      <HeroScene />
+    <div className="absolute inset-0 scale-125 sm:scale-110 flex items-center justify-center">
+      <div className="absolute top-8 left-1/2 -translate-x-1/2 scale-125 sm:scale-150 opacity-80 pointer-events-none z-0">
+        <GradientMeshOrb size={700} glowColor="rgba(139,92,246,0.75)" />
+      </div>
+      <div className="absolute inset-0 z-10">
+        <HeroScene />
+      </div>
     </div>
   );
 }

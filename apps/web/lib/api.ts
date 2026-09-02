@@ -29,12 +29,11 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:400
 export async function fetchProducts(category?: string): Promise<Product[]> {
   try {
     const url = category ? `${API_BASE}/api/products?category=${encodeURIComponent(category)}` : `${API_BASE}/api/products`;
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url, { next: { revalidate: 60 } });
     if (!res.ok) return [];
     const data = await res.json();
-    return data.products || [];
+    return Array.isArray(data.products) ? data.products : [];
   } catch (error) {
-    console.error('Failed to fetch products from API:', error);
     return [];
   }
 }

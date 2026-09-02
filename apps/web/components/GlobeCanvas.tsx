@@ -3,7 +3,26 @@
 import React, { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 
-const GlobeScene = dynamic(() => import('./three/GlobeScene'), { ssr: false });
+class ErrorBoundary extends React.Component<
+  { fallback: React.ReactNode; children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(err: unknown) {
+    console.warn('GlobeScene failed to load dynamic chunk:', err);
+  }
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
+
+const GlobeScene = dynamic(() => import('./three/GlobeScene'), {
+  ssr: false,
+  loading: () => null,
+});
 
 /**
  * Mounts the real WebGL globe only once this section nears the viewport,
@@ -46,7 +65,9 @@ export default function GlobeCanvas() {
 
       {shouldMount && !reducedMotion && (
         <div className="absolute inset-0">
-          <GlobeScene />
+          <ErrorBoundary fallback={null}>
+            <GlobeScene />
+          </ErrorBoundary>
         </div>
       )}
 

@@ -20,12 +20,7 @@ export default function GradientMeshOrb({
   glowColor = 'rgba(124,58,237,0.65)',
   opacity = 1,
 }: GradientMeshOrbProps) {
-  const [mounted, setMounted] = useState(false);
   const rawId = useId();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const containerStyle: React.CSSProperties = {
     position: 'relative',
@@ -35,16 +30,6 @@ export default function GradientMeshOrb({
     aspectRatio: '1 / 1',
     opacity,
   };
-
-  if (!mounted) {
-    return (
-      <div
-        aria-hidden="true"
-        className={`pointer-events-none select-none ${className}`}
-        style={containerStyle}
-      />
-    );
-  }
 
   const safeId = rawId.replace(/:/g, '_');
   const warpId = `stxWarp_${safeId}`;

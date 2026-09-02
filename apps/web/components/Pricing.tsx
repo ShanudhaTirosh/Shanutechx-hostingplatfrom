@@ -42,7 +42,8 @@ function CheckIcon() {
 }
 
 function formatPrice(cents: number) {
-  return `LKR ${(cents / 100).toLocaleString('en-LK', { minimumFractionDigits: 0 })}`;
+  const amount = Math.floor(cents / 100);
+  return `LKR ${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 }
 
 interface Plan { id: string; name: string; price: number; billingType: string; }
@@ -50,7 +51,6 @@ interface Product { id: string; name: string; category: string; description: str
 
 export default function Pricing() {
   const [products, setProducts] = useState<Product[] | null>(null);
-  const [error, setError] = useState(false);
   const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
   const loginUrl = `${dashboardUrl}/login`;
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -58,11 +58,11 @@ export default function Pricing() {
   useEffect(() => {
     fetch(`${apiBase}/api/products`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => setProducts(d.products ?? []))
-      .catch(() => setError(true));
+      .then((d) => setProducts(Array.isArray(d.products) ? d.products : []))
+      .catch(() => setProducts([]));
   }, [apiBase]);
 
-  const displayed = products?.filter((p) => p.plans.length > 0).slice(0, 6) ?? [];
+  const displayed = products?.filter((p) => p.plans && p.plans.length > 0).slice(0, 6) ?? [];
 
   return (
     <section id="pricing" className="px-4 py-28 max-w-6xl mx-auto relative">
@@ -82,118 +82,105 @@ export default function Pricing() {
         </p>
       </Reveal>
 
-      {/* Loading skeleton */}
-      {products === null && !error && (
+      {/* Skeleton loader while fetching */}
+      {products === null && (
         <div className="grid md:grid-cols-3 gap-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="glass rounded-2xl p-6 animate-pulse space-y-4">
-              <div className="h-8 w-8 rounded-full bg-white/10" />
-              <div className="h-5 w-32 rounded bg-white/10" />
+              <div className="h-10 w-10 rounded-xl bg-white/10" />
+              <div className="h-5 w-36 rounded bg-white/10" />
               <div className="h-4 w-full rounded bg-white/[0.06]" />
-              <div className="h-10 w-24 rounded bg-white/10" />
+              <div className="h-8 w-28 rounded bg-white/10" />
             </div>
           ))}
         </div>
       )}
 
-      {/* Error fallback */}
-      {error && (
-        <p className="text-center text-text-muted text-sm py-10">
-          Could not load products right now. <a href={loginUrl} className="text-accent-violet-light underline">Sign in to browse</a>.
-        </p>
-      )}
-
-      {/* Products grid */}
-      {displayed.length > 0 && (
+      {/* Products grid from API */}
+      {products !== null && displayed.length > 0 && (
         <div className="grid md:grid-cols-3 gap-6">
           {displayed.map((product, idx) => {
             const cheapest = product.plans.reduce((min, p) => (p.price < min.price ? p : min), product.plans[0]);
             const recommended = idx === 1;
             return (
               <Reveal key={product.id} index={idx}>
-              <TiltCard
-                strength={5}
-                className={`relative h-full rounded-2xl p-6 flex flex-col transition-colors duration-300 ${
-                  recommended
-                    ? 'glass border-accent-violet/50 ring-1 ring-accent-violet/40 shadow-glow-violet scale-[1.02]'
-                    : 'glass hover:bg-white/[0.05] hover:border-white/12'
-                }`}
-              >
-                {recommended && (
-                  <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-xs font-semibold text-white bg-brand-gradient shadow-glow-violet">
-                    Most Popular
-                  </span>
-                )}
-
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-10 w-10 rounded-xl bg-accent-violet/10 border border-accent-violet/20 flex items-center justify-center shrink-0">
-                    {renderCategoryIcon(product.category)}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-text-primary">{product.name}</h3>
-                    <p className="text-text-faint text-xs font-medium">{product.plans.length} plan{product.plans.length !== 1 ? 's' : ''}</p>
-                  </div>
-                </div>
-
-                {product.description && (
-                  <p className="text-text-muted text-xs leading-relaxed mb-5 min-h-[36px] line-clamp-2">
-                    {product.description}
-                  </p>
-                )}
-
-                <div className="mb-6">
-                  <div className="flex items-end gap-1">
-                    <span className="text-3xl font-bold text-text-primary">
-                      {formatPrice(cheapest.price)}
-                    </span>
-                    <span className="text-text-muted text-xs mb-1.5">
-                      {BILLING_LABEL[cheapest.billingType] ?? cheapest.billingType}
-                    </span>
-                  </div>
-                  {product.plans.length > 1 && (
-                    <p className="text-text-faint text-[11px] mt-0.5">+ {product.plans.length - 1} more plan{product.plans.length > 2 ? 's' : ''}</p>
-                  )}
-                </div>
-
-                <a
-                  href={loginUrl}
-                  className={`rounded-full px-4 py-2.5 text-sm font-semibold text-center transition-all hover:opacity-90 ${
+                <TiltCard
+                  strength={5}
+                  className={`relative h-full rounded-2xl p-6 flex flex-col transition-colors duration-300 ${
                     recommended
-                      ? 'bg-brand-gradient text-white shadow-glow-violet'
-                      : 'glass text-text-primary hover:bg-white/[0.08]'
+                      ? 'glass border-accent-violet/50 ring-1 ring-accent-violet/40 shadow-glow-violet scale-[1.02]'
+                      : 'glass hover:bg-white/[0.05] hover:border-white/12'
                   }`}
                 >
-                  Order Now →
-                </a>
+                  {recommended && (
+                    <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-xs font-semibold text-white bg-brand-gradient shadow-glow-violet">
+                      Most Popular
+                    </span>
+                  )}
 
-                {product.description && (
-                  <ul className="mt-6 space-y-2.5 text-xs text-text-muted flex-1 border-t border-white/[0.05] pt-5">
-                    {product.plans.map((plan) => (
-                      <li key={plan.id} className="flex items-start gap-2">
-                        <CheckIcon />
-                        <span>{plan.name} — {formatPrice(plan.price)} {BILLING_LABEL[plan.billingType] ?? plan.billingType}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </TiltCard>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-10 w-10 rounded-xl bg-accent-violet/10 border border-accent-violet/20 flex items-center justify-center shrink-0">
+                      {renderCategoryIcon(product.category)}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-text-primary">{product.name}</h3>
+                      <p className="text-text-faint text-xs font-medium">{product.plans.length} plan{product.plans.length !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+
+                  {product.description && (
+                    <p className="text-text-muted text-xs leading-relaxed mb-5 min-h-[36px] line-clamp-2">
+                      {product.description}
+                    </p>
+                  )}
+
+                  <div className="mb-6">
+                    <div className="flex items-end gap-1">
+                      <span className="text-3xl font-bold text-text-primary">
+                        {formatPrice(cheapest.price)}
+                      </span>
+                      <span className="text-text-muted text-xs mb-1.5">
+                        {BILLING_LABEL[cheapest.billingType] ?? cheapest.billingType}
+                      </span>
+                    </div>
+                    {product.plans.length > 1 && (
+                      <p className="text-text-faint text-[11px] mt-0.5">+ {product.plans.length - 1} more plan{product.plans.length > 2 ? 's' : ''}</p>
+                    )}
+                  </div>
+
+                  <a
+                    href={loginUrl}
+                    className={`rounded-full px-4 py-2.5 text-sm font-semibold text-center transition-all hover:opacity-90 ${
+                      recommended
+                        ? 'bg-brand-gradient text-white shadow-glow-violet'
+                        : 'glass text-text-primary hover:bg-white/[0.08]'
+                    }`}
+                  >
+                    Order Now →
+                  </a>
+
+                  {product.description && (
+                    <ul className="mt-6 space-y-2.5 text-xs text-text-muted flex-1 border-t border-white/[0.05] pt-5">
+                      {product.plans.map((plan) => (
+                        <li key={plan.id} className="flex items-start gap-2">
+                          <CheckIcon />
+                          <span>{plan.name} — {formatPrice(plan.price)} {BILLING_LABEL[plan.billingType] ?? plan.billingType}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </TiltCard>
               </Reveal>
             );
           })}
         </div>
       )}
 
-      {/* Empty state: no products in DB yet */}
-      {products !== null && displayed.length === 0 && !error && (
-        <div className="text-center py-16">
-          <p className="text-text-muted text-sm mb-4">No products available yet. Check back soon!</p>
-          <a
-            href={loginUrl}
-            className="inline-flex items-center gap-2 rounded-full bg-brand-gradient px-6 py-3 font-semibold text-sm text-white hover:opacity-90 transition-opacity shadow-glow-violet"
-          >
-            Sign in to explore
-          </a>
-        </div>
+      {/* Empty state when database returned zero products */}
+      {products !== null && displayed.length === 0 && (
+        <p className="text-center text-text-muted text-sm py-10">
+          No products available right now. Check back soon!
+        </p>
       )}
 
       <div className="mt-14 text-center">

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import MeshBackground from '@/components/MeshBackground';
 
 export const metadata: Metadata = {
   title: 'SHANUTECHX Dashboard',
@@ -25,8 +26,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://api.shanutechx.com" />
         <link rel="dns-prefetch" href="https://api.shanutechx.com" />
       </head>
-      <body suppressHydrationWarning>
-        {children}
+      <body suppressHydrationWarning className="relative min-h-screen">
+        <MeshBackground />
+        <div className="relative z-10">
+          {children}
+        </div>
         <script
           dangerouslySetInnerHTML={{
             __html: `

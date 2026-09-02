@@ -19,7 +19,7 @@ export default function CountUp({ value, className, duration = 1.4 }: CountUpPro
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, margin: '-40px' });
   const reduceMotion = useReducedMotion();
-  const [display, setDisplay] = useState(reduceMotion ? value : '0');
+  const [display, setDisplay] = useState(value);
 
   const match = value.match(/(-?\d+(?:\.\d+)?)/);
   const numeric = match ? parseFloat(match[1]) : null;
@@ -28,8 +28,9 @@ export default function CountUp({ value, className, duration = 1.4 }: CountUpPro
   const decimals = match && match[1].includes('.') ? match[1].split('.')[1].length : 0;
 
   useEffect(() => {
-    if (!inView || numeric === null || reduceMotion) {
-      if (reduceMotion) setDisplay(value);
+    if (numeric === null || reduceMotion) return;
+    if (!inView) {
+      setDisplay(`${prefix}${(0).toFixed(decimals)}${suffix}`);
       return;
     }
     const controls = animate(0, numeric, {
@@ -38,12 +39,11 @@ export default function CountUp({ value, className, duration = 1.4 }: CountUpPro
       onUpdate: (v) => setDisplay(`${prefix}${v.toFixed(decimals)}${suffix}`),
     });
     return () => controls.stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inView]);
+  }, [inView, reduceMotion, numeric, value, prefix, suffix, decimals, duration]);
 
   return (
     <span ref={ref} className={className}>
-      {numeric === null ? value : display}
+      {display}
     </span>
   );
 }
