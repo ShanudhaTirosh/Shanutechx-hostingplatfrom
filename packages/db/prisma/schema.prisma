@@ -178,6 +178,14 @@ model User {
   teamMemberships      TeamMember[]
   sentTeamInvites      TeamInvite[]
   emailContacts        EmailContact[]
+  webmailFolders       WebmailFolder[]
+  webmailLabels        WebmailLabel[]
+  webmailFilters       WebmailFilter[]
+  webmailSignatures    WebmailSignature[]
+  webmailTemplates     WebmailTemplate[]
+  webmailAutoReplies   WebmailAutoReply[]
+  webmailBlockedSenders WebmailBlockedSender[]
+  webmailCalendarSyncs WebmailCalendarSync[]
 }
 
 // Real Expo push tokens, registered by the mobile admin app
@@ -525,12 +533,10 @@ model WebmailMessage {
   id             String   @id @default(cuid())
   userId         String
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // Which of the user's provisioned mailboxes this belongs to, if any --
-  // nullable because a user's very first "Welcome" message (or a message
-  // sent before any SmtpAccount existed) may not be tied to one yet.
   smtpAccountId  String?
   smtpAccount    SmtpAccount? @relation(fields: [smtpAccountId], references: [id], onDelete: SetNull)
-  folder         String   // 'inbox' | 'sent' | 'drafts' | 'spam' | 'trash'
+  folder         String   // 'inbox' | 'sent' | 'drafts' | 'spam' | 'trash' | 'archive' | 'snoozed'
+  threadId       String?
   senderName     String
   senderEmail    String
   recipientEmail String
@@ -540,13 +546,134 @@ model WebmailMessage {
   replyTo        String?
   inReplyTo      String?
   tag            String?
+  category       String   @default("primary") // 'primary' | 'social' | 'promotions' | 'updates'
+  priority       String   @default("normal")  // 'low' | 'normal' | 'high'
   isRead         Boolean  @default(false)
   isStarred      Boolean  @default(false)
+  isPinned       Boolean  @default(false)
+  snoozedUntil   DateTime?
+  scheduledAt    DateTime?
+  readReceipt    Boolean  @default(false)
   hasAttachments Boolean  @default(false)
   attachmentsJson Json?
+  labels         String[] @default([])
   createdAt      DateTime @default(now())
 
   @@index([userId, folder])
+  @@index([userId, threadId])
+  @@index([userId, category])
+}
+
+// User-created custom folders
+model WebmailFolder {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  icon      String?  @default("📁")
+  color     String?  @default("#6366f1")
+  parentId  String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// User-created custom labels
+model WebmailLabel {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  color     String   @default("#6366f1")
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Automated Webmail rules / filters
+model WebmailFilter {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  conditionsJson Json     // e.g. { fromContains, subjectContains, hasKeywords }
+  actionsJson    Json     // e.g. { moveToFolder, applyLabel, markRead, star }
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Signatures per mailbox / user
+model WebmailSignature {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  smtpAccountId String?
+  name          String
+  htmlContent   String   @db.Text
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Saved canned responses / templates
+model WebmailTemplate {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  subject   String?
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Vacation responder / auto-reply
+model WebmailAutoReply {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  smtpAccountId String?
+  enabled       Boolean   @default(false)
+  subject       String
+  body          String    @db.Text
+  startDate     DateTime?
+  endDate       DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// Blocked senders list
+model WebmailBlockedSender {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailOrDomain String
+  reason        String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+// External Calendar Sync (Google Calendar, Outlook iCal)
+model WebmailCalendarSync {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider        String    // 'google' | 'ical' | 'outlook'
+  name            String
+  calendarUrl     String?   // For iCal feed
+  accessTokenEnc  String?   // Encrypted OAuth access token
+  refreshTokenEnc String?   // Encrypted OAuth refresh token
+  lastSyncedAt    DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([userId])
 }
 
 // Contacts saved per user in Webmail.

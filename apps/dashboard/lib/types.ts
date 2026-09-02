@@ -328,3 +328,143 @@ export interface VpsPlan {
   createdAt: string;
   updatedAt: string;
 }
+
+// ── Webmail Interfaces ───────────────────────────────────────────────────
+
+export interface WebmailMessage {
+  id: string;
+  userId: string;
+  smtpAccountId?: string | null;
+  folder: 'inbox' | 'starred' | 'drafts' | 'sent' | 'spam' | 'trash' | 'archive' | 'snoozed';
+  threadId?: string | null;
+  senderName: string;
+  senderEmail: string;
+  recipientEmail: string;
+  subject: string;
+  snippet: string;
+  htmlBody: string;
+  replyTo?: string | null;
+  inReplyTo?: string | null;
+  tag?: string | null;
+  category?: 'primary' | 'social' | 'promotions' | 'updates';
+  priority?: 'low' | 'normal' | 'high';
+  isRead: boolean;
+  isStarred: boolean;
+  isPinned?: boolean;
+  snoozedUntil?: string | null;
+  scheduledAt?: string | null;
+  readReceipt?: boolean;
+  hasAttachments?: boolean;
+  attachmentsJson?: Array<{ filename: string; sizeStr: string; url?: string }>;
+  attachments?: Array<{ filename: string; sizeStr: string; url?: string }>;
+  labels?: string[];
+  createdAt: string;
+  updatedAt?: string;
+
+  // Compatibility fields
+  from?: string;
+  to?: string;
+  body?: string;
+  timestamp?: string;
+}
+
+
+export interface WebmailThread {
+  threadId: string;
+  messageCount: number;
+  latestMessage: WebmailMessage;
+  participants: string[];
+  subject: string;
+  snippet: string;
+  isRead: boolean;
+  isStarred: boolean;
+  isPinned?: boolean;
+  folder: string;
+  timestamp: string;
+  messages: WebmailMessage[];
+}
+
+export interface WebmailFolder {
+  id: string;
+  userId: string;
+  name: string;
+  icon?: string;
+  color?: string;
+  parentId?: string | null;
+  order: number;
+  createdAt: string;
+}
+
+export interface WebmailLabel {
+  id: string;
+  userId: string;
+  name: string;
+  color: string;
+  createdAt: string;
+}
+
+export interface WebmailFilter {
+  id: string;
+  userId: string;
+  name: string;
+  conditionsJson: any;
+  actionsJson: any;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface WebmailSignature {
+  id: string;
+  userId: string;
+  smtpAccountId?: string | null;
+  name: string;
+  htmlContent: string;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+export interface WebmailTemplate {
+  id: string;
+  userId: string;
+  name: string;
+  subject?: string | null;
+  body: string;
+  createdAt: string;
+}
+
+export interface WebmailAutoReply {
+  id: string;
+  userId: string;
+  smtpAccountId?: string | null;
+  enabled: boolean;
+  subject: string;
+  body: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  createdAt: string;
+}
+
+export interface WebmailBlockedSender {
+  id: string;
+  userId: string;
+  emailOrDomain: string;
+  reason?: string | null;
+  createdAt: string;
+}
+
+export interface WebmailCalendarSync {
+  id: string;
+  userId: string;
+  provider: 'google' | 'ical' | 'outlook';
+  name: string;
+  calendarUrl?: string | null;
+  lastSyncedAt?: string | null;
+  createdAt: string;
+}
+
+export interface WebmailAiSummary {
+  keyTakeaway: string;
+  bulletPoints: string[];
+  sentiment: string;
+}
+

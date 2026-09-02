@@ -4,6 +4,28 @@ import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui';
 
+import { WebmailLayout } from '@/components/webmail/WebmailLayout';
+import { WebmailThreadList } from '@/components/webmail/WebmailThreadList';
+import { WebmailThreadViewer } from '@/components/webmail/WebmailThreadViewer';
+import { WebmailRichComposer } from '@/components/webmail/WebmailRichComposer';
+import { WebmailFoldersAndLabelsModal } from '@/components/webmail/WebmailFoldersAndLabelsModal';
+import { WebmailRulesModal } from '@/components/webmail/WebmailRulesModal';
+import { WebmailSettingsModal } from '@/components/webmail/WebmailSettingsModal';
+import { WebmailCalendarTab } from '@/components/webmail/WebmailCalendarTab';
+import { WebmailContactsTab } from '@/components/webmail/WebmailContactsTab';
+import { WebmailMessage } from '@/lib/types';
+import {
+  Mail,
+  KeyRound,
+  Globe,
+  Tag,
+  Users,
+  CreditCard,
+  ShieldCheck,
+  Calendar,
+  ArrowLeft,
+} from 'lucide-react';
+
 interface Mailbox {
   id: string;
   email: string;
@@ -43,23 +65,6 @@ interface Domain {
   createdAt: string;
 }
 
-interface EmailMessage {
-  id: string;
-  from: string;
-  fromAvatar?: string;
-  to: string;
-  subject: string;
-  snippet: string;
-  body: string;
-  folder: 'inbox' | 'starred' | 'drafts' | 'sent' | 'spam' | 'trash';
-  tag?: 'Documents' | 'Work' | 'News' | 'Important';
-  isRead: boolean;
-  isStarred: boolean;
-  hasAttachments?: boolean;
-  attachments?: { filename: string; sizeStr: string; url?: string }[];
-  timestamp: string;
-}
-
 interface Contact {
   id: string;
   name: string;
@@ -83,88 +88,14 @@ interface UpcomingEvent {
   participants: string[];
 }
 
-const DEMO_MESSAGES: EmailMessage[] = [
-  {
-    id: 'msg-1',
-    from: 'Mike Robertson',
-    fromAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
-    to: 'me@shanutechx.com',
-    subject: 'Landing page design system update',
-    snippet: 'Hey team, I updated the typography hierarchy and color variables for the new landing page...',
-    body: 'Hey team,\n\nI updated the typography hierarchy and color variables for the new landing page components. Please take a look at the attached preview and share feedback before end of day.\n\nBest regards,\nMike',
-    folder: 'inbox',
-    tag: 'Work',
-    isRead: false,
-    isStarred: true,
-    hasAttachments: true,
-    attachments: [
-      { filename: 'design-system-v2.pdf', sizeStr: '2.4 MB' },
-      { filename: 'component-spec.png', sizeStr: '850 KB' },
-    ],
-    timestamp: '10:42 AM',
-  },
-  {
-    id: 'msg-2',
-    from: 'TechCrunch Newsletter',
-    to: 'me@shanutechx.com',
-    subject: 'Weekly AI Roundup & Cloud Infrastructure Trends',
-    snippet: 'This week in AI: Next-generation agentic assistants, serverless scale-to-zero databases...',
-    body: 'Welcome to this week\'s edition of TechCrunch Cloud & AI Insights. In today\'s issue:\n- Autonomous Agentic Coding\n- Edge compute optimization\n- Multi-cloud PaaS deployment tools',
-    folder: 'inbox',
-    tag: 'News',
-    isRead: false,
-    isStarred: false,
-    timestamp: 'Yesterday',
-  },
-  {
-    id: 'msg-3',
-    from: 'Finance Department',
-    to: 'me@shanutechx.com',
-    subject: 'Invoice #STX-2026-8890 Paid Successfully',
-    snippet: 'Your monthly payment for ShanuTechX Enterprise Hosting has been processed successfully...',
-    body: 'Dear Customer,\n\nYour invoice #STX-2026-8890 has been paid successfully via Stripe. Thank you for choosing ShanuTechX PaaS Cloud platform.',
-    folder: 'inbox',
-    tag: 'Documents',
-    isRead: true,
-    isStarred: false,
-    timestamp: '18 May',
-  },
-  {
-    id: 'msg-4',
-    from: 'Security Operations',
-    to: 'me@shanutechx.com',
-    subject: 'SSL Certificate Auto-Renewal Notice for Domain',
-    snippet: 'Let\'s Encrypt SSL certificate for custom domain webmail.shanutechx.com renewed...',
-    body: 'Automated notification: Let\'s Encrypt SSL certificate auto-renewed successfully for webmail.shanutechx.com.',
-    folder: 'inbox',
-    tag: 'Important',
-    isRead: true,
-    isStarred: true,
-    timestamp: '15 May',
-  },
-];
-
-const INITIAL_TODOS: TodoItem[] = [
-  { id: 't1', title: 'Design landing page for Oylers', completed: true },
-  { id: 't2', title: 'AI research & study', completed: true },
-  { id: 't3', title: 'Setup Claude Code for Mike', completed: false },
-  { id: 't4', title: 'Publish 3 designs on Dribbble', completed: false },
-  { id: 't5', title: 'Buy more coffee filters', completed: false },
-];
-
-const INITIAL_EVENTS: UpcomingEvent[] = [
-  { id: 'e1', title: 'Brainstorm UI Redesign', dateStr: '16 May', timeStr: '10:30 AM', participants: ['M', 'S', 'A'] },
-  { id: 'e2', title: 'Team Sync & Standup', dateStr: '18 May', timeStr: '12:00 PM', participants: ['D', 'K'] },
-];
-
 export default function RedesignedMailboxStudioPage() {
   const [activeTab, setActiveTab] = useState<'webmail' | 'smtp_creds' | 'dns' | 'aliases' | 'contacts' | 'billing' | 'delegation'>('webmail');
-  const [activeFolder, setActiveFolder] = useState<'inbox' | 'starred' | 'drafts' | 'sent' | 'spam' | 'trash'>('inbox');
+  const [activeFolder, setActiveFolder] = useState<'inbox' | 'starred' | 'drafts' | 'sent' | 'spam' | 'trash' | 'archive' | 'snoozed'>('inbox');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  const [messages, setMessages] = useState<EmailMessage[]>(DEMO_MESSAGES);
-  const [selectedMessage, setSelectedMessage] = useState<EmailMessage | null>(DEMO_MESSAGES[0]);
+  const [messages, setMessages] = useState<WebmailMessage[]>([]);
+  const [selectedMessage, setSelectedMessage] = useState<WebmailMessage | null>(null);
 
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [selectedMailboxId, setSelectedMailboxId] = useState<string>('');
@@ -173,9 +104,9 @@ export default function RedesignedMailboxStudioPage() {
 
   const [domains, setDomains] = useState<Domain[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [todos, setTodos] = useState<TodoItem[]>(INITIAL_TODOS);
+  const [todos, setTodos] = useState<TodoItem[]>([]);
   const [newTodoText, setNewTodoText] = useState('');
-  const [events, setEvents] = useState<UpcomingEvent[]>(INITIAL_EVENTS);
+  const [events, setEvents] = useState<UpcomingEvent[]>([]);
 
   // Modals & Inputs
   const [showComposeModal, setShowComposeModal] = useState(false);
@@ -199,7 +130,19 @@ export default function RedesignedMailboxStudioPage() {
   const [newCustomDomain, setNewCustomDomain] = useState('');
   const [verifyingDnsId, setVerifyingDnsId] = useState<string | null>(null);
 
+  // Webmail Suite Enhancements State
+  const [webmailCategory, setWebmailCategory] = useState<'primary' | 'social' | 'promotions' | 'updates'>('primary');
+  const [webmailViewMode, setWebmailViewMode] = useState<'threads' | 'flat'>('threads');
+  const [listDensity, setListDensity] = useState<'compact' | 'comfortable' | 'spacious'>('comfortable');
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+
+  const [showFoldersModal, setShowFoldersModal] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showCalendarTab, setShowCalendarTab] = useState(false);
+
   const { toast } = useToast();
+
 
   useEffect(() => {
     fetchMailboxes();
@@ -269,27 +212,15 @@ export default function RedesignedMailboxStudioPage() {
   };
 
   useEffect(() => {
-    api.email.messages(activeFolder).then((res) => {
-      if (res.messages && res.messages.length > 0) {
-        const formatted: EmailMessage[] = res.messages.map((m: any) => ({
-          id: m.id,
-          from: m.from || m.senderEmail || m.senderName || 'Sender',
-          to: m.to || m.recipientEmail || 'me@domain.com',
-          subject: m.subject || '(No subject)',
-          snippet: m.snippet || m.body?.slice(0, 80) || '',
-          body: m.body || m.htmlBody || '',
-          folder: m.folder || activeFolder,
-          tag: m.tag || undefined,
-          isRead: !!m.isRead,
-          isStarred: !!m.isStarred,
-          hasAttachments: !!m.hasAttachments,
-          attachments: m.attachmentsJson ? JSON.parse(JSON.stringify(m.attachmentsJson)) : [],
-          timestamp: m.timestamp || new Date(m.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        }));
-        setMessages(formatted);
-        setSelectedMessage(formatted[0]);
-      }
-    }).catch(() => {});
+    api.webmail.listMessages(activeFolder).then((res) => {
+      const list: WebmailMessage[] = res.messages || [];
+      setMessages(list);
+      if (list.length > 0) setSelectedMessage(list[0]);
+      else setSelectedMessage(null);
+    }).catch(() => {
+      setMessages([]);
+      setSelectedMessage(null);
+    });
   }, [activeFolder]);
 
   const activeMailbox = mailboxes.find((m) => m.id === selectedMailboxId) || mailboxes[0];
@@ -310,21 +241,21 @@ export default function RedesignedMailboxStudioPage() {
     toast(`${label} copied to clipboard!`, 'success');
   };
 
-  const toggleStar = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const toggleStar = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     const target = messages.find((m) => m.id === id);
     if (!target) return;
     const nextStarred = !target.isStarred;
     setMessages((prev) =>
       prev.map((m) => (m.id === id ? { ...m, isStarred: nextStarred } : m))
     );
-    api.email.patchMessage(id, { isStarred: nextStarred }).catch(() => {});
+    api.webmail.bulkAction({ action: nextStarred ? 'star' : 'unstar', messageIds: [id] }).catch(() => {});
   };
 
   const handleDeleteMessage = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     try {
-      await api.email.deleteMessage(id);
+      await api.webmail.bulkAction({ action: 'delete', messageIds: [id] });
       toast('Message moved to Trash', 'info');
       setMessages((prev) => prev.filter((m) => m.id !== id));
       if (selectedMessage?.id === id) {
@@ -347,21 +278,6 @@ export default function RedesignedMailboxStudioPage() {
       });
       toast(`Email dispatched to ${composeTo}!`, 'success');
       setShowComposeModal(false);
-      const newMsg: EmailMessage = {
-        id: `msg-${Date.now()}`,
-        from: activeMailbox?.email || 'Me',
-        to: composeTo,
-        subject: composeSubject,
-        snippet: composeBody.slice(0, 80),
-        body: composeBody,
-        folder: 'sent',
-        isRead: true,
-        isStarred: false,
-        hasAttachments: attachments.length > 0,
-        attachments,
-        timestamp: 'Just now',
-      };
-      setMessages((prev) => [newMsg, ...prev]);
       setComposeTo('');
       setComposeSubject('');
       setComposeBody('');
@@ -375,19 +291,6 @@ export default function RedesignedMailboxStudioPage() {
 
   const handleSaveDraft = async () => {
     if (!composeTo && !composeSubject && !composeBody) return;
-    const draftMsg: EmailMessage = {
-      id: `draft-${Date.now()}`,
-      from: activeMailbox?.email || 'Me',
-      to: composeTo || '(No recipient)',
-      subject: composeSubject ? `[Draft] ${composeSubject}` : '[Draft] No Subject',
-      snippet: composeBody.slice(0, 80) || 'Empty draft...',
-      body: composeBody,
-      folder: 'drafts',
-      isRead: true,
-      isStarred: false,
-      timestamp: 'Draft saved',
-    };
-    setMessages((prev) => [draftMsg, ...prev]);
     toast('Draft saved to Drafts folder', 'info');
     setShowComposeModal(false);
   };
@@ -445,13 +348,13 @@ export default function RedesignedMailboxStudioPage() {
   const filteredMessages = messages.filter((m) => {
     if (activeFolder === 'starred' && !m.isStarred) return false;
     if (activeFolder !== 'starred' && m.folder !== activeFolder) return false;
-    if (activeTag && m.tag !== activeTag) return false;
+    if (activeTag && m.labels && !m.labels.includes(activeTag)) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
-        m.subject.toLowerCase().includes(q) ||
-        m.from.toLowerCase().includes(q) ||
-        m.snippet.toLowerCase().includes(q)
+        (m.subject || '').toLowerCase().includes(q) ||
+        (m.senderName || m.senderEmail || m.from || '').toLowerCase().includes(q) ||
+        (m.snippet || m.htmlBody || m.body || '').toLowerCase().includes(q)
       );
     }
     return true;
@@ -465,8 +368,8 @@ export default function RedesignedMailboxStudioPage() {
       {/* Top Header & Navigation Studio Bar */}
       <div className="bg-white rounded-3xl p-4 px-6 shadow-sm border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white font-extrabold flex items-center justify-center text-lg shadow-md shadow-indigo-500/20">
-            ✉️
+          <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white font-extrabold flex items-center justify-center shadow-md shadow-indigo-500/20">
+            <Mail className="h-5 w-5" />
           </div>
           <div>
             <h1 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
@@ -480,291 +383,135 @@ export default function RedesignedMailboxStudioPage() {
         {/* Studio Mode Navigation Tabs */}
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl overflow-x-auto">
           {[
-            { id: 'webmail', label: '📥 Webmail Client' },
-            { id: 'smtp_creds', label: '🔑 SMTP Credentials' },
-            { id: 'dns', label: '🌐 Custom Domains & DNS' },
-            { id: 'aliases', label: '🏷️ Email Aliases' },
-            { id: 'contacts', label: '👥 Contacts' },
-            { id: 'billing', label: '💳 Plan & Billing' },
-            { id: 'delegation', label: '🛡️ Admin Access' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+            { id: 'webmail', label: 'Webmail Client', icon: Mail },
+            { id: 'smtp_creds', label: 'SMTP Credentials', icon: KeyRound },
+            { id: 'dns', label: 'Custom Domains & DNS', icon: Globe },
+            { id: 'aliases', label: 'Email Aliases', icon: Tag },
+            { id: 'contacts', label: 'Contacts', icon: Users },
+            { id: 'billing', label: 'Plan & Billing', icon: CreditCard },
+            { id: 'delegation', label: 'Admin Access', icon: ShieldCheck },
+          ].map((tab) => {
+            const IconComp = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                  activeTab === tab.id
+                    ? 'bg-white text-indigo-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+              >
+                <IconComp className="h-3.5 w-3.5" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Main Container Area */}
       {activeTab === 'webmail' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
-          {/* COLUMN 1: LEFT NAVIGATION SIDEBAR (3 cols) */}
-          <div className="lg:col-span-3 bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 flex flex-col justify-between space-y-6">
-            <div className="space-y-6">
-              {/* Account Dropdown Switcher */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 px-1">Select Active Mailbox</label>
-                <select
-                  value={selectedMailboxId}
-                  onChange={(e) => setSelectedMailboxId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  {mailboxes.length > 0 ? (
-                    mailboxes.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.email} ({m.planName})
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">me@shanutechx.com (System Default)</option>
-                  )}
-                </select>
-              </div>
-
-              {/* New Email Button */}
-              <button
-                onClick={() => setShowComposeModal(true)}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-3 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
-              >
-                <span className="text-base">+</span>
-                <span>Compose New Email</span>
+        showCalendarTab ? (
+          <div className="flex-1 rounded-3xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl">
+            <div className="bg-slate-900 border-b border-slate-800 p-3 flex justify-between items-center px-6">
+              <span className="text-xs font-bold text-white flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-indigo-400" /> Integrated Calendar Mode
+              </span>
+              <button onClick={() => setShowCalendarTab(false)} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-1">
+                <ArrowLeft className="h-3.5 w-3.5" /> Back to Webmail Client
               </button>
-
-              {/* Folder Navigation */}
-              <div className="space-y-1">
-                <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 px-3 mb-2">Folders</p>
-                {[
-                  { id: 'inbox', label: 'Inbox', icon: '📥' },
-                  { id: 'starred', label: 'Starred', icon: '★' },
-                  { id: 'drafts', label: 'Drafts', icon: '📝' },
-                  { id: 'sent', label: 'Sent', icon: '📤' },
-                  { id: 'spam', label: 'Spam', icon: '⚠️' },
-                  { id: 'trash', label: 'Trash', icon: '🗑️' },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => { setActiveFolder(item.id as any); setActiveTag(null); }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all ${
-                      activeFolder === item.id && !activeTag
-                        ? 'bg-indigo-50 text-indigo-700 font-bold'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                  >
-                    <span className="flex items-center gap-3">
-                      <span className="text-sm">{item.icon}</span>
-                      <span>{item.label}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Tags Section */}
-              <div className="space-y-1">
-                <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 px-3 mb-2">Filter Tags</p>
-                {[
-                  { name: 'Documents', color: 'bg-emerald-500' },
-                  { name: 'Work', color: 'bg-indigo-500' },
-                  { name: 'News', color: 'bg-amber-500' },
-                  { name: 'Important', color: 'bg-rose-500' },
-                ].map((tag) => (
-                  <button
-                    key={tag.name}
-                    onClick={() => setActiveTag(activeTag === tag.name ? null : tag.name)}
-                    className={`w-full flex items-center justify-between px-3.5 py-2 rounded-2xl text-xs font-medium transition-all ${
-                      activeTag === tag.name ? 'bg-slate-100 font-bold text-slate-900' : 'text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <span className={`h-2.5 w-2.5 rounded-full ${tag.color}`} />
-                      <span>{tag.name}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
             </div>
-
-            {/* Bottom Storage Meter Bar */}
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-800">Storage Usage</span>
-                <span className="text-[11px] font-mono text-slate-500">
-                  {((activeMailbox?.storageUsedMb || 434) / 1024).toFixed(2)} GB / {((activeMailbox?.storageQuotaMb || 1024) / 1024).toFixed(0)} GB
-                </span>
+            <WebmailCalendarTab />
+          </div>
+        ) : (
+          <WebmailLayout
+            mailboxes={mailboxes}
+            selectedMailboxId={selectedMailboxId}
+            onSelectMailboxId={setSelectedMailboxId}
+            activeFolder={activeFolder}
+            onSelectFolder={(f) => { setActiveFolder(f as any); setActiveTag(null); }}
+            activeTag={activeTag}
+            onSelectTag={setActiveTag}
+            activeCategory={webmailCategory}
+            onSelectCategory={(cat) => setWebmailCategory(cat as any)}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            listDensity={listDensity}
+            onChangeDensity={(d) => setListDensity(d as any)}
+            viewMode={webmailViewMode}
+            onChangeViewMode={setWebmailViewMode}
+            onOpenCompose={() => setShowComposeModal(true)}
+            onOpenFoldersModal={() => setShowFoldersModal(true)}
+            onOpenRulesModal={() => setShowRulesModal(true)}
+            onOpenSettingsModal={() => setShowSettingsModal(true)}
+            onOpenCalendarTab={() => setShowCalendarTab(true)}
+            onOpenContactsTab={() => setActiveTab('contacts')}
+            storageUsedMb={activeMailbox?.storageUsedMb || 434}
+            storageQuotaMb={activeMailbox?.storageQuotaMb || 1024}
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+              {/* THREAD LIST (5 COLS) */}
+              <div className="lg:col-span-5 h-full min-h-[680px]">
+                <WebmailThreadList
+                  messages={filteredMessages}
+                  selectedMessageId={selectedMessage?.id || null}
+                  onSelectMessage={(msg) => {
+                    setSelectedMessage(msg);
+                    if (msg.threadId) setActiveThreadId(msg.threadId);
+                  }}
+                  activeFolder={activeFolder}
+                  viewMode={webmailViewMode}
+                  listDensity={listDensity}
+                  onToggleStar={(id, e) => toggleStar(id, e)}
+                  onDeleteMessage={(id, e) => handleDeleteMessage(id, e)}
+                />
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                <div
-                  className="bg-indigo-600 h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      Math.round(
-                        ((activeMailbox?.storageUsedMb || 434) / (activeMailbox?.storageQuotaMb || 1024)) * 100
-                      ) || 15
-                    )}%`,
+
+              {/* THREAD / MESSAGE VIEWER (7 COLS) */}
+              <div className="lg:col-span-7 h-full min-h-[680px]">
+                <WebmailThreadViewer
+                  selectedMessage={selectedMessage}
+                  activeThreadId={activeThreadId}
+                  onReply={(msg) => {
+                    setComposeTo(msg.senderEmail || msg.from || '');
+                    setComposeSubject(`Re: ${msg.subject}`);
+                    setComposeBody(`\n\n--- On ${msg.createdAt || msg.timestamp}, ${msg.senderName || msg.from} wrote:\n> ${msg.htmlBody || msg.body}`);
+                    setShowComposeModal(true);
+                  }}
+                  onForward={(msg) => {
+                    setComposeSubject(`Fwd: ${msg.subject}`);
+                    setComposeBody(`\n\n--- Forwarded message ---\nFrom: ${msg.senderName || msg.from}\nSubject: ${msg.subject}\n\n${msg.htmlBody || msg.body}`);
+                    setShowComposeModal(true);
+                  }}
+                  onDelete={(id) => {
+                    handleDeleteMessage(id);
+                    setSelectedMessage(null);
                   }}
                 />
               </div>
-              <button
-                onClick={() => setActiveTab('billing')}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs transition-all shadow-sm"
-              >
-                Upgrade Mailbox Storage
-              </button>
             </div>
-          </div>
-
-          {/* COLUMN 2: CENTER EMAIL LIST (5 cols) */}
-          <div className="lg:col-span-5 bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 flex flex-col space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 gap-2">
-              <h2 className="text-sm font-bold text-slate-900 capitalize flex items-center gap-2">
-                <span>{activeFolder}</span>
-                {activeTag && <span className="text-xs font-normal text-slate-500">/ {activeTag}</span>}
-              </h2>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search messages..."
-                className="bg-slate-100 border border-slate-200 rounded-full py-1.5 px-3.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div className="space-y-4 overflow-y-auto max-h-[720px] pr-1">
-              {filteredMessages.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 text-xs font-medium">
-                  No messages in {activeFolder}
-                </div>
-              ) : (
-                filteredMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    onClick={() => setSelectedMessage(msg)}
-                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
-                      selectedMessage?.id === msg.id
-                        ? 'bg-indigo-50/70 border-indigo-200 shadow-sm'
-                        : 'bg-white border-slate-100 hover:border-slate-200'
-                    }`}
-                  >
-                    <div className="h-9 w-9 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-xs shrink-0 shadow-sm">
-                      {msg.from[0].toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-bold text-slate-900 truncate">{msg.from}</p>
-                        <span className="text-[10px] text-slate-400 font-mono">{msg.timestamp}</span>
-                      </div>
-                      <p className="text-xs font-semibold text-slate-800 truncate">{msg.subject}</p>
-                      <p className="text-[11px] text-slate-500 truncate">{msg.snippet}</p>
-                      {msg.hasAttachments && (
-                        <span className="inline-block mt-1 text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-md">
-                          📎 {msg.attachments?.length || 1} Attachment(s)
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <button onClick={(e) => toggleStar(msg.id, e)} className="text-slate-300 hover:text-amber-400 text-sm">
-                        {msg.isStarred ? '★' : '☆'}
-                      </button>
-                      <button onClick={(e) => handleDeleteMessage(msg.id, e)} className="text-slate-300 hover:text-rose-500 text-xs">
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* COLUMN 3: RIGHT EMAIL READING PANE (4 cols) */}
-          <div className="lg:col-span-4 bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between space-y-6">
-            {selectedMessage ? (
-              <div className="space-y-6 overflow-y-auto max-h-[720px] pr-1">
-                {/* Header */}
-                <div className="border-b border-slate-100 pb-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase">
-                      {selectedMessage.folder}
-                    </span>
-                    <span className="text-xs text-slate-400 font-mono">{selectedMessage.timestamp}</span>
-                  </div>
-                  <h2 className="text-base font-bold text-slate-900 leading-tight">{selectedMessage.subject}</h2>
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-slate-800 text-white font-bold flex items-center justify-center text-xs">
-                      {selectedMessage.from[0]}
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-900">{selectedMessage.from}</p>
-                      <p className="text-[11px] text-slate-500">To: {selectedMessage.to}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Body */}
-                <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap font-sans bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                  {selectedMessage.body}
-                </div>
-
-                {/* Attachments Section */}
-                {selectedMessage.hasAttachments && selectedMessage.attachments && selectedMessage.attachments.length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-slate-100">
-                    <p className="text-xs font-bold text-slate-900">Attachments ({selectedMessage.attachments.length})</p>
-                    <div className="space-y-2">
-                      {selectedMessage.attachments.map((att, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-100 rounded-xl text-xs border border-slate-200">
-                          <span className="font-medium text-slate-800 truncate">📄 {att.filename} ({att.sizeStr})</span>
-                          <button
-                            onClick={() => toast(`Downloading ${att.filename}...`, 'info')}
-                            className="text-indigo-600 font-bold hover:underline text-[11px]"
-                          >
-                            Download
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Reply / Forward Actions Bar */}
-                <div className="flex items-center gap-2 pt-4 border-t border-slate-100">
-                  <button
-                    onClick={() => {
-                      setComposeTo(selectedMessage.from);
-                      setComposeSubject(`Re: ${selectedMessage.subject}`);
-                      setComposeBody(`\n\n--- On ${selectedMessage.timestamp}, ${selectedMessage.from} wrote:\n> ${selectedMessage.body}`);
-                      setShowComposeModal(true);
-                    }}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl transition-all shadow-sm"
-                  >
-                    ↩ Reply
-                  </button>
-                  <button
-                    onClick={() => {
-                      setComposeSubject(`Fwd: ${selectedMessage.subject}`);
-                      setComposeBody(`\n\n--- Forwarded message ---\nFrom: ${selectedMessage.from}\nSubject: ${selectedMessage.subject}\n\n${selectedMessage.body}`);
-                      setShowComposeModal(true);
-                    }}
-                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2.5 rounded-xl transition-all"
-                  >
-                    ➔ Forward
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-xs">
-                Select a message to view content
-              </div>
-            )}
-          </div>
-        </div>
+          </WebmailLayout>
+        )
       )}
+
+      {/* WEBMAIL SUITE MODALS */}
+      <WebmailFoldersAndLabelsModal isOpen={showFoldersModal} onClose={() => setShowFoldersModal(false)} />
+      <WebmailRulesModal isOpen={showRulesModal} onClose={() => setShowRulesModal(false)} />
+      <WebmailSettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
+
+      {/* RICH DOCKABLE COMPOSER */}
+      {showComposeModal && (
+        <WebmailRichComposer
+          isOpen={showComposeModal}
+          onClose={() => setShowComposeModal(false)}
+          defaultTo={composeTo}
+          defaultSubject={composeSubject}
+          defaultBody={composeBody}
+          fromEmail={activeMailbox?.email || 'me@shanutechx.com'}
+        />
+      )}
+
 
       {/* TAB 2: SMTP CONNECTION CREDENTIALS */}
       {activeTab === 'smtp_creds' && (
@@ -1058,51 +805,16 @@ export default function RedesignedMailboxStudioPage() {
 
       {/* TAB 4: CONTACTS MANAGEMENT */}
       {activeTab === 'contacts' && (
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-6 max-w-5xl mx-auto w-full">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Email Address Book & Contacts</h2>
-              <p className="text-xs text-slate-500">Manage saved contacts for quick email dispatch.</p>
-            </div>
-            <button
-              onClick={() => setShowAddContactModal(true)}
-              className="bg-indigo-600 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-sm hover:bg-indigo-700"
-            >
-              + Add Contact
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {contacts.length === 0 ? (
-              <div className="col-span-full text-center py-10 text-slate-400 text-xs font-medium">
-                No contacts saved yet. Click "+ Add Contact" to get started.
-              </div>
-            ) : (
-              contacts.map((c) => (
-                <div key={c.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 flex flex-col justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-xs text-slate-900">{c.name}</h3>
-                      {c.company && <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-md">{c.company}</span>}
-                    </div>
-                    <p className="text-xs font-mono text-indigo-600">{c.email}</p>
-                    {c.phone && <p className="text-[11px] text-slate-500">📞 {c.phone}</p>}
-                  </div>
-                  <button
-                    onClick={() => {
-                      setComposeTo(c.email);
-                      setShowComposeModal(true);
-                    }}
-                    className="mt-3 w-full bg-white border border-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl hover:bg-slate-100 shadow-sm"
-                  >
-                    ✉️ Compose Email
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
+        <div className="bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 shadow-2xl flex-1">
+          <WebmailContactsTab
+            onComposeTo={(email) => {
+              setComposeTo(email);
+              setShowComposeModal(true);
+            }}
+          />
         </div>
       )}
+
 
       {/* TAB 5: PLAN & BILLING */}
       {activeTab === 'billing' && (

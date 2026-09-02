@@ -629,23 +629,158 @@ export const api = {
   },
 
   webmail: {
-    listMessages: (folder = 'inbox', search = '') =>
-      apiFetch(`/api/webmail/messages?folder=${folder}${search ? `&search=${encodeURIComponent(search)}` : ''}`).then((r) =>
-        asJson<{ messages: any[]; unreadCount: number; total: number }>(r)
+    listMessages: (folder = 'inbox', search = '', category?: string, smtpAccountId?: string) =>
+      apiFetch(
+        `/api/webmail/messages?folder=${folder}${search ? `&search=${encodeURIComponent(search)}` : ''}${
+          category ? `&category=${category}` : ''
+        }${smtpAccountId ? `&smtpAccountId=${smtpAccountId}` : ''}`
+      ).then((r) => asJson<{ messages: import('./types').WebmailMessage[]; unreadCount: number; total: number }>(r)),
+    listThreads: (folder = 'inbox') =>
+      apiFetch(`/api/webmail/threads?folder=${folder}`).then((r) =>
+        asJson<{ threads: import('./types').WebmailThread[]; total: number }>(r)
       ),
-    getMessage: (id: string) => apiFetch(`/api/webmail/messages/${id}`).then((r) => asJson<{ message: any }>(r)),
-    send: (data: { recipientEmail: string; subject: string; htmlBody: string }) =>
+    getThread: (threadId: string) =>
+      apiFetch(`/api/webmail/threads/${threadId}`).then((r) =>
+        asJson<{ threadId: string; messages: import('./types').WebmailMessage[]; total: number }>(r)
+      ),
+    getMessage: (id: string) =>
+      apiFetch(`/api/webmail/messages/${id}`).then((r) => asJson<{ message: import('./types').WebmailMessage }>(r)),
+    send: (data: {
+      recipientEmail: string;
+      subject: string;
+      htmlBody: string;
+      smtpAccountId?: string;
+      threadId?: string;
+      inReplyTo?: string;
+      scheduledAt?: string;
+      readReceipt?: boolean;
+      labels?: string[];
+      attachments?: Array<{ filename: string; sizeStr: string; url?: string }>;
+    }) =>
       apiFetch('/api/webmail/send', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
-        asJson<{ ok: boolean; message: any }>(r)
+        asJson<{ ok: boolean; message: import('./types').WebmailMessage; scheduled?: boolean }>(r)
       ),
-    updateMessage: (id: string, data: { isRead?: boolean; isStarred?: boolean; folder?: string }) =>
+    saveDraft: (data: { recipientEmail?: string; subject?: string; htmlBody?: string; id?: string }) =>
+      apiFetch('/api/webmail/drafts', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ draft: import('./types').WebmailMessage }>(r)
+      ),
+    bulkAction: (data: {
+      messageIds: string[];
+      action: 'markRead' | 'markUnread' | 'star' | 'unstar' | 'pin' | 'unpin' | 'archive' | 'delete' | 'moveFolder' | 'applyLabel' | 'snooze';
+      targetFolder?: string;
+      label?: string;
+      snoozeUntil?: string;
+    }) =>
+      apiFetch('/api/webmail/bulk', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ ok: boolean; count: number }>(r)
+      ),
+    updateMessage: (id: string, data: Partial<import('./types').WebmailMessage>) =>
       apiFetch(`/api/webmail/messages/${id}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) =>
-        asJson<{ message: any }>(r)
+        asJson<{ message: import('./types').WebmailMessage }>(r)
       ),
     deleteMessage: (id: string) =>
       apiFetch(`/api/webmail/messages/${id}`, { method: 'DELETE' }).then((r) =>
         asJson<{ ok: boolean; deletedId: string }>(r)
       ),
+
+    // Folders, Labels & Filters
+    folders: {
+      list: () => apiFetch('/api/webmail/folders').then((r) => asJson<{ folders: import('./types').WebmailFolder[] }>(r)),
+      create: (data: { name: string; icon?: string; color?: string; parentId?: string }) =>
+        apiFetch('/api/webmail/folders', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+          asJson<{ folder: import('./types').WebmailFolder }>(r)
+        ),
+      delete: (id: string) => apiFetch(`/api/webmail/folders/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    },
+    labels: {
+      list: () => apiFetch('/api/webmail/labels').then((r) => asJson<{ labels: import('./types').WebmailLabel[] }>(r)),
+      create: (data: { name: string; color?: string }) =>
+        apiFetch('/api/webmail/labels', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+          asJson<{ label: import('./types').WebmailLabel }>(r)
+        ),
+      delete: (id: string) => apiFetch(`/api/webmail/labels/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    },
+    filters: {
+      list: () => apiFetch('/api/webmail/filters').then((r) => asJson<{ filters: import('./types').WebmailFilter[] }>(r)),
+      create: (data: { name: string; conditionsJson: any; actionsJson: any }) =>
+        apiFetch('/api/webmail/filters', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+          asJson<{ filter: import('./types').WebmailFilter }>(r)
+        ),
+      delete: (id: string) => apiFetch(`/api/webmail/filters/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    },
+
+    // Signatures & Templates
+    signatures: {
+      list: () => apiFetch('/api/webmail/signatures').then((r) => asJson<{ signatures: import('./types').WebmailSignature[] }>(r)),
+      create: (data: { name: string; htmlContent: string; isDefault?: boolean; smtpAccountId?: string }) =>
+        apiFetch('/api/webmail/signatures', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+          asJson<{ signature: import('./types').WebmailSignature }>(r)
+        ),
+      delete: (id: string) => apiFetch(`/api/webmail/signatures/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    },
+    templates: {
+      list: () => apiFetch('/api/webmail/templates').then((r) => asJson<{ templates: import('./types').WebmailTemplate[] }>(r)),
+      create: (data: { name: string; subject?: string; body: string }) =>
+        apiFetch('/api/webmail/templates', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+          asJson<{ template: import('./types').WebmailTemplate }>(r)
+        ),
+      delete: (id: string) => apiFetch(`/api/webmail/templates/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    },
+
+    // Auto-reply & Blocklist
+    autoReply: {
+      get: () => apiFetch('/api/webmail/auto-reply').then((r) => asJson<{ autoReply: import('./types').WebmailAutoReply | null }>(r)),
+      save: (data: { enabled: boolean; subject: string; body: string; startDate?: string; endDate?: string }) =>
+        apiFetch('/api/webmail/auto-reply', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+          asJson<{ autoReply: import('./types').WebmailAutoReply }>(r)
+        ),
+    },
+    blockedSenders: {
+      list: () => apiFetch('/api/webmail/blocked-senders').then((r) => asJson<{ blockedSenders: import('./types').WebmailBlockedSender[] }>(r)),
+      add: (data: { emailOrDomain: string; reason?: string }) =>
+        apiFetch('/api/webmail/blocked-senders', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+          asJson<{ blocked: import('./types').WebmailBlockedSender }>(r)
+        ),
+      delete: (id: string) => apiFetch(`/api/webmail/blocked-senders/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    },
+
+    // Calendar & Google Sync
+    calendarSync: {
+      list: () => apiFetch('/api/webmail/calendar/sync').then((r) => asJson<{ syncs: import('./types').WebmailCalendarSync[] }>(r)),
+      create: (data: { provider: 'google' | 'ical' | 'outlook'; name: string; calendarUrl?: string }) =>
+        apiFetch('/api/webmail/calendar/sync', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+          asJson<{ sync: import('./types').WebmailCalendarSync; message: string }>(r)
+        ),
+      delete: (id: string) => apiFetch(`/api/webmail/calendar/sync/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+      parseIcs: (icsContent: string) =>
+        apiFetch('/api/webmail/ics/parse', { method: 'POST', body: JSON.stringify({ icsContent }) }).then((r) =>
+          asJson<{ event: { title: string; start: string; end: string; location?: string } }>(r)
+        ),
+    },
+
+    // Express AI Gateway
+    ai: {
+      summarize: (threadBody: string, subject?: string) =>
+        apiFetch('/api/webmail/ai/summarize', { method: 'POST', body: JSON.stringify({ threadBody, subject }) }).then((r) =>
+          asJson<{ summary: import('./types').WebmailAiSummary }>(r)
+        ),
+      replySuggestions: (messageBody: string, senderName?: string) =>
+        apiFetch('/api/webmail/ai/reply-suggestions', { method: 'POST', body: JSON.stringify({ messageBody, senderName }) }).then((r) =>
+          asJson<{ suggestions: string[] }>(r)
+        ),
+      draft: (prompt: string, tone?: string, recipientName?: string) =>
+        apiFetch('/api/webmail/ai/draft', { method: 'POST', body: JSON.stringify({ prompt, tone, recipientName }) }).then((r) =>
+          asJson<{ draft: { subject: string; body: string } }>(r)
+        ),
+      threatCheck: (senderEmail: string, subject: string, body: string) =>
+        apiFetch('/api/webmail/ai/threat-check', { method: 'POST', body: JSON.stringify({ senderEmail, subject, body }) }).then((r) =>
+          asJson<{ assessment: { riskLevel: 'safe' | 'suspicious' | 'dangerous'; flags: string[]; isExternal: boolean; recommendation: string } }>(r)
+        ),
+      translate: (text: string, targetLanguage: string) =>
+        apiFetch('/api/webmail/ai/translate', { method: 'POST', body: JSON.stringify({ text, targetLanguage }) }).then((r) =>
+          asJson<{ translatedText: string; sourceLanguage: string }>(r)
+        ),
+    },
   },
 
   livekit: {
