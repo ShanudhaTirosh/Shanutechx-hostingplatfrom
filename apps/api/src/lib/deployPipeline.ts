@@ -150,11 +150,8 @@ export async function deployService(params: DeployParams) {
     );
 
     if (result.phase === 'error') {
-      await prisma.deployment.update({
-        where: { id: deployment.id },
-        data: { status: 'failed' },
-      });
-      void fireWebhook(userId, 'deployment_status_changed', { deploymentId: deployment.id, status: 'failed' });
+      // BUG-06 FIX: Simply throw the error and let the single catch block handle
+      // the status update to 'failed', the webhook event, and customer notification.
       throw new Error(result.message ?? 'Deployment failed');
     }
 

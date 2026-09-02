@@ -70,6 +70,17 @@ billingRouter.post('/subscriptions/:id/renew', requireAuth, async (req: AuthedRe
     return res.status(409).json({ error: 'Cannot renew a cancelled subscription' });
   }
 
+  // BUG-03 FIX: Prevent renewal of one-time (non-recurring) plans
+  const billingType = subscription.orderItem.plan?.billingType ?? 'one_time';
+  if (billingType === 'one_time') {
+    return res.status(400).json({ error: 'One-time plans cannot be renewed. Please place a new order instead.' });
+  }
+
+  // BUG-07 FIX: Ensure at least planId or serviceId is present for the renewal order
+  if (!subscription.orderItem.planId && !subscription.orderItem.serviceId) {
+    return res.status(400).json({ error: 'Subscription has no associated plan or service. Cannot create renewal order.' });
+  }
+
   // Determine renewal amount from original plan or legacy service price
   const planPrice = subscription.orderItem.plan?.price ?? subscription.orderItem.service?.price ?? 0;
   const currency = (subscription.orderItem.plan?.currency ?? subscription.orderItem.service?.currency ?? 'LKR') as Currency;
@@ -96,12 +107,15 @@ billingRouter.post('/subscriptions/:id/renew', requireAuth, async (req: AuthedRe
   });
 
   // Create a Payment record in manual_review
+  // BUG-14 FIX: Removed dead `req.file?.path` reference — this route has no
+  // multer middleware, so req.file is always undefined. Payment proof is
+  // submitted separately via the payment proof upload endpoint.
   const payment = await prisma.payment.create({
     data: {
       orderId: renewalOrder.id,
       method: 'proof_upload',
       status: 'manual_review',
-      proofUrl: (req as any).file?.path ?? null,
+      proofUrl: null,
     },
   });
 
@@ -136,20 +150,44 @@ export async function extendSubscription(subscriptionId: string): Promise<void> 
   });
   if (!sub) return;
 
+  // BUG-09 FIX: Do not re-activate a cancelled subscription via extension
+  if (sub.status === 'cancelled') {
+    return;
+  }
+
   const billingType = sub.orderItem.plan?.billingType ?? 'monthly';
-  const daysToAdd: Record<string, number> = {
-    one_time: 0,
-    monthly: 30,
-    quarterly: 90,
-    semiannual: 180,
-    yearly: 365,
-  };
-  const days = daysToAdd[billingType] ?? 30;
+
+  // BUG-03 FIX: Do not extend one-time subscriptions — they don't recur
+  if (billingType === 'one_time') {
+    return;
+  }
+
+  // BUG-23 FIX: Use calendar-accurate offsets instead of fixed-day approximations.
+  // addCalendarMonths(date, n) correctly handles month-length differences.
   const base = sub.currentPeriodEnd > new Date() ? sub.currentPeriodEnd : new Date();
-  const newEnd = new Date(base.getTime() + days * 86400000);
+  const monthsToAdd: Record<string, number> = {
+    monthly: 1,
+    quarterly: 3,
+    semiannual: 6,
+    yearly: 12,
+  };
+  const months = monthsToAdd[billingType] ?? 1;
+  const newEnd = addCalendarMonths(base, months);
 
   await prisma.subscription.update({
     where: { id: subscriptionId },
     data: { currentPeriodEnd: newEnd, status: 'active', pastDueAt: null },
   });
+}
+
+/** Calendar-accurate month addition (handles Feb, varying month lengths). */
+function addCalendarMonths(date: Date, months: number): Date {
+  const result = new Date(date);
+  const targetMonth = result.getMonth() + months;
+  result.setMonth(targetMonth);
+  // If the day overflowed (e.g. Jan 31 + 1 month → Mar 3), clamp to last day of target month
+  if (result.getMonth() !== ((targetMonth % 12) + 12) % 12) {
+    result.setDate(0); // sets to last day of previous month
+  }
+  return result;
 }

@@ -64,7 +64,15 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
 
   // At least one of Origin/Referer is present (i.e. a browser-originated
   // request). Verify it points at a trusted host.
-  const requestOrigin = origin || (referer ? new URL(referer).origin : '');
+  // BUG-15 FIX: Safely parse referer header using try/catch to prevent 500 TypeError crash on malformed Referer.
+  let requestOrigin = origin ?? '';
+  if (!requestOrigin && referer) {
+    try {
+      requestOrigin = new URL(referer).origin;
+    } catch {
+      requestOrigin = '';
+    }
+  }
   
   if (!isOriginAllowed(requestOrigin)) {
     logger.warn(

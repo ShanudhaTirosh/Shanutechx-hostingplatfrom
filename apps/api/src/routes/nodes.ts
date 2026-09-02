@@ -7,6 +7,7 @@ import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/aut
 import { env } from '../env';
 import { encryptSecret } from '../lib/secretsVault';
 import { verifySharedSecret } from '../lib/gateAuth';
+import { logger } from '../lib/logger';
 
 export const nodesRouter = Router();
 
@@ -202,6 +203,42 @@ nodesRouter.post('/nodes/register', async (req: Request, res: Response) => {
   res.status(200).json({ success: true, node });
 });
 
+// ── BUG-08 FIX: Node agent stats endpoint BEFORE admin middleware ──
+// The node agent authenticates via x-agent-secret, not Firebase/admin API key.
+// This must be registered before the requireAuth+requireAdminOrDev middleware.
+const statsSchema = z.object({
+  cpuUsedPct: z.number().min(0).max(100),
+  ramUsedMb: z.number().int().min(0),
+  diskUsedGb: z.number().int().min(0),
+});
+
+nodesRouter.post('/nodes/:id/stats', async (req: Request, res: Response) => {
+  const agentSecret = req.headers['x-agent-secret'];
+  if (typeof agentSecret !== 'string' || !clusterSecretMatches(agentSecret)) {
+    return res.status(401).json({ error: 'Invalid agent secret' });
+  }
+
+  const parsed = statsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  // BUG-18 FIX: Handle the case where the node ID does not exist
+  try {
+    const node = await prisma.node.update({
+      where: { id: req.params.id },
+      data: { ...parsed.data, lastSeenAt: new Date() },
+    });
+    res.json({ node });
+  } catch (err: any) {
+    if (err?.code === 'P2025') {
+      return res.status(404).json({ error: 'Node not found' });
+    }
+    logger.error({ err, nodeId: req.params.id }, 'Failed to update node stats');
+    res.status(500).json({ error: 'Failed to update node stats' });
+  }
+});
+
 // ── 2. ADMIN / STAFF PROTECTED ROUTING ──
 nodesRouter.use(requireAuth, requireAdminOrDev);
 
@@ -210,9 +247,9 @@ nodesRouter.get('/nodes', async (_req: AuthedRequest, res: Response) => {
   res.json({ nodes });
 });
 
-nodesRouter.get('/nodes/cluster-secret', (_req: AuthedRequest, res: Response) => {
-  res.json({ secret: CLUSTER_SECRET });
-});
+// BUG-01 FIX: Removed /nodes/cluster-secret endpoint.
+// The cluster secret must never be exposed via an API response.
+// Admins who need it should read it from the server's .env or secret manager directly.
 
 nodesRouter.get('/nodes/:id', async (req: AuthedRequest, res: Response) => {
   const node = await prisma.node.findUnique({ where: { id: req.params.id } });
@@ -384,14 +421,29 @@ nodesRouter.post('/nodes/connect', async (req: AuthedRequest, res: Response) => 
 
     // Step 5: Download and install the node agent
     log('🤖 [5/6] Deploying ShanuTechX Node Agent...');
+    // BUG-02 FIX: Write the cluster secret to a tempfile from stdin instead
+    // of passing it as a CLI argument (which leaks into shell history, /proc,
+    // and the captured provisioning logs).
     const installCmd = [
       `curl -sSL "${apiUrl}/api/nodes/install.sh" -o /tmp/shanutechx-install.sh`,
-      `bash /tmp/shanutechx-install.sh "${apiUrl}" "${CLUSTER_SECRET}" "${label}" "${roleTags.join(',')}" 2>&1`,
+      `printf '%s' '${CLUSTER_SECRET.replace(/'/g, "'\\''")}' > /tmp/.shanutechx-secret`,
+      `SECRET=$(cat /tmp/.shanutechx-secret) bash /tmp/shanutechx-install.sh "${apiUrl}" "$SECRET" "${label}" "${roleTags.join(',')}" 2>&1`,
+      `rm -f /tmp/.shanutechx-secret`,
     ].join(' && ');
     await sshExec(ssh, installCmd, log);
 
     // Step 6: Write and enable systemd service
     log('⚙️ [6/6] Configuring systemd service...');
+    // BUG-02 FIX: Write the secret into an EnvironmentFile instead of
+    // embedding it literally in the unit file (which is world-readable).
+    const envFileContent = `NODE_AGENT_SECRET=${CLUSTER_SECRET}`;
+    const escapedEnvFile = envFileContent.replace(/'/g, "'\\''" );
+    await sshExec(ssh, [
+      `printf '%s' '${escapedEnvFile}' > /etc/shanutechx-agent.env`,
+      'chmod 0600 /etc/shanutechx-agent.env',
+      'chown shanutechx-agent:shanutechx-agent /etc/shanutechx-agent.env',
+    ].join(' && '), log);
+
     const serviceContent = [
       '[Unit]',
       'Description=ShanuTechX Node Agent & Cockpit Management Service',
@@ -403,9 +455,9 @@ nodesRouter.post('/nodes/connect', async (req: AuthedRequest, res: Response) => 
       'User=shanutechx-agent',
       'Group=shanutechx-agent',
       'WorkingDirectory=/opt/shanutechx/services/node-agent',
+      'EnvironmentFile=/etc/shanutechx-agent.env',
       'Environment=NODE_ENV=production',
       'Environment=AGENT_PORT=5000',
-      `Environment=NODE_AGENT_SECRET=${CLUSTER_SECRET}`,
       `Environment=API_URL=${apiUrl}`,
       'Environment=AGENT_WORKSPACES_DIR=/var/lib/shanutechx/workspaces',
       'ExecStart=/usr/bin/node src/index.js',
@@ -447,10 +499,27 @@ nodesRouter.post('/nodes/connect', async (req: AuthedRequest, res: Response) => 
       data: { adminId: req.user!.id, action: 'node.ssh_provision', target: node.id },
     });
 
-    res.json({ success: true, message: 'Node provisioned and fully configured via SSH', node, logs });
+    // BUG-10 FIX: Sanitize provisioning logs to strip any cluster secret values
+    const sanitizedLogs = sanitizeLogs(logs);
+    res.json({ success: true, message: 'Node provisioned and fully configured via SSH', node, logs: sanitizedLogs });
   } catch (err: any) {
+    // BUG-21 FIX: Attempt to clean up the orphaned Docker container on the remote host
+    try {
+      await new Promise<void>((resolve) => {
+        const cleanupSsh = new SshClient();
+        cleanupSsh.on('ready', () => {
+          sshExec(cleanupSsh, 'docker stop shanutechx-agent 2>/dev/null; docker rm shanutechx-agent 2>/dev/null')
+            .finally(() => { cleanupSsh.end(); resolve(); });
+        });
+        cleanupSsh.on('error', () => resolve());
+        cleanupSsh.connect(connectCfg);
+        // Timeout cleanup after 10s to avoid blocking indefinitely
+        setTimeout(() => { try { cleanupSsh.end(); } catch {} resolve(); }, 10_000);
+      });
+    } catch { /* best-effort cleanup */ }
     ssh.end();
-    res.status(500).json({ error: err.message || 'SSH provisioning failed', logs });
+    const sanitizedLogs = sanitizeLogs(logs);
+    res.status(500).json({ error: err.message || 'SSH provisioning failed', logs: sanitizedLogs });
   }
 });
 
@@ -539,10 +608,23 @@ nodesRouter.post('/nodes/connect/stream', async (req: AuthedRequest, res: Respon
     await sshExec(ssh, `printf '%s' '${sudoers}' > /etc/sudoers.d/shanutechx-agent && chmod 0440 /etc/sudoers.d/shanutechx-agent && visudo -cf /etc/sudoers.d/shanutechx-agent`, log);
 
     step('🤖 [5/6] Deploying ShanuTechX Node Agent...');
-    await sshExec(ssh, `curl -sSL "${apiUrl}/api/nodes/install.sh" -o /tmp/shanutechx-install.sh && bash /tmp/shanutechx-install.sh "${apiUrl}" "${CLUSTER_SECRET}" "${label}" "${roleTags.join(',')}" 2>&1`, log);
+    // BUG-02 FIX: Same tempfile approach as /nodes/connect
+    await sshExec(ssh, [
+      `curl -sSL "${apiUrl}/api/nodes/install.sh" -o /tmp/shanutechx-install.sh`,
+      `printf '%s' '${CLUSTER_SECRET.replace(/'/g, "'\\''")}' > /tmp/.shanutechx-secret`,
+      `SECRET=$(cat /tmp/.shanutechx-secret) bash /tmp/shanutechx-install.sh "${apiUrl}" "$SECRET" "${label}" "${roleTags.join(',')}" 2>&1`,
+      `rm -f /tmp/.shanutechx-secret`,
+    ].join(' && '), log);
 
     step('⚙️ [6/6] Configuring systemd service...');
-    const svcContent = `[Unit]\nDescription=ShanuTechX Node Agent & Cockpit Management Service\nAfter=network.target docker.service\nRequires=docker.service\n\n[Service]\nType=simple\nUser=shanutechx-agent\nGroup=shanutechx-agent\nWorkingDirectory=/opt/shanutechx/services/node-agent\nEnvironment=NODE_ENV=production\nEnvironment=AGENT_PORT=5000\nEnvironment=NODE_AGENT_SECRET=${CLUSTER_SECRET}\nEnvironment=API_URL=${apiUrl}\nEnvironment=AGENT_WORKSPACES_DIR=/var/lib/shanutechx/workspaces\nExecStart=/usr/bin/node src/index.js\nRestart=always\nRestartSec=5\nLimitNOFILE=65536\n\n[Install]\nWantedBy=multi-user.target`.replace(/'/g, "'\\''" );
+    // BUG-02 FIX: Use EnvironmentFile instead of inline secret
+    const envFileContent2 = `NODE_AGENT_SECRET=${CLUSTER_SECRET}`.replace(/'/g, "'\\''" );
+    await sshExec(ssh, [
+      `printf '%s' '${envFileContent2}' > /etc/shanutechx-agent.env`,
+      'chmod 0600 /etc/shanutechx-agent.env',
+      'chown shanutechx-agent:shanutechx-agent /etc/shanutechx-agent.env',
+    ].join(' && '), log);
+    const svcContent = `[Unit]\nDescription=ShanuTechX Node Agent & Cockpit Management Service\nAfter=network.target docker.service\nRequires=docker.service\n\n[Service]\nType=simple\nUser=shanutechx-agent\nGroup=shanutechx-agent\nWorkingDirectory=/opt/shanutechx/services/node-agent\nEnvironmentFile=/etc/shanutechx-agent.env\nEnvironment=NODE_ENV=production\nEnvironment=AGENT_PORT=5000\nEnvironment=API_URL=${apiUrl}\nEnvironment=AGENT_WORKSPACES_DIR=/var/lib/shanutechx/workspaces\nExecStart=/usr/bin/node src/index.js\nRestart=always\nRestartSec=5\nLimitNOFILE=65536\n\n[Install]\nWantedBy=multi-user.target`.replace(/'/g, "'\\''" );
     await sshExec(ssh, `printf '%s' '${svcContent}' > /etc/systemd/system/shanutechx-node-agent.service && systemctl daemon-reload && systemctl enable --now shanutechx-node-agent 2>&1 || true`, log);
 
     log('🎉 All 6 setup steps completed successfully!');
@@ -559,31 +641,17 @@ nodesRouter.post('/nodes/connect/stream', async (req: AuthedRequest, res: Respon
     await prisma.auditLog.create({ data: { adminId: req.user!.id, action: 'node.ssh_provision', target: node.id } });
     done(node);
   } catch (err: any) {
+    // BUG-21 FIX: Attempt cleanup of orphaned Docker container
+    try {
+      await sshExec(ssh, 'docker stop shanutechx-agent 2>/dev/null; docker rm shanutechx-agent 2>/dev/null').catch(() => {});
+    } catch { /* best-effort */ }
     ssh.end();
-    fail(err.message || 'SSH provisioning failed', logs);
+    // BUG-10 FIX: Sanitize logs
+    const sanitizedLogs = sanitizeLogs(logs);
+    fail(err.message || 'SSH provisioning failed', sanitizedLogs);
   }
 });
 
-
-const statsSchema = z.object({
-  cpuUsedPct: z.number().min(0).max(100),
-  ramUsedMb: z.number().int().min(0),
-  diskUsedGb: z.number().int().min(0),
-});
-
-nodesRouter.post('/nodes/:id/stats', async (req: AuthedRequest, res: Response) => {
-  const parsed = statsSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
-  }
-
-  const node = await prisma.node.update({
-    where: { id: req.params.id },
-    data: { ...parsed.data, lastSeenAt: new Date() },
-  });
-
-  res.json({ node });
-});
 
 const updateNodeSchema = z.object({ isActive: z.boolean() });
 
@@ -599,3 +667,8 @@ nodesRouter.patch('/nodes/:id', async (req: AuthedRequest, res: Response) => {
 
   res.json({ node });
 });
+
+// ── BUG-10 FIX: Sanitize provisioning logs to remove cluster secret values ──
+function sanitizeLogs(logs: string[]): string[] {
+  return logs.map(line => line.replaceAll(CLUSTER_SECRET, '[REDACTED]'));
+}

@@ -5,7 +5,8 @@ import { Client as SshClient } from 'ssh2';
 import { logger } from './logger';
 import { getVps, getCredentials, LeasewebApiError } from './leasewebClient';
 import { decryptSecret } from './secretsVault';
-import { env } from '../env';
+import { prisma } from './prisma';
+import { canAccessResource } from '../middleware/rbac';
 
 /**
  * Real, interactive SSH-from-the-browser for a customer's (or staff's) VPS.
@@ -86,13 +87,41 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
 
   (async () => {
     try {
+      // BUG-16 FIX: Verify user exists and still has access rights before establishing SSH connection
+      const user = await prisma.user.findUnique({ where: { id: entry.userId } });
+      if (!user || user.isBanned) {
+        return fail('User account is invalid or banned.');
+      }
+
       // Cockpit-native node ticket: format is 'node:IP:sshKeyRef'
       // These connect directly to the node using the stored SSH key,
       // bypassing Leaseweb entirely.
       if (entry.vpsId.startsWith('node:')) {
-        const parts = entry.vpsId.split(':');
-        const ip = parts[1];
-        const sshKeyRef = parts.slice(2).join(':');
+        // Only admin or dev can access raw infrastructure node terminals
+        if (user.role !== 'admin' && user.role !== 'dev') {
+          return fail('Admin/Dev role required to connect to node terminal.');
+        }
+
+        // BUG-19 FIX: Parse node IP and sshKeyRef robustly handling IPv6 addresses or extra colons
+        const raw = entry.vpsId.slice(5); // strip 'node:'
+        let ip: string;
+        let sshKeyRef: string;
+
+        if (raw.startsWith('[')) {
+          const closingBracket = raw.indexOf(']');
+          if (closingBracket !== -1 && raw[closingBracket + 1] === ':') {
+            ip = raw.slice(1, closingBracket);
+            sshKeyRef = raw.slice(closingBracket + 2);
+          } else {
+            const idx = raw.indexOf(':');
+            ip = raw.slice(0, idx);
+            sshKeyRef = raw.slice(idx + 1);
+          }
+        } else {
+          const idx = raw.indexOf(':');
+          ip = raw.slice(0, idx);
+          sshKeyRef = raw.slice(idx + 1);
+        }
 
         sendStatus(`Connecting to node at ${ip}…`);
 
@@ -164,6 +193,16 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
       }
 
       // Leaseweb-managed VPS path (original implementation)
+      // BUG-16 FIX: Re-verify customer ownership of the Leaseweb VPS provision
+      if (user.role === 'customer') {
+        const provision = await prisma.vpsProvision.findFirst({
+          where: { leasewebVpsId: entry.vpsId, userId: user.id, status: { not: 'terminated' } },
+        });
+        if (!provision) {
+          return fail('You do not own this VPS provision.');
+        }
+      }
+
       sendStatus('Fetching VPS details…');
       const [instance, credentials] = await Promise.all([
         getVps(entry.vpsId),

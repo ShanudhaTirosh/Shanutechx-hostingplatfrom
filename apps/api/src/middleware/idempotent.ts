@@ -37,11 +37,19 @@ export function idempotent(req: Request, res: Response, next: NextFunction) {
     return next(); // no key provided — not required, just supported
   }
 
-  const userId = (req as AuthedRequest).user?.id ?? 'anonymous';
+  const userId = (req as AuthedRequest).user?.id;
+  // BUG-05 FIX: If user is not authenticated yet, do not fall back to 'anonymous'
+  // to avoid cross-user key collision or DoS attacks across unauthenticated requests.
+  if (!userId) {
+    return next();
+  }
+
   const cacheKey = `idempotency:${userId}:${req.path}:${key}`;
 
+  // BUG-22 FIX: Set a short 30-second TTL on IN_PROGRESS marker so that if a server
+  // crashes before setting the final cached response or clearing the key, it won't block forever.
   redis
-    .set(cacheKey, 'IN_PROGRESS', 'EX', 60, 'NX')
+    .set(cacheKey, 'IN_PROGRESS', 'EX', 30, 'NX')
     .then((result) => {
       if (result !== 'OK') {
         // Key already exists — either in-progress concurrently, or previously completed
