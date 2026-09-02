@@ -5,7 +5,8 @@ export type DeploymentStatus =
   | 'building'
   | 'running'
   | 'failed'
-  | 'stopped';
+  | 'stopped'
+  | 'deleted';
 
 export interface Deployment {
   id: string;
@@ -27,8 +28,8 @@ export interface Deployment {
 export interface DeploymentCreateInput {
   /** GitHub/GitLab repo URL or public git URL */
   repoUrl: string;
-  /** Which VPS node to deploy on */
-  nodeId: string;
+  /** Which VPS node to deploy on (auto-selected if omitted) */
+  nodeId?: string;
   /** Container internal port (default: 3000) */
   internalPort?: number;
   /** Environment variables to set */

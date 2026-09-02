@@ -22,7 +22,7 @@
       ".read": "auth != null && root.child('staff').child(auth.uid).exists()",
       "$uid": {
         ".write": "auth != null && (auth.uid === $uid || root.child('staff').child(auth.uid).exists())",
-        ".validate": "newData.hasChildren(['userEmail', 'lastMessage', 'lastMessageTime']) && newData.child('userEmail').isString() && newData.child('lastMessage').isString() && newData.child('lastMessageTime').isNumber()"
+        ".validate": "newData.hasChildren(['lastMessageAt', 'lastMessageText', 'lastSenderRole']) && newData.child('lastMessageText').isString() && newData.child('lastMessageAt').isNumber() && (newData.child('lastSenderRole').val() === 'customer' || newData.child('lastSenderRole').val() === 'staff')"
       }
     },
 

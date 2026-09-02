@@ -63,14 +63,16 @@ export function formatLogLine(line: string): string {
     }
   });
   
-  // Replace Unix timestamps (10-13 digits)
+  // Replace Unix timestamps (10 or 13 digits)
   formatted = formatted.replace(unixTimestampRegex, (match) => {
     try {
-      const timestamp = parseInt(match);
-      // Check if it's a reasonable timestamp (between 2000 and 2100)
-      // Timestamps can be in seconds (10 digits) or milliseconds (13 digits)
-      if (timestamp > 946684800 && timestamp < 4102444800000) {
-        const date = new Date(timestamp > 9999999999 ? timestamp : timestamp * 1000);
+      const ts = parseInt(match);
+      // Valid seconds timestamp: 10 digits between ~2017 (1500000000) and ~2039 (2200000000)
+      const isSeconds = match.length === 10 && ts >= 1500000000 && ts <= 2200000000;
+      // Valid ms timestamp: 13 digits between ~2017 (1500000000000) and ~2039 (2200000000000)
+      const isMs = match.length === 13 && ts >= 1500000000000 && ts <= 2200000000000;
+      if (isSeconds || isMs) {
+        const date = new Date(isMs ? ts : ts * 1000);
         return date.toLocaleString();
       }
       return match;

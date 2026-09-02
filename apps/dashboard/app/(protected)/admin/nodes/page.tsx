@@ -264,6 +264,11 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
         roleTags,
       });
 
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}: ${res.statusText}` }));
+        throw new Error(errData.error || errData.message || `SSH Connection failed: ${res.status}`);
+      }
+
       if (!res.body) throw new Error('No stream body received');
       const reader = res.body.getReader();
       const decoder = new TextDecoder();

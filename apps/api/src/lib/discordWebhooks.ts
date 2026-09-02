@@ -15,6 +15,7 @@ export type NotificationEvent =
   | 'new_order'
   | 'new_ticket'
   | 'deployment_failed'
+  | 'deployment_recovered'
   | 'vps_assigned'
   | 'new_ai_subscription_request';
 
@@ -25,6 +26,7 @@ const EVENT_COLOR: Record<NotificationEvent, number> = {
   new_order: 0x3498db, // blue
   new_ticket: 0x9b59b6, // purple
   deployment_failed: 0xe74c3c, // red
+  deployment_recovered: 0x2ecc71, // green
   vps_assigned: 0x2ecc71, // green
   new_ai_subscription_request: 0x9b59b6, // purple
 };
@@ -36,6 +38,7 @@ const EVENT_TITLE: Record<NotificationEvent, string> = {
   new_order: '🛒 New Order Created',
   new_ticket: '🎫 New Support Ticket Opened',
   deployment_failed: '🔥 Deployment Failed',
+  deployment_recovered: '✅ Deployment Recovered',
   vps_assigned: '🖥️ VPS Instance Provisioned',
   new_ai_subscription_request: '🤖 AI Subscription Requested',
 };

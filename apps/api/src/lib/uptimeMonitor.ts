@@ -170,7 +170,7 @@ export async function runUptimeChecks(): Promise<{ checked: number; up: number; 
       const msg = `Alert: Deployment "${deployment.subdomain}" (${url}) is now ${stateStr}. ${errorMessage ? `Reason: ${errorMessage}` : ''}`;
       
       void notifyCustomer(deployment.user, msg);
-      void notifyDiscordChannel('deployment_failed', {
+      void notifyDiscordChannel(isUp ? 'deployment_recovered' : 'deployment_failed', {
         Deployment: deployment.id,
         Subdomain: deployment.subdomain ?? '',
         Status: stateStr,

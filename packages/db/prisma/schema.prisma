@@ -804,6 +804,7 @@ enum NotificationEvent {
   new_order
   new_ticket
   deployment_failed
+  deployment_recovered
   vps_assigned
   new_ai_subscription_request
 }

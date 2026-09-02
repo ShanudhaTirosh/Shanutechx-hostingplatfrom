@@ -8,7 +8,8 @@ export class CatalogResource extends BaseClient {
   }
 
   async get(slug: string): Promise<CatalogTemplate> {
-    return this.httpGet<CatalogTemplate>(`/api/catalog/${slug}`);
+    const res = await this.httpGet<{ template: CatalogTemplate }>(`/api/catalog/${slug}`);
+    return res.template;
   }
 
   async deploy(input: CatalogDeployInput): Promise<Deployment> {

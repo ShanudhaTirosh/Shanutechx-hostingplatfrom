@@ -72,7 +72,7 @@ async function wildDuckRequest<T>(
   options: { method?: string; body?: unknown; query?: Record<string, string | number | undefined> } = {}
 ): Promise<T> {
   const baseUrl = (env.wildduckApiUrl || 'http://localhost:8080').replace(/\/$/, '');
-  const apiKey = env.wildduckApiKey || '';
+  const apiKey = env.wildduckApiKey || 'secret-wildduck-api-token';
 
   let urlStr = `${baseUrl}${path.startsWith('/') ? path : '/' + path}`;
   if (options.query) {

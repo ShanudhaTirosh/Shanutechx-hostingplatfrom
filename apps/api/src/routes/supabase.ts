@@ -530,7 +530,8 @@ supabaseRouter.get('/supabase/advisors', requireAuth, requireAdminOrDev, async (
   res.json({
     security: securityLints,
     performance: performanceLints,
-    scannedAt: new Date().toISOString()
+    scannedAt: new Date().toISOString(),
+    isFallback: true,
   });
 });
 
@@ -551,7 +552,8 @@ supabaseRouter.get('/supabase/observability', requireAuth, requireAdminOrDev, as
       avgQueryLatencyMs: 14.2,
       cacheHitRatePercent: 98.4
     },
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    isFallback: true,
   });
 });
 
@@ -567,7 +569,7 @@ supabaseRouter.get('/supabase/logs', requireAuth, requireAdminOrDev, async (req:
     { id: 'log_05', timestamp: new Date(Date.now() - 450000).toISOString(), service: 'realtime', level: 'INFO', message: 'WebSocket client connected topic=realtime:public:orders' }
   ].filter((l) => service === 'all' || l.service === service);
 
-  res.json({ logs });
+  res.json({ logs, isFallback: true });
 });
 
 // 14. Integrations (Webhooks, Vault, FDW) Endpoint
@@ -583,7 +585,8 @@ supabaseRouter.get('/supabase/integrations', requireAuth, requireAdminOrDev, asy
     fdw: [
       { id: 'fdw_01', name: 'stripe_fdw', wrapper: 'wasm_foreign_data_wrapper', serverName: 'stripe_server', status: 'CONNECTED' },
       { id: 'fdw_02', name: 'firebase_fdw', wrapper: 'postgres_fdw', serverName: 'firebase_remote', status: 'CONFIGURED' }
-    ]
+    ],
+    isFallback: true,
   });
 });
 
