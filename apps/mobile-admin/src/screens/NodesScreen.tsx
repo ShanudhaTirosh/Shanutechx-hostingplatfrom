@@ -67,10 +67,10 @@ function NodeCard({
 
       {/* Footer meta & Staff Actions */}
       <View style={styles.footerMeta}>
-        <Text style={styles.metaText}>🚀 {node.deploymentCount} deployment{node.deploymentCount !== 1 ? 's' : ''}</Text>
+        <Text style={styles.metaText}>{node.deploymentCount} deployment{node.deploymentCount !== 1 ? 's' : ''}</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable onPress={() => onOpenCockpit(node)} style={styles.cockpitBtn}>
-            <Text style={styles.cockpitBtnText}>⚡ Cockpit</Text>
+            <Text style={styles.cockpitBtnText}>Cockpit</Text>
           </Pressable>
           <Pressable onPress={() => onToggleActive(node)} style={styles.actionBtn}>
             <Text style={styles.actionBtnText}>{node.status === 'online' ? 'Pause' : 'Activate'}</Text>
@@ -214,9 +214,9 @@ export function NodesScreen() {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <Text style={styles.modalTitle}>⚡ Cockpit Telemetry</Text>
+              <Text style={styles.modalTitle}>Cockpit Telemetry</Text>
               <Pressable onPress={() => setCockpitNode(null)}>
-                <Text style={{ color: colors.muted, fontSize: 18 }}>✕</Text>
+                <Text style={{ color: colors.muted, fontSize: 16 }}>X</Text>
               </Pressable>
             </View>
             <Text style={styles.modalSubtitle}>{cockpitNode?.label} ({cockpitNode?.ip})</Text>

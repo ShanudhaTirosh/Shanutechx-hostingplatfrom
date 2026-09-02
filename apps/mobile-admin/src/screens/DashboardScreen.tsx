@@ -70,7 +70,7 @@ export function DashboardScreen() {
           <Text style={styles.role}>{apiUser?.role?.toUpperCase()}</Text>
         </View>
         <Pressable onPress={() => navigation.navigate('Notifications')} style={styles.bell}>
-          <Text style={{ fontSize: 18 }}>🔔</Text>
+          <Text style={{ color: colors.onSurface, fontSize: 11, fontWeight: 'bold' }}>INFO</Text>
           {pendingPayments && pendingPayments.length > 0 && <View style={styles.bellDot} />}
         </Pressable>
       </View>
@@ -111,7 +111,6 @@ export function DashboardScreen() {
         style={styles.quickAccessRow}
       >
         <GlassCard style={styles.quickAccessCard}>
-          <Text style={styles.quickAccessIcon}>💳</Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.quickAccessLabel}>Payment Review Queue</Text>
             <Text style={styles.quickAccessSub}>
@@ -126,7 +125,7 @@ export function DashboardScreen() {
       {pendingPayments === null ? (
         <GlassCard><Text style={styles.muted}>Loading…</Text></GlassCard>
       ) : pendingPayments.length === 0 ? (
-        <GlassCard><Text style={styles.muted}>No payments waiting for review. 🎉</Text></GlassCard>
+        <GlassCard><Text style={styles.muted}>No payments waiting for review.</Text></GlassCard>
       ) : (
         pendingPayments.slice(0, 3).map((p) => (
           <Pressable key={p.id} onPress={() => navigation.navigate('Payments')}>

@@ -106,7 +106,6 @@ export function DeploymentsScreen() {
 
       {/* Search */}
       <View style={styles.searchRow}>
-        <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
           placeholder="Search by name, user, URL…"
@@ -163,17 +162,17 @@ export function DeploymentsScreen() {
 
             <View style={styles.depMeta}>
               <Text style={styles.metaChip}>
-                🖥 {dep.node?.label ?? 'No node'}
+                Node: {dep.node?.label ?? 'No node'}
               </Text>
               {dep.publicUrl ? (
                 <Text style={styles.metaChip} numberOfLines={1}>
-                  🌐 {dep.publicUrl.replace(/^https?:\/\//, '')}
+                  {dep.publicUrl.replace(/^https?:\/\//, '')}
                 </Text>
               ) : dep.customSubdomain ? (
-                <Text style={styles.metaChip}>🔗 {dep.customSubdomain}</Text>
+                <Text style={styles.metaChip}>Subdomain: {dep.customSubdomain}</Text>
               ) : null}
               <Text style={styles.metaChip}>
-                📦 {dep.image}:{dep.tag}
+                Image: {dep.image}:{dep.tag}
               </Text>
             </View>
 

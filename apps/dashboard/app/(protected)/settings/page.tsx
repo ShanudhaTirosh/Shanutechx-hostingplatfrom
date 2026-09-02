@@ -900,11 +900,11 @@ export default function SettingsPage() {
 
         <Tabs
           tabs={[
-            { label: '👥 Team & RBAC', value: 'team' },
-            { label: '🔔 Discord Webhooks', value: 'webhooks' },
-            { label: '💾 Database Backups', value: 'backups' },
-            { label: '🔌 API Configs', value: 'configs' },
-            { label: '🔒 Security PIN', value: 'pin' },
+            { label: 'Team & RBAC', value: 'team' },
+            { label: 'Discord Webhooks', value: 'webhooks' },
+            { label: 'Database Backups', value: 'backups' },
+            { label: 'API Configs', value: 'configs' },
+            { label: 'Security PIN', value: 'pin' },
           ]}
           active={activeTab}
           onChange={setActiveTab}

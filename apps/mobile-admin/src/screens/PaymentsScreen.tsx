@@ -115,7 +115,7 @@ export function PaymentsScreen() {
           ) : error ? (
             <Text style={{ color: colors.error }}>{error}</Text>
           ) : (
-            <GlassCard><Text style={styles.muted}>No payments waiting for review. 🎉</Text></GlassCard>
+            <GlassCard><Text style={styles.muted}>No payments waiting for review.</Text></GlassCard>
           )
         }
         renderItem={({ item }) => (
@@ -132,7 +132,7 @@ export function PaymentsScreen() {
               <Pressable onPress={() => setPreviewProofUrl(item.proofUrl)} style={styles.proofContainer}>
                 <Image source={{ uri: item.proofUrl }} style={styles.proof} resizeMode="cover" />
                 <View style={styles.zoomHint}>
-                  <Text style={styles.zoomHintText}>🔍 Tap to inspect slip</Text>
+                  <Text style={styles.zoomHintText}>Tap to inspect slip</Text>
                 </View>
               </Pressable>
             )}

@@ -7,6 +7,8 @@ import { secretsApi, SecretProject } from '@/lib/secretsApi';
 import { SecretRow } from '@/components/secrets/SecretRow';
 import { EnvImporter } from '@/components/secrets/EnvImporter';
 
+import { Download, Upload } from 'lucide-react';
+
 export default function ProjectSecretsPage() {
   const params = useParams();
   const projectId = params.project as string;
@@ -96,14 +98,14 @@ export default function ProjectSecretsPage() {
           onClick={() => setShowImporter(!showImporter)}
           className="px-3 py-1.5 rounded-lg bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet-light border border-accent-violet/30 text-xs font-semibold transition-all"
         >
-          {showImporter ? 'Hide Importer' : '📥 Bulk Import .env'}
+          {showImporter ? 'Hide Importer' : <span className="flex items-center gap-1.5"><Upload className="h-3.5 w-3.5" /> Bulk Import .env</span>}
         </button>
 
         <button
           onClick={handleExportEnv}
           className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-text-muted hover:text-text-primary text-xs font-medium border border-white/[0.08] transition-all"
         >
-          📤 Export .env File
+          <span className="flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> Export .env File</span>
         </button>
       </div>
 

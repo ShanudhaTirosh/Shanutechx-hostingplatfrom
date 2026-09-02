@@ -63,9 +63,8 @@ export function TicketsScreen() {
     <View style={styles.screen}>
       <Text style={[styles.title, { paddingTop: insets.top + 12 }]}>Support Tickets</Text>
 
-      {/* Search Bar */}
+      {/* Search */}
       <View style={styles.searchRow}>
-        <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
           placeholder="Search by subject, customer email…"

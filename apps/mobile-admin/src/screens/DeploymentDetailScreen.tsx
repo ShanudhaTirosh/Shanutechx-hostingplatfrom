@@ -158,7 +158,7 @@ export function DeploymentDetailScreen() {
             <View style={styles.actionsRow}>
               <View style={{ flex: 1, marginRight: 8 }}>
                 <Button
-                  label={actionLoading === 'restart' ? 'Restarting…' : '↺ Restart'}
+                  label={actionLoading === 'restart' ? 'Restarting…' : 'Restart'}
                   variant="outline"
                   onPress={handleRestart}
                   disabled={!!actionLoading || deployment.status === 'building'}
@@ -166,7 +166,7 @@ export function DeploymentDetailScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Button
-                  label={actionLoading === 'stop' ? 'Stopping…' : '■ Stop'}
+                  label={actionLoading === 'stop' ? 'Stopping…' : 'Stop'}
                   variant="outlineDanger"
                   onPress={handleStop}
                   disabled={!!actionLoading || deployment.status === 'stopped' || deployment.status === 'terminated'}
@@ -188,7 +188,7 @@ export function DeploymentDetailScreen() {
               }}
             >
               <InfoRow
-                label="Subdomain ✏️"
+                label="Subdomain"
                 value={deployment.customSubdomain ? `${deployment.customSubdomain}.shanutechx.com` : 'Set Subdomain…'}
                 mono
               />
