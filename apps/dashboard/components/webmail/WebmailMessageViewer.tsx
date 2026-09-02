@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { IconTrash } from '@/components/Icons';
 
 interface WebmailMessageViewerProps {
   message: any;
@@ -38,9 +39,9 @@ export function WebmailMessageViewer({
           </button>
           <button
             onClick={() => onDelete(message.id)}
-            className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 text-xs font-semibold transition-all"
+            className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 text-xs font-semibold transition-all flex items-center gap-1.5"
           >
-            🗑 Delete
+            <IconTrash size={13} /> Delete
           </button>
         </div>
       </div>

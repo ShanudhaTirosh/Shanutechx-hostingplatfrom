@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { api } from '@/lib/api';
+import { IconSend } from '@/components/Icons';
 
 interface WebmailComposerProps {
   isOpen: boolean;
@@ -116,9 +117,9 @@ export function WebmailComposer({
             <button
               type="submit"
               disabled={sending}
-              className="px-5 py-2 rounded-xl bg-accent-violet hover:bg-accent-violet-light text-white text-xs font-semibold shadow-glow-violet transition-all disabled:opacity-50"
+              className="px-5 py-2 rounded-xl bg-accent-violet hover:bg-accent-violet-light text-white text-xs font-semibold shadow-glow-violet transition-all disabled:opacity-50 flex items-center gap-1.5"
             >
-              {sending ? 'Sending...' : 'Send Message ✈️'}
+              <IconSend size={14} /> {sending ? 'Sending...' : 'Send Message'}
             </button>
           </div>
         </form>

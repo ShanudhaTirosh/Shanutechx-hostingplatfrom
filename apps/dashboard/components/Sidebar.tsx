@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { firebaseAuth } from '@/lib/firebaseClient';
 import { useAppUser } from '@/lib/AppUserContext';
+import { IconStore, IconSettings } from '@/components/Icons';
 
 // ── Icons (inline SVG, no deps) ─────────────────────────────────────────────
 function Icon({ d, viewBox = '0 0 24 24' }: { d: string | React.ReactNode; viewBox?: string }) {
@@ -191,7 +192,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold rounded-xl bg-accent-violet/10 text-accent-violet-light border border-accent-violet/20 hover:bg-accent-violet/20 transition-all shadow-sm"
             >
               <span className="flex items-center gap-2">
-                <span className="text-base">🛒</span> Customer Storefront
+                <IconStore size={15} /> Customer Storefront
               </span>
               <span>→</span>
             </Link>
@@ -201,7 +202,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold rounded-xl bg-teal-500/10 text-teal-300 border border-teal-500/20 hover:bg-teal-500/20 transition-all shadow-sm"
             >
               <span className="flex items-center gap-2">
-                <span className="text-base">⚙️</span> Control Panel
+                <IconSettings size={15} /> Control Panel
               </span>
               <span>→</span>
             </Link>

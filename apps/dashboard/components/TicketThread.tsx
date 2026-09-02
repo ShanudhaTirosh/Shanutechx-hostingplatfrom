@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { Ticket } from '@/lib/types';
 import { Card, Button, Badge, Spinner, ErrorBanner, useToast } from '@/components/ui';
 import { useAppUser } from '@/lib/AppUserContext';
+import { IconShield } from '@/components/Icons';
 
 export function TicketThread({
   ticketId,
@@ -80,8 +81,14 @@ export function TicketThread({
                 }`}
               >
                 <div className="flex justify-between items-center gap-6 text-[10px] opacity-75 mb-1.5 font-medium">
-                  <span>
-                    {message.senderRole === 'admin' ? '🛡️ Support Team' : message.sender?.email ?? 'User'}
+                  <span className="flex items-center gap-1">
+                    {message.senderRole === 'admin' ? (
+                      <>
+                        <IconShield size={12} className="text-cyan-300" /> Support Team
+                      </>
+                    ) : (
+                      message.sender?.email ?? 'User'
+                    )}
                   </span>
                   <span>
                     {new Date(message.createdAt).toLocaleString('en-US', {

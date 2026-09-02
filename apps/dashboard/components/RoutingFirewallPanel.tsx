@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { api } from '@/lib/api';
 import { Card, Button, Badge, useToast } from '@/components/ui';
+import { IconShield, IconTerminal, IconUnlock } from '@/components/Icons';
 
 export type RoutingMode = 'proxied' | 'direct' | 'no_ssl';
 
@@ -103,7 +104,7 @@ export function RoutingFirewallPanel({
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xl">🛡️</span>
+                <IconShield size={22} className="text-accent-cyan" />
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
                   Recommended
                 </span>
@@ -124,7 +125,7 @@ export function RoutingFirewallPanel({
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xl">⚡</span>
+                <IconTerminal size={22} className="text-accent-violet" />
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-accent-violet/20 text-accent-violet">
                   Raw TCP / UDP
                 </span>
@@ -145,7 +146,7 @@ export function RoutingFirewallPanel({
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xl">🔓</span>
+                <IconUnlock size={22} className="text-amber-400" />
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
                   HTTP Only
                 </span>

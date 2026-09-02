@@ -17,6 +17,19 @@ import {
   ConfirmDialog,
   RevealSecret,
 } from '@/components/ui';
+import {
+  IconServer,
+  IconTerminal,
+  IconFolder,
+  IconPlay,
+  IconStop,
+  IconRestart,
+  IconKey,
+  IconRefresh,
+  IconPlus,
+  IconAlert,
+  IconShield,
+} from '@/components/Icons';
 import { VpsFileManager } from '@/components/VpsFileManager';
 import { CockpitDashboardPanel } from '@/components/CockpitDashboardPanel';
 
@@ -265,8 +278,8 @@ export default function VpsPage() {
           title="Your Virtual Server Fleet"
           description="Manage root credentials, interactive SSH shell, desktop-grade SFTP file manager, power reboot/stop, and live performance metrics."
         />
-        <Button variant="primary" size="sm" onClick={() => setAddVpsModal(true)}>
-          ➕ Add Existing / Custom VPS (IP &amp; Root SSH)
+        <Button variant="primary" size="sm" onClick={() => setAddVpsModal(true)} className="flex items-center gap-1.5">
+          <IconPlus size={14} /> Add Existing / Custom VPS (IP &amp; Root SSH)
         </Button>
       </div>
 
@@ -278,7 +291,7 @@ export default function VpsPage() {
 
       {/* Global Warning Note */}
       <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-xs text-amber-200 leading-relaxed flex items-start gap-3">
-        <span className="text-base select-none">⚠️</span>
+        <IconAlert size={18} className="text-amber-400 shrink-0 mt-0.5" />
         <div>
           <strong className="font-semibold text-amber-300">IMPORTANT SECURITY NOTICE:</strong> If you change your root user password directly inside the terminal (`chpasswd`) or via your external provider dashboard, you <strong>MUST</strong> update your stored credentials here in the control panel. This ensures SFTP file transfers, live stats telemetry, and automated SSH power controls remain synchronized.
         </div>
@@ -301,7 +314,7 @@ export default function VpsPage() {
               <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
                 <div>
                   <p className="font-semibold text-text-primary text-base flex items-center gap-2 font-mono">
-                    🖥️ {displayIp ?? p.externalId ?? p.id.slice(0, 8).toUpperCase()}
+                    <IconServer size={18} className="text-accent-teal" /> {displayIp ?? p.externalId ?? p.id.slice(0, 8).toUpperCase()}
                   </p>
                   <p className="text-xs text-text-muted">
                     Provider: <span className="font-mono text-text-primary uppercase">{p.provider || 'Generic VPS'}</span>
@@ -333,21 +346,22 @@ export default function VpsPage() {
               {!isTerminated && (
                 <div className="space-y-3">
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="primary" onClick={() => setTerminalTarget(p)}>
-                      💻 Web SSH Shell
+                    <Button size="sm" variant="primary" onClick={() => setTerminalTarget(p)} className="flex items-center gap-1.5">
+                      <IconTerminal size={14} /> Web SSH Shell
                     </Button>
                     <Button
                       size="sm"
                       variant={isSftpOpen ? 'secondary' : 'primary'}
                       onClick={() => setSftpTargetId(isSftpOpen ? null : p.id)}
+                      className="flex items-center gap-1.5"
                     >
-                      {isSftpOpen ? 'Close SFTP' : '📁 SFTP File Manager'}
+                      <IconFolder size={14} /> {isSftpOpen ? 'Close SFTP' : 'SFTP File Manager'}
                     </Button>
-                    <Button size="sm" variant="secondary" loading={busyId === p.id} onClick={() => handlePower(p, 'reboot')}>
-                      🔄 Restart
+                    <Button size="sm" variant="secondary" loading={busyId === p.id} onClick={() => handlePower(p, 'reboot')} className="flex items-center gap-1.5">
+                      <IconRestart size={14} /> Restart
                     </Button>
-                    <Button size="sm" variant="danger" loading={busyId === p.id} onClick={() => handlePower(p, 'stop')}>
-                      ⏹ Stop / Shutdown
+                    <Button size="sm" variant="danger" loading={busyId === p.id} onClick={() => handlePower(p, 'stop')} className="flex items-center gap-1.5">
+                      <IconStop size={14} /> Stop / Shutdown
                     </Button>
                   </div>
 
@@ -361,8 +375,9 @@ export default function VpsPage() {
                           setChangePasswordTarget(p);
                           setNewPasswordInput('');
                         }}
+                        className="flex items-center gap-1.5"
                       >
-                        🔑 Change Root Password
+                        <IconKey size={13} /> Change Root Password
                       </Button>
                       <Button
                         size="sm"
@@ -374,8 +389,9 @@ export default function VpsPage() {
                           setSyncUsernameInput(p.username || 'root');
                           setSyncPasswordInput('');
                         }}
+                        className="flex items-center gap-1.5"
                       >
-                        🔄 Sync Credentials
+                        <IconRefresh size={13} /> Sync Credentials
                       </Button>
                     </div>
 

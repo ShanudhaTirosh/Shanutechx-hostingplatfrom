@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAppUser } from '@/lib/AppUserContext';
+import { IconLock, IconUnlock } from '@/components/Icons';
 
 const DEV_RIGHT_CLICK_STORAGE_KEY = 'dev_enable_right_click';
 
@@ -88,7 +89,8 @@ export function DevRightClickToggle() {
           : 'bg-white/5 border-white/10 text-text-muted hover:text-white hover:bg-white/10'
       }`}
     >
-      <span>{enabled ? '🔓 Dev Inspect: ON' : '🔒 Dev Inspect: OFF'}</span>
+      {enabled ? <IconUnlock size={13} /> : <IconLock size={13} />}
+      <span>{enabled ? 'Dev Inspect: ON' : 'Dev Inspect: OFF'}</span>
     </button>
   );
 }

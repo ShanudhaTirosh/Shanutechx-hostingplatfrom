@@ -3,6 +3,23 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { api } from '@/lib/api';
 import { Button, Card, Spinner, useToast, ConfirmDialog } from '@/components/ui';
+import {
+  IconFolder,
+  IconFile,
+  IconZip,
+  IconCode,
+  IconImage,
+  IconUp,
+  IconRefresh,
+  IconUpload,
+  IconDownload,
+  IconSearch,
+  IconPlus,
+  IconEdit,
+  IconTrash,
+  IconClose,
+  IconSave,
+} from '@/components/Icons';
 
 interface SftpItem {
   name: string;
@@ -105,14 +122,13 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
     });
   }
 
-  function getFileIcon(item: SftpItem) {
-    if (item.isDirectory) return '📁';
+  function renderFileIcon(item: SftpItem) {
+    if (item.isDirectory) return <IconFolder size={16} className="text-amber-400" />;
     const name = item.name.toLowerCase();
-    if (name.endsWith('.zip') || name.endsWith('.tar') || name.endsWith('.gz') || name.endsWith('.tgz')) return '📦';
-    if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.svg') || name.endsWith('.webp')) return '🖼️';
-    if (name.endsWith('.json') || name.endsWith('.js') || name.endsWith('.ts') || name.endsWith('.py') || name.endsWith('.sh') || name.endsWith('.html') || name.endsWith('.css') || name.endsWith('.env')) return '📜';
-    if (name.endsWith('.log') || name.endsWith('.txt') || name.endsWith('.md')) return '📄';
-    return '📄';
+    if (name.endsWith('.zip') || name.endsWith('.tar') || name.endsWith('.gz') || name.endsWith('.tgz')) return <IconZip size={16} className="text-purple-400" />;
+    if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.svg') || name.endsWith('.webp')) return <IconImage size={16} className="text-emerald-400" />;
+    if (name.endsWith('.json') || name.endsWith('.js') || name.endsWith('.ts') || name.endsWith('.py') || name.endsWith('.sh') || name.endsWith('.html') || name.endsWith('.css') || name.endsWith('.env')) return <IconCode size={16} className="text-cyan-400" />;
+    return <IconFile size={16} className="text-text-muted" />;
   }
 
   function isArchive(name: string) {
@@ -274,31 +290,32 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
       {/* Top Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/10">
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={goUp} disabled={currentPath === '/' || busy}>
-            ⬆️ Up
+          <Button size="sm" variant="secondary" onClick={goUp} disabled={currentPath === '/' || busy} className="flex items-center gap-1.5">
+            <IconUp size={14} /> Up
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => loadPath(currentPath)} disabled={busy}>
-            🔄 Refresh
+          <Button size="sm" variant="secondary" onClick={() => loadPath(currentPath)} disabled={busy} className="flex items-center gap-1.5">
+            <IconRefresh size={14} /> Refresh
           </Button>
-          <Button size="sm" variant="primary" onClick={() => setTouchModal(true)}>
-            📄 + File
+          <Button size="sm" variant="primary" onClick={() => setTouchModal(true)} className="flex items-center gap-1.5">
+            <IconPlus size={14} /> File
           </Button>
-          <Button size="sm" variant="primary" onClick={() => setMkdirModal(true)}>
-            📁 + Folder
+          <Button size="sm" variant="primary" onClick={() => setMkdirModal(true)} className="flex items-center gap-1.5">
+            <IconFolder size={14} /> Folder
           </Button>
-          <Button size="sm" variant="primary" onClick={() => setUploadModal(true)}>
-            📤 Upload
+          <Button size="sm" variant="primary" onClick={() => setUploadModal(true)} className="flex items-center gap-1.5">
+            <IconUpload size={14} /> Upload
           </Button>
         </div>
 
-        <div className="w-full sm:w-48">
+        <div className="w-full sm:w-48 relative">
           <input
             type="text"
-            placeholder="🔍 Search files..."
+            placeholder="Search files..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-text-muted focus:outline-none focus:border-accent-teal"
+            className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-text-muted focus:outline-none focus:border-accent-teal"
           />
+          <IconSearch size={14} className="absolute left-2.5 top-2.5 text-text-muted" />
         </div>
       </div>
 
@@ -359,7 +376,7 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
                     onDoubleClick={() => handleOpenFile(item)}
                   >
                     <td className="py-2.5 px-3 font-medium text-white flex items-center gap-2 select-none">
-                      <span className="text-base select-none">{getFileIcon(item)}</span>
+                      <span className="select-none flex items-center justify-center">{renderFileIcon(item)}</span>
                       <button
                         onClick={() => handleOpenFile(item)}
                         className="hover:underline hover:text-accent-teal text-left truncate max-w-xs sm:max-w-md font-mono"
@@ -377,27 +394,27 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
                     <td className="py-2.5 px-3 text-right">
                       <div className="flex justify-end gap-1.5 opacity-80 group-hover:opacity-100">
                         {item.isDirectory ? (
-                          <Button size="sm" variant="ghost" onClick={() => navigateTo(item.name)}>
-                            Open 📂
+                          <Button size="sm" variant="ghost" onClick={() => navigateTo(item.name)} className="flex items-center gap-1">
+                            <IconFolder size={13} /> Open
                           </Button>
                         ) : (
                           <>
-                            <Button size="sm" variant="ghost" onClick={() => handleOpenFile(item)}>
-                              Edit ✏️
+                            <Button size="sm" variant="ghost" onClick={() => handleOpenFile(item)} className="flex items-center gap-1">
+                              <IconEdit size={13} /> Edit
                             </Button>
                             <a
                               href={api.vps.sftpDownloadUrl(provisionId, `${currentPath}/${item.name}`.replace(/\/+/g, '/'))}
                               download
-                              className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 rounded-md text-text-muted hover:text-white transition-colors"
+                              className="p-1.5 text-xs bg-white/5 hover:bg-white/10 rounded-md text-text-muted hover:text-white transition-colors flex items-center justify-center"
                               title="Download file"
                             >
-                              ⬇️
+                              <IconDownload size={13} />
                             </a>
                           </>
                         )}
                         {isArchive(item.name) && (
-                          <Button size="sm" variant="secondary" onClick={() => setExtractTarget(item)}>
-                            📦 Unzip
+                          <Button size="sm" variant="secondary" onClick={() => setExtractTarget(item)} className="flex items-center gap-1">
+                            <IconZip size={13} /> Unzip
                           </Button>
                         )}
                         <Button
@@ -405,16 +422,18 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
                           variant="ghost"
                           onClick={() => setRenameItem({ item, newName: item.name })}
                           title="Rename"
+                          className="px-2"
                         >
-                          ✏️
+                          <IconEdit size={13} />
                         </Button>
                         <Button
                           size="sm"
                           variant="danger"
                           onClick={() => setDeleteTarget(item)}
                           title="Delete"
+                          className="px-2"
                         >
-                          🗑️
+                          <IconTrash size={13} />
                         </Button>
                       </div>
                     </td>
@@ -433,8 +452,8 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
           className="fixed z-50 bg-neutral-900 border border-white/20 shadow-2xl rounded-xl py-1.5 w-48 text-xs font-medium text-white space-y-0.5 animate-in fade-in zoom-in-95 duration-100"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-3 py-1.5 border-b border-white/10 text-[10px] text-text-muted font-mono truncate">
-            {getFileIcon(contextMenu.item)} {contextMenu.item.name}
+          <div className="px-3 py-1.5 border-b border-white/10 text-[10px] text-text-muted font-mono truncate flex items-center gap-2">
+            {renderFileIcon(contextMenu.item)} {contextMenu.item.name}
           </div>
 
           {contextMenu.item.isDirectory ? (
@@ -445,7 +464,7 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
               }}
               className="w-full px-3 py-1.5 text-left hover:bg-white/10 flex items-center gap-2"
             >
-              📂 Open Folder
+              <IconFolder size={14} /> Open Folder
             </button>
           ) : (
             <>
@@ -456,7 +475,7 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
                 }}
                 className="w-full px-3 py-1.5 text-left hover:bg-white/10 flex items-center gap-2"
               >
-                ✏️ View / Edit File
+                <IconEdit size={14} /> View / Edit File
               </button>
               <a
                 href={api.vps.sftpDownloadUrl(provisionId, `${currentPath}/${contextMenu.item.name}`.replace(/\/+/g, '/'))}
@@ -464,7 +483,7 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
                 onClick={() => setContextMenu(null)}
                 className="w-full px-3 py-1.5 text-left hover:bg-white/10 flex items-center gap-2 block"
               >
-                ⬇️ Download File
+                <IconDownload size={14} /> Download File
               </a>
             </>
           )}
@@ -477,7 +496,7 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
               }}
               className="w-full px-3 py-1.5 text-left hover:bg-amber-500/20 text-amber-300 flex items-center gap-2"
             >
-              📦 Unzip / Extract Archive
+              <IconZip size={14} /> Unzip Archive
             </button>
           )}
 
@@ -488,7 +507,7 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
             }}
             className="w-full px-3 py-1.5 text-left hover:bg-white/10 flex items-center gap-2"
           >
-            ✏️ Rename
+            <IconEdit size={14} /> Rename
           </button>
 
           <button
@@ -498,7 +517,7 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
             }}
             className="w-full px-3 py-1.5 text-left hover:bg-red-500/20 text-red-400 flex items-center gap-2"
           >
-            🗑️ Delete
+            <IconTrash size={14} /> Delete
           </button>
         </div>
       )}
@@ -510,12 +529,12 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  📜 Editing: <span className="font-mono text-accent-teal">{editFile.name}</span>
+                  <IconCode size={16} className="text-cyan-400" /> Editing: <span className="font-mono text-accent-teal">{editFile.name}</span>
                 </h3>
                 <p className="text-[11px] text-text-muted font-mono">{editFile.path}</p>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => setEditFile(null)}>
-                ✖ Close
+              <Button size="sm" variant="ghost" onClick={() => setEditFile(null)} className="flex items-center gap-1">
+                <IconClose size={14} /> Close
               </Button>
             </div>
 
@@ -534,8 +553,8 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
                 <Button size="sm" variant="secondary" onClick={() => setEditFile(null)}>
                   Cancel
                 </Button>
-                <Button size="sm" variant="primary" onClick={handleSaveFile} loading={busy}>
-                  💾 Save Changes
+                <Button size="sm" variant="primary" onClick={handleSaveFile} loading={busy} className="flex items-center gap-1.5">
+                  <IconSave size={14} /> Save Changes
                 </Button>
               </div>
             </div>
@@ -622,7 +641,7 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <Card className="max-w-md w-full border border-white/20 bg-neutral-900 space-y-4">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              📦 Unzip Archive: <span className="font-mono text-amber-300">{extractTarget.name}</span>
+              <IconZip size={16} className="text-amber-300" /> Unzip Archive: <span className="font-mono text-amber-300">{extractTarget.name}</span>
             </h3>
             <p className="text-xs text-text-muted">
               Specify the target extraction directory on your remote VPS:
@@ -654,7 +673,7 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
             <p className="text-xs text-text-muted">Target Directory: <span className="font-mono text-white">{currentPath}</span></p>
 
             <div
-              className="border-2 border-dashed border-white/20 rounded-xl p-6 text-center cursor-pointer hover:border-accent-teal transition-colors"
+              className="border-2 border-dashed border-white/20 rounded-xl p-6 text-center cursor-pointer hover:border-accent-teal transition-colors flex flex-col items-center justify-center"
               onClick={() => fileInputRef.current?.click()}
             >
               <input
@@ -663,7 +682,7 @@ export function VpsFileManager({ provisionId }: { provisionId: string }) {
                 className="hidden"
                 onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
               />
-              <span className="text-2xl block mb-2">📁</span>
+              <IconUpload size={32} className="text-text-muted mb-2" />
               {uploadFile ? (
                 <p className="text-xs font-mono text-emerald-300 font-bold">{uploadFile.name} ({formatSize(uploadFile.size)})</p>
               ) : (
