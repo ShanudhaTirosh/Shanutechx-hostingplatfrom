@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Zap, Code, Bot, Globe, Monitor, Terminal, CheckCircle2, ArrowRight, Sparkles, Copy, Check } from 'lucide-react';
+import React from 'react';
+import { Zap, Code, Bot, Globe, Monitor, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
 import GradientMeshOrb from './GradientMeshOrb';
 
 interface HeroProps {
@@ -27,17 +27,10 @@ const STATS = [
 ];
 
 export default function Hero({ title, subtitle }: HeroProps) {
-  const [copied, setCopied] = useState(false);
-  const commandText = 'npx create-shanutechx-app my-service';
-
-  const copyCommand = () => {
-    navigator.clipboard.writeText(commandText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
 
   return (
-    <section className="relative flex flex-col items-center text-center pt-36 md:pt-44 pb-24 px-4 overflow-hidden">
+    <section className="relative flex flex-col items-center text-center pt-36 md:pt-44 pb-24 px-4 overflow-hidden font-sans">
       {/* Dynamic Background Mesh Orb */}
       <div className="absolute inset-0 -z-10 flex items-center justify-center overflow-hidden pointer-events-none">
         <div className="absolute top-8 left-1/2 -translate-x-1/2 scale-125 sm:scale-150 md:scale-175 opacity-90 sm:opacity-95">
@@ -47,10 +40,10 @@ export default function Hero({ title, subtitle }: HeroProps) {
       </div>
 
       {/* Hero Announcement Badge */}
-      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.1] backdrop-blur-md mb-8 animate-fade-in hover:border-accent-violet/40 transition-all cursor-default">
-        <Sparkles className="h-3.5 w-3.5 text-accent-violet-light animate-pulse" />
+      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.1] backdrop-blur-md mb-8 animate-fade-in hover:border-purple-500/40 transition-all cursor-default">
+        <Sparkles className="h-3.5 w-3.5 text-purple-400 animate-pulse" />
         <span className="text-xs font-medium text-text-muted">
-          ShanuTechX v2.4 Engine Live • <span className="text-text-primary">Autonomous VPS Orchestration</span>
+          ShanuTechX Engine Live • <span className="text-white font-bold">Autonomous Cloud Orchestration</span>
         </span>
       </div>
 
@@ -63,7 +56,7 @@ export default function Hero({ title, subtitle }: HeroProps) {
         ) : (
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight leading-[1.06] text-white">
             Autonomous Cloud Hosting for
-            <span className="text-gradient block mt-1">Modern Engineers</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-indigo-300 to-teal-300 block mt-1">Modern Engineers</span>
           </h1>
         )}
       </div>
@@ -80,39 +73,24 @@ export default function Hero({ title, subtitle }: HeroProps) {
           return (
             <span
               key={badge.label}
-              className="glass rounded-full px-3.5 py-1.5 text-xs font-medium text-text-muted flex items-center gap-1.5 hover:text-text-primary hover:border-white/20 transition-all"
+              className="glass rounded-full px-3.5 py-1.5 text-xs font-medium text-text-muted flex items-center gap-1.5 hover:text-white hover:border-white/20 transition-all"
             >
-              <Icon className="h-3.5 w-3.5 text-accent-violet-light" />
+              <Icon className="h-3.5 w-3.5 text-purple-400" />
               {badge.label}
             </span>
           );
         })}
       </div>
 
-      {/* CTA Buttons */}
-      <div className="mt-2 flex flex-col sm:flex-row items-center gap-4 animate-slide-up delay-200">
+      {/* CTA Button */}
+      <div className="mt-2 flex items-center justify-center animate-slide-up delay-200">
         <a
-          href={`${process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001'}/login`}
-          className="btn-shimmer rounded-full px-8 py-3.5 font-semibold text-white text-sm shadow-glow-violet flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+          href={`${dashboardUrl}/login`}
+          className="btn-shimmer rounded-full px-8 py-3.5 font-extrabold text-white text-sm shadow-glow-violet flex items-center gap-2.5 hover:scale-105 active:scale-95 transition-all"
         >
-          <span>Get Started Free</span>
+          <span>Get Started</span>
           <ArrowRight className="h-4 w-4" />
         </a>
-
-        {/* Quick CLI command button */}
-        <button
-          onClick={copyCommand}
-          className="glass rounded-full px-5 py-3 font-mono text-xs text-text-muted hover:text-text-primary border border-white/[0.1] hover:border-white/[0.2] flex items-center gap-2.5 transition-all bg-black/30"
-          title="Click to copy quick setup CLI command"
-        >
-          <Terminal className="h-3.5 w-3.5 text-accent-teal-bright" />
-          <span>{commandText}</span>
-          {copied ? (
-            <Check className="h-3.5 w-3.5 text-accent-teal-bright ml-1" />
-          ) : (
-            <Copy className="h-3.5 w-3.5 text-text-muted hover:text-text-primary ml-1" />
-          )}
-        </button>
       </div>
 
       {/* Interactive Glass Terminal Preview */}
@@ -125,25 +103,25 @@ export default function Hero({ title, subtitle }: HeroProps) {
             <div className="w-3 h-3 rounded-full bg-green-500/80" />
             <span className="ml-2 text-xs font-mono text-text-muted">shanutechx ~ container-daemon</span>
           </div>
-          <div className="flex items-center gap-1.5 text-[11px] font-mono text-accent-teal-bright">
-            <span className="w-2 h-2 rounded-full bg-accent-teal-bright animate-ping" />
+          <div className="flex items-center gap-1.5 text-[11px] font-mono text-teal-400">
+            <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
             Active
           </div>
         </div>
 
         {/* Terminal Code Body */}
         <div className="p-5 font-mono text-xs space-y-2.5 text-text-muted leading-relaxed">
-          <div className="flex items-center gap-2 text-text-primary">
-            <span className="text-accent-violet-light">$</span>
+          <div className="flex items-center gap-2 text-white">
+            <span className="text-purple-400">$</span>
             <span>stx deploy --git github.com/shanudha/express-api --branch main</span>
           </div>
           <div className="text-white/60 pl-4">➜ Building container image node:20-alpine...</div>
-          <div className="text-white/60 pl-4">➜ Provisioning PostgreSQL database cluster & vault secrets...</div>
+          <div className="text-white/60 pl-4">➜ Provisioning PostgreSQL database cluster &amp; vault secrets...</div>
           <div className="flex items-center gap-2 text-emerald-400 font-semibold pl-4">
             <CheckCircle2 className="h-3.5 w-3.5" />
             <span>Deployment complete (18.4s)</span>
           </div>
-          <div className="pl-4 text-accent-teal-bright underline">
+          <div className="pl-4 text-teal-300 underline">
             https://express-api-production.shanutech.cloud
           </div>
         </div>
@@ -153,7 +131,7 @@ export default function Hero({ title, subtitle }: HeroProps) {
       <div className="mt-16 flex items-center gap-8 md:gap-16 animate-fade-in delay-400">
         {STATS.map((stat) => (
           <div key={stat.label} className="text-center">
-            <div className="text-2xl md:text-3xl font-extrabold text-gradient-warm">{stat.value}</div>
+            <div className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-teal-300">{stat.value}</div>
             <div className="text-xs text-text-muted mt-1 font-medium">{stat.label}</div>
           </div>
         ))}
