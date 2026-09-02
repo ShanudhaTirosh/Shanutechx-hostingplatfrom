@@ -7,6 +7,7 @@ import { getVps, getCredentials, LeasewebApiError } from './leasewebClient';
 import { decryptSecret } from './secretsVault';
 import { prisma } from './prisma';
 import { canAccessResource } from '../middleware/rbac';
+import { env } from '../env';
 
 /**
  * Real, interactive SSH-from-the-browser for a customer's (or staff's) VPS.
