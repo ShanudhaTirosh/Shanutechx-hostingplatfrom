@@ -343,3 +343,107 @@ export async function touchFileSsh(
   }
   return { success: true };
 }
+
+export interface VpsFirewallRuleSsh {
+  index: number;
+  to: string;
+  action: 'ALLOW' | 'DENY';
+  from: string;
+  comment?: string;
+}
+
+export interface VpsFirewallStatusSsh {
+  status: 'active' | 'inactive';
+  rules: VpsFirewallRuleSsh[];
+}
+
+/**
+ * Retrieves Host Firewall status and active rules over SSH (using UFW).
+ */
+export async function getVpsFirewallRulesSsh(provision: VpsProvision): Promise<VpsFirewallStatusSsh> {
+  const cmd = `(sudo ufw status numbered || ufw status numbered) 2>/dev/null || echo "Status: unavailable"`;
+  const res = await execVpsSsh(provision, cmd);
+  const stdout = res.stdout;
+
+  const isInactive = stdout.toLowerCase().includes('status: inactive') || stdout.toLowerCase().includes('status: unavailable');
+  const rules: VpsFirewallRuleSsh[] = [];
+
+  if (!isInactive) {
+    const lines = stdout.split('\n');
+    const ruleRegex = /\[\s*(\d+)\]\s+([^\s]+)\s+(ALLOW|DENY|ALLOW IN|DENY IN)\s+([^\s]+)(?:\s+#\s*(.*))?$/i;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      const match = trimmed.match(ruleRegex);
+      if (match) {
+        rules.push({
+          index: parseInt(match[1], 10),
+          to: match[2],
+          action: match[3].toUpperCase().includes('ALLOW') ? 'ALLOW' : 'DENY',
+          from: match[4],
+          comment: match[5] ? match[5].trim() : undefined,
+        });
+      }
+    }
+  }
+
+  return {
+    status: isInactive ? 'inactive' : 'active',
+    rules,
+  };
+}
+
+/**
+ * Toggles Host Firewall (UFW) ON or OFF over SSH.
+ */
+export async function toggleVpsFirewallSsh(provision: VpsProvision, enabled: boolean): Promise<{ success: boolean; status: 'active' | 'inactive' }> {
+  const cmd = enabled
+    ? `sudo ufw --force enable || ufw --force enable`
+    : `sudo ufw disable || ufw disable`;
+
+  const res = await execVpsSsh(provision, cmd);
+  if (res.code !== 0 && res.stderr.toLowerCase().includes('error')) {
+    throw new Error(`Firewall toggle failed: ${res.stderr || res.stdout || 'ufw error'}`);
+  }
+  return { success: true, status: enabled ? 'active' : 'inactive' };
+}
+
+/**
+ * Adds a new Firewall Rule (UFW) over SSH.
+ */
+export async function addVpsFirewallRuleSsh(
+  provision: VpsProvision,
+  rule: {
+    action: 'allow' | 'deny';
+    port?: number | string;
+    protocol?: 'tcp' | 'udp' | 'any';
+    sourceIp?: string;
+    comment?: string;
+  }
+): Promise<{ success: boolean; message: string }> {
+  const action = rule.action === 'deny' ? 'deny' : 'allow';
+  const proto = rule.protocol && rule.protocol !== 'any' ? `proto ${rule.protocol}` : '';
+  const from = rule.sourceIp && rule.sourceIp.trim() !== '' ? `from ${rule.sourceIp.trim()}` : 'from any';
+  const portStr = rule.port ? `to any port ${rule.port}` : 'to any';
+  const commentStr = rule.comment ? `comment '${rule.comment.replace(/'/g, '')}'` : '';
+
+  const cmd = `sudo ufw ${action} ${from} ${portStr} ${proto} ${commentStr} || ufw ${action} ${from} ${portStr} ${proto} ${commentStr}`;
+
+  const res = await execVpsSsh(provision, cmd);
+  if (res.code !== 0 && res.stderr.toLowerCase().includes('error')) {
+    throw new Error(`Adding firewall rule failed: ${res.stderr || res.stdout || 'ufw error'}`);
+  }
+  return { success: true, message: `Rule added successfully: ${action.toUpperCase()} ${rule.port || 'ALL'} (${rule.protocol || 'ANY'})` };
+}
+
+/**
+ * Deletes a Firewall Rule (UFW) by line index over SSH.
+ */
+export async function deleteVpsFirewallRuleSsh(provision: VpsProvision, ruleIndex: number): Promise<{ success: boolean }> {
+  const cmd = `echo "y" | sudo ufw delete ${ruleIndex} || echo "y" | ufw delete ${ruleIndex}`;
+  const res = await execVpsSsh(provision, cmd);
+  if (res.code !== 0 && res.stderr.toLowerCase().includes('error')) {
+    throw new Error(`Deleting firewall rule #${ruleIndex} failed: ${res.stderr || res.stdout || 'ufw error'}`);
+  }
+  return { success: true };
+}

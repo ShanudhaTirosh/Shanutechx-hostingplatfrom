@@ -738,6 +738,27 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ remotePath, content }),
       }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
+    getFirewall: (id: string) =>
+      apiFetch(`/api/vps-provisions/${id}/firewall`).then((r) =>
+        asJson<{ status: 'active' | 'inactive'; rules: Array<{ index: number; to: string; action: 'ALLOW' | 'DENY'; from: string; comment?: string }> }>(r)
+      ),
+    toggleFirewall: (id: string, enabled: boolean) =>
+      apiFetch(`/api/vps-provisions/${id}/firewall/toggle`, {
+        method: 'POST',
+        body: JSON.stringify({ enabled }),
+      }).then((r) => asJson<{ success: boolean; status: 'active' | 'inactive' }>(r)),
+    addFirewallRule: (
+      id: string,
+      rule: { action: 'allow' | 'deny'; port?: number | string; protocol?: 'tcp' | 'udp' | 'any'; sourceIp?: string; comment?: string }
+    ) =>
+      apiFetch(`/api/vps-provisions/${id}/firewall/rules`, {
+        method: 'POST',
+        body: JSON.stringify(rule),
+      }).then((r) => asJson<{ success: boolean; message: string }>(r)),
+    deleteFirewallRule: (id: string, ruleIndex: number) =>
+      apiFetch(`/api/vps-provisions/${id}/firewall/rules/${ruleIndex}`, {
+        method: 'DELETE',
+      }).then((r) => asJson<{ success: boolean }>(r)),
     create: (data: {
       userId: string;
       orderItemId: string;

@@ -32,6 +32,7 @@ import {
 } from '@/components/Icons';
 import { VpsFileManager } from '@/components/VpsFileManager';
 import { CockpitDashboardPanel } from '@/components/CockpitDashboardPanel';
+import { VpsFirewallManager } from '@/components/VpsFirewallManager';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,7 @@ export default function VpsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [terminalTarget, setTerminalTarget] = useState<VpsProvision | null>(null);
   const [sftpTargetId, setSftpTargetId] = useState<string | null>(null);
+  const [firewallTargetId, setFirewallTargetId] = useState<string | null>(null);
   const [terminateTarget, setTerminateTarget] = useState<VpsProvision | null>(null);
   const [reinstallTarget, setReinstallTarget] = useState<VpsProvision | null>(null);
   const [snapshotTarget, setSnapshotTarget] = useState<VpsProvision | null>(null);
@@ -307,6 +309,7 @@ export default function VpsPage() {
           const pSnapshots = snapshots[p.id] ?? [];
           const isCockpitOpen = cockpitTargetId === p.id;
           const isSftpOpen = sftpTargetId === p.id;
+          const isFirewallOpen = firewallTargetId === p.id;
           const stats = sshStats[p.id];
 
           return (
@@ -370,6 +373,14 @@ export default function VpsPage() {
                     <div className="flex items-center gap-2">
                       <Button
                         size="sm"
+                        variant={isFirewallOpen ? 'secondary' : 'ghost'}
+                        onClick={() => setFirewallTargetId(isFirewallOpen ? null : p.id)}
+                        className="flex items-center gap-1.5"
+                      >
+                        <IconShield size={13} /> {isFirewallOpen ? 'Close Firewall' : 'Host Firewall'}
+                      </Button>
+                      <Button
+                        size="sm"
                         variant="ghost"
                         onClick={() => {
                           setChangePasswordTarget(p);
@@ -408,6 +419,13 @@ export default function VpsPage() {
               {isSftpOpen && (
                 <div className="pt-3 border-t border-white/10">
                   <VpsFileManager provisionId={p.id} />
+                </div>
+              )}
+
+              {/* Host Firewall Manager Drawer */}
+              {isFirewallOpen && (
+                <div className="pt-3 border-t border-white/10">
+                  <VpsFirewallManager provisionId={p.id} sshPort={p.sshPort || 22} />
                 </div>
               )}
 

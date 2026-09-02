@@ -21,6 +21,10 @@ import {
   renamePathSsh,
   mkdirSsh,
   touchFileSsh,
+  getVpsFirewallRulesSsh,
+  toggleVpsFirewallSsh,
+  addVpsFirewallRuleSsh,
+  deleteVpsFirewallRuleSsh,
 } from '../lib/vpsSshClient';
 
 export const vpsRouter = Router();
@@ -632,6 +636,114 @@ vpsRouter.delete('/vps-provisions/:id', async (req: AuthedRequest, res: Response
   });
 
   res.json({ ok: true, deletedId: provision.id });
+});
+
+/**
+ * GET /api/vps-provisions/:id/firewall
+ * Retrieves active Firewall rules and toggle status over SSH.
+ */
+vpsRouter.get('/vps-provisions/:id/firewall', async (req: AuthedRequest, res: Response) => {
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  try {
+    const data = await getVpsFirewallRulesSsh(provision);
+    res.json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: `Firewall query failed: ${err.message}` });
+  }
+});
+
+const toggleFirewallSchema = z.object({
+  enabled: z.boolean(),
+});
+
+/**
+ * POST /api/vps-provisions/:id/firewall/toggle
+ * Enable or Disable Host Firewall (UFW) over SSH.
+ */
+vpsRouter.post('/vps-provisions/:id/firewall/toggle', async (req: AuthedRequest, res: Response) => {
+  const parsed = toggleFirewallSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  try {
+    const result = await toggleVpsFirewallSsh(provision, parsed.data.enabled);
+    await prisma.auditLog.create({
+      data: { adminId: req.user!.id, action: 'vps.firewall_toggle', target: `${provision.id}:${result.status}` },
+    });
+    res.json(result);
+  } catch (err: any) {
+    res.status(502).json({ error: `Firewall toggle failed: ${err.message}` });
+  }
+});
+
+const addRuleSchema = z.object({
+  action: z.enum(['allow', 'deny']).default('allow'),
+  port: z.union([z.string(), z.number()]).optional(),
+  protocol: z.enum(['tcp', 'udp', 'any']).default('tcp'),
+  sourceIp: z.string().optional(),
+  comment: z.string().optional(),
+});
+
+/**
+ * POST /api/vps-provisions/:id/firewall/rules
+ * Add a new host firewall security rule over SSH.
+ */
+vpsRouter.post('/vps-provisions/:id/firewall/rules', async (req: AuthedRequest, res: Response) => {
+  const parsed = addRuleSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  try {
+    const result = await addVpsFirewallRuleSsh(provision, parsed.data);
+    await prisma.auditLog.create({
+      data: { adminId: req.user!.id, action: 'vps.firewall_add_rule', target: `${provision.id}:${parsed.data.port || 'ALL'}` },
+    });
+    res.json(result);
+  } catch (err: any) {
+    res.status(502).json({ error: `Add firewall rule failed: ${err.message}` });
+  }
+});
+
+/**
+ * DELETE /api/vps-provisions/:id/firewall/rules/:ruleIndex
+ * Delete a host firewall security rule by index over SSH.
+ */
+vpsRouter.delete('/vps-provisions/:id/firewall/rules/:ruleIndex', async (req: AuthedRequest, res: Response) => {
+  const ruleIndex = parseInt(req.params.ruleIndex, 10);
+  if (isNaN(ruleIndex) || ruleIndex < 1) {
+    return res.status(400).json({ error: 'Invalid rule index' });
+  }
+
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  try {
+    const result = await deleteVpsFirewallRuleSsh(provision, ruleIndex);
+    await prisma.auditLog.create({
+      data: { adminId: req.user!.id, action: 'vps.firewall_delete_rule', target: `${provision.id}:rule#${ruleIndex}` },
+    });
+    res.json(result);
+  } catch (err: any) {
+    res.status(502).json({ error: `Delete firewall rule failed: ${err.message}` });
+  }
 });
 
 function omitCredentialRef<T extends { credentialRef: string | null }>(provision: T) {
