@@ -155,14 +155,13 @@ export default function BentoGrid() {
             />
 
             {/* Content */}
-            <div style={{ position: 'relative', zIndex: 10 }}>
-              {/* Provider Logo Badges (Leaseweb, Linode, DigitalOcean, BreezeHost using official SVGs) */}
+            <div style={{ position: 'relative', zIn              {/* Provider Logo Badges (Leaseweb, Linode, DigitalOcean, BreezeHost using user logo assets) */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px', alignItems: 'center' }}>
                 {[
-                  { name: 'Leaseweb', logo: '/images/logos/leaseweb.svg' },
+                  { name: 'Leaseweb', logo: '/images/provider-stx-big.png' },
                   { name: 'Linode', logo: '/images/logos/linode.svg' },
                   { name: 'DigitalOcean', logo: '/images/logos/digitalocean.svg' },
-                  { name: 'BreezeHost', logo: '/images/logos/breezehost.svg' },
+                  { name: 'BreezeHost', logo: '/images/provider-stx-fav.ico' },
                 ].map((provider, idx) => (
                   <div
                     key={idx}
@@ -185,7 +184,7 @@ export default function BentoGrid() {
                     </span>
                   </div>
                 ))}
-              </div>
+              </div>      </div>
 
               {/* Badges / Tech Tags */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px', alignItems: 'center' }}>
