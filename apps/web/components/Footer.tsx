@@ -7,6 +7,8 @@ export default function Footer() {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
+  const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
+
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
@@ -31,7 +33,7 @@ export default function Footer() {
             </Link>
 
             <p className="text-text-muted text-xs leading-relaxed max-w-sm">
-              Deploy static sites, Node.js, Python apps, Discord bots, managed databases, and V2Ray proxy tunneling in seconds. Powered by our high-performance edge nodes.
+              Deploy static sites, Node.js, Python apps, Discord bots, managed databases, and proxy tunneling in seconds. Powered by our high-performance edge nodes.
             </p>
 
             {/* Newsletter Subscription */}
@@ -67,9 +69,9 @@ export default function Footer() {
               <ul className="space-y-2.5 text-xs text-text-muted">
                 <li><Link href="/pricing" className="hover:text-white transition-colors">VPS Hosting</Link></li>
                 <li><Link href="/v2ray" className="hover:text-white transition-colors">V2Ray &amp; Netch Proxy</Link></li>
-                <li><a href="http://localhost:3001/catalog" className="hover:text-white transition-colors">1-Click App Catalog</a></li>
-                <li><a href="http://localhost:3001/admin/databases" className="hover:text-white transition-colors">Managed PostgreSQL &amp; Redis</a></li>
-                <li><a href="http://localhost:3001/webmail" className="hover:text-white transition-colors">Mail Studio</a></li>
+                <li><a href={`${dashboardUrl}/services`} className="hover:text-white transition-colors">1-Click App Catalog</a></li>
+                <li><a href={`${dashboardUrl}/services`} className="hover:text-white transition-colors">Managed PostgreSQL &amp; Redis</a></li>
+                <li><a href={`${dashboardUrl}/webmail`} className="hover:text-white transition-colors">Mail Studio</a></li>
               </ul>
             </div>
 
@@ -88,7 +90,7 @@ export default function Footer() {
               <ul className="space-y-2.5 text-xs text-text-muted">
                 <li><Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
                 <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-                <li><a href="http://localhost:3001/login" className="hover:text-white transition-colors">Client Space Login</a></li>
+                <li><a href={`${dashboardUrl}/login`} className="hover:text-white transition-colors">Client Space Login</a></li>
               </ul>
             </div>
           </div>
@@ -100,7 +102,6 @@ export default function Footer() {
           <div className="flex items-center gap-4">
             <a href="https://discord.gg/shanutechx" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Discord</a>
             <a href="https://github.com/shanutechx" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">GitHub</a>
-            <a href="https://v2ray.shanutechx.com" target="_blank" rel="noreferrer" className="hover:text-purple-400 transition-colors font-bold">V2Ray Store ↗</a>
           </div>
         </div>
       </div>

@@ -71,23 +71,22 @@ const FEATURES = [
 
 export default function PlatformShowcase() {
   const [activeFeature, setActiveFeature] = useState(FEATURES[0]);
+  const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
 
   return (
-    <section className="py-20 bg-[#0b0c1b] text-white relative font-sans border-t border-white/[0.06]">
-      <div className="max-w-7xl mx-auto px-6 space-y-12">
-        <div className="space-y-3">
-          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-500/10 text-purple-300 border border-purple-500/20">
+    <section className="py-20 px-6 max-w-7xl mx-auto font-sans relative">
+      <div className="space-y-12">
+        {/* Section Header */}
+        <div className="text-center space-y-3 flex flex-col items-center">
+          <span className="text-xs font-bold font-mono tracking-widest text-indigo-400 uppercase bg-indigo-500/10 border border-indigo-500/20 px-3.5 py-1.5 rounded-full">
             Control Panel Studio
           </span>
           <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
             Experience Our <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-indigo-300 to-pink-500">Platform</span>
           </h2>
-          <p className="text-text-muted text-sm max-w-xl">
-            Discover the powerful features and modern tools that make our cloud management interface the perfect choice for your infrastructure needs.
-          </p>
         </div>
 
-        {/* 2-Column Grid: Feature Selector on Left, Preview Card on Right */}
+        {/* 2-Column Grid */}
         <div className="grid lg:grid-cols-12 gap-8 items-stretch">
           {/* Left Column: Feature Buttons */}
           <div className="lg:col-span-5 space-y-3 flex flex-col justify-center">
@@ -98,50 +97,67 @@ export default function PlatformShowcase() {
                 <button
                   key={feat.id}
                   onClick={() => setActiveFeature(feat)}
-                  className={`w-full text-left p-5 rounded-2xl border transition-all flex items-start gap-4 ${
+                  className={`w-full text-left p-4 rounded-2xl border transition-all duration-300 flex items-start gap-4 ${
                     active
-                      ? 'bg-gradient-to-r from-indigo-900/40 to-purple-900/20 border-indigo-500/50 shadow-glow-violet'
-                      : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] hover:border-white/10'
+                      ? 'bg-[#0f1026] border-purple-500/50 shadow-glow-violet'
+                      : 'bg-[#080918]/60 border-white/[0.06] hover:bg-[#0c0d22]'
                   }`}
                 >
-                  <span className="p-2 rounded-xl bg-white/5 border border-white/10 shrink-0">
-                    <Icon className="h-5 w-5 text-accent-violet-light" />
-                  </span>
+                  <div
+                    className={`p-2.5 rounded-xl border shrink-0 ${
+                      active
+                        ? 'bg-purple-600/20 border-purple-500/40 text-purple-300'
+                        : 'bg-white/5 border-white/10 text-text-muted'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
                   <div>
-                    <h3 className={`font-bold text-sm ${active ? 'text-white font-extrabold' : 'text-text-muted'}`}>
-                      {feat.title}
-                    </h3>
-                    <p className="text-xs text-text-muted mt-1 leading-relaxed">
-                      {feat.description}
-                    </p>
+                    <h3 className="font-bold text-sm text-white">{feat.title}</h3>
+                    <p className="text-xs text-text-muted mt-1 line-clamp-2">{feat.description}</p>
                   </div>
                 </button>
               );
             })}
           </div>
 
-          {/* Right Column: Live Mockup Card */}
-          <div className="lg:col-span-7 bg-[#101228] border border-white/12 rounded-3xl p-6 shadow-2xl flex flex-col justify-between backdrop-blur-xl relative overflow-hidden">
-            {/* Top Toolbar */}
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
+          {/* Right Column: Live Interactive Mockup Card */}
+          <div className="lg:col-span-7 bg-[#080918] border border-white/10 rounded-3xl p-6 flex flex-col justify-between shadow-2xl relative overflow-hidden">
+            {/* Top Mock Window Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-red-500/80 inline-block" />
-                <span className="w-3 h-3 rounded-full bg-yellow-500/80 inline-block" />
-                <span className="w-3 h-3 rounded-full bg-green-500/80 inline-block" />
-                <span className="text-xs font-mono text-text-muted ml-2">{activeFeature.preview.header}</span>
+                <div className="w-3 h-3 rounded-full bg-rose-500/80" />
+                <div className="w-3 h-3 rounded-full bg-amber-500/80" />
+                <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
+                <span className="text-[11px] font-mono text-text-muted ml-2">
+                  shanutechx-cloud // {activeFeature.id}
+                </span>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300">
-                Live Interface
+              <span className="text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                Active Node
               </span>
             </div>
 
-            {/* Code / Output Screen */}
-            <div className="py-6 space-y-3 font-mono text-xs text-indigo-200">
-              {activeFeature.preview.body.map((line, idx) => (
-                <p key={idx} className="leading-relaxed bg-black/40 p-2.5 rounded-xl border border-white/5 font-mono">
-                  {line}
-                </p>
-              ))}
+            {/* Mock Content Body */}
+            <div className="py-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-mono text-indigo-300 font-bold uppercase tracking-wider">
+                  {activeFeature.preview.header}
+                </h4>
+                <span className="text-xs text-text-faint font-mono">Live Terminal output</span>
+              </div>
+
+              {/* Console Code Window */}
+              <div className="bg-[#03040c] border border-white/[0.08] rounded-xl p-4 font-mono text-xs space-y-2 text-text-muted shadow-inner">
+                {activeFeature.preview.body.map((line, idx) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <span className="text-indigo-400 select-none">&gt;</span>
+                    <span className={idx === activeFeature.preview.body.length - 1 ? 'text-emerald-300 font-bold' : ''}>
+                      {line}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Bottom Card Summary */}
@@ -151,7 +167,7 @@ export default function PlatformShowcase() {
                 <p className="text-xs text-text-muted mt-0.5">{activeFeature.description}</p>
               </div>
               <a
-                href="https://dashboard.shanutechx.com"
+                href={`${dashboardUrl}/login`}
                 className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-glow-violet shrink-0 transition-all"
               >
                 Launch Studio →

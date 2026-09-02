@@ -6,7 +6,6 @@ import { MessageSquare, User, Menu, ChevronDown } from 'lucide-react';
 
 const LINKS = [
   { label: 'Cloud VPS', href: '#features' },
-  { label: 'V2Ray & Digital Store', href: 'https://store.shanutechx.com' },
   { label: 'Pricing', href: '/pricing' },
   { label: 'Docs', href: '/docs' },
   { label: 'Status', href: '/status' },
