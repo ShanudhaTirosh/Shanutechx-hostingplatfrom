@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Terminal, Cpu, Server, Activity } from 'lucide-react';
+import Reveal from './motion/Reveal';
 
 const FEATURES = [
   {
@@ -77,19 +78,19 @@ export default function PlatformShowcase() {
     <section className="py-20 px-6 max-w-7xl mx-auto font-sans relative">
       <div className="space-y-12">
         {/* Section Header */}
-        <div className="text-center space-y-3 flex flex-col items-center">
+        <Reveal className="text-center space-y-3 flex flex-col items-center">
           <span className="text-xs font-bold font-mono tracking-widest text-indigo-400 uppercase bg-indigo-500/10 border border-indigo-500/20 px-3.5 py-1.5 rounded-full">
             Control Panel Studio
           </span>
-          <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
+          <h2 className="text-display">
             Experience Our <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-indigo-300 to-pink-500">Platform</span>
           </h2>
-        </div>
+        </Reveal>
 
         {/* 2-Column Grid */}
         <div className="grid lg:grid-cols-12 gap-8 items-stretch">
           {/* Left Column: Feature Buttons */}
-          <div className="lg:col-span-5 space-y-3 flex flex-col justify-center">
+          <Reveal index={1} className="lg:col-span-5 space-y-3 flex flex-col justify-center">
             {FEATURES.map((feat) => {
               const active = activeFeature.id === feat.id;
               const Icon = feat.icon;
@@ -119,10 +120,10 @@ export default function PlatformShowcase() {
                 </button>
               );
             })}
-          </div>
+          </Reveal>
 
           {/* Right Column: Live Interactive Mockup Card */}
-          <div className="lg:col-span-7 bg-[#080918] border border-white/10 rounded-3xl p-6 flex flex-col justify-between shadow-2xl relative overflow-hidden">
+          <Reveal index={2} className="lg:col-span-7 bg-[#080918] border border-white/10 rounded-3xl p-6 flex flex-col justify-between shadow-2xl relative overflow-hidden">
             {/* Top Mock Window Header */}
             <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
               <div className="flex items-center gap-2">
@@ -173,7 +174,7 @@ export default function PlatformShowcase() {
                 Launch Studio →
               </a>
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
     </section>

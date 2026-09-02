@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { Zap, ExternalLink } from 'lucide-react';
+import Reveal from './motion/Reveal';
+import TiltCard from './motion/TiltCard';
 
 const V2RAY_FEATURES = [
   { title: 'Protocols Supported', desc: 'VMess, VLESS, Trojan, Shadowsocks, gRPC, WebSocket' },
@@ -14,7 +16,7 @@ export default function V2RaySection() {
   return (
     <section className="py-20 bg-[#090a18] text-white relative font-sans border-t border-white/[0.06]">
       <div className="max-w-7xl mx-auto px-6">
-        <div className="bg-gradient-to-r from-[#12132a] via-[#1a1738] to-[#12132a] border border-purple-500/30 rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden">
+        <Reveal className="bg-gradient-to-r from-[#12132a] via-[#1a1738] to-[#12132a] border border-purple-500/30 rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden">
           {/* Background Glow Aura */}
           <div className="absolute right-0 top-0 w-96 h-96 bg-purple-600/20 blur-3xl rounded-full pointer-events-none" />
 
@@ -32,10 +34,12 @@ export default function V2RaySection() {
 
               <div className="grid sm:grid-cols-2 gap-4">
                 {V2RAY_FEATURES.map((item, idx) => (
-                  <div key={idx} className="bg-black/30 border border-white/10 rounded-2xl p-4 space-y-1">
-                    <h4 className="font-bold text-xs text-white">{item.title}</h4>
-                    <p className="text-[11px] text-text-muted">{item.desc}</p>
-                  </div>
+                  <Reveal key={idx} index={idx} delay={0.1}>
+                    <TiltCard strength={4} spotlight={false} className="h-full bg-black/30 border border-white/10 rounded-2xl p-4 space-y-1 hover:border-purple-500/30">
+                      <h4 className="font-bold text-xs text-white">{item.title}</h4>
+                      <p className="text-[11px] text-text-muted">{item.desc}</p>
+                    </TiltCard>
+                  </Reveal>
                 ))}
               </div>
 
@@ -54,31 +58,33 @@ export default function V2RaySection() {
             </div>
 
             {/* Right Card Mockup */}
-            <div className="bg-[#0b0c1b] border border-white/15 rounded-3xl p-6 space-y-4 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                <span className="font-mono text-xs text-purple-300 font-bold">V2Ray Node Status Monitor</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 uppercase">99.99% Online</span>
-              </div>
+            <Reveal index={2}>
+              <TiltCard strength={5} spotlight={false} className="bg-[#0b0c1b] border border-white/15 rounded-3xl p-6 space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <span className="font-mono text-xs text-purple-300 font-bold">V2Ray Node Status Monitor</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 uppercase">99.99% Online</span>
+                </div>
 
-              <div className="space-y-2 text-xs font-mono">
-                {[
-                  { name: 'DE-Frankfurt-VLESS', ping: '18 ms', protocol: 'VLESS+TLS' },
-                  { name: 'US-Virginia-VMess', ping: '24 ms', protocol: 'VMess+WS' },
-                  { name: 'SG-Singapore-Trojan', ping: '12 ms', protocol: 'Trojan+gRPC' },
-                  { name: 'LK-Colombo-Shadowsocks', ping: '5 ms', protocol: 'Shadowsocks-2022' },
-                ].map((node, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                    <span className="font-bold text-white">{node.name}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-text-muted text-[11px]">{node.protocol}</span>
-                      <span className="text-emerald-400 font-bold">{node.ping}</span>
+                <div className="space-y-2 text-xs font-mono">
+                  {[
+                    { name: 'DE-Frankfurt-VLESS', ping: '18 ms', protocol: 'VLESS+TLS' },
+                    { name: 'US-Virginia-VMess', ping: '24 ms', protocol: 'VMess+WS' },
+                    { name: 'SG-Singapore-Trojan', ping: '12 ms', protocol: 'Trojan+gRPC' },
+                    { name: 'LK-Colombo-Shadowsocks', ping: '5 ms', protocol: 'Shadowsocks-2022' },
+                  ].map((node, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                      <span className="font-bold text-white">{node.name}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-text-muted text-[11px]">{node.protocol}</span>
+                        <span className="text-emerald-400 font-bold">{node.ping}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+                  ))}
+                </div>
+              </TiltCard>
+            </Reveal>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   );

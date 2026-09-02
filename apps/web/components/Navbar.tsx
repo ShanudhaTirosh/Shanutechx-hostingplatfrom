@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { motion, AnimatePresence, useScroll, useTransform, useReducedMotion } from 'framer-motion';
 import { MessageSquare, User, Menu, ChevronDown, Server, Code2, Bot, Database, LayoutGrid, X } from 'lucide-react';
 
 const PRODUCTS = [
@@ -51,26 +52,38 @@ const MAIN_LINKS = [
 ];
 
 export default function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
   const loginUrl = `${dashboardUrl}/login`;
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  // Smooth scroll-progress-based intensification instead of a binary
+  // class swap: width, padding, and background opacity all interpolate
+  // continuously as the page scrolls past the first ~120px.
+  const { scrollY } = useScroll();
+  const navWidth = useTransform(scrollY, [0, 120], ['98%', '94%']);
+  const navPaddingX = useTransform(scrollY, [0, 120], [32, 24]);
+  const navPaddingY = useTransform(scrollY, [0, 120], [14, 10]);
+  const navBg = useTransform(scrollY, [0, 120], ['rgba(11,12,30,0.7)', 'rgba(11,12,30,0.95)']);
 
   return (
     <div className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4 font-sans">
-      <nav
-        className={`bg-[#0b0c1e]/90 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-between transition-all duration-300 shadow-2xl ${
-          scrolled ? 'w-[94%] max-w-5xl px-6 py-2.5' : 'w-[98%] max-w-6xl px-8 py-3.5'
-        }`}
+      <motion.nav
+        style={
+          reduceMotion
+            ? undefined
+            : {
+                width: navWidth,
+                paddingLeft: navPaddingX,
+                paddingRight: navPaddingX,
+                paddingTop: navPaddingY,
+                paddingBottom: navPaddingY,
+                backgroundColor: navBg,
+              }
+        }
+        className="max-w-6xl backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-between shadow-2xl bg-[#0b0c1e]/90"
       >
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-2.5 font-extrabold text-white tracking-tight text-base group">
@@ -95,37 +108,43 @@ export default function Navbar() {
             </button>
 
             {/* Dropdown Menu Box */}
-            <div
-              className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-80 bg-[#0d0e24] border border-white/15 rounded-3xl p-3 shadow-2xl transition-all duration-200 ${
-                servicesOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-2'
-              }`}
-            >
-              <div className="space-y-1">
-                {PRODUCTS.map((prod) => {
-                  const Icon = prod.icon;
-                  return (
-                    <Link
-                      key={prod.href}
-                      href={prod.href}
-                      onClick={() => setServicesOpen(false)}
-                      className="flex items-start gap-3 p-2.5 rounded-2xl hover:bg-white/10 transition-colors group/item"
-                    >
-                      <div className={`p-2 rounded-xl bg-white/5 border border-white/10 ${prod.color} group-hover/item:scale-110 transition-transform`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <span className="block font-bold text-white text-xs group-hover/item:text-purple-300 transition-colors">
-                          {prod.name}
-                        </span>
-                        <span className="block text-[11px] text-text-muted leading-tight mt-0.5">
-                          {prod.desc}
-                        </span>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
+            <AnimatePresence>
+              {servicesOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                  transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                  className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-80 bg-[#0d0e24] border border-white/15 rounded-3xl p-3 shadow-2xl"
+                >
+                  <div className="space-y-1">
+                    {PRODUCTS.map((prod) => {
+                      const Icon = prod.icon;
+                      return (
+                        <Link
+                          key={prod.href}
+                          href={prod.href}
+                          onClick={() => setServicesOpen(false)}
+                          className="flex items-start gap-3 p-2.5 rounded-2xl hover:bg-white/10 transition-colors group/item"
+                        >
+                          <div className={`p-2 rounded-xl bg-white/5 border border-white/10 ${prod.color} group-hover/item:scale-110 transition-transform`}>
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <span className="block font-bold text-white text-xs group-hover/item:text-purple-300 transition-colors">
+                              {prod.name}
+                            </span>
+                            <span className="block text-[11px] text-text-muted leading-tight mt-0.5">
+                              {prod.desc}
+                            </span>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Standard Navigation Links */}
@@ -186,7 +205,7 @@ export default function Navbar() {
             {mobileOpen ? <X className="h-5 w-5 text-purple-400" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
-      </nav>
+      </motion.nav>
 
       {/* Mobile Drawer Menu */}
       {mobileOpen && (

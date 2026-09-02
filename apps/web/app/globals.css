@@ -19,6 +19,53 @@ html, body {
   min-height: 100vh;
 }
 
+/* ─── Typography System ──────────────────────────────────────
+   Three semantic text styles reused across the site instead of
+   ad-hoc per-component utility soup. Fluid via clamp() so headings
+   scale continuously between breakpoints rather than jumping.
+──────────────────────────────────────────────────────────────*/
+.text-display {
+  font-family: var(--font-geist-sans), 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  font-size: clamp(2.25rem, 4.4vw, 3.75rem);
+}
+.text-display-lg {
+  font-family: var(--font-geist-sans), 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.02;
+  font-size: clamp(2.75rem, 6vw, 5.5rem);
+}
+.text-body {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 400;
+  line-height: 1.65;
+  color: #9A9AA5;
+}
+.text-mono-label {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  font-size: 0.6875rem;
+}
+
+/* ─── Grain / Noise Overlay ───────────────────────────────── */
+.grain-overlay {
+  position: fixed;
+  inset: -10%;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain 8s steps(10) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .grain-overlay { animation: none; }
+}
+
 /* ─── Glass Utilities ────────────────────────────────────── */
 .glass {
   background: rgba(255, 255, 255, 0.04);
@@ -164,4 +211,47 @@ html, body {
 .dot-pattern {
   background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
   background-size: 28px 28px;
+}
+
+/* ─── Spotlight Cards ─────────────────────────────────────────
+   Cursor-follow radial glow behind hovered cards. Driven by
+   --mx / --my custom properties set on pointermove (see
+   components/motion/SpotlightCard.tsx). Falls back to a static
+   card with no spotlight if JS never sets the variables.
+──────────────────────────────────────────────────────────────*/
+.spotlight-card {
+  position: relative;
+  isolation: isolate;
+}
+.spotlight-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: radial-gradient(
+    280px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(124, 58, 237, 0.16),
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+.spotlight-card:hover::before { opacity: 1; }
+.spotlight-card > * { position: relative; z-index: 1; }
+
+/* ─── Tilt Cards ─────────────────────────────────────────────
+   3D pointer-tilt. transform is written inline via JS
+   (rotateX/rotateY); this class only sets up the perspective
+   and a smooth relax-back transition for pointer leave.
+──────────────────────────────────────────────────────────────*/
+.tilt-card {
+  transform-style: preserve-3d;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tilt-card { transition: none !important; }
 }

@@ -8,6 +8,8 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['var(--font-geist-sans)', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-geist-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       colors: {
         bg: '#0A0A14',
@@ -18,6 +20,7 @@ module.exports = {
         'accent-violet-light': '#A855F7',
         'accent-teal': '#0EA5E9',
         'accent-teal-bright': '#22D3EE',
+        'accent-magenta': '#D946EF',
         'text-primary': '#F5F5F7',
         'text-muted': '#9A9AA5',
         'text-faint': '#5A5A6A',
@@ -26,6 +29,7 @@ module.exports = {
       backgroundImage: {
         'brand-gradient': 'linear-gradient(135deg, #7C3AED 0%, #0EA5E9 100%)',
         'brand-gradient-warm': 'linear-gradient(135deg, #A855F7 0%, #06B6D4 100%)',
+        'brand-gradient-deep': 'linear-gradient(135deg, #7C3AED 0%, #D946EF 45%, #0EA5E9 100%)',
         'shimmer': 'linear-gradient(135deg, #7C3AED 0%, #0EA5E9 50%, #7C3AED 100%)',
       },
       animation: {
@@ -38,6 +42,7 @@ module.exports = {
         'spin-slow': 'spin-slow 8s linear infinite',
         'orb-pulse': 'orb-pulse 6s ease-in-out infinite',
         'shimmer': 'shimmer 3s linear infinite',
+        'grain': 'grain 8s steps(10) infinite',
       },
       keyframes: {
         'fade-in': { from: { opacity: '0' }, to: { opacity: '1' } },
@@ -49,10 +54,23 @@ module.exports = {
         'spin-slow': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } },
         'orb-pulse': { '0%,100%': { opacity: '0.18', transform: 'scale(1)' }, '50%': { opacity: '0.28', transform: 'scale(1.06)' } },
         'shimmer': { '0%': { backgroundPosition: '-200% center' }, '100%': { backgroundPosition: '200% center' } },
+        'grain': {
+          '0%,100%': { transform: 'translate(0,0)' },
+          '10%': { transform: 'translate(-2%,-4%)' },
+          '20%': { transform: 'translate(-6%,2%)' },
+          '30%': { transform: 'translate(4%,-8%)' },
+          '40%': { transform: 'translate(-2%,6%)' },
+          '50%': { transform: 'translate(-8%,2%)' },
+          '60%': { transform: 'translate(6%,4%)' },
+          '70%': { transform: 'translate(0,8%)' },
+          '80%': { transform: 'translate(4%,0)' },
+          '90%': { transform: 'translate(-4%,-4%)' },
+        },
       },
       boxShadow: {
         'glow-violet': '0 0 20px rgba(124,58,237,0.3), 0 0 60px rgba(124,58,237,0.1)',
         'glow-teal': '0 0 20px rgba(34,211,238,0.3), 0 0 60px rgba(34,211,238,0.1)',
+        'glow-magenta': '0 0 20px rgba(217,70,239,0.3), 0 0 60px rgba(217,70,239,0.1)',
         'card': '0 4px 24px rgba(0,0,0,0.4)',
       },
     },

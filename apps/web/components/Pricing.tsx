@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { Globe, Zap, Code, Bot, MessageSquare, Music, Monitor, Brain, Mail, Database, Package } from 'lucide-react';
 
 import GradientMeshOrb from './GradientMeshOrb';
+import Reveal from './motion/Reveal';
+import TiltCard from './motion/TiltCard';
 
 function renderCategoryIcon(category: string) {
   const className = "h-5 w-5 text-accent-violet-light";
@@ -68,17 +70,17 @@ export default function Pricing() {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 opacity-65 sm:opacity-80 pointer-events-none">
         <GradientMeshOrb size={600} glowColor="rgba(45,212,191,0.55)" />
       </div>
-      <div className="text-center mb-12">
+      <Reveal className="text-center mb-12">
         <span className="glass inline-block rounded-full px-4 py-1 text-xs text-text-muted mb-4">
           Products &amp; Pricing
         </span>
-        <h2 className="text-3xl md:text-5xl font-bold">
+        <h2 className="text-display">
           Host anything, <span className="text-gradient">pay per product</span>
         </h2>
         <p className="text-text-muted mt-3 max-w-2xl mx-auto">
           No complex packages. Pay only for the specific resources you need. Fully managed under our auto-scaling edge network and secure SSL routing.
         </p>
-      </div>
+      </Reveal>
 
       {/* Loading skeleton */}
       {products === null && !error && (
@@ -108,9 +110,10 @@ export default function Pricing() {
             const cheapest = product.plans.reduce((min, p) => (p.price < min.price ? p : min), product.plans[0]);
             const recommended = idx === 1;
             return (
-              <div
-                key={product.id}
-                className={`relative rounded-2xl p-6 flex flex-col transition-all duration-300 ${
+              <Reveal key={product.id} index={idx}>
+              <TiltCard
+                strength={5}
+                className={`relative h-full rounded-2xl p-6 flex flex-col transition-colors duration-300 ${
                   recommended
                     ? 'glass border-accent-violet/50 ring-1 ring-accent-violet/40 shadow-glow-violet scale-[1.02]'
                     : 'glass hover:bg-white/[0.05] hover:border-white/12'
@@ -173,7 +176,8 @@ export default function Pricing() {
                     ))}
                   </ul>
                 )}
-              </div>
+              </TiltCard>
+              </Reveal>
             );
           })}
         </div>

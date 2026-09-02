@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Reveal from './motion/Reveal';
 
 const TESTIMONIALS = [
   {
@@ -48,46 +49,47 @@ export default function Testimonials() {
 
   return (
     <section id="testimonials" className="px-4 py-28 max-w-5xl mx-auto">
-      <div className="text-center mb-14">
+      <Reveal className="text-center mb-14">
         <span className="glass inline-block rounded-full px-4 py-1 text-xs text-text-muted mb-4">
           Testimonials
         </span>
-        <h2 className="text-3xl md:text-5xl font-bold">
+        <h2 className="text-display">
           Loved by <span className="text-gradient">developers</span>
         </h2>
         <p className="text-text-muted mt-3">
           See what customers have to say about hosting with us.
         </p>
-      </div>
+      </Reveal>
 
       {/* Cards */}
       <div className="grid md:grid-cols-3 gap-6">
         {TESTIMONIALS.map((t, i) => (
-          <div
-            key={t.name}
-            onClick={() => setActive(i)}
-            className={`glass rounded-2xl p-6 flex flex-col justify-between cursor-pointer transition-all duration-300 ${
-              active === i
-                ? 'border-accent-violet/40 ring-1 ring-accent-violet/30 scale-[1.02]'
-                : 'hover:bg-white/[0.05]'
-            }`}
-          >
-            <div>
-              <StarRating />
-              <p className="text-text-primary text-sm leading-relaxed mb-6">
-                &ldquo;{t.quote}&rdquo;
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className={`h-9 w-9 rounded-full bg-gradient-to-br ${t.gradient} flex items-center justify-center text-white text-xs font-semibold shrink-0`}>
-                {t.avatar}
-              </div>
+          <Reveal key={t.name} index={i}>
+            <div
+              onClick={() => setActive(i)}
+              className={`glass rounded-2xl p-6 flex flex-col justify-between cursor-pointer transition-all duration-300 hover:-translate-y-1 ${
+                active === i
+                  ? 'border-accent-violet/40 ring-1 ring-accent-violet/30 scale-[1.02]'
+                  : 'hover:bg-white/[0.05]'
+              }`}
+            >
               <div>
-                <div className="text-sm font-semibold text-text-primary">{t.name}</div>
-                <div className="text-xs text-text-muted">{t.role}</div>
+                <StarRating />
+                <p className="text-text-primary text-sm leading-relaxed mb-6">
+                  &ldquo;{t.quote}&rdquo;
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className={`h-9 w-9 rounded-full bg-gradient-to-br ${t.gradient} flex items-center justify-center text-white text-xs font-semibold shrink-0`}>
+                  {t.avatar}
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-text-primary">{t.name}</div>
+                  <div className="text-xs text-text-muted">{t.role}</div>
+                </div>
               </div>
             </div>
-          </div>
+          </Reveal>
         ))}
       </div>
 

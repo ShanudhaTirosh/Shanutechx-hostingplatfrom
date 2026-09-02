@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Reveal from './motion/Reveal';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
@@ -66,18 +67,19 @@ export default function Contact() {
 
   return (
     <section id="contact" className="px-4 py-28 max-w-2xl mx-auto">
-      <div className="text-center mb-10">
+      <Reveal className="text-center mb-10">
         <span className="glass inline-block rounded-full px-4 py-1 text-xs text-text-muted mb-4">
           Contact
         </span>
-        <h2 className="text-3xl md:text-5xl font-bold">
+        <h2 className="text-display">
           Get in <span className="text-gradient">touch</span>
         </h2>
         <p className="text-text-muted mt-3">
           Questions about hosting, VPS, or bot deployments? We reply fast.
         </p>
-      </div>
+      </Reveal>
 
+      <Reveal index={1} as="div">
       <form onSubmit={handleSubmit} className="glass rounded-2xl p-7 space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
@@ -135,6 +137,7 @@ export default function Contact() {
           )}
         </button>
       </form>
+      </Reveal>
     </section>
   );
 }

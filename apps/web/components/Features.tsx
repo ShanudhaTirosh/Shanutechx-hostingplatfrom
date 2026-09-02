@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Reveal from './motion/Reveal';
+import TiltCard from './motion/TiltCard';
 
 export interface FeatureItem {
   id: string;
@@ -271,11 +273,11 @@ export default function Features() {
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-accent-violet/10 rounded-full blur-[140px] pointer-events-none -z-10" />
 
       {/* Header */}
-      <div className="text-center mb-16 max-w-3xl mx-auto">
+      <Reveal className="text-center mb-16 max-w-3xl mx-auto">
         <span className="glass inline-block rounded-full px-4 py-1 text-xs text-accent-teal-bright font-medium mb-4 shadow-glow-teal">
           Complete Platform Capabilities
         </span>
-        <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
+        <h2 className="text-display">
           Everything you need to <span className="text-gradient">build &amp; scale</span>
         </h2>
         <p className="text-text-muted mt-4 text-base md:text-lg leading-relaxed">
@@ -337,7 +339,7 @@ export default function Features() {
             })}
           </div>
         </div>
-      </div>
+      </Reveal>
 
       {/* Grid of 14 Feature Cards */}
       {filteredFeatures.length === 0 ? (
@@ -355,56 +357,58 @@ export default function Features() {
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredFeatures.map((feat) => (
-            <div
-              key={feat.id}
-              className="glass-card rounded-2xl p-6 relative group overflow-hidden flex flex-col justify-between transition-all duration-300 hover:scale-[1.02] hover:border-white/20"
-              style={{ '--glow-color': feat.glow } as React.CSSProperties}
-            >
-              {/* Subtle top light bar */}
-              <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${feat.color} opacity-80 group-hover:opacity-100 transition-opacity`} />
+          {filteredFeatures.map((feat, idx) => (
+            <Reveal key={feat.id} index={idx % 6}>
+              <TiltCard
+                strength={5}
+                className="glass-card h-full rounded-2xl p-6 relative group overflow-hidden flex flex-col justify-between hover:border-white/20"
+                style={{ '--glow-color': feat.glow } as React.CSSProperties}
+              >
+                {/* Subtle top light bar */}
+                <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${feat.color} opacity-80 group-hover:opacity-100 transition-opacity`} />
 
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  {/* Icon */}
-                  <div
-                    className={`h-11 w-11 rounded-xl bg-gradient-to-br ${feat.color} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}
-                    style={{ boxShadow: `0 4px 20px ${feat.glow}` }}
-                  >
-                    {feat.icon}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    {/* Icon */}
+                    <div
+                      className={`h-11 w-11 rounded-xl bg-gradient-to-br ${feat.color} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}
+                      style={{ boxShadow: `0 4px 20px ${feat.glow}` }}
+                    >
+                      {feat.icon}
+                    </div>
+                    {/* Badge */}
+                    <span className="text-[11px] font-semibold text-text-muted glass rounded-full px-2.5 py-0.5 border border-white/10">
+                      {feat.badge}
+                    </span>
                   </div>
-                  {/* Badge */}
-                  <span className="text-[11px] font-semibold text-text-muted glass rounded-full px-2.5 py-0.5 border border-white/10">
-                    {feat.badge}
-                  </span>
+
+                  <h3 className="text-lg font-bold text-text-primary mb-2 group-hover:text-white transition-colors">
+                    {feat.title}
+                  </h3>
+                  <p className="text-text-muted text-xs leading-relaxed mb-6">
+                    {feat.description}
+                  </p>
                 </div>
 
-                <h3 className="text-lg font-bold text-text-primary mb-2 group-hover:text-white transition-colors">
-                  {feat.title}
-                </h3>
-                <p className="text-text-muted text-xs leading-relaxed mb-6">
-                  {feat.description}
-                </p>
-              </div>
-
-              {/* Action footer */}
-              <div className="pt-4 border-t border-white/[0.05] flex items-center justify-between text-xs">
-                <span className="text-accent-teal-bright font-medium flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                  <span>Explore in Dashboard</span>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-0.5 transition-transform">
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                    <polyline points="12 5 19 12 12 19" />
-                  </svg>
-                </span>
-                <span className="text-text-faint font-mono text-[10px]">Active</span>
-              </div>
-            </div>
+                {/* Action footer */}
+                <div className="pt-4 border-t border-white/[0.05] flex items-center justify-between text-xs">
+                  <span className="text-accent-teal-bright font-medium flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                    <span>Explore in Dashboard</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-0.5 transition-transform">
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                      <polyline points="12 5 19 12 12 19" />
+                    </svg>
+                  </span>
+                  <span className="text-text-faint font-mono text-[10px]">Active</span>
+                </div>
+              </TiltCard>
+            </Reveal>
           ))}
         </div>
       )}
 
       {/* Bottom CTA Banner */}
-      <div className="mt-20 glass rounded-3xl p-8 md:p-12 text-center relative overflow-hidden border border-accent-violet/30 shadow-glow-violet">
+      <Reveal className="mt-20 glass rounded-3xl p-8 md:p-12 text-center relative overflow-hidden border border-accent-violet/30 shadow-glow-violet">
         <div className="absolute inset-0 bg-brand-gradient opacity-[0.06] pointer-events-none" />
         <h3 className="text-2xl md:text-3xl font-bold text-text-primary mb-3">
           Ready to deploy with complete freedom?
@@ -426,7 +430,7 @@ export default function Features() {
             View Hardware Specifications
           </a>
         </div>
-      </div>
+      </Reveal>
     </section>
   );
 }

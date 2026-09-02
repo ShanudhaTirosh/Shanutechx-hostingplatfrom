@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Reveal from './motion/Reveal';
 
 const DEFAULT_FAQS = [
   {
@@ -49,41 +50,42 @@ export default function FAQ({ items }: { items?: FAQItem[] }) {
 
   return (
     <section id="faq" className="px-4 py-28 max-w-3xl mx-auto">
-      <div className="text-center mb-12">
+      <Reveal className="text-center mb-12">
         <span className="glass inline-block rounded-full px-4 py-1 text-xs text-text-muted mb-4">
           FAQ
         </span>
-        <h2 className="text-3xl md:text-5xl font-bold">
+        <h2 className="text-display">
           Frequently asked <span className="text-gradient">questions</span>
         </h2>
-      </div>
+      </Reveal>
 
       <div className="space-y-3">
         {faqs.map((item, i) => {
           const open = openIndex === i;
           return (
-            <div
-              key={item.q}
-              className={`glass rounded-2xl overflow-hidden transition-all duration-200 ${open ? 'border-white/12' : ''}`}
-            >
-              <button
-                onClick={() => setOpenIndex(open ? null : i)}
-                className="w-full flex items-center justify-between px-5 py-4 text-left font-medium text-text-primary hover:bg-white/[0.03] transition-colors"
-              >
-                <span className="pr-4">{item.q}</span>
-                <ChevronIcon open={open} />
-              </button>
-
+            <Reveal key={item.q} index={i % 6}>
               <div
-                className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                  open ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-                }`}
+                className={`glass rounded-2xl overflow-hidden transition-all duration-200 ${open ? 'border-white/12' : ''}`}
               >
-                <div className="px-5 pb-5 pt-1 text-sm text-text-muted leading-relaxed border-t border-white/[0.05]">
-                  {item.a}
+                <button
+                  onClick={() => setOpenIndex(open ? null : i)}
+                  className="w-full flex items-center justify-between px-5 py-4 text-left font-medium text-text-primary hover:bg-white/[0.03] transition-colors"
+                >
+                  <span className="pr-4">{item.q}</span>
+                  <ChevronIcon open={open} />
+                </button>
+
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    open ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                  }`}
+                >
+                  <div className="px-5 pb-5 pt-1 text-sm text-text-muted leading-relaxed border-t border-white/[0.05]">
+                    {item.a}
+                  </div>
                 </div>
               </div>
-            </div>
+            </Reveal>
           );
         })}
       </div>
