@@ -140,7 +140,7 @@ export function VpsFirewallManager({ provisionId, sshPort = 22 }: VpsFirewallMan
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-white">Host VPS Firewall (UFW)</h3>
+                <h3 className="text-sm font-bold text-white">Host VPS Network Firewall</h3>
                 <Badge status={status === 'active' ? 'running' : 'stopped'} />
               </div>
               <p className="text-xs text-text-muted mt-0.5">

@@ -59,7 +59,7 @@ function SubscriptionsIcon() {
 
 const QUICK_ACTIONS = [
   { href: '/services', label: 'Browse catalog', hint: 'Order static, Node.js/Python hosting, VPS or Bot plans' },
-  { href: '/deployments', label: 'Deploy Repository', hint: 'Deploy a code repository instantly via Nixpacks build pipeline' },
+  { href: '/deployments', label: 'Deploy Repository', hint: 'Deploy a code repository instantly via automated build pipeline' },
   { href: '/tickets', label: 'Get support', hint: 'Open a support ticket or talk to our engineers via live chat' },
 ];
 
@@ -125,7 +125,7 @@ export default function DashboardPage() {
           Welcome back, {user?.displayName ?? apiUser?.email?.split('@')[0]} 👋
         </h1>
         <p className="text-text-muted text-sm mt-1">
-          Everything is running smoothly. Your infrastructure is managed under our Traefik &amp; Cloudflare gateway.
+          Everything is running smoothly. Your services are active and monitored in real time.
         </p>
       </div>
 

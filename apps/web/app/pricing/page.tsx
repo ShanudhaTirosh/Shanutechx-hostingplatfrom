@@ -2,8 +2,8 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata = {
-  title: 'Pricing & Infrastructure Specifications | SHANUTECHX',
-  description: 'Detailed specifications, Nixpack build pipelines, Traefik auto-routing, and Cloudflare DNS features for all SHANUTECHX products.',
+  title: 'Pricing & Specifications | SHANUTECHX',
+  description: 'Detailed resource specifications, build pipelines, auto-routing, and security features for all SHANUTECHX products.',
 };
 
 const BILLING_LABEL: Record<string, string> = {
@@ -54,29 +54,29 @@ export default async function PricingPage() {
           </p>
         </div>
 
-        {/* Infrastructure explanation */}
+        {/* Platform overview */}
         <div className="glass rounded-2xl p-6 md:p-8 mb-16 border-white/[0.08] relative overflow-hidden animate-slide-up">
           <div className="absolute inset-0 bg-brand-gradient opacity-[0.03] -z-10" />
           <h2 className="text-lg md:text-xl font-bold text-text-primary mb-4 flex items-center gap-2">
-            <span>⚙️</span> The SHANUTECHX Infrastructure Stack
+            <span>⚡</span> Automated Cloud Platform
           </h2>
           <div className="grid md:grid-cols-3 gap-6 text-sm">
             <div>
-              <h3 className="font-semibold text-text-primary mb-1">1. Nixpacks Build Pipeline</h3>
+              <h3 className="font-semibold text-text-primary mb-1">1. Automated Build Pipeline</h3>
               <p className="text-text-muted text-xs leading-relaxed">
-                Similar to Railway's container builder, Nixpacks analyzes your code repositories automatically. It builds lean, containerized OCI images for Node.js, Python, or static stacks with zero config needed.
+                Automatically analyzes your code repositories upon push. Builds lightweight, production-ready images for Node.js, Python, or static web applications with zero manual setup.
               </p>
             </div>
             <div>
-              <h3 className="font-semibold text-text-primary mb-1">2. Traefik Auto-Proxying</h3>
+              <h3 className="font-semibold text-text-primary mb-1">2. Instant Auto-Routing</h3>
               <p className="text-text-muted text-xs leading-relaxed">
-                Our edge routers run Traefik. When your service finishes building, Traefik auto-detects the port, routes traffic instantly, and registers custom domains or subdomains with automatic TLS certificates.
+                When your service finishes building, traffic is instantly routed to your deployment, automatically linking your custom subdomains with free SSL certificates.
               </p>
             </div>
             <div>
-              <h3 className="font-semibold text-text-primary mb-1">3. Cloudflare Shield &amp; DNS</h3>
+              <h3 className="font-semibold text-text-primary mb-1">3. High-Speed Edge &amp; Protection</h3>
               <p className="text-text-muted text-xs leading-relaxed">
-                All external traffic is tunneled through Cloudflare. This ensures high-performance edge-caching for static files, automatic DDoS protection, and SSL handshake acceleration at the nearest edge server.
+                All external traffic is processed through our global edge network, ensuring high-performance caching for static files, automatic DDoS mitigation, and low latency.
               </p>
             </div>
           </div>

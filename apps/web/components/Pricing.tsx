@@ -76,7 +76,7 @@ export default function Pricing() {
           Host anything, <span className="text-gradient">pay per product</span>
         </h2>
         <p className="text-text-muted mt-3 max-w-2xl mx-auto">
-          No complex packages. Pay only for the specific resources you need. Fully managed under our auto-scaling Traefik &amp; Cloudflare routing mesh.
+          No complex packages. Pay only for the specific resources you need. Fully managed under our auto-scaling edge network and secure SSL routing.
         </p>
       </div>
 
@@ -197,7 +197,7 @@ export default function Pricing() {
           href="/pricing"
           className="inline-flex items-center gap-2 text-sm font-medium text-accent-teal-bright hover:underline"
         >
-          <span>Explore all infrastructure specifications, Nixpacks configs &amp; VPS features</span>
+          <span>Explore all infrastructure specifications, build settings &amp; VPS features</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="5" y1="12" x2="19" y2="12"></line>
             <polyline points="12 5 19 12 12 19"></polyline>

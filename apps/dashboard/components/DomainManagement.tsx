@@ -211,16 +211,16 @@ function AddDomainForm({
             </p>
             <ol className="text-xs text-text-muted space-y-2 list-decimal list-inside">
               <li>
-                Log in to your DNS provider (e.g. Cloudflare, Namecheap, GoDaddy).
+                Log in to your DNS provider (e.g. Namecheap, GoDaddy, Cloudflare).
               </li>
               <li>
                 Create a new <strong className="text-text-primary">CNAME</strong> record with the parameters below.
               </li>
               <li>
-                Wait for DNS propagation (1–5 minutes for Cloudflare, up to 24h for traditional registrars).
+                Wait for DNS propagation (usually within a few minutes).
               </li>
               <li>
-                Click <strong className="text-text-primary">Verify Domain</strong> below to complete routing & Let's Encrypt SSL certificate provisioning.
+                Click <strong className="text-text-primary">Verify Domain</strong> below to complete routing & SSL certificate provisioning.
               </li>
             </ol>
 
@@ -281,7 +281,7 @@ function AddDomainForm({
           />
         </div>
 
-        {/* Cloudflare Auto-DNS Integration toggle */}
+        {/* Auto-DNS Integration toggle */}
         <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-3">
           <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-text-primary">
             <input
@@ -290,13 +290,13 @@ function AddDomainForm({
               onChange={(e) => setUseCloudflare(e.target.checked)}
               className="rounded bg-white/5 border-white/10 text-accent-violet focus:ring-0"
             />
-            Automate DNS CNAME creation using Cloudflare API
+            Automate DNS CNAME creation using API
           </label>
 
           {useCloudflare && (
             <div className="space-y-3 pt-1 border-t border-white/[0.04]">
               <Input
-                label="Cloudflare API Token"
+                label="DNS Provider API Token"
                 type="password"
                 placeholder="Scoped API token (Zone.DNS Edit)"
                 value={cfToken}
@@ -305,12 +305,12 @@ function AddDomainForm({
                 hint="Token with Zone:DNS Edit permission on your domain"
               />
               <Input
-                label="Cloudflare Zone ID"
-                placeholder="32-character Zone ID from domain overview"
+                label="DNS Zone ID"
+                placeholder="Zone ID from domain overview"
                 value={cfZoneId}
                 onChange={(e) => setCfZoneId(e.target.value)}
                 required={useCloudflare}
-                hint="Found on your domain overview sidebar in Cloudflare"
+                hint="Found on your domain management dashboard"
               />
             </div>
           )}

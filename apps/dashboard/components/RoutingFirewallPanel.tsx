@@ -57,7 +57,7 @@ export function RoutingFirewallPanel({
           ? `Direct Mode enabled! Bound container to host port ${publishedPort}`
           : routingMode === 'no_ssl'
           ? 'HTTP-Only Mode enabled (No SSL redirect).'
-          : 'Proxied Mode enabled! Traffic routed via Traefik HTTPS proxy.',
+          : 'Proxied Mode enabled! Traffic routed via secure HTTPS proxy.',
         'success'
       );
     } catch (err: any) {
@@ -109,9 +109,9 @@ export function RoutingFirewallPanel({
                   Recommended
                 </span>
               </div>
-              <h4 className="text-xs font-semibold text-white">Proxied (Traefik SSL)</h4>
+              <h4 className="text-xs font-semibold text-white">Proxied (Auto SSL)</h4>
               <p className="text-[11px] text-text-muted leading-relaxed">
-                Reverse proxied through Traefik. Free automatic Let's Encrypt HTTPS certificates and DDoS protection.
+                Reverse proxied automatically. Free automatic HTTPS certificates and DDoS protection.
               </p>
             </div>
 

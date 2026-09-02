@@ -7,28 +7,28 @@ const ADVANCED_ITEMS = [
   {
     title: 'High Performance',
     icon: Zap,
-    description: 'Powered by latest generation AMD EPYC & Intel Xeon processors for maximum single-thread and multi-thread performance.',
+    description: 'Powered by high-performance enterprise processors for maximum single-thread and multi-thread performance.',
   },
   {
     title: 'Low Latency',
     icon: Zap,
-    description: 'Optimized network routing infrastructure with direct BGP peering for minimal ping lag and jitter.',
+    description: 'Optimized network routing infrastructure for minimal ping lag and latency.',
   },
   {
     title: 'Advanced Security',
     icon: ShieldCheck,
-    description: 'Multi-layered DDoS protection, automated UFW firewall, and AES-256 encrypted secrets vault.',
+    description: 'Multi-layered DDoS protection, automated network firewall, and AES-256 encrypted secrets vault.',
     wide: true,
   },
   {
     title: 'Auto Recovery',
     icon: RefreshCw,
-    description: 'Automated container process recovery, database rotation, and Cloudflare R2 backup snapshots.',
+    description: 'Automated process recovery, database rotation, and secure cloud backup snapshots.',
   },
   {
     title: 'Full Control',
     icon: Settings,
-    description: 'Complete web control panel with browser SSH/TTY, raw Docker Compose exports, and API access.',
+    description: 'Complete web control panel with browser SSH/TTY, container exports, and API access.',
   },
   {
     title: 'Resource Scaling',

@@ -448,12 +448,12 @@ export function CockpitDashboardPanel({ nodeId, nodeLabel, ipAddress }: CockpitD
         </div>
       )}
 
-      {/* Tab 5: Firewall & UFW */}
+      {/* Tab 5: Network Firewall */}
       {activeTab === 'firewall' && (
         <div className="glass rounded-2xl p-5 border border-white/[0.08] space-y-4">
           <div className="flex justify-between items-center">
             <div>
-              <h3 className="text-sm font-semibold text-text-primary">UFW Network Firewall</h3>
+              <h3 className="text-sm font-semibold text-text-primary">Network Firewall</h3>
               <p className="text-xs text-text-muted">Status: {firewall?.active ? '🟢 Active' : '🔴 Inactive'}</p>
             </div>
             <Button size="sm" variant="primary" onClick={() => setShowAddRuleModal(true)}>+ Add Rule</Button>
@@ -528,7 +528,7 @@ export function CockpitDashboardPanel({ nodeId, nodeLabel, ipAddress }: CockpitD
       )}
 
       {showAddRuleModal && (
-        <Modal open={true} onClose={() => setShowAddRuleModal(false)} title="Add UFW Firewall Rule" width="max-w-md">
+        <Modal open={true} onClose={() => setShowAddRuleModal(false)} title="Add Network Firewall Rule" width="max-w-md">
           <div className="space-y-4">
             <Input placeholder="Port Number (1-65535)" value={newRulePort} onChange={(e) => setNewRulePort(e.target.value)} />
             <div className="flex gap-4 text-xs text-text-muted">

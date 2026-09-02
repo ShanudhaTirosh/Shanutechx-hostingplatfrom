@@ -57,7 +57,7 @@ export default function PrivacyPage() {
             <p>Data passes through the following services as part of how the platform works:</p>
             <ul className="list-disc pl-5 space-y-1">
               <li><strong>Firebase (Google)</strong> — account authentication, and live chat messages (Realtime Database)</li>
-              <li><strong>Cloudflare</strong> — DNS and network-level protection for your subdomain/domain</li>
+              <li><strong>Edge Network &amp; DNS</strong> — DNS and network-level protection for your subdomain/domain</li>
               <li><strong>Google Gemini</strong> — reads payment proof screenshots to extract the amount/reference automatically</li>
               <li><strong>Postal (self-hosted)</strong> — sends account/order email notifications and powers SMTP hosting plans</li>
               <li><strong>WhatsApp / Discord</strong> — if you link these, order and deployment notifications are sent through them</li>

@@ -69,7 +69,7 @@ export default function Footer() {
                 <li><Link href="/v2ray" className="hover:text-white transition-colors">V2Ray &amp; Netch Proxy</Link></li>
                 <li><a href="http://localhost:3001/catalog" className="hover:text-white transition-colors">1-Click App Catalog</a></li>
                 <li><a href="http://localhost:3001/admin/databases" className="hover:text-white transition-colors">Managed PostgreSQL &amp; Redis</a></li>
-                <li><a href="http://localhost:3001/webmail" className="hover:text-white transition-colors">Hostinger Mail Studio</a></li>
+                <li><a href="http://localhost:3001/webmail" className="hover:text-white transition-colors">Mail Studio</a></li>
               </ul>
             </div>
 

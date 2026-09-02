@@ -71,7 +71,7 @@ const INFRA_PANELS = [
   {
     href: '/admin/nodes',
     label: 'Compute Nodes',
-    description: 'Register and monitor bare-metal and VPS compute nodes running Nixpacks workloads via Traefik.',
+    description: 'Register and monitor bare-metal and VPS compute nodes running cloud workloads.',
     icon: <ServerIcon />,
     color: 'bg-accent-violet/10 text-accent-violet-light',
     countKey: 'nodes',

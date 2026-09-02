@@ -93,7 +93,7 @@ print("Response:", response.json())`,
       '2. Click "+ New Deployment" and select your deployment source (GitHub/GitLab URL or Upload Zip file).',
       '3. Choose your runtime environment (Node.js 20, Python 3.11, or Static Web).',
       '4. Add encrypted environment variables in the Env Vars section (AES-256 encrypted).',
-      '5. Click "Deploy App". Our Node Agent will build your container, assign a subdomain, and issue an SSL certificate automatically.',
+      '5. Click "Deploy App". Our platform will build your deployment, assign a subdomain, and issue an SSL certificate automatically.',
     ],
   },
   {
@@ -111,25 +111,25 @@ print("Response:", response.json())`,
       '2. Select your database engine: PostgreSQL 17, MySQL 8.4, Redis 7, or MongoDB 8.',
       '3. Click "Provision Database". Credentials (username, password, database name) will be generated securely.',
       '4. Use the "Copy DSN Connection String" utility to integrate with your backend applications.',
-      '5. Power controls (Start, Stop, Restart) and automated daily Cloudflare R2 backups are managed from the database detail card.',
+      '5. Power controls (Start, Stop, Restart) and automated daily cloud backups are managed from the database detail card.',
     ],
   },
   {
     id: 'domains',
     category: 'Network & Security',
-    title: 'Custom Domains & Cloudflare SSL Setup',
+    title: 'Custom Domains & SSL Setup',
     iconSvg: (
       <svg className="w-6 h-6 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
       </svg>
     ),
-    summary: 'Connect your own domain to any deployment with Cloudflare API automation and Traefik Let\'s Encrypt SSL.',
+    summary: 'Connect your own domain to any deployment with automated DNS mapping and free SSL certificates.',
     content: [
       '1. Select your target deployment and open the "Custom Domain" tab.',
       '2. Enter your custom domain name (e.g. app.mycompany.com).',
       '3. Add a CNAME record at your DNS provider pointing to `ingress.shanutechx.com`.',
-      '4. (Optional) Provide a Cloudflare API Token for 1-click automatic DNS record creation.',
-      '5. Click "Verify & Route Domain". Once verified, Traefik dynamic reverse proxy and Let\'s Encrypt SSL certificates are configured instantly.',
+      '4. (Optional) Provide a DNS API Token for 1-click automatic DNS record creation.',
+      '5. Click "Verify & Route Domain". Once verified, dynamic reverse proxying and SSL certificates are configured instantly.',
     ],
   },
   {

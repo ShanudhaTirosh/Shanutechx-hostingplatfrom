@@ -12,11 +12,11 @@ const FEATURES = [
     preview: {
       header: 'Interactive Terminal Container Gateway',
       body: [
-        'root@shanutechx-node-01:~# docker ps',
+        'root@shanutechx-node-01:~# status --services',
         'CONTAINER ID   IMAGE                  STATUS          PORTS',
-        'a8f9c1d2e3b4   nixpacks/app-prod      Up 14 days      0.0.0.0:3000->3000/tcp',
+        'a8f9c1d2e3b4   app/service-prod       Up 14 days      0.0.0.0:3000->3000/tcp',
         'b7e6f5a4c3d2   postgres:17-alpine     Up 14 days      0.0.0.0:5432->5432/tcp',
-        'root@shanutechx-node-01:~# ufw status verbose',
+        'root@shanutechx-node-01:~# status --firewall',
         'Status: active | Ports 80, 443, 22 OPEN',
       ],
     },
@@ -31,8 +31,8 @@ const FEATURES = [
       body: [
         'Selected Template: WordPress + MySQL Stack',
         'Auto-generated MySQL root password (Encrypted AES-GCM)',
-        'Traefik router rules injected for subdomain.shanutechx.com',
-        'Let\'s Encrypt SSL auto-certificate provisioned',
+        'Automated SSL & route initialized for subdomain.shanutechx.com',
+        'SSL auto-certificate provisioned',
         'Status: RUNNING on Node-Central-01',
       ],
     },
@@ -41,7 +41,7 @@ const FEATURES = [
     id: 'mod',
     title: 'Multi-Node Cluster Manager',
     icon: Server,
-    description: 'Connect, provision, and load-balance across multiple bare-metal or cloud nodes with automated Docker & UFW firewall setup.',
+    description: 'Connect, provision, and load-balance across multiple cloud nodes with automated firewall setup.',
     preview: {
       header: 'Node Cluster Distribution',
       body: [
