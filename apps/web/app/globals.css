@@ -13,8 +13,8 @@ html {
 }
 
 html, body {
-  background-color: #030014;
-  color: #f1f5f9;
+  background-color: #030014 !important;
+  color: #f1f5f9 !important;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   min-height: 100vh;
 }

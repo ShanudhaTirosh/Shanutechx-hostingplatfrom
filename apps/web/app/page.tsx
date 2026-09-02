@@ -1,16 +1,12 @@
 import Navbar from '@/components/Navbar';
-import Hero from '@/components/Hero';
-import AdvancedFeatures from '@/components/AdvancedFeatures';
-import PlatformShowcase from '@/components/PlatformShowcase';
-import GlobeVisual from '@/components/GlobeVisual';
-import V2RaySection from '@/components/V2RaySection';
-import Features from '@/components/Features';
-import About from '@/components/About';
-import Testimonials from '@/components/Testimonials';
+import OrbitHero from '@/components/OrbitHero';
+import MarqueeStrips from '@/components/MarqueeStrips';
+import BentoGrid from '@/components/BentoGrid';
+import FeaturesGrid from '@/components/FeaturesGrid';
 import Pricing from '@/components/Pricing';
 import FAQ from '@/components/FAQ';
 import Contact from '@/components/Contact';
-import Footer from '@/components/Footer';
+import StxFooter from '@/components/StxFooter';
 
 interface CmsContent {
   heroTitle?: string;
@@ -36,24 +32,18 @@ export default async function HomePage() {
   const content = await getCmsContent();
 
   return (
-    <main className="bg-[#070814] text-white font-sans overflow-x-hidden">
+    <main className="bg-transparent text-white font-sans overflow-x-hidden">
       <Navbar />
-      <Hero title={content.heroTitle} subtitle={content.heroSubtitle} />
-      <AdvancedFeatures />
-      <PlatformShowcase />
-      <GlobeVisual />
-      <V2RaySection />
-      <div id="features">
-        <Features />
-      </div>
-      <About />
-      <Testimonials />
+      <OrbitHero />
+      <MarqueeStrips />
+      <BentoGrid />
+      <FeaturesGrid />
       <Pricing />
       <div id="faq">
         <FAQ items={content.faqItems} />
       </div>
       <Contact />
-      <Footer />
+      <StxFooter />
     </main>
   );
 }
