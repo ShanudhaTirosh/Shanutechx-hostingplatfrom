@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useId } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 
 interface GradientMeshOrbProps {
   size?: number | string;
@@ -20,7 +20,32 @@ export default function GradientMeshOrb({
   glowColor = 'rgba(124,58,237,0.65)',
   opacity = 1,
 }: GradientMeshOrbProps) {
+  const [mounted, setMounted] = useState(false);
   const rawId = useId();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const containerStyle: React.CSSProperties = {
+    position: 'relative',
+    width: typeof size === 'number' ? `${size}px` : size,
+    height: typeof size === 'number' ? `${size}px` : size,
+    maxWidth: '100%',
+    aspectRatio: '1 / 1',
+    opacity,
+  };
+
+  if (!mounted) {
+    return (
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none select-none ${className}`}
+        style={containerStyle}
+      />
+    );
+  }
+
   const safeId = rawId.replace(/:/g, '_');
   const warpId = `stxWarp_${safeId}`;
   const meshAId = `stxMeshA_${safeId}`;
@@ -38,14 +63,7 @@ export default function GradientMeshOrb({
     <div
       aria-hidden="true"
       className={`pointer-events-none select-none ${className}`}
-      style={{
-        position: 'relative',
-        width: typeof size === 'number' ? `${size}px` : size,
-        height: typeof size === 'number' ? `${size}px` : size,
-        maxWidth: '100%',
-        aspectRatio: '1 / 1',
-        opacity,
-      }}
+      style={containerStyle}
     >
       {/* Ambient glow behind the orb */}
       <div
@@ -125,3 +143,4 @@ export default function GradientMeshOrb({
     </div>
   );
 }
+
