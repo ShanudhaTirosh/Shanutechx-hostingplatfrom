@@ -67,11 +67,11 @@ export default function Footer() {
             <div>
               <h4 className="text-xs font-extrabold uppercase tracking-widest text-indigo-400 mb-4">Cloud Services</h4>
               <ul className="space-y-2.5 text-xs text-text-muted">
-                <li><Link href="/pricing" className="hover:text-white transition-colors">VPS Hosting</Link></li>
-                <li><Link href="/v2ray" className="hover:text-white transition-colors">V2Ray &amp; Netch Proxy</Link></li>
-                <li><a href={`${dashboardUrl}/services`} className="hover:text-white transition-colors">1-Click App Catalog</a></li>
-                <li><a href={`${dashboardUrl}/services`} className="hover:text-white transition-colors">Managed PostgreSQL &amp; Redis</a></li>
-                <li><a href={`${dashboardUrl}/webmail`} className="hover:text-white transition-colors">Mail Studio</a></li>
+                <li><Link href="/vps" className="hover:text-white transition-colors">Cloud VPS Hosting</Link></li>
+                <li><Link href="/app-hosting" className="hover:text-white transition-colors">Web App &amp; Repo Hosting</Link></li>
+                <li><Link href="/bot-hosting" className="hover:text-white transition-colors">24/7 Bot Hosting</Link></li>
+                <li><Link href="/databases" className="hover:text-white transition-colors">Managed Databases</Link></li>
+                <li><Link href="/catalog" className="hover:text-white transition-colors">1-Click App Catalog</Link></li>
               </ul>
             </div>
 

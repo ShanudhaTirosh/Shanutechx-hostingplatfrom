@@ -22,8 +22,7 @@ function formatPrice(cents: number) {
 }
 
 async function getProducts(): Promise<Product[]> {
-  const apiBase = process.env.API_BASE_URL;
-  if (!apiBase) return [];
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
   try {
     const res = await fetch(`${apiBase}/api/products`, { cache: 'no-store' });
     if (!res.ok) return [];

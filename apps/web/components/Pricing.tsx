@@ -51,7 +51,7 @@ export default function Pricing() {
   const [error, setError] = useState(false);
   const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
   const loginUrl = `${dashboardUrl}/login`;
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
     fetch(`${apiBase}/api/products`)
