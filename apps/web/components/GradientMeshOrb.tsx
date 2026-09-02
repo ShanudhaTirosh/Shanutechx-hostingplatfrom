@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useId } from 'react';
 
 interface GradientMeshOrbProps {
   size?: number | string;
@@ -17,13 +17,20 @@ interface GradientMeshOrbProps {
 export default function GradientMeshOrb({
   size = 480,
   className = '',
-  glowColor = 'rgba(124,58,237,0.45)',
+  glowColor = 'rgba(124,58,237,0.65)',
   opacity = 1,
 }: GradientMeshOrbProps) {
+  const rawId = useId();
+  const safeId = rawId.replace(/:/g, '_');
+  const warpId = `stxWarp_${safeId}`;
+  const meshAId = `stxMeshA_${safeId}`;
+  const meshBId = `stxMeshB_${safeId}`;
+  const meshCId = `stxMeshC_${safeId}`;
+
   const palette = {
-    a: '#7c3aed', // Violet
-    b: '#2dd4bf', // Teal
-    c: '#38bdf8', // Sky Blue
+    a: '#8b5cf6', // Bright Violet
+    b: '#14b8a6', // Bright Teal
+    c: '#06b6d4', // Sky Cyan
     glow: glowColor,
   };
 
@@ -45,10 +52,10 @@ export default function GradientMeshOrb({
         className="animate-stx-orb-breathe"
         style={{
           position: 'absolute',
-          inset: '10%',
+          inset: '5%',
           borderRadius: '50%',
           background: palette.glow,
-          filter: 'blur(65px)',
+          filter: 'blur(70px)',
         }}
       />
 
@@ -59,11 +66,11 @@ export default function GradientMeshOrb({
         className="animate-stx-orb-spin"
         style={{
           position: 'relative',
-          filter: 'blur(6px) saturate(1.25)',
+          filter: 'blur(2px) saturate(1.35)',
         }}
       >
         <defs>
-          <filter id="stxMeshWarp" x="-20%" y="-20%" width="140%" height="140%">
+          <filter id={warpId} x="-20%" y="-20%" width="140%" height="140%">
             <feTurbulence
               type="fractalNoise"
               baseFrequency="0.008 0.012"
@@ -87,21 +94,21 @@ export default function GradientMeshOrb({
             />
           </filter>
 
-          <radialGradient id="stxMeshA" r="60%">
+          <radialGradient id={meshAId} r="60%">
             <animate attributeName="cx" values="35%;55%;30%;35%" dur="18s" repeatCount="indefinite" />
             <animate attributeName="cy" values="30%;45%;55%;30%" dur="22s" repeatCount="indefinite" />
             <stop offset="0%" stopColor={palette.a} stopOpacity="0.95" />
             <stop offset="100%" stopColor={palette.a} stopOpacity="0" />
           </radialGradient>
 
-          <radialGradient id="stxMeshB" r="55%">
+          <radialGradient id={meshBId} r="55%">
             <animate attributeName="cx" values="70%;50%;75%;70%" dur="20s" repeatCount="indefinite" />
             <animate attributeName="cy" values="65%;40%;70%;65%" dur="16s" repeatCount="indefinite" />
             <stop offset="0%" stopColor={palette.b} stopOpacity="0.9" />
             <stop offset="100%" stopColor={palette.b} stopOpacity="0" />
           </radialGradient>
 
-          <radialGradient id="stxMeshC" r="50%">
+          <radialGradient id={meshCId} r="50%">
             <animate attributeName="cx" values="50%;30%;60%;50%" dur="26s" repeatCount="indefinite" />
             <animate attributeName="cy" values="80%;55%;35%;80%" dur="19s" repeatCount="indefinite" />
             <stop offset="0%" stopColor={palette.c} stopOpacity="0.85" />
@@ -109,10 +116,10 @@ export default function GradientMeshOrb({
           </radialGradient>
         </defs>
 
-        <g filter="url(#stxMeshWarp)">
-          <circle cx="240" cy="240" r="190" fill="url(#stxMeshA)" />
-          <circle cx="240" cy="240" r="190" fill="url(#stxMeshB)" />
-          <circle cx="240" cy="240" r="190" fill="url(#stxMeshC)" />
+        <g filter={`url(#${warpId})`}>
+          <circle cx="240" cy="240" r="190" fill={`url(#${meshAId})`} />
+          <circle cx="240" cy="240" r="190" fill={`url(#${meshBId})`} />
+          <circle cx="240" cy="240" r="190" fill={`url(#${meshCId})`} />
         </g>
       </svg>
     </div>

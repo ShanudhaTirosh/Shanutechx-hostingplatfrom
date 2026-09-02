@@ -65,8 +65,8 @@ export default function Pricing() {
   return (
     <section id="pricing" className="px-4 py-28 max-w-6xl mx-auto relative">
       {/* Background Orb Accent */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 opacity-30 pointer-events-none">
-        <GradientMeshOrb size={500} glowColor="rgba(45,212,191,0.3)" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 opacity-65 sm:opacity-80 pointer-events-none">
+        <GradientMeshOrb size={600} glowColor="rgba(45,212,191,0.55)" />
       </div>
       <div className="text-center mb-12">
         <span className="glass inline-block rounded-full px-4 py-1 text-xs text-text-muted mb-4">

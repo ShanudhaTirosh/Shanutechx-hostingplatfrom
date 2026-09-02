@@ -40,11 +40,10 @@ export default function Hero({ title, subtitle }: HeroProps) {
     <section className="relative flex flex-col items-center text-center pt-36 md:pt-44 pb-24 px-4 overflow-hidden">
       {/* Dynamic Background Mesh Orb */}
       <div className="absolute inset-0 -z-10 flex items-center justify-center overflow-hidden pointer-events-none">
-        <div className="absolute -top-[120px] left-1/2 -translate-x-1/2 scale-125 md:scale-150 opacity-70 md:opacity-85">
-          <GradientMeshOrb size={650} glowColor="rgba(124,58,237,0.5)" />
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 scale-125 sm:scale-150 md:scale-175 opacity-90 sm:opacity-95">
+          <GradientMeshOrb size={700} glowColor="rgba(139,92,246,0.75)" />
         </div>
-        <div className="dot-pattern absolute inset-0 opacity-30" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#070814]/40 to-[#070814]" />
+        <div className="dot-pattern absolute inset-0 opacity-25" />
       </div>
 
       {/* Hero Announcement Badge */}
