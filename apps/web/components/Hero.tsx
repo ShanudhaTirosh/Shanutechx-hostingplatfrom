@@ -1,4 +1,8 @@
-import { Zap, Code, Bot, Globe, Monitor } from 'lucide-react';
+'use client';
+
+import React, { useState } from 'react';
+import { Zap, Code, Bot, Globe, Monitor, Terminal, CheckCircle2, ArrowRight, Sparkles, Copy, Check } from 'lucide-react';
+import GradientMeshOrb from './GradientMeshOrb';
 
 interface HeroProps {
   title?: string;
@@ -6,41 +10,78 @@ interface HeroProps {
 }
 
 const DEFAULT_SUBTITLE =
-  'Deploy web apps, Node.js and Python services, and Discord bots in minutes. Automatic subdomains, automatic SSL, zero port conflicts.';
+  'Deploy web apps, Node.js & Python backends, and Discord bots in seconds. Automatic SSL, custom subdomains, PostgreSQL/Redis, and real-time container telemetry.';
 
 const BADGES = [
-  { icon: Zap, label: 'Node.js' },
-  { icon: Code, label: 'Python' },
-  { icon: Bot, label: 'Discord Bots' },
-  { icon: Globe, label: 'Web Hosting' },
-  { icon: Monitor, label: 'VPS' },
+  { icon: Zap, label: 'Node.js 20' },
+  { icon: Code, label: 'Python 3.12' },
+  { icon: Bot, label: 'Discord & WA Bots' },
+  { icon: Globe, label: 'Webmail & Web Apps' },
+  { icon: Monitor, label: 'VPS Cockpit' },
 ];
 
 const STATS = [
-  { value: '99.9%', label: 'Uptime SLA' },
-  { value: '<60s', label: 'Deploy Time' },
-  { value: '24/7', label: 'Support' },
+  { value: '99.99%', label: 'Platform Uptime' },
+  { value: '<30s', label: 'Deploy Velocity' },
+  { value: '15+', label: 'One-Click Apps' },
 ];
 
 export default function Hero({ title, subtitle }: HeroProps) {
+  const [copied, setCopied] = useState(false);
+  const commandText = 'npx create-shanutechx-app my-service';
+
+  const copyCommand = () => {
+    navigator.clipboard.writeText(commandText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <section className="relative flex flex-col items-center text-center pt-44 pb-28 px-4 overflow-hidden">
-      {/* Background Orbs */}
-      <div className="absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] rounded-full bg-accent-violet/20 blur-[120px] animate-orb-pulse" />
-        <div className="absolute top-20 left-1/4 w-[300px] h-[300px] rounded-full bg-accent-teal/10 blur-[80px] animate-orb-pulse delay-300" />
-        <div className="absolute top-32 right-1/4 w-[250px] h-[250px] rounded-full bg-accent-violet-light/10 blur-[80px] animate-orb-pulse delay-500" />
-        <div className="dot-pattern absolute inset-0 opacity-40" />
+    <section className="relative flex flex-col items-center text-center pt-36 md:pt-44 pb-24 px-4 overflow-hidden">
+      {/* Dynamic Background Mesh Orb */}
+      <div className="absolute inset-0 -z-10 flex items-center justify-center overflow-hidden pointer-events-none">
+        <div className="absolute -top-[120px] left-1/2 -translate-x-1/2 scale-125 md:scale-150 opacity-70 md:opacity-85">
+          <GradientMeshOrb size={650} glowColor="rgba(124,58,237,0.5)" />
+        </div>
+        <div className="dot-pattern absolute inset-0 opacity-30" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#070814]/40 to-[#070814]" />
       </div>
 
-      {/* Badge Row */}
-      <div className="flex items-center gap-2 flex-wrap justify-center mb-8 animate-fade-in">
+      {/* Hero Announcement Badge */}
+      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.1] backdrop-blur-md mb-8 animate-fade-in hover:border-accent-violet/40 transition-all cursor-default">
+        <Sparkles className="h-3.5 w-3.5 text-accent-violet-light animate-pulse" />
+        <span className="text-xs font-medium text-text-muted">
+          ShanuTechX v2.4 Engine Live • <span className="text-text-primary">Autonomous VPS Orchestration</span>
+        </span>
+      </div>
+
+      {/* Heading */}
+      <div className="animate-slide-up max-w-4xl">
+        {title ? (
+          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.08] text-white">
+            {title}
+          </h1>
+        ) : (
+          <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight leading-[1.06] text-white">
+            Autonomous Cloud Hosting for
+            <span className="text-gradient block mt-1">Modern Engineers</span>
+          </h1>
+        )}
+      </div>
+
+      {/* Subtitle */}
+      <p className="max-w-2xl mt-6 text-text-muted text-base md:text-lg leading-relaxed animate-slide-up delay-100">
+        {subtitle || DEFAULT_SUBTITLE}
+      </p>
+
+      {/* Badge Pills */}
+      <div className="flex items-center gap-2 flex-wrap justify-center mt-8 mb-8 animate-fade-in">
         {BADGES.map((badge) => {
           const Icon = badge.icon;
           return (
             <span
               key={badge.label}
-              className="glass rounded-full px-3 py-1 text-xs text-text-muted flex items-center gap-1.5 hover:text-text-primary transition-colors"
+              className="glass rounded-full px-3.5 py-1.5 text-xs font-medium text-text-muted flex items-center gap-1.5 hover:text-text-primary hover:border-white/20 transition-all"
             >
               <Icon className="h-3.5 w-3.5 text-accent-violet-light" />
               {badge.label}
@@ -49,57 +90,74 @@ export default function Hero({ title, subtitle }: HeroProps) {
         })}
       </div>
 
-      {/* Heading */}
-      <div className="animate-slide-up">
-        {title ? (
-          <h1 className="max-w-3xl text-5xl md:text-7xl font-bold tracking-tight leading-[1.08]">
-            {title}
-          </h1>
-        ) : (
-          <h1 className="max-w-3xl text-5xl md:text-7xl font-bold tracking-tight leading-[1.08]">
-            Hosting that gets out of
-            <span className="text-gradient block md:inline"> your way</span>
-          </h1>
-        )}
-      </div>
-
-      {/* Subtitle */}
-      <p className="max-w-xl mt-6 text-text-muted text-base md:text-lg leading-relaxed animate-slide-up delay-100">
-        {subtitle || DEFAULT_SUBTITLE}
-      </p>
-
       {/* CTA Buttons */}
-      <div className="mt-10 flex flex-col sm:flex-row gap-4 animate-slide-up delay-200">
+      <div className="mt-2 flex flex-col sm:flex-row items-center gap-4 animate-slide-up delay-200">
         <a
           href={`${process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001'}/login`}
-          className="btn-shimmer rounded-full px-8 py-3.5 font-semibold text-white text-sm shadow-glow-violet"
+          className="btn-shimmer rounded-full px-8 py-3.5 font-semibold text-white text-sm shadow-glow-violet flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-transform"
         >
-          Get started free →
+          <span>Get Started Free</span>
+          <ArrowRight className="h-4 w-4" />
         </a>
-        <a
-          href="/pricing"
-          className="glass rounded-full px-8 py-3.5 font-medium text-text-primary text-sm hover:bg-white/[0.07] transition-colors"
+
+        {/* Quick CLI command button */}
+        <button
+          onClick={copyCommand}
+          className="glass rounded-full px-5 py-3 font-mono text-xs text-text-muted hover:text-text-primary border border-white/[0.1] hover:border-white/[0.2] flex items-center gap-2.5 transition-all bg-black/30"
+          title="Click to copy quick setup CLI command"
         >
-          See pricing
-        </a>
+          <Terminal className="h-3.5 w-3.5 text-accent-teal-bright" />
+          <span>{commandText}</span>
+          {copied ? (
+            <Check className="h-3.5 w-3.5 text-accent-teal-bright ml-1" />
+          ) : (
+            <Copy className="h-3.5 w-3.5 text-text-muted hover:text-text-primary ml-1" />
+          )}
+        </button>
+      </div>
+
+      {/* Interactive Glass Terminal Preview */}
+      <div className="mt-14 w-full max-w-3xl rounded-2xl border border-white/[0.1] bg-black/60 backdrop-blur-xl shadow-2xl overflow-hidden text-left animate-slide-up delay-300">
+        {/* Terminal Header */}
+        <div className="flex items-center justify-between px-4 py-3 bg-white/[0.03] border-b border-white/[0.06]">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500/80" />
+            <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+            <div className="w-3 h-3 rounded-full bg-green-500/80" />
+            <span className="ml-2 text-xs font-mono text-text-muted">shanutechx ~ container-daemon</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] font-mono text-accent-teal-bright">
+            <span className="w-2 h-2 rounded-full bg-accent-teal-bright animate-ping" />
+            Active
+          </div>
+        </div>
+
+        {/* Terminal Code Body */}
+        <div className="p-5 font-mono text-xs space-y-2.5 text-text-muted leading-relaxed">
+          <div className="flex items-center gap-2 text-text-primary">
+            <span className="text-accent-violet-light">$</span>
+            <span>stx deploy --git github.com/shanudha/express-api --branch main</span>
+          </div>
+          <div className="text-white/60 pl-4">➜ Building container image node:20-alpine...</div>
+          <div className="text-white/60 pl-4">➜ Provisioning PostgreSQL database cluster & vault secrets...</div>
+          <div className="flex items-center gap-2 text-emerald-400 font-semibold pl-4">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span>Deployment complete (18.4s)</span>
+          </div>
+          <div className="pl-4 text-accent-teal-bright underline">
+            https://express-api-production.shanutech.cloud
+          </div>
+        </div>
       </div>
 
       {/* Stats Row */}
       <div className="mt-16 flex items-center gap-8 md:gap-16 animate-fade-in delay-400">
-        {STATS.map((stat, i) => (
+        {STATS.map((stat) => (
           <div key={stat.label} className="text-center">
-            <div className="text-2xl font-bold text-gradient-warm">{stat.value}</div>
-            <div className="text-xs text-text-muted mt-0.5">{stat.label}</div>
+            <div className="text-2xl md:text-3xl font-extrabold text-gradient-warm">{stat.value}</div>
+            <div className="text-xs text-text-muted mt-1 font-medium">{stat.label}</div>
           </div>
         ))}
-      </div>
-
-      {/* Scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-float opacity-40">
-        <svg width="20" height="28" viewBox="0 0 20 28" fill="none">
-          <rect x="1" y="1" width="18" height="26" rx="9" stroke="currentColor" strokeWidth="1.5" className="text-text-muted"/>
-          <circle cx="10" cy="8" r="3" fill="currentColor" className="text-accent-teal-bright animate-pulse"/>
-        </svg>
       </div>
     </section>
   );

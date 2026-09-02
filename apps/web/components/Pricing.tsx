@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Globe, Zap, Code, Bot, MessageSquare, Music, Monitor, Brain, Mail, Database, Package } from 'lucide-react';
 
+import GradientMeshOrb from './GradientMeshOrb';
+
 function renderCategoryIcon(category: string) {
   const className = "h-5 w-5 text-accent-violet-light";
   switch (category) {
@@ -61,7 +63,11 @@ export default function Pricing() {
   const displayed = products?.filter((p) => p.plans.length > 0).slice(0, 6) ?? [];
 
   return (
-    <section id="pricing" className="px-4 py-28 max-w-6xl mx-auto">
+    <section id="pricing" className="px-4 py-28 max-w-6xl mx-auto relative">
+      {/* Background Orb Accent */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 opacity-30 pointer-events-none">
+        <GradientMeshOrb size={500} glowColor="rgba(45,212,191,0.3)" />
+      </div>
       <div className="text-center mb-12">
         <span className="glass inline-block rounded-full px-4 py-1 text-xs text-text-muted mb-4">
           Products &amp; Pricing
