@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { FileText } from 'lucide-react';
 
 interface FileItem {
   name: string;
@@ -67,7 +68,7 @@ export function BucketFileBrowser({ bucketName }: BucketFileBrowserProps) {
                 }`}
               >
                 <div className="flex items-center gap-2.5 truncate">
-                  <span>📄</span>
+                  <FileText className="h-4 w-4 text-accent-violet-light shrink-0" />
                   <span className="font-medium truncate">{file.name}</span>
                 </div>
                 <span className="text-[11px] text-text-faint shrink-0">

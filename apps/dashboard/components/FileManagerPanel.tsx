@@ -1,8 +1,25 @@
-'use client';
-
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '@/lib/api';
-import { Button, Spinner, useToast } from '@/components/ui';
+import {
+  Folder,
+  Archive,
+  Code,
+  FileJson,
+  FileText,
+  Lock,
+  Box,
+  Palette,
+  Terminal,
+  FileCode,
+  UploadCloud,
+  Save,
+  Pencil,
+  Trash2,
+  X,
+  File,
+  RotateCw,
+  Plus,
+  ArrowUp,
+  GitCommit,
+} from 'lucide-react';
 
 interface FsEntry {
   name: string;
@@ -47,21 +64,21 @@ function isArchive(name: string): boolean {
   return ARCHIVE_EXTENSIONS.some((ext) => name.toLowerCase().endsWith(ext));
 }
 
-function fileIcon(entry: FsEntry): string {
-  if (entry.type === 'dir') return '📁';
+function renderFileIcon(entry: FsEntry) {
+  if (entry.type === 'dir') return <Folder className="h-4 w-4 text-amber-400" />;
   const n = entry.name.toLowerCase();
-  if (isArchive(n)) return '📦';
-  if (n.endsWith('.ts') || n.endsWith('.tsx')) return '🟦';
-  if (n.endsWith('.js') || n.endsWith('.jsx') || n.endsWith('.mjs')) return '🟨';
-  if (n.endsWith('.json')) return '📋';
-  if (n.endsWith('.md') || n.endsWith('.mdx')) return '📝';
-  if (n.startsWith('.env') || n.includes('.env.')) return '🔐';
-  if (n === 'dockerfile') return '🐳';
-  if (n.endsWith('.css') || n.endsWith('.scss')) return '🎨';
-  if (n.endsWith('.py')) return '🐍';
-  if (n.endsWith('.sh') || n.endsWith('.bash')) return '⚡';
-  if (n.endsWith('.yaml') || n.endsWith('.yml')) return '📄';
-  return '📄';
+  if (isArchive(n)) return <Archive className="h-4 w-4 text-purple-400" />;
+  if (n.endsWith('.ts') || n.endsWith('.tsx')) return <FileCode className="h-4 w-4 text-blue-400" />;
+  if (n.endsWith('.js') || n.endsWith('.jsx') || n.endsWith('.mjs')) return <Code className="h-4 w-4 text-yellow-400" />;
+  if (n.endsWith('.json')) return <FileJson className="h-4 w-4 text-emerald-400" />;
+  if (n.endsWith('.md') || n.endsWith('.mdx')) return <FileText className="h-4 w-4 text-sky-400" />;
+  if (n.startsWith('.env') || n.includes('.env.')) return <Lock className="h-4 w-4 text-rose-400" />;
+  if (n === 'dockerfile') return <Box className="h-4 w-4 text-cyan-400" />;
+  if (n.endsWith('.css') || n.endsWith('.scss')) return <Palette className="h-4 w-4 text-pink-400" />;
+  if (n.endsWith('.py')) return <Terminal className="h-4 w-4 text-emerald-400" />;
+  if (n.endsWith('.sh') || n.endsWith('.bash')) return <Terminal className="h-4 w-4 text-amber-400" />;
+  if (n.endsWith('.yaml') || n.endsWith('.yml')) return <FileText className="h-4 w-4 text-orange-400" />;
+  return <File className="h-4 w-4 text-slate-400" />;
 }
 
 export function FileManagerPanel({ deploymentId, repoUrl, connectedAccounts = [] }: Props) {
@@ -367,14 +384,22 @@ export function FileManagerPanel({ deploymentId, repoUrl, connectedAccounts = []
 
         <div className="flex items-center gap-2">
           {currentPath && (
-            <Button size="sm" variant="ghost" onClick={navigateUp}>← Up</Button>
+            <Button size="sm" variant="ghost" onClick={navigateUp}>
+              <ArrowUp className="h-3.5 w-3.5 mr-1" /> Up
+            </Button>
           )}
           <Button size="sm" onClick={() => fileInputRef.current?.click()} loading={uploading}>
-            {uploading ? 'Uploading...' : '📤 Upload Files'}
+            {uploading ? 'Uploading...' : <span className="flex items-center gap-1.5"><UploadCloud className="h-3.5 w-3.5" /> Upload Files</span>}
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => setShowNewFileModal(true)}>+ New File</Button>
-          <Button size="sm" variant="secondary" onClick={handleCreateDir}>+ New Folder</Button>
-          <Button size="sm" variant="secondary" onClick={() => loadDir(currentPath)}>↺ Refresh</Button>
+          <Button size="sm" variant="secondary" onClick={() => setShowNewFileModal(true)}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> New File
+          </Button>
+          <Button size="sm" variant="secondary" onClick={handleCreateDir}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> New Folder
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => loadDir(currentPath)}>
+            <RotateCw className="h-3.5 w-3.5 mr-1" /> Refresh
+          </Button>
         </div>
       </div>
 
@@ -410,7 +435,7 @@ export function FileManagerPanel({ deploymentId, repoUrl, connectedAccounts = []
                   if (entry.type === 'dir') loadDir(currentPath ? `${currentPath}/${entry.name}` : entry.name);
                 }}
               >
-                <span className="text-base flex-shrink-0">{fileIcon(entry)}</span>
+                <span className="flex-shrink-0">{renderFileIcon(entry)}</span>
                 <span className="text-xs text-text-primary flex-1 truncate font-mono">{entry.name}</span>
                 {/* Context actions on hover */}
                 <div className="hidden group-hover:flex items-center gap-1">
@@ -438,18 +463,18 @@ export function FileManagerPanel({ deploymentId, repoUrl, connectedAccounts = []
                   <button
                     type="button"
                     onClick={(ev) => { ev.stopPropagation(); setRenameFrom(entry.name); setRenameTo(entry.name); setShowRenameModal(true); }}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white/60 transition-all"
+                    className="text-[10px] p-1 rounded bg-white/10 hover:bg-white/20 text-white/60 transition-all"
                     title="Rename"
                   >
-                    ✏
+                    <Pencil className="h-3 w-3" />
                   </button>
                   <button
                     type="button"
                     onClick={(ev) => { ev.stopPropagation(); handleDelete(entry.name, entry.type); }}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-all"
+                    className="text-[10px] p-1 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-all"
                     title="Delete"
                   >
-                    ✕
+                    <Trash2 className="h-3 w-3" />
                   </button>
                 </div>
               </div>
@@ -483,7 +508,7 @@ export function FileManagerPanel({ deploymentId, repoUrl, connectedAccounts = []
                       onClick={(e) => closeTab(tab.path, e)}
                       className="hover:text-red-400 text-text-faint text-[11px] ml-1"
                     >
-                      ✕
+                      <X className="h-3 w-3" />
                     </button>
                   </div>
                 );
@@ -494,7 +519,7 @@ export function FileManagerPanel({ deploymentId, repoUrl, connectedAccounts = []
           {!activeTab && (
             <div className="flex-1 flex items-center justify-center text-text-faint text-sm p-8">
               <div className="text-center space-y-3">
-                <p className="text-4xl">⚡</p>
+                <Terminal className="h-10 w-10 text-accent-cyan mx-auto opacity-80" />
                 <h4 className="text-sm font-semibold text-white">ShanuTechX Web IDE</h4>
                 <p className="text-xs text-text-muted max-w-sm">
                   Double-click any file in the workspace tree to open it in a tab. Edit code with syntax highlighting, shortcuts (<kbd className="px-1 py-0.5 bg-white/10 rounded">Ctrl+S</kbd>), and 1-click Git push.
@@ -526,11 +551,11 @@ export function FileManagerPanel({ deploymentId, repoUrl, connectedAccounts = []
                       variant="secondary"
                       onClick={() => { setGitCommitMsg(`Update ${activeTab.name}`); setShowGitPushModal(true); }}
                     >
-                      ↑ Push to Git
+                      <GitCommit className="h-3.5 w-3.5 mr-1" /> Push to Git
                     </Button>
                   )}
                   <Button size="sm" onClick={handleSaveFile} loading={savingFile} disabled={!activeTab.isDirty}>
-                    {savingFile ? 'Saving...' : '💾 Save (Ctrl+S)'}
+                    {savingFile ? 'Saving...' : <span className="flex items-center gap-1.5"><Save className="h-3.5 w-3.5" /> Save (Ctrl+S)</span>}
                   </Button>
                 </div>
               </div>

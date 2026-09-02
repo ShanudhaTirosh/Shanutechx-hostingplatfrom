@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Terminal, Cpu, Server, Activity } from 'lucide-react';
 
 const FEATURES = [
   {
     id: 'shell',
     title: 'Shell Access & Web TTY',
-    icon: '⚡',
+    icon: Terminal,
     description: 'Manage your server directly via our built-in interactive browser SSH shell system. No third-party terminal client required.',
     preview: {
       header: 'Interactive Terminal Container Gateway',
@@ -23,23 +24,23 @@ const FEATURES = [
   {
     id: 'catalog',
     title: '1-Click App Catalog',
-    icon: '🔌',
+    icon: Cpu,
     description: 'Deploy production stacks (WordPress, n8n, MongoDB, Redis, Lavalink, LiveKit) in one click with pre-configured environment variables.',
     preview: {
       header: 'Catalog Stack Installer',
       body: [
-        '✔ Selected Template: WordPress + MySQL Stack',
-        '✔ Auto-generated MySQL root password (Encrypted AES-GCM)',
-        '✔ Traefik router rules injected for subdomain.shanutechx.com',
-        '✔ Let\'s Encrypt SSL auto-certificate provisioned',
-        '🚀 Status: RUNNING on Node-Central-01',
+        'Selected Template: WordPress + MySQL Stack',
+        'Auto-generated MySQL root password (Encrypted AES-GCM)',
+        'Traefik router rules injected for subdomain.shanutechx.com',
+        'Let\'s Encrypt SSL auto-certificate provisioned',
+        'Status: RUNNING on Node-Central-01',
       ],
     },
   },
   {
     id: 'mod',
     title: 'Multi-Node Cluster Manager',
-    icon: '📦',
+    icon: Server,
     description: 'Connect, provision, and load-balance across multiple bare-metal or cloud nodes with automated Docker & UFW firewall setup.',
     preview: {
       header: 'Node Cluster Distribution',
@@ -47,22 +48,22 @@ const FEATURES = [
         'Node #1 (Amsterdam): 16 vCPU | 64 GB RAM | CPU Load: 12%',
         'Node #2 (Chicago):   8 vCPU | 32 GB RAM | CPU Load: 24%',
         'Node #3 (Colombo):   4 vCPU | 16 GB RAM | CPU Load: 8%',
-        '✔ Auto-Failover: Active',
+        'Auto-Failover: Active',
       ],
     },
   },
   {
     id: 'analytics',
     title: 'Real-Time Telemetry & Alerts',
-    icon: '💜',
+    icon: Activity,
     description: 'Inspect CPU, RAM, Disk, and Network bandwidth metrics live with WhatsApp & Discord alert hook triggers.',
     preview: {
       header: 'Real-Time Health Pulse',
       body: [
-        '📊 CPU Utilization: 14.2% [||.......]',
-        '🧠 Memory Usage:    4.1 GB / 32 GB (12.8%)',
-        '💾 Disk Storage:     42 GB / 500 GB (8.4%)',
-        '🔔 Discord Webhook: Active (Payment & Status Alerts)',
+        'CPU Utilization: 14.2% [||.......]',
+        'Memory Usage:    4.1 GB / 32 GB (12.8%)',
+        'Disk Storage:     42 GB / 500 GB (8.4%)',
+        'Discord Webhook: Active (Payment & Status Alerts)',
       ],
     },
   },
@@ -92,6 +93,7 @@ export default function PlatformShowcase() {
           <div className="lg:col-span-5 space-y-3 flex flex-col justify-center">
             {FEATURES.map((feat) => {
               const active = activeFeature.id === feat.id;
+              const Icon = feat.icon;
               return (
                 <button
                   key={feat.id}
@@ -102,7 +104,9 @@ export default function PlatformShowcase() {
                       : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] hover:border-white/10'
                   }`}
                 >
-                  <span className="text-2xl p-2 rounded-xl bg-white/5 border border-white/10 shrink-0">{feat.icon}</span>
+                  <span className="p-2 rounded-xl bg-white/5 border border-white/10 shrink-0">
+                    <Icon className="h-5 w-5 text-accent-violet-light" />
+                  </span>
                   <div>
                     <h3 className={`font-bold text-sm ${active ? 'text-white font-extrabold' : 'text-text-muted'}`}>
                       {feat.title}

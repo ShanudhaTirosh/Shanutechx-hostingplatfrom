@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Button, Badge } from '@/components/ui';
+import { Server } from 'lucide-react';
 
 interface Props {
   kind: 'provision' | 'node';
@@ -120,7 +121,7 @@ export default function LeasewebInstancePanel({ kind, id }: Props) {
           Open console
         </Button>
         <Button variant="primary" onClick={() => setShowCockpit(!showCockpit)}>
-          {showCockpit ? 'Hide Cockpit Dashboard' : '🖥️ Cockpit Management'}
+          {showCockpit ? 'Hide Cockpit Dashboard' : <span className="flex items-center gap-1.5"><Server className="h-3.5 w-3.5" /> Cockpit Management</span>}
         </Button>
       </div>
 

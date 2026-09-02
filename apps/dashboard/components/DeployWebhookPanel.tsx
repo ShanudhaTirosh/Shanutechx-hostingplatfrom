@@ -1,8 +1,7 @@
-'use client';
-
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Button, Spinner, useToast } from '@/components/ui';
+import { AlertTriangle, GitBranch, GitPullRequest, Check, Copy } from 'lucide-react';
 
 interface Props {
   deploymentId: string;
@@ -116,7 +115,7 @@ export function DeployWebhookPanel({ deploymentId, apiBase = '' }: Props) {
               {fullWebhookUrl || info.webhookUrl}
             </code>
             <Button size="sm" variant="secondary" onClick={() => copyToClipboard(fullWebhookUrl || info.webhookUrl, 'url')}>
-              {copiedUrl ? '✓ Copied!' : 'Copy'}
+              {copiedUrl ? <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Copied!</span> : <span className="flex items-center gap-1"><Copy className="h-3.5 w-3.5" /> Copy</span>}
             </Button>
           </div>
         </div>
@@ -126,7 +125,7 @@ export function DeployWebhookPanel({ deploymentId, apiBase = '' }: Props) {
       {revealedSecret && (
         <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/25 space-y-2">
           <div className="flex items-center gap-2">
-            <span className="text-yellow-400 text-sm">⚠️</span>
+            <AlertTriangle className="h-4 w-4 text-yellow-400" />
             <p className="text-xs font-semibold text-yellow-300">Copy your webhook secret now — it won't be shown again!</p>
           </div>
           <div className="flex gap-2">
@@ -134,7 +133,7 @@ export function DeployWebhookPanel({ deploymentId, apiBase = '' }: Props) {
               {revealedSecret}
             </code>
             <Button size="sm" onClick={() => copyToClipboard(revealedSecret, 'secret')}>
-              {copiedSecret ? '✓ Copied!' : 'Copy Secret'}
+              {copiedSecret ? <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Copied!</span> : <span className="flex items-center gap-1"><Copy className="h-3.5 w-3.5" /> Copy Secret</span>}
             </Button>
           </div>
         </div>
@@ -147,7 +146,7 @@ export function DeployWebhookPanel({ deploymentId, apiBase = '' }: Props) {
           <div className="space-y-2">
             <details className="group">
               <summary className="cursor-pointer flex items-center gap-2 p-3 bg-white/[0.03] border border-white/[0.06] rounded-xl hover:bg-white/[0.05] transition-all text-xs text-text-primary font-medium">
-                🐙 GitHub Webhook Setup
+                <GitBranch className="h-3.5 w-3.5 text-accent-violet" /> GitHub Webhook Setup
               </summary>
               <div className="mt-2 p-3 bg-black/30 rounded-xl border border-white/[0.04] text-xs text-text-muted leading-relaxed">
                 {info.instructions.github}
@@ -155,7 +154,7 @@ export function DeployWebhookPanel({ deploymentId, apiBase = '' }: Props) {
             </details>
             <details className="group">
               <summary className="cursor-pointer flex items-center gap-2 p-3 bg-white/[0.03] border border-white/[0.06] rounded-xl hover:bg-white/[0.05] transition-all text-xs text-text-primary font-medium">
-                🦊 GitLab Webhook Setup
+                <GitPullRequest className="h-3.5 w-3.5 text-accent-cyan" /> GitLab Webhook Setup
               </summary>
               <div className="mt-2 p-3 bg-black/30 rounded-xl border border-white/[0.04] text-xs text-text-muted leading-relaxed">
                 {info.instructions.gitlab}

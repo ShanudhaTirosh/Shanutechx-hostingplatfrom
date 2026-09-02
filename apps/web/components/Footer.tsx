@@ -55,7 +55,7 @@ export default function Footer() {
                 </button>
               </div>
               {subscribed && (
-                <p className="text-emerald-400 text-xs font-mono">✔ Thanks for subscribing to updates!</p>
+                <p className="text-emerald-400 text-xs font-mono">Thanks for subscribing to updates!</p>
               )}
             </form>
           </div>

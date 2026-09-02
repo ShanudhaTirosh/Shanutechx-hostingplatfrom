@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { supabaseAdmin, EmailTemplate } from '@/lib/supabaseAdmin';
 import { Button } from '@/components/ui';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { Mail } from 'lucide-react';
 
 export function EmailTemplateEditor() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -68,13 +69,13 @@ export function EmailTemplateEditor() {
             <button
               key={t.id}
               onClick={() => handleSelectTemplate(t.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5 ${
                 selectedId === t.id
                   ? 'bg-accent-violet text-white shadow-glow-violet'
                   : 'text-text-muted hover:bg-white/[0.04]'
               }`}
             >
-              ✉️ {t.name}
+              <Mail className="h-3.5 w-3.5" /> {t.name}
             </button>
           ))}
         </div>

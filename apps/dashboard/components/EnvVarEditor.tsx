@@ -14,6 +14,8 @@ interface EnvVarEditorProps {
 
 import { parseEnvText } from '@/lib/envParser';
 
+import { Sparkles, FolderOpen, X, Plus } from 'lucide-react';
+
 export function EnvVarEditor({ deploymentId, initialEnvVars, deploymentStatus, onClose, onSaved }: EnvVarEditorProps) {
   const [envVars, setEnvVars] = useState<Array<{ key: string; value: string; id: string }>>(
     Object.entries(initialEnvVars).map(([key, value], idx) => ({
@@ -70,7 +72,7 @@ export function EnvVarEditor({ deploymentId, initialEnvVars, deploymentStatus, o
       }
 
       setEnvVars(updated);
-      setImportSummary(`✨ Imported ${parsed.length} variables: ${newCount} new, ${overwriteCount} will overwrite existing values.`);
+      setImportSummary(`Imported ${parsed.length} variables: ${newCount} new, ${overwriteCount} will overwrite existing values.`);
       toast(`Parsed ${parsed.length} environment variables`, 'success');
     };
     reader.readAsText(file);
@@ -172,8 +174,8 @@ export function EnvVarEditor({ deploymentId, initialEnvVars, deploymentStatus, o
                   isDragging ? 'border-accent-violet bg-accent-violet/10' : 'border-white/15 bg-white/[0.02] hover:border-white/30'
                 }`}
               >
-                <p className="text-xs font-semibold text-text-primary">
-                  📂 Drag &amp; Drop <code className="text-indigo-400 font-mono">.env</code> file here or click to browse
+                <p className="text-xs font-semibold text-text-primary flex items-center justify-center gap-1.5">
+                  <FolderOpen className="h-4 w-4 text-indigo-400" /> Drag &amp; Drop <code className="text-indigo-400 font-mono">.env</code> file here or click to browse
                 </p>
                 <p className="text-[11px] text-text-muted">Supports .env, .env.local, .env.production or text files</p>
                 <input
@@ -194,8 +196,8 @@ export function EnvVarEditor({ deploymentId, initialEnvVars, deploymentStatus, o
               {/* Diff Preview Summary Banner */}
               {importSummary && (
                 <div className="p-3 bg-indigo-600/20 border border-indigo-500/30 rounded-xl text-xs text-indigo-300 font-medium flex items-center justify-between">
-                  <span>{importSummary}</span>
-                  <button onClick={() => setImportSummary(null)} className="text-indigo-400 hover:text-white">✕</button>
+                  <span className="flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-indigo-400" /> {importSummary}</span>
+                  <button onClick={() => setImportSummary(null)} className="text-indigo-400 hover:text-white"><X className="h-3.5 w-3.5" /></button>
                 </div>
               )}
 

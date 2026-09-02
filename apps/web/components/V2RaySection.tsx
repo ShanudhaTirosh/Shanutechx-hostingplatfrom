@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Zap, ExternalLink } from 'lucide-react';
 
 const V2RAY_FEATURES = [
   { title: 'Protocols Supported', desc: 'VMess, VLESS, Trojan, Shadowsocks, gRPC, WebSocket' },
@@ -20,7 +21,7 @@ export default function V2RaySection() {
           <div className="grid lg:grid-cols-2 gap-8 items-center relative z-10">
             <div className="space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/40">
-                <span>⚡ High-Speed Proxy Solutions</span>
+                <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-purple-300" /> High-Speed Proxy Solutions</span>
               </div>
               <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
                 V2Ray &amp; Netch <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-300 to-indigo-300">Proxy Configs</span>
@@ -40,13 +41,13 @@ export default function V2RaySection() {
 
               <div className="pt-2 flex flex-wrap gap-4 items-center">
                 <a
-                  href="https://v2ray.shanutechx.com"
+                  href="https://store.shanutechx.com"
                   target="_blank"
                   rel="noreferrer"
                   className="px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-glow-violet transition-all flex items-center gap-2"
                 >
                   <span>Visit V2Ray Proxy Store Portal</span>
-                  <span>↗</span>
+                  <ExternalLink className="h-3.5 w-3.5" />
                 </a>
                 <span className="text-xs text-text-faint font-mono">Instant subscription delivery after payment</span>
               </div>

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { MessageSquare, User, Menu, ChevronDown } from 'lucide-react';
 
 const LINKS = [
   { label: 'Cloud VPS', href: '#features' },
@@ -60,7 +61,7 @@ export default function Navbar() {
           {/* Legal Dropdown */}
           <div className="relative group py-1">
             <span className="cursor-pointer hover:text-white transition-colors flex items-center gap-1">
-              Legal ▼
+              Legal <ChevronDown className="h-3 w-3" />
             </span>
             <div className="absolute top-full right-0 mt-2 w-40 bg-[#12132b] border border-white/10 rounded-2xl p-2 hidden group-hover:block shadow-2xl space-y-1">
               <Link href="/terms" className="block px-3 py-1.5 rounded-xl hover:bg-white/10 text-xs text-text-muted hover:text-white">
@@ -83,7 +84,7 @@ export default function Navbar() {
             title="Join Discord Server"
             className="hidden sm:flex items-center justify-center h-8 w-8 rounded-full bg-white/5 hover:bg-indigo-600/20 text-indigo-300 border border-white/10 transition-all"
           >
-            <span>💬</span>
+            <MessageSquare className="h-4 w-4" />
           </a>
 
           {/* CLIENT SPACE Button */}
@@ -91,7 +92,7 @@ export default function Navbar() {
             href={loginUrl}
             className="rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 px-5 py-2 text-xs font-extrabold text-white shadow-glow-violet transition-all uppercase tracking-wider flex items-center gap-1.5"
           >
-            <span>👤 CLIENT SPACE</span>
+            <User className="h-3.5 w-3.5" /> CLIENT SPACE
           </a>
 
           {/* Mobile Hamburger */}
@@ -99,7 +100,7 @@ export default function Navbar() {
             onClick={() => setMobileOpen((v) => !v)}
             className="md:hidden p-2 text-text-muted hover:text-white"
           >
-            ☰
+            <Menu className="h-5 w-5" />
           </button>
         </div>
       </nav>

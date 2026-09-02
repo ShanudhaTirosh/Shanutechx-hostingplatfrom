@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic';
 import { Button, Input, Modal, useToast } from './ui';
 import { api } from '@/lib/api';
 
+import { Server, Activity, Settings, User, Box, Shield, Terminal } from 'lucide-react';
+
 // CRITICAL: @xterm/xterm references `self` (browser-only global) at module load.
 // A static import causes "ReferenceError: self is not defined" during Next.js SSR
 // prerender. dynamic() with ssr:false defers the import to client-side only.
@@ -209,7 +211,7 @@ export function CockpitDashboardPanel({ nodeId, nodeLabel, ipAddress }: CockpitD
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass p-5 rounded-2xl border border-white/[0.08]">
         <div>
           <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
-            🖥️ Server Cockpit: <span className="text-accent-violet">{nodeLabel || nodeId}</span>
+            <Server className="h-5 w-5 text-accent-violet" /> Server Cockpit: <span className="text-accent-violet">{nodeLabel || nodeId}</span>
           </h2>
           <p className="text-xs text-text-muted mt-1 font-mono">
             IP: {ipAddress || 'Internal'} • Real-time Monitoring &amp; System Administration
@@ -219,25 +221,29 @@ export function CockpitDashboardPanel({ nodeId, nodeLabel, ipAddress }: CockpitD
         {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-1 bg-black/40 p-1.5 rounded-xl border border-white/[0.06]">
           {[
-            { id: 'monitoring', label: '📊 Monitoring' },
-            { id: 'services', label: '⚙️ Services' },
-            { id: 'users', label: '👤 Users' },
-            { id: 'docker', label: '🐳 Docker' },
-            { id: 'firewall', label: '🛡️ Firewall' },
-            { id: 'terminal', label: '💻 Terminal' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                activeTab === tab.id
-                  ? 'bg-accent-violet text-white shadow-glow-violet'
-                  : 'text-text-muted hover:text-text-primary hover:bg-white/[0.05]'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+            { id: 'monitoring', label: 'Monitoring', icon: Activity },
+            { id: 'services', label: 'Services', icon: Settings },
+            { id: 'users', label: 'Users', icon: User },
+            { id: 'docker', label: 'Docker', icon: Box },
+            { id: 'firewall', label: 'Firewall', icon: Shield },
+            { id: 'terminal', label: 'Terminal', icon: Terminal },
+          ].map((tab) => {
+            const IconComp = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                  activeTab === tab.id
+                    ? 'bg-accent-violet text-white shadow-glow-violet'
+                    : 'text-text-muted hover:text-text-primary hover:bg-white/[0.05]'
+                }`}
+              >
+                <IconComp className="h-3.5 w-3.5" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 

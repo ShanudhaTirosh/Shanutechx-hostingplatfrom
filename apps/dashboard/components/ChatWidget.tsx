@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAppUser } from '@/lib/AppUserContext';
 import { firebaseAuth } from '@/lib/firebaseClient';
 import { sendChatMessage, subscribeToChat, markChatRead, ChatMessage } from '@/lib/chat';
+import { MessageSquare, X } from 'lucide-react';
 
 export default function ChatWidget() {
   const { apiUser } = useAppUser();
@@ -47,7 +48,7 @@ export default function ChatWidget() {
           <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
             <span className="text-sm font-medium">Live support</span>
             <button onClick={() => setOpen(false)} className="text-text-muted hover:text-text-primary text-sm">
-              ✕
+              <X className="h-4 w-4" />
             </button>
           </div>
 
@@ -94,7 +95,7 @@ export default function ChatWidget() {
         className="h-12 w-12 rounded-full bg-brand-gradient text-white flex items-center justify-center shadow-lg hover:opacity-90 transition-opacity"
         aria-label="Open live chat"
       >
-        💬
+        <MessageSquare className="h-5 w-5" />
       </button>
     </div>
   );

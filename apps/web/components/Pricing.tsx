@@ -1,21 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Globe, Zap, Code, Bot, MessageSquare, Music, Monitor, Brain, Mail, Database, Package } from 'lucide-react';
 
-const CATEGORY_ICON: Record<string, string> = {
-  web_hosting: '🌐',
-  node_app_hosting: '⚡',
-  python_app_hosting: '🐍',
-  discordbot_node: '🤖',
-  discordbot_python: '🐍',
-  whatsappbot_hosting: '💬',
-  lavalink_hosting: '🎵',
-  vps: '🖥️',
-  ai_subscription: '🧠',
-  smtp_hosting: '📧',
-  database_hosting: '🗄️',
-  app_catalog: '📦',
-};
+function renderCategoryIcon(category: string) {
+  const className = "h-5 w-5 text-accent-violet-light";
+  switch (category) {
+    case 'web_hosting': return <Globe className={className} />;
+    case 'node_app_hosting': return <Zap className={className} />;
+    case 'python_app_hosting': return <Code className={className} />;
+    case 'discordbot_node':
+    case 'discordbot_python': return <Bot className={className} />;
+    case 'whatsappbot_hosting': return <MessageSquare className={className} />;
+    case 'lavalink_hosting': return <Music className={className} />;
+    case 'vps': return <Monitor className={className} />;
+    case 'ai_subscription': return <Brain className={className} />;
+    case 'smtp_hosting': return <Mail className={className} />;
+    case 'database_hosting': return <Database className={className} />;
+    case 'app_catalog': default: return <Package className={className} />;
+  }
+}
 
 const BILLING_LABEL: Record<string, string> = {
   one_time: 'one-time',
@@ -113,7 +117,9 @@ export default function Pricing() {
                 )}
 
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="text-2xl">{CATEGORY_ICON[product.category] ?? '📦'}</span>
+                  <div className="h-10 w-10 rounded-xl bg-accent-violet/10 border border-accent-violet/20 flex items-center justify-center shrink-0">
+                    {renderCategoryIcon(product.category)}
+                  </div>
                   <div>
                     <h3 className="font-semibold text-text-primary">{product.name}</h3>
                     <p className="text-text-faint text-xs font-medium">{product.plans.length} plan{product.plans.length !== 1 ? 's' : ''}</p>

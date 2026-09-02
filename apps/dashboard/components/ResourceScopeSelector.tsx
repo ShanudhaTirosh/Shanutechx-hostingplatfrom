@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui';
 
+import { User, Users, X } from 'lucide-react';
+
 interface TeamItem {
   id: string;
   name: string;
@@ -99,11 +101,11 @@ export function ResourceScopeSelector({
         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent-violet/50 transition-colors"
       >
         <option value="personal" className="bg-[#0a0a14]">
-          👤 Personal Account (Private to You)
+          Personal Account (Private to You)
         </option>
         {teams.map((t) => (
           <option key={t.id} value={t.id} className="bg-[#0a0a14]">
-            👥 Team: {t.name} ({t.myRole.toUpperCase()})
+            Team: {t.name} ({t.myRole.toUpperCase()})
           </option>
         ))}
       </select>
@@ -120,7 +122,7 @@ export function ResourceScopeSelector({
                 onClick={() => setShowCreateModal(false)}
                 className="text-text-muted hover:text-text-primary text-lg"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
 

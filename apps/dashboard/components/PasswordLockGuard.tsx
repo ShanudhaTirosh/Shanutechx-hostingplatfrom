@@ -4,6 +4,8 @@ import { useState, useEffect, ReactNode } from 'react';
 import { Card, Input, Button, ErrorBanner } from './ui';
 import { api } from '@/lib/api';
 
+import { Lock, KeyRound } from 'lucide-react';
+
 interface PasswordLockGuardProps {
   children: ReactNode;
   title?: string;
@@ -77,7 +79,7 @@ export default function PasswordLockGuard({
             <span className="font-medium">Settings Unlocked (Active Security Session)</span>
           </div>
           <Button variant="ghost" size="sm" onClick={handleLock} className="text-xs py-1 h-7">
-            🔒 Lock Settings
+            <Lock className="h-3.5 w-3.5 mr-1" /> Lock Settings
           </Button>
         </div>
         {children}
@@ -91,8 +93,8 @@ export default function PasswordLockGuard({
         <div className="absolute top-0 left-0 right-0 h-1 bg-brand-gradient" />
         
         <div className="flex flex-col items-center text-center space-y-4">
-          <div className="h-14 w-14 rounded-2xl bg-accent-violet/15 text-accent-violet-light flex items-center justify-center text-2xl shadow-glow-violet">
-            🔐
+          <div className="h-14 w-14 rounded-2xl bg-accent-violet/15 text-accent-violet-light flex items-center justify-center shadow-glow-violet">
+            <KeyRound className="h-6 w-6 text-accent-violet-light" />
           </div>
 
           <div>

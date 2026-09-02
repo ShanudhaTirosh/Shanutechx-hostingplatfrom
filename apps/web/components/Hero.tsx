@@ -1,3 +1,5 @@
+import { Zap, Code, Bot, Globe, Monitor } from 'lucide-react';
+
 interface HeroProps {
   title?: string;
   subtitle?: string;
@@ -7,11 +9,11 @@ const DEFAULT_SUBTITLE =
   'Deploy web apps, Node.js and Python services, and Discord bots in minutes. Automatic subdomains, automatic SSL, zero port conflicts.';
 
 const BADGES = [
-  { icon: '⚡', label: 'Node.js' },
-  { icon: '🐍', label: 'Python' },
-  { icon: '🤖', label: 'Discord Bots' },
-  { icon: '🌐', label: 'Web Hosting' },
-  { icon: '🖥️', label: 'VPS' },
+  { icon: Zap, label: 'Node.js' },
+  { icon: Code, label: 'Python' },
+  { icon: Bot, label: 'Discord Bots' },
+  { icon: Globe, label: 'Web Hosting' },
+  { icon: Monitor, label: 'VPS' },
 ];
 
 const STATS = [
@@ -33,15 +35,18 @@ export default function Hero({ title, subtitle }: HeroProps) {
 
       {/* Badge Row */}
       <div className="flex items-center gap-2 flex-wrap justify-center mb-8 animate-fade-in">
-        {BADGES.map((badge) => (
-          <span
-            key={badge.label}
-            className="glass rounded-full px-3 py-1 text-xs text-text-muted flex items-center gap-1.5 hover:text-text-primary transition-colors"
-          >
-            <span>{badge.icon}</span>
-            {badge.label}
-          </span>
-        ))}
+        {BADGES.map((badge) => {
+          const Icon = badge.icon;
+          return (
+            <span
+              key={badge.label}
+              className="glass rounded-full px-3 py-1 text-xs text-text-muted flex items-center gap-1.5 hover:text-text-primary transition-colors"
+            >
+              <Icon className="h-3.5 w-3.5 text-accent-violet-light" />
+              {badge.label}
+            </span>
+          );
+        })}
       </div>
 
       {/* Heading */}
