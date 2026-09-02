@@ -326,7 +326,7 @@ export default function StxFooter() {
             borderTop: '1px solid rgba(255,255,255,0.05)',
             paddingTop: '24px',
             display: 'flex',
-            justify: 'space-between',
+            justifyContent: 'space-between',
             alignItems: 'center',
             flexWrap: 'wrap',
             gap: '12px',
