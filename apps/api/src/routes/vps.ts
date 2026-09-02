@@ -17,6 +17,10 @@ import {
   sftpDownloadFile,
   sftpUploadFile,
   sftpDeleteFile,
+  extractArchiveSsh,
+  renamePathSsh,
+  mkdirSsh,
+  touchFileSsh,
 } from '../lib/vpsSshClient';
 
 export const vpsRouter = Router();
@@ -450,6 +454,159 @@ vpsRouter.delete('/vps-provisions/:id/sftp/delete', async (req: AuthedRequest, r
     res.json({ ok: true, remotePath, message: `${isDirectory ? 'Directory' : 'File'} deleted over SFTP` });
   } catch (err: any) {
     res.status(502).json({ error: `SFTP deletion failed (${remotePath}): ${err.message}` });
+  }
+});
+
+const extractSchema = z.object({
+  archivePath: z.string().min(1),
+  targetDirectory: z.string().optional(),
+});
+
+/**
+ * POST /api/vps-provisions/:id/sftp/extract
+ * Extract a zip/tar/tgz archive directly on the remote VPS over SSH.
+ */
+vpsRouter.post('/vps-provisions/:id/sftp/extract', async (req: AuthedRequest, res: Response) => {
+  const parsed = extractSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  try {
+    const result = await extractArchiveSsh(provision, parsed.data.archivePath, parsed.data.targetDirectory);
+    res.json({ ok: true, message: result.message });
+  } catch (err: any) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+const renameSchema = z.object({
+  oldPath: z.string().min(1),
+  newPath: z.string().min(1),
+});
+
+/**
+ * POST /api/vps-provisions/:id/sftp/rename
+ * Rename / move a file or folder on the remote VPS over SSH.
+ */
+vpsRouter.post('/vps-provisions/:id/sftp/rename', async (req: AuthedRequest, res: Response) => {
+  const parsed = renameSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  try {
+    await renamePathSsh(provision, parsed.data.oldPath, parsed.data.newPath);
+    res.json({ ok: true, message: 'Renamed successfully' });
+  } catch (err: any) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+const mkdirSchema = z.object({ dirPath: z.string().min(1) });
+
+/**
+ * POST /api/vps-provisions/:id/sftp/mkdir
+ * Create a directory on the remote VPS over SSH.
+ */
+vpsRouter.post('/vps-provisions/:id/sftp/mkdir', async (req: AuthedRequest, res: Response) => {
+  const parsed = mkdirSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  try {
+    await mkdirSsh(provision, parsed.data.dirPath);
+    res.json({ ok: true, message: 'Directory created successfully' });
+  } catch (err: any) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+const touchSchema = z.object({ filePath: z.string().min(1) });
+
+/**
+ * POST /api/vps-provisions/:id/sftp/touch
+ * Create an empty file on the remote VPS over SSH.
+ */
+vpsRouter.post('/vps-provisions/:id/sftp/touch', async (req: AuthedRequest, res: Response) => {
+  const parsed = touchSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  try {
+    await touchFileSsh(provision, parsed.data.filePath);
+    res.json({ ok: true, message: 'File created successfully' });
+  } catch (err: any) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/vps-provisions/:id/sftp/read-file
+ * Read text file content over SFTP for online editor preview/edit.
+ */
+vpsRouter.get('/vps-provisions/:id/sftp/read-file', async (req: AuthedRequest, res: Response) => {
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  const remotePath = req.query.path as string;
+  if (!remotePath) return res.status(400).json({ error: 'path query parameter is required' });
+
+  try {
+    const buffer = await sftpDownloadFile(provision, remotePath);
+    const content = buffer.toString('utf-8');
+    res.json({ path: remotePath, content });
+  } catch (err: any) {
+    res.status(502).json({ error: `Read file failed: ${err.message}` });
+  }
+});
+
+const saveFileSchema = z.object({
+  remotePath: z.string().min(1),
+  content: z.string(),
+});
+
+/**
+ * POST /api/vps-provisions/:id/sftp/save-file
+ * Save text file content over SFTP from online editor.
+ */
+vpsRouter.post('/vps-provisions/:id/sftp/save-file', async (req: AuthedRequest, res: Response) => {
+  const parsed = saveFileSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  try {
+    const buffer = Buffer.from(parsed.data.content, 'utf-8');
+    await sftpUploadFile(provision, parsed.data.remotePath, buffer);
+    res.json({ ok: true, message: 'File saved successfully over SFTP' });
+  } catch (err: any) {
+    res.status(502).json({ error: `Save file failed: ${err.message}` });
   }
 });
 

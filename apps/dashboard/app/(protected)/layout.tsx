@@ -110,15 +110,18 @@ function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { childre
             {subdomain === 'admin' ? 'SHANUTECHX ADMIN' : subdomain === 'dev' ? 'SHANUTECHX DEV' : 'SHANUTECHX'}
           </span>
         </div>
-        <button
-          onClick={() => setSidebarOpen((v) => !v)}
-          className="flex flex-col gap-1.5 p-1"
-          aria-label="Toggle sidebar"
-        >
-          <span className={`block h-0.5 w-5 bg-text-muted rounded transition-all ${sidebarOpen ? 'rotate-45 translate-y-2' : ''}`} />
-          <span className={`block h-0.5 w-5 bg-text-muted rounded transition-all ${sidebarOpen ? 'opacity-0' : ''}`} />
-          <span className={`block h-0.5 w-5 bg-text-muted rounded transition-all ${sidebarOpen ? '-rotate-45 -translate-y-2' : ''}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <DevRightClickToggle />
+          <button
+            onClick={() => setSidebarOpen((v) => !v)}
+            className="flex flex-col gap-1.5 p-1"
+            aria-label="Toggle sidebar"
+          >
+            <span className={`block h-0.5 w-5 bg-text-muted rounded transition-all ${sidebarOpen ? 'rotate-45 translate-y-2' : ''}`} />
+            <span className={`block h-0.5 w-5 bg-text-muted rounded transition-all ${sidebarOpen ? 'opacity-0' : ''}`} />
+            <span className={`block h-0.5 w-5 bg-text-muted rounded transition-all ${sidebarOpen ? '-rotate-45 -translate-y-2' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {/* Mobile sidebar overlay */}
@@ -150,6 +153,8 @@ function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { childre
   );
 }
 
+import { RightClickProtector, DevRightClickToggle } from '@/components/RightClickProtector';
+
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -168,9 +173,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   return (
     <ToastProvider>
       <AppUserProvider>
-        <GatedLayoutContent sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
-          {children}
-        </GatedLayoutContent>
+        <RightClickProtector>
+          <GatedLayoutContent sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
+            {children}
+          </GatedLayoutContent>
+        </RightClickProtector>
       </AppUserProvider>
     </ToastProvider>
   );

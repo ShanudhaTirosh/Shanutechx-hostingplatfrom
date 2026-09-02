@@ -662,20 +662,95 @@ export const api = {
   },
 
   vps: {
-    list: () => apiFetch('/api/vps-provisions').then((r) => asJson<{ provisions: VpsProvision[] }>(r)),
+    list: () => apiFetch('/api/vps-provisions').then((r) => asJson<{ provisions: VpsProvision[]; notice?: string }>(r)),
+    get: (id: string) => apiFetch(`/api/vps-provisions/${id}`).then((r) => asJson<{ provision: VpsProvision; notice?: string }>(r)),
     revealPassword: (id: string) =>
-      apiFetch(`/api/vps-provisions/${id}/reveal-password`).then((r) => asJson<{ password: string }>(r)),
+      apiFetch(`/api/vps-provisions/${id}/reveal-password`).then((r) =>
+        asJson<{ username: string; password: string; ip?: string; sshPort?: number; credentialType: string; notice?: string }>(r)
+      ),
+    sshTicket: (id: string) =>
+      apiFetch(`/api/vps-provisions/${id}/ssh-ticket`, { method: 'POST' }).then(
+        (r) => asJson<{ ticket: string; expiresInMs: number; notice?: string }>(r)
+      ),
+    power: (id: string, action: 'reboot' | 'stop' | 'start' | 'status') =>
+      apiFetch(`/api/vps-provisions/${id}/power`, { method: 'POST', body: JSON.stringify({ action }) }).then(
+        (r) => asJson<{ ok: boolean; action: string; message?: string; status?: string; uptime?: string }>(r)
+      ),
+    stats: (id: string) =>
+      apiFetch(`/api/vps-provisions/${id}/stats`).then((r) =>
+        asJson<{ stats: { uptime: string; cpuCores: number; ramTotalMb: number; ramUsedMb: number; diskTotalGb: number; diskUsedGb: number } }>(r)
+      ),
+    changePassword: (id: string, newPassword: string) =>
+      apiFetch(`/api/vps-provisions/${id}/change-password`, { method: 'POST', body: JSON.stringify({ newPassword }) }).then(
+        (r) => asJson<{ ok: boolean; message: string; notice?: string }>(r)
+      ),
+    updateCredentials: (id: string, data: { ip?: string; sshPort?: number; username?: string; password?: string }) =>
+      apiFetch(`/api/vps-provisions/${id}/update-credentials`, { method: 'PATCH', body: JSON.stringify(data) }).then(
+        (r) => asJson<{ ok: boolean; provision: VpsProvision; notice?: string }>(r)
+      ),
+    sftpList: (id: string, path = '/root') =>
+      apiFetch(`/api/vps-provisions/${id}/sftp/list?path=${encodeURIComponent(path)}`).then((r) =>
+        asJson<{
+          path: string;
+          items: Array<{ name: string; size: number; isDirectory: boolean; modifyTime: number; permissions: number }>;
+          notice?: string;
+        }>(r)
+      ),
+    sftpDownloadUrl: (id: string, path: string) => `/api/vps-provisions/${id}/sftp/download?path=${encodeURIComponent(path)}`,
+    sftpUpload: (id: string, remotePath: string, file: File) => {
+      const formData = new FormData();
+      formData.append('remotePath', remotePath);
+      formData.append('file', file);
+      return apiFetch(`/api/vps-provisions/${id}/sftp/upload`, { method: 'POST', body: formData }).then(
+        (r) => asJson<{ ok: boolean; remotePath: string; message: string }>(r)
+      );
+    },
+    sftpDelete: (id: string, path: string, isDirectory = false) =>
+      apiFetch(`/api/vps-provisions/${id}/sftp/delete?path=${encodeURIComponent(path)}&isDirectory=${isDirectory}`, {
+        method: 'DELETE',
+      }).then((r) => asJson<{ ok: boolean; remotePath: string; message: string }>(r)),
+    sftpExtract: (id: string, archivePath: string, targetDirectory?: string) =>
+      apiFetch(`/api/vps-provisions/${id}/sftp/extract`, {
+        method: 'POST',
+        body: JSON.stringify({ archivePath, targetDirectory }),
+      }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
+    sftpRename: (id: string, oldPath: string, newPath: string) =>
+      apiFetch(`/api/vps-provisions/${id}/sftp/rename`, {
+        method: 'POST',
+        body: JSON.stringify({ oldPath, newPath }),
+      }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
+    sftpMkdir: (id: string, dirPath: string) =>
+      apiFetch(`/api/vps-provisions/${id}/sftp/mkdir`, {
+        method: 'POST',
+        body: JSON.stringify({ dirPath }),
+      }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
+    sftpTouch: (id: string, filePath: string) =>
+      apiFetch(`/api/vps-provisions/${id}/sftp/touch`, {
+        method: 'POST',
+        body: JSON.stringify({ filePath }),
+      }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
+    sftpReadFile: (id: string, path: string) =>
+      apiFetch(`/api/vps-provisions/${id}/sftp/read-file?path=${encodeURIComponent(path)}`).then((r) =>
+        asJson<{ path: string; content: string }>(r)
+      ),
+    sftpSaveFile: (id: string, remotePath: string, content: string) =>
+      apiFetch(`/api/vps-provisions/${id}/sftp/save-file`, {
+        method: 'POST',
+        body: JSON.stringify({ remotePath, content }),
+      }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
     create: (data: {
       userId: string;
       orderItemId: string;
-      provider: string;
+      provider?: string;
       externalId?: string;
-      panelUrl: string;
-      username: string;
+      panelUrl?: string;
+      ip?: string;
+      sshPort?: number;
+      username?: string;
       password: string;
     }) =>
       apiFetch('/api/vps-provisions', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
-        asJson<{ provision: VpsProvision }>(r)
+        asJson<{ provision: VpsProvision; notice?: string }>(r)
       ),
   },
 

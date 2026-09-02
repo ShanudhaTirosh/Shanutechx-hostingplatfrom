@@ -188,7 +188,10 @@ export interface VpsProvision {
   provider: string;
   externalId: string | null;
   panelUrl: string | null;
+  ip: string | null;
+  sshPort: number | null;
   username: string | null;
+  credentialRef: string | null;
   status: VpsProvisionStatus;
   createdAt: string;
   leasewebVpsId: string | null;

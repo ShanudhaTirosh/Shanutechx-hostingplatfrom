@@ -266,3 +266,80 @@ export async function sftpDeleteFile(provision: VpsProvision, remotePath: string
     });
   });
 }
+
+/**
+ * Unzips / extracts an archive (zip, tar, tar.gz, tgz, gz) remotely on the VPS.
+ */
+export async function extractArchiveSsh(
+  provision: VpsProvision,
+  archivePath: string,
+  targetDirectory?: string
+): Promise<{ success: boolean; message: string }> {
+  const dir = targetDirectory || archivePath.substring(0, archivePath.lastIndexOf('/')) || '/root';
+  const ext = archivePath.toLowerCase();
+
+  let cmd = '';
+  if (ext.endsWith('.zip')) {
+    cmd = `cd '${dir}' && (unzip -o '${archivePath}' || busybox unzip -o '${archivePath}' || python3 -m zipfile -e '${archivePath}' .)`;
+  } else if (ext.endsWith('.tar.gz') || ext.endsWith('.tgz')) {
+    cmd = `cd '${dir}' && tar -xzf '${archivePath}'`;
+  } else if (ext.endsWith('.tar')) {
+    cmd = `cd '${dir}' && tar -xf '${archivePath}'`;
+  } else if (ext.endsWith('.gz')) {
+    cmd = `cd '${dir}' && gunzip -k '${archivePath}'`;
+  } else {
+    throw new Error('Unsupported archive format. Supported formats: .zip, .tar, .tar.gz, .tgz, .gz');
+  }
+
+  const res = await execVpsSsh(provision, cmd);
+  if (res.code !== 0 && res.stderr.toLowerCase().includes('error')) {
+    throw new Error(`Extraction failed: ${res.stderr || res.stdout || 'Archive command error'}`);
+  }
+  return { success: true, message: `Archive extracted into ${dir}` };
+}
+
+/**
+ * Renames / moves a file or directory remotely over SSH.
+ */
+export async function renamePathSsh(
+  provision: VpsProvision,
+  oldPath: string,
+  newPath: string
+): Promise<{ success: boolean }> {
+  const cmd = `mv '${oldPath.replace(/'/g, "'\\''")}' '${newPath.replace(/'/g, "'\\''")}'`;
+  const res = await execVpsSsh(provision, cmd);
+  if (res.code !== 0) {
+    throw new Error(`Rename failed: ${res.stderr || 'mv command error'}`);
+  }
+  return { success: true };
+}
+
+/**
+ * Creates a new directory remotely over SSH.
+ */
+export async function mkdirSsh(
+  provision: VpsProvision,
+  dirPath: string
+): Promise<{ success: boolean }> {
+  const cmd = `mkdir -p '${dirPath.replace(/'/g, "'\\''")}'`;
+  const res = await execVpsSsh(provision, cmd);
+  if (res.code !== 0) {
+    throw new Error(`Directory creation failed: ${res.stderr || 'mkdir command error'}`);
+  }
+  return { success: true };
+}
+
+/**
+ * Creates a new empty file remotely over SSH.
+ */
+export async function touchFileSsh(
+  provision: VpsProvision,
+  filePath: string
+): Promise<{ success: boolean }> {
+  const cmd = `touch '${filePath.replace(/'/g, "'\\''")}'`;
+  const res = await execVpsSsh(provision, cmd);
+  if (res.code !== 0) {
+    throw new Error(`File creation failed: ${res.stderr || 'touch command error'}`);
+  }
+  return { success: true };
+}
