@@ -1,13 +1,14 @@
 import crypto from 'crypto';
 import type { Server as HttpServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { Client as SshClient } from 'ssh2';
+import { Client as SshClient, ConnectConfig } from 'ssh2';
 import { logger } from './logger';
 import { getVps, getCredentials, LeasewebApiError } from './leasewebClient';
 import { decryptSecret } from './secretsVault';
 import { prisma } from './prisma';
 import { canAccessResource } from '../middleware/rbac';
 import { env } from '../env';
+import { getVpsSshConfig } from './vpsSshClient';
 
 /**
  * Real, interactive SSH-from-the-browser for a customer's (or staff's) VPS.
@@ -193,34 +194,58 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
         return;
       }
 
-      // Leaseweb-managed VPS path (original implementation)
-      // BUG-16 FIX: Re-verify customer ownership of the Leaseweb VPS provision
-      if (user.role === 'customer') {
-        const provision = await prisma.vpsProvision.findFirst({
-          where: { leasewebVpsId: entry.vpsId, userId: user.id, status: { not: 'terminated' } },
-        });
-        if (!provision) {
-          return fail('You do not own this VPS provision.');
-        }
+      // 1. Try resolving VpsProvision row by ID (for both Direct SSH and Leaseweb provisions)
+      const provision = await prisma.vpsProvision.findFirst({
+        where: {
+          OR: [{ id: entry.vpsId }, { leasewebVpsId: entry.vpsId }],
+          status: { not: 'terminated' },
+        },
+      });
+
+      if (provision && user.role === 'customer' && provision.userId !== user.id) {
+        return fail('You do not own this VPS provision.');
       }
 
-      sendStatus('Fetching VPS details…');
-      const [instance, credentials] = await Promise.all([
-        getVps(entry.vpsId),
-        getCredentials(entry.vpsId, 'OPERATING_SYSTEM'),
-      ]);
+      let connectOpts: ConnectConfig;
 
-      const ip = instance.ips?.[0]?.ip;
-      if (!ip) return fail('No IP address found for this VPS.');
+      // Direct SSH path (Manual / Provider without API access)
+      if (provision && provision.ip && !provision.leasewebVpsId) {
+        sendStatus(`Connecting to VPS at ${provision.ip}…`);
+        try {
+          connectOpts = getVpsSshConfig(provision);
+        } catch (err: any) {
+          return fail(`Failed to read VPS SSH configuration: ${err.message}`);
+        }
+      } else {
+        // Leaseweb-managed VPS path
+        const targetLeasewebId = provision?.leasewebVpsId || entry.vpsId;
+        sendStatus('Fetching VPS credentials from Leaseweb…');
+        const [instance, credentials] = await Promise.all([
+          getVps(targetLeasewebId),
+          getCredentials(targetLeasewebId, 'OPERATING_SYSTEM'),
+        ]);
+
+        const ip = instance.ips?.[0]?.ip;
+        if (!ip) return fail('No IP address found for this VPS.');
+
+        connectOpts = {
+          host: ip,
+          port: 22,
+          username: credentials.username || 'root',
+          password: credentials.password,
+          readyTimeout: 15_000,
+          keepaliveInterval: 10_000,
+        };
+      }
 
       if (closed || !ssh) return;
 
-      sendStatus(`Connecting to ${ip}…`);
+      sendStatus(`Establishing SSH session to ${connectOpts.host}:${connectOpts.port}…`);
 
       const currentSsh = ssh;
       currentSsh.on('ready', () => {
         if (!ssh || closed) return;
-        sendStatus('Connected. Opening shell…');
+        sendStatus('Connected. Opening terminal shell…');
         const sshInst = ssh;
         sshInst.shell({ term: 'xterm-256color' }, (err, stream) => {
           if (err || closed || !ssh) {
@@ -271,14 +296,7 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
         if (!closed) fail(`SSH connection failed: ${err.message}`);
       });
 
-      currentSsh.connect({
-        host: ip,
-        port: 22,
-        username: credentials.username || 'root',
-        password: credentials.password,
-        readyTimeout: 15_000,
-        keepaliveInterval: 10_000,
-      });
+      currentSsh.connect(connectOpts);
     } catch (err) {
       const message =
         err instanceof LeasewebApiError

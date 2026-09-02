@@ -650,11 +650,13 @@ model VpsProvision {
   user          User               @relation(fields: [userId], references: [id])
   orderItemId   String             @unique
   orderItem     OrderItem          @relation(fields: [orderItemId], references: [id])
-  provider      String             // e.g. "leaseweb", "contabo", "vultr", "ovh"
+  provider      String             // e.g. "leaseweb", "contabo", "vultr", "ovh", "custom"
   externalId    String?            // the upstream provider's VPS/instance ID
   panelUrl      String?
-  username      String?
-  credentialRef String?            // encrypted panel password — see lib/secretsVault.ts
+  ip            String?            // Public IP address for direct SSH & SFTP management
+  sshPort       Int                @default(22) // SSH port (default 22)
+  username      String?            // root or primary login username
+  credentialRef String?            // encrypted password or SSH private key — see lib/secretsVault.ts
   status        VpsProvisionStatus @default(pending)
   createdAt     DateTime           @default(now())
   provisionedAt DateTime?
