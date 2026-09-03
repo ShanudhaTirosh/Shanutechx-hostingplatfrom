@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   signInWithPopup,
@@ -145,9 +146,12 @@ export default function LoginPage() {
       <div className="w-full max-w-sm animate-scale-in">
         {/* Brand Logo Header */}
         <div className="flex items-center gap-3 justify-center mb-8">
-          <span className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-cyan-500 to-indigo-500 flex items-center justify-center text-white font-black text-xs shadow-[0_0_20px_rgba(16,185,129,0.5)]">
-            STX
-          </span>
+          <img
+            src="/STX.png"
+            alt="STX HOSTING Logo"
+            className="w-10 h-10 max-w-[40px] max-h-[40px] shrink-0 rounded-xl object-contain shadow-[0_0_20px_rgba(16,185,129,0.5)]"
+            style={{ filter: 'brightness(0) invert(1)' }}
+          />
           <span className="font-extrabold text-xl text-white tracking-tight">
             SHANUTECHX <span className="text-emerald-400 font-bold">.CLOUD</span>
           </span>
@@ -213,13 +217,13 @@ export default function LoginPage() {
 
         <p className="text-center text-[11px] text-slate-500 mt-6 font-sans">
           By signing in you agree to ShanuTechX Cloud{' '}
-          <a href="/terms" className="underline hover:text-white transition-colors">
+          <Link href="/terms" className="underline hover:text-white transition-colors">
             Terms of Service
-          </a>{' '}
+          </Link>{' '}
           and{' '}
-          <a href="/privacy" className="underline hover:text-white transition-colors">
+          <Link href="/privacy" className="underline hover:text-white transition-colors">
             Privacy Policy
-          </a>
+          </Link>
           .
         </p>
       </div>

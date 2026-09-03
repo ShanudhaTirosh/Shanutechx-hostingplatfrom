@@ -38,13 +38,22 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhos
 export async function getAuthToken(): Promise<string> {
   let user = firebaseAuth.currentUser;
   if (!user && typeof window !== 'undefined') {
-    await new Promise<void>((resolve) => {
-      const unsubscribe = onAuthStateChanged(firebaseAuth, (u) => {
-        user = u;
-        unsubscribe();
-        resolve();
-      });
-    });
+    try {
+      await Promise.race([
+        new Promise<void>((resolve) => {
+          const unsubscribe = onAuthStateChanged(firebaseAuth, (u) => {
+            user = u;
+            unsubscribe();
+            resolve();
+          });
+        }),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('Authentication timeout — please sign in again')), 5000)
+        ),
+      ]);
+    } catch (err) {
+      // Timeout or error resolving Firebase user
+    }
   }
   if (!user) {
     if (typeof window !== 'undefined') {

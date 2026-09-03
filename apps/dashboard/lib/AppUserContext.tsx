@@ -56,10 +56,10 @@ export function AppUserProvider({ children }: { children: React.ReactNode }) {
   const fetchUser = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await api.me();
       setApiUser(data.user);
       setRootDomain(data.rootDomain);
-      setError(null);
       if (typeof window !== 'undefined') {
         try {
           localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data.user));
@@ -76,7 +76,7 @@ export function AppUserProvider({ children }: { children: React.ReactNode }) {
         } catch {}
       }
       setApiUser(null);
-      setError(err.message);
+      setError(err.message || 'Failed to fetch user context from server');
     } finally {
       setLoading(false);
     }

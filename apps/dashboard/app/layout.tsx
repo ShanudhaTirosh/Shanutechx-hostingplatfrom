@@ -6,9 +6,13 @@ export const metadata: Metadata = {
   title: 'STX HOSTING Control Panel',
   description: 'Manage your VPS hosting, cloud deployments, V2Ray proxies, and invoices.',
   icons: {
-    icon: '/STX.png',
-    shortcut: '/STX.png',
-    apple: '/STX.png',
+    icon: [
+      { url: '/favicon.png', type: 'image/png' },
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/STX.png', type: 'image/png' },
+    ],
+    shortcut: '/favicon.png',
+    apple: '/favicon.png',
   },
   manifest: '/manifest.json',
 };

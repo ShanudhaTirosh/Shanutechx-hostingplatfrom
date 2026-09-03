@@ -40,7 +40,7 @@ function DashboardSkeleton() {
 
 function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { children: React.ReactNode, sidebarOpen: boolean, setSidebarOpen: React.Dispatch<React.SetStateAction<boolean>> }) {
   const pathname = usePathname();
-  const { apiUser, loading: apiUserLoading } = useAppUser();
+  const { apiUser, loading: apiUserLoading, error: userError, refetchUser } = useAppUser();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
@@ -54,10 +54,6 @@ function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { childre
     const host = typeof window !== 'undefined' ? window.location.hostname : '';
     const parts = host.split('.');
     const subdomain = parts.length > 2 ? parts[0].toLowerCase() : '';
-
-    const isDevSub = subdomain === 'dev';
-    const isAdminSub = subdomain === 'admin';
-    const isClientSub = subdomain === 'app' || subdomain === 'client';
 
     const userRole = apiUser.role;
 
@@ -88,8 +84,48 @@ function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { childre
     // Dev and Admin roles have full access to all routes (admin, dev, catalog, storefront)
   }, [apiUser, apiUserLoading, pathname, router, mounted]);
 
-  if (apiUserLoading || !apiUser) {
+  if (apiUserLoading) {
     return <LoadingSpinner message="Loading user context..." />;
+  }
+
+  if (userError && !apiUser) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-bg p-4">
+        <div className="max-w-md w-full p-6 rounded-2xl bg-white/[0.03] border border-white/[0.08] text-center space-y-4 shadow-2xl">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-rose-500/10 text-rose-400">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-semibold text-white">Unable to load user context</h2>
+          <p className="text-sm text-text-muted">{userError}</p>
+          <div className="flex justify-center gap-3 pt-2">
+            <button
+              onClick={() => refetchUser()}
+              className="px-4 py-2 rounded-xl bg-accent-teal text-black font-medium text-sm hover:opacity-90 transition-opacity"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('shanutechx_user_cache');
+                  localStorage.removeItem('shanutechx_user_cache_ts');
+                  window.location.href = '/login';
+                }
+              }}
+              className="px-4 py-2 rounded-xl bg-white/10 text-white font-medium text-sm hover:bg-white/15 transition-colors"
+            >
+              Sign in again
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!apiUser) {
+    return <LoadingSpinner message="Redirecting to login..." />;
   }
 
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
