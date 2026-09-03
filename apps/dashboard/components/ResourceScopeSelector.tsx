@@ -113,7 +113,7 @@ export function ResourceScopeSelector({
       {hint && <p className="text-[10px] text-text-faint">{hint}</p>}
 
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-background-card p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="font-semibold text-sm text-text-primary">Create Team Workspace</h3>

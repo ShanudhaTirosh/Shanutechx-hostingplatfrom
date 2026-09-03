@@ -6,8 +6,22 @@ import { env } from '../env';
 
 export const meRouter = Router();
 
-meRouter.get('/me', requireAuth, (req: AuthedRequest, res) => {
-  res.json({ user: req.user, rootDomain: env.rootDomain });
+meRouter.get('/me', requireAuth, async (req: AuthedRequest, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: {
+      id: true,
+      firebaseUid: true,
+      email: true,
+      role: true,
+      displayName: true,
+      phoneNumber: true,
+      discordUserId: true,
+      isBanned: true,
+      createdAt: true,
+    },
+  });
+  res.json({ user: user || req.user, rootDomain: env.rootDomain });
 });
 
 const updateProfileSchema = z.object({

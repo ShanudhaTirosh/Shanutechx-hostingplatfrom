@@ -153,6 +153,14 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
   },
 };
 
+function isPathInSpace(pathname: string, spaceKey: SpaceKey): boolean {
+  const space = SPACES[spaceKey];
+  if (!space) return false;
+  return space.links.some(
+    (link) => pathname === link.href || (link.href !== '/dashboard' && link.href !== '/admin' && link.href !== '/dev' && pathname.startsWith(link.href))
+  );
+}
+
 function getSpaceFromPathname(pathname: string): SpaceKey {
   if (
     pathname.startsWith('/dev') ||
@@ -200,31 +208,50 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     allowedSpaces.push('customer');
   }
 
-  // Detect active space from pathname, falling back to first allowed space
-  const detectedSpace = getSpaceFromPathname(pathname);
+  // Detect active space from pathname, falling back to first allowed space or saved space
   const [selectedSpace, setSelectedSpace] = useState<SpaceKey>(() => {
-    return allowedSpaces.includes(detectedSpace) ? detectedSpace : allowedSpaces[0] || 'customer';
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('shanutechx_active_space') as SpaceKey;
+        if (saved && allowedSpaces.includes(saved) && isPathInSpace(pathname, saved)) {
+          return saved;
+        }
+      } catch {}
+    }
+    const detected = getSpaceFromPathname(pathname);
+    return allowedSpaces.includes(detected) ? detected : allowedSpaces[0] || 'customer';
   });
 
-  // Keep selected space synced with pathname when user navigates directly
+  // Keep selected space synced with pathname only if pathname leaves current space
   useEffect(() => {
+    if (isPathInSpace(pathname, selectedSpace) && allowedSpaces.includes(selectedSpace)) {
+      return;
+    }
     const spaceForPath = getSpaceFromPathname(pathname);
     if (allowedSpaces.includes(spaceForPath)) {
       setSelectedSpace(spaceForPath);
+      if (typeof window !== 'undefined') {
+        try { localStorage.setItem('shanutechx_active_space', spaceForPath); } catch {}
+      }
     } else if (!allowedSpaces.includes(selectedSpace)) {
-      setSelectedSpace(allowedSpaces[0] || 'customer');
+      const fallback = allowedSpaces[0] || 'customer';
+      setSelectedSpace(fallback);
+      if (typeof window !== 'undefined') {
+        try { localStorage.setItem('shanutechx_active_space', fallback); } catch {}
+      }
     }
-  }, [pathname, isDev, isAdmin, isSupport]);
+  }, [pathname, isDev, isAdmin, isSupport, selectedSpace]);
 
   const activePanel = SPACES[selectedSpace] || SPACES.customer;
 
   function handleSpaceSwitch(spaceKey: SpaceKey) {
     if (!allowedSpaces.includes(spaceKey)) return;
     setSelectedSpace(spaceKey);
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('shanutechx_active_space', spaceKey); } catch {}
+    }
     const spaceObj = SPACES[spaceKey];
-    // If current path is not in the newly selected space, navigate to default route for that space
-    const pathSpace = getSpaceFromPathname(pathname);
-    if (pathSpace !== spaceKey && spaceObj) {
+    if (!isPathInSpace(pathname, spaceKey) && spaceObj) {
       router.push(spaceObj.defaultHref);
     }
   }
@@ -239,7 +266,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   return (
-    <aside className="w-72 md:w-64 lg:w-72 shrink-0 flex flex-col py-6 px-4 gap-1 border-r border-white/[0.05] h-screen overflow-y-auto bg-bg">
+    <aside className="w-72 md:w-64 lg:w-72 shrink-0 flex flex-col py-6 px-3.5 gap-1 border-r border-white/[0.05] h-screen overflow-y-auto bg-bg">
       {/* Brand Header */}
       <div className="flex items-center justify-between px-3 mb-4">
         <div className="flex items-center gap-2.5">

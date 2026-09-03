@@ -186,7 +186,7 @@ function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { childre
         />
       )}
 
-      <div className="flex min-h-screen max-w-[1400px] mx-auto">
+      <div className="flex min-h-screen w-full">
         {/* Sidebar */}
         <div className={`
           fixed md:sticky top-0 left-0 z-40 h-screen transition-transform duration-300

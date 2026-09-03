@@ -69,13 +69,23 @@ export default function VpsPage() {
   const [syncUsernameInput, setSyncUsernameInput] = useState<string>('root');
   const [syncPasswordInput, setSyncPasswordInput] = useState<string>('');
 
-  // Manual Add VPS Modal
+  // Staff Add VPS Modal state
   const [addVpsModal, setAddVpsModal] = useState<boolean>(false);
+  const [addMode, setAddMode] = useState<'customer' | 'node'>('customer');
+  const [customerOptions, setCustomerOptions] = useState<Array<{ id: string; email: string; displayName?: string | null }>>([]);
+  const [targetUserId, setTargetUserId] = useState<string>('');
   const [manualIp, setManualIp] = useState<string>('');
   const [manualPort, setManualPort] = useState<number>(22);
   const [manualUsername, setManualUsername] = useState<string>('root');
   const [manualPassword, setManualPassword] = useState<string>('');
-  const [manualProvider, setManualProvider] = useState<string>('generic_vps');
+  const [manualProvider, setManualProvider] = useState<string>('STX Enterprise');
+
+  // Node mode fields
+  const [nodeLabel, setNodeLabel] = useState<string>('vps-node-1');
+  const [nodeCpu, setNodeCpu] = useState<number>(2);
+  const [nodeRam, setNodeRam] = useState<number>(2048);
+  const [nodeDisk, setNodeDisk] = useState<number>(40);
+  const [nodeRoleTags, setNodeRoleTags] = useState<string>('web-hosting,node-hosting');
 
   const { toast } = useToast();
   const isStaff = apiUser?.role === 'admin' || apiUser?.role === 'dev';
@@ -117,6 +127,15 @@ export default function VpsPage() {
   }
 
   useEffect(load, []);
+
+  useEffect(() => {
+    if (addVpsModal && isStaff && customerOptions.length === 0) {
+      api.admin.customers(100).then((res) => {
+        setCustomerOptions(res.customers || []);
+        if (res.customers?.[0]?.id) setTargetUserId(res.customers[0].id);
+      }).catch(() => {});
+    }
+  }, [addVpsModal, isStaff, customerOptions.length]);
 
   async function handlePower(p: VpsProvision, action: 'start' | 'stop' | 'reboot') {
     setBusyId(p.id);
@@ -171,28 +190,52 @@ export default function VpsPage() {
   }
 
   async function handleAddManualVps() {
-    if (!manualIp || !manualPassword) {
-      toast('IP and password are required', 'error');
+    if (!manualIp) {
+      toast('IP address is required', 'error');
       return;
     }
     setBusyId('new');
     try {
-      await api.vps.create({
-        userId: apiUser?.id || '',
-        orderItemId: `manual-${Date.now()}`,
-        provider: manualProvider,
-        ip: manualIp,
-        sshPort: manualPort,
-        username: manualUsername,
-        password: manualPassword,
-      });
-      toast('Manual VPS added successfully.', 'success');
+      if (addMode === 'customer') {
+        const finalUserId = targetUserId.trim() || apiUser?.id || '';
+        if (!finalUserId) {
+          toast('Please select a target customer to assign this VPS', 'error');
+          setBusyId(null);
+          return;
+        }
+        if (!manualPassword) {
+          toast('Root password is required', 'error');
+          setBusyId(null);
+          return;
+        }
+        await api.vps.create({
+          userId: finalUserId,
+          orderItemId: `manual-${Date.now()}`,
+          provider: manualProvider,
+          ip: manualIp,
+          sshPort: manualPort,
+          username: manualUsername,
+          password: manualPassword,
+        });
+        toast('VPS successfully provisioned and assigned to customer.', 'success');
+      } else {
+        await api.nodes.create({
+          label: nodeLabel || `node-${manualIp.replace(/\./g, '-')}`,
+          ip: manualIp,
+          cpuCores: nodeCpu,
+          ramMb: nodeRam,
+          diskGb: nodeDisk,
+          sshKeyRef: `vault:${manualIp}`,
+          roleTags: nodeRoleTags.split(',').map((t) => t.trim()).filter(Boolean),
+        });
+        toast('Server registered as Infrastructure Compute Node.', 'success');
+      }
       setAddVpsModal(false);
       setManualIp('');
       setManualPassword('');
       load();
     } catch (err: any) {
-      toast(`Failed to add VPS: ${err.message}`, 'error');
+      toast(`Action failed: ${err.message}`, 'error');
     } finally {
       setBusyId(null);
     }
@@ -277,18 +320,20 @@ export default function VpsPage() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <PageHeader
-          title="Your Virtual Server Fleet"
+          title="Virtual Server Fleet"
           description="Manage root credentials, interactive SSH shell, desktop-grade SFTP file manager, power reboot/stop, and live performance metrics."
         />
-        <Button variant="primary" size="sm" onClick={() => setAddVpsModal(true)} className="flex items-center gap-1.5">
-          <IconPlus size={14} /> Add Existing / Custom VPS (IP &amp; Root SSH)
-        </Button>
+        {isStaff && (
+          <Button variant="primary" size="sm" onClick={() => setAddVpsModal(true)} className="flex items-center gap-1.5">
+            <IconPlus size={14} /> Add VPS (Assign to Customer or System Node)
+          </Button>
+        )}
       </div>
 
       {error && <ErrorBanner message={error} />}
       {provisions === null && <Spinner label="Loading your VPS fleet..." />}
       {provisions?.length === 0 && (
-        <EmptyState message="No VPS assigned to your account yet. Deploy one from the catalog or add your server credentials above." />
+        <EmptyState message="No VPS server assigned to your account yet. VPS servers purchased from STX Hosting will automatically appear here once provisioned." />
       )}
 
       {/* Global Warning Note */}
@@ -440,78 +485,201 @@ export default function VpsPage() {
         })}
       </div>
 
-      {/* Manual VPS Creation Modal */}
-      {addVpsModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="max-w-md w-full border border-white/20 bg-neutral-900 space-y-4">
-            <h3 className="text-base font-bold text-white">Add VPS Server (Root SSH)</h3>
+      {/* Manual VPS / Node Creation Modal (Admin / Dev Staff Only) */}
+      {addVpsModal && isStaff && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <Card className="max-w-lg w-full border border-white/20 bg-neutral-900 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <h3 className="text-base font-bold text-white">Add Server (Staff Only)</h3>
+              <button onClick={() => setAddVpsModal(false)} className="text-text-muted hover:text-white text-sm">✕</button>
+            </div>
             <p className="text-xs text-text-muted">
-              Connect external VPS servers (Leaseweb manual, Contabo, Hetzner, Vultr) using root SSH login.
+              Add a VPS server to assign to a specific customer account or register it as a cluster infrastructure compute node.
             </p>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="text-text-muted block mb-1">Provider Name</label>
-                <input
-                  type="text"
-                  placeholder="Leaseweb / Contabo / Hetzner"
-                  value={manualProvider}
-                  onChange={(e) => setManualProvider(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="col-span-2">
-                  <label className="text-text-muted block mb-1">IP Address *</label>
-                  <input
-                    type="text"
-                    placeholder="192.168.1.100"
-                    value={manualIp}
-                    onChange={(e) => setManualIp(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-text-muted block mb-1">SSH Port</label>
-                  <input
-                    type="number"
-                    value={manualPort}
-                    onChange={(e) => setManualPort(parseInt(e.target.value) || 22)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-text-muted block mb-1">Username</label>
-                  <input
-                    type="text"
-                    value={manualUsername}
-                    onChange={(e) => setManualUsername(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-text-muted block mb-1">Root Password *</label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={manualPassword}
-                    onChange={(e) => setManualPassword(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
-                  />
-                </div>
-              </div>
+            {/* Mode Switcher */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-white/5 rounded-xl border border-white/10">
+              <button
+                type="button"
+                onClick={() => setAddMode('customer')}
+                className={`py-2 px-3 text-xs font-semibold rounded-lg transition-all ${
+                  addMode === 'customer'
+                    ? 'bg-accent-violet text-white shadow-glow-violet'
+                    : 'text-text-muted hover:text-white'
+                }`}
+              >
+                Assign to Customer
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddMode('node')}
+                className={`py-2 px-3 text-xs font-semibold rounded-lg transition-all ${
+                  addMode === 'node'
+                    ? 'bg-accent-violet text-white shadow-glow-violet'
+                    : 'text-text-muted hover:text-white'
+                }`}
+              >
+                Add as System Node
+              </button>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            {addMode === 'customer' ? (
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="text-text-muted block mb-1">Target Customer Account *</label>
+                  {customerOptions.length > 0 ? (
+                    <select
+                      value={targetUserId}
+                      onChange={(e) => setTargetUserId(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-2.5 text-white focus:outline-none focus:border-accent-teal font-mono text-xs"
+                    >
+                      {customerOptions.map((c) => (
+                        <option key={c.id} value={c.id} className="bg-neutral-900 text-white">
+                          {c.email} ({c.displayName || c.id})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Enter Customer User ID"
+                      value={targetUserId}
+                      onChange={(e) => setTargetUserId(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                    />
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-text-muted block mb-1">Provider Name</label>
+                  <input
+                    type="text"
+                    placeholder="STX Enterprise / Leaseweb / Contabo / Hetzner"
+                    value={manualProvider}
+                    onChange={(e) => setManualProvider(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-2">
+                    <label className="text-text-muted block mb-1">IP Address *</label>
+                    <input
+                      type="text"
+                      placeholder="192.168.1.100"
+                      value={manualIp}
+                      onChange={(e) => setManualIp(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-text-muted block mb-1">SSH Port</label>
+                    <input
+                      type="number"
+                      value={manualPort}
+                      onChange={(e) => setManualPort(parseInt(e.target.value) || 22)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-text-muted block mb-1">Username</label>
+                    <input
+                      type="text"
+                      value={manualUsername}
+                      onChange={(e) => setManualUsername(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-text-muted block mb-1">Root Password *</label>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      value={manualPassword}
+                      onChange={(e) => setManualPassword(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="text-text-muted block mb-1">System Node Label *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. node-singapore-1"
+                    value={nodeLabel}
+                    onChange={(e) => setNodeLabel(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-2">
+                    <label className="text-text-muted block mb-1">Node IP Address *</label>
+                    <input
+                      type="text"
+                      placeholder="192.168.1.100"
+                      value={manualIp}
+                      onChange={(e) => setManualIp(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-text-muted block mb-1">vCPU Cores</label>
+                    <input
+                      type="number"
+                      value={nodeCpu}
+                      onChange={(e) => setNodeCpu(parseInt(e.target.value) || 2)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-text-muted block mb-1">RAM (MB)</label>
+                    <input
+                      type="number"
+                      value={nodeRam}
+                      onChange={(e) => setNodeRam(parseInt(e.target.value) || 2048)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-text-muted block mb-1">Disk Storage (GB)</label>
+                    <input
+                      type="number"
+                      value={nodeDisk}
+                      onChange={(e) => setNodeDisk(parseInt(e.target.value) || 40)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-text-muted block mb-1">Role Tags (comma-separated)</label>
+                  <input
+                    type="text"
+                    placeholder="web-hosting, node-hosting"
+                    value={nodeRoleTags}
+                    onChange={(e) => setNodeRoleTags(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
               <Button size="sm" variant="secondary" onClick={() => setAddVpsModal(false)}>
                 Cancel
               </Button>
               <Button size="sm" variant="primary" onClick={handleAddManualVps} loading={busyId === 'new'}>
-                Save Server Credentials
+                {addMode === 'customer' ? 'Save & Assign to Customer' : 'Register System Node'}
               </Button>
             </div>
           </Card>
