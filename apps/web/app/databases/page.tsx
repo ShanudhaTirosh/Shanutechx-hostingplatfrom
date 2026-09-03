@@ -55,7 +55,7 @@ export default async function ManagedDatabasesPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#03040c] text-white font-sans selection:bg-teal-500 selection:text-white">
+    <div className="min-h-screen bg-transparent text-white font-sans selection:bg-teal-500 selection:text-white">
       <Navbar />
 
       {/* Hero Section */}

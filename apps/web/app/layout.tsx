@@ -40,7 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdSchema) }}
         />
       </head>
-      <body className="bg-[#070814] text-white antialiased relative selection:bg-purple-500 selection:text-white min-h-screen">
+      <body className="bg-[#030014] text-white antialiased relative selection:bg-purple-500 selection:text-white min-h-screen">
         <MeshBackground />
         <div className="grain-overlay" aria-hidden="true" />
         <div className="relative z-10">

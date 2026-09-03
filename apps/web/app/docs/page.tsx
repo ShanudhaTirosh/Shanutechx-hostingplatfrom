@@ -201,7 +201,7 @@ export default function DocsPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#070814] text-white font-sans">
+    <main className="min-h-screen bg-transparent text-white font-sans">
       <Navbar />
 
       <div className="pt-32 pb-20 max-w-7xl mx-auto px-6 space-y-10">

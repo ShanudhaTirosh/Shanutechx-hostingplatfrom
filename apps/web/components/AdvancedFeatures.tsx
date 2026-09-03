@@ -46,7 +46,7 @@ const ADVANCED_ITEMS = [
 
 export default function AdvancedFeatures() {
   return (
-    <section className="py-20 bg-[#070814] text-white relative font-sans border-t border-white/[0.06]">
+    <section className="py-20 bg-transparent text-white relative font-sans border-t border-white/[0.06]">
       <div className="max-w-7xl mx-auto px-6 space-y-12">
         {/* Category Badge & Heading */}
         <Reveal className="space-y-3">

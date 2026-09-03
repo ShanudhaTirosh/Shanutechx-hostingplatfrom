@@ -14,7 +14,7 @@ export const metadata = {
 
 export default function V2RayPage() {
   return (
-    <main className="min-h-screen bg-[#070814] text-white font-sans">
+    <main className="min-h-screen bg-transparent text-white font-sans">
       <Navbar />
       <div className="pt-28 pb-12">
         <V2RaySection />

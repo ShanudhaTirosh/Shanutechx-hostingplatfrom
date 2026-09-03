@@ -199,7 +199,7 @@ export default function PublicStatusPage() {
   });
 
   return (
-    <main className="min-h-screen bg-[#060814] text-white font-sans selection:bg-purple-500 selection:text-white relative">
+    <main className="min-h-screen bg-transparent text-white font-sans selection:bg-purple-500 selection:text-white relative">
       <Navbar />
 
       <div className="pt-28 pb-20 max-w-5xl mx-auto px-4 sm:px-6 space-y-10">

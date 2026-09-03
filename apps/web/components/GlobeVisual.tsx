@@ -22,7 +22,7 @@ const LOCATIONS = {
 
 export default function GlobeVisual() {
   return (
-    <section className="py-20 bg-[#070814] text-white relative overflow-hidden font-sans border-t border-white/[0.06]">
+    <section className="py-20 bg-transparent text-white relative overflow-hidden font-sans border-t border-white/[0.06]">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left Column: Heading & Locations */}

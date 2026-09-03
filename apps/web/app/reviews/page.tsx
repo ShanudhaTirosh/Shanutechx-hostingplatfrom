@@ -46,7 +46,7 @@ export default function ReviewsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#030014] text-white flex flex-col selection:bg-purple-500 selection:text-white relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-transparent text-white flex flex-col selection:bg-purple-500 selection:text-white relative overflow-hidden font-sans">
       <div className="absolute inset-0 bg-[radial-gradient(#7c3aed26_1px,transparent_1px)] [background-size:32px_32px] opacity-40 pointer-events-none" />
       <Navbar />
 

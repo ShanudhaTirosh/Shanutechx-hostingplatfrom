@@ -14,7 +14,7 @@ const V2RAY_FEATURES = [
 
 export default function V2RaySection() {
   return (
-    <section className="py-20 bg-[#090a18] text-white relative font-sans border-t border-white/[0.06]">
+    <section className="py-20 bg-transparent text-white relative font-sans border-t border-white/[0.06]">
       <div className="max-w-7xl mx-auto px-6">
         <Reveal className="bg-gradient-to-r from-[#12132a] via-[#1a1738] to-[#12132a] border border-purple-500/30 rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden">
           {/* Background Glow Aura */}

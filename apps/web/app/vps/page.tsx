@@ -16,7 +16,7 @@ export default async function VpsHostingPage() {
   const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
 
   return (
-    <div className="min-h-screen bg-[#04040c] text-white flex flex-col selection:bg-purple-500 selection:text-white relative overflow-hidden">
+    <div className="min-h-screen bg-transparent text-white flex flex-col selection:bg-purple-500 selection:text-white relative overflow-hidden">
       {/* Background Grid Pattern Overlay */}
       <div className="absolute inset-0 bg-[radial-gradient(#1e1b4b_1px,transparent_1px)] [background-size:32px_32px] opacity-40 pointer-events-none" />
 
