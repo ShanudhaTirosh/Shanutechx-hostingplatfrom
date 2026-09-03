@@ -97,10 +97,10 @@ export default function OrbitHero() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '130px 24px 70px',
+        padding: '120px 24px 10px',
         overflow: 'hidden',
         fontFamily: "'Inter', sans-serif",
-        background: 'radial-gradient(circle at 60% 30%, rgba(124, 58, 237, 0.18), rgba(7, 8, 20, 0.98) 75%)',
+        background: 'transparent',
       }}
     >
       {/* Apple-style Dot Grid Pattern Overlay */}

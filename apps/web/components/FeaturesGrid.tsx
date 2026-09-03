@@ -1,62 +1,69 @@
 'use client';
 
 import React from 'react';
-import { Zap, Bot, Sparkles, Server, Gamepad2, Clock } from 'lucide-react';
+import Link from 'next/link';
+import { Cpu, GitBranch, Bot, Database, Layers, ShieldCheck, ArrowRight } from 'lucide-react';
 
 const FEATURES = [
   {
-    badge: 'VPN & TUNNELING',
-    badgeColor: 'rgba(16, 185, 129, 0.15)',
-    badgeBorder: 'rgba(16, 185, 129, 0.3)',
-    badgeText: '#34d399',
-    icon: <Zap className="h-5 w-5 text-emerald-400" />,
-    title: 'Ultra-Fast V2Ray VPN',
-    desc: 'Bypass ISP throttling with optimized VLESS/VMESS SNI protocols for SLT, Dialog, Airtel, Hutch & Mobitel.',
-  },
-  {
-    badge: 'AI SUBSCRIPTIONS',
-    badgeColor: 'rgba(236, 72, 153, 0.15)',
-    badgeBorder: 'rgba(236, 72, 153, 0.3)',
-    badgeText: '#f472b6',
-    icon: <Bot className="h-5 w-5 text-pink-400" />,
-    title: 'AI Accounts & Pro Tools',
-    desc: 'Instant access to ChatGPT Plus, Claude Pro, Lovable AI, Midjourney & Gemini Advanced at unbeatable prices.',
-  },
-  {
-    badge: 'COMMUNITY & NITRO',
-    badgeColor: 'rgba(99, 102, 241, 0.15)',
-    badgeBorder: 'rgba(99, 102, 241, 0.3)',
-    badgeText: '#818cf8',
-    icon: <Sparkles className="h-5 w-5 text-indigo-400" />,
-    title: 'Discord Boosts & Nitro',
-    desc: '14x Level 3 Server Boosts and Discord Nitro upgrades delivered straight to your server within minutes.',
-  },
-  {
-    badge: 'CLOUD & INFRASTRUCTURE',
+    badge: 'NVME COMPUTE & VPS',
     badgeColor: 'rgba(56, 189, 248, 0.15)',
     badgeBorder: 'rgba(56, 189, 248, 0.3)',
     badgeText: '#38bdf8',
-    icon: <Server className="h-5 w-5 text-sky-400" />,
-    title: 'App & Web Hosting',
-    desc: 'High-performance Node.js, Python, Discord bot & website hosting powered by shanutechx.com with 99.9% uptime.',
+    icon: <Cpu className="h-5 w-5 text-sky-400" />,
+    title: 'Cloud VPS & Root SSH',
+    desc: 'High-speed NVMe compute nodes with root SSH access, dedicated bandwidth, and multi-provider availability (Leaseweb, Linode, DigitalOcean & BreezeHost).',
+    href: '/vps',
   },
   {
-    badge: 'GAMING KEYS',
+    badge: 'DEPLOY & GIT CI/CD',
+    badgeColor: 'rgba(16, 185, 129, 0.15)',
+    badgeBorder: 'rgba(16, 185, 129, 0.3)',
+    badgeText: '#34d399',
+    icon: <GitBranch className="h-5 w-5 text-emerald-400" />,
+    title: 'App & Repo Hosting',
+    desc: 'Instant automated deployment from GitHub, GitLab, or ZIP packages for Node.js, Python, Go, and static web apps with free automatic SSL & custom domains.',
+    href: '/deployments',
+  },
+  {
+    badge: 'DAEMON ORCHESTRATION',
     badgeColor: 'rgba(168, 85, 247, 0.15)',
     badgeBorder: 'rgba(168, 85, 247, 0.3)',
     badgeText: '#c084fc',
-    icon: <Gamepad2 className="h-5 w-5 text-purple-400" />,
-    title: 'Game Accounts & Activation Keys',
-    desc: 'Legit activation keys and premium game accounts for Steam, EA Play, Ubisoft, PlayStation & PC titles.',
+    icon: <Bot className="h-5 w-5 text-purple-400" />,
+    title: '24/7 Bot Hosting',
+    desc: 'Dedicated 24/7 background daemon hosting for Discord.js, Telegram Bot API, and Baileys WhatsApp messaging gateways with automated process supervision.',
+    href: '/bots',
   },
   {
-    badge: '24/7 AUTOMATED',
+    badge: 'MANAGED CLUSTERS',
+    badgeColor: 'rgba(59, 130, 246, 0.15)',
+    badgeBorder: 'rgba(59, 130, 246, 0.3)',
+    badgeText: '#60a5fa',
+    icon: <Database className="h-5 w-5 text-blue-400" />,
+    title: 'Managed Databases',
+    desc: 'One-click automated database cluster provisioning for PostgreSQL 16, MySQL 8, Redis, and MongoDB with automated Cloudflare R2 backup storage.',
+    href: '/databases',
+  },
+  {
+    badge: 'TEMPLATE STORE',
+    badgeColor: 'rgba(236, 72, 153, 0.15)',
+    badgeBorder: 'rgba(236, 72, 153, 0.3)',
+    badgeText: '#f472b6',
+    icon: <Layers className="h-5 w-5 text-pink-400" />,
+    title: '1-Click Catalog',
+    desc: 'Instant one-click deployment of WordPress, N8n automation, Plausible analytics, and 15+ production Docker Compose application stacks.',
+    href: '/catalog',
+  },
+  {
+    badge: 'AUTONOMOUS ENGINE',
     badgeColor: 'rgba(245, 158, 11, 0.15)',
     badgeBorder: 'rgba(245, 158, 11, 0.3)',
     badgeText: '#fbbf24',
-    icon: <Clock className="h-5 w-5 text-amber-400" />,
-    title: 'Instant Delivery & 24/7 Support',
-    desc: 'Automated credentials delivered to your dashboard seconds after purchase with 24/7 live admin support.',
+    icon: <ShieldCheck className="h-5 w-5 text-amber-400" />,
+    title: 'Instant Provisioning & Vault',
+    desc: 'Automated container creation, live WebSockets SSH terminal, AES-256-GCM secrets vault, and instant credential delivery upon payment approval.',
+    href: '/dashboard',
   },
 ];
 
@@ -65,7 +72,7 @@ export default function FeaturesGrid() {
     <section
       style={{
         maxWidth: '1160px',
-        margin: '80px auto',
+        margin: '40px auto',
         padding: '0 24px',
         fontFamily: "'Inter', sans-serif",
         position: 'relative',
@@ -83,18 +90,18 @@ export default function FeaturesGrid() {
             margin: '0 0 12px 0',
           }}
         >
-          Why Choose STX Digital Store?
+          Why Choose ShanuTechX Platform?
         </h2>
         <p
           style={{
             fontSize: '15px',
             color: '#94a3b8',
-            maxWidth: '600px',
+            maxWidth: '650px',
             margin: '0 auto',
             lineHeight: 1.6,
           }}
         >
-          Everything you need for ultra-fast VPN, AI software accounts, Discord boosts, cloud hosting &amp; gaming top-ups
+          Autonomous enterprise cloud hosting, high-speed NVMe compute, container orchestration &amp; 24/7 managed infrastructure.
         </p>
       </div>
 
@@ -107,67 +114,80 @@ export default function FeaturesGrid() {
         }}
       >
         {FEATURES.map((feat, idx) => (
-          <div
+          <Link
             key={idx}
+            href={feat.href}
             style={{
-              background: 'rgba(11, 11, 15, 0.85)',
+              textDecoration: 'none',
+              background: 'rgba(11, 11, 15, 0.75)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '20px',
               padding: '28px 24px',
               backdropFilter: 'blur(16px)',
               boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
-              transition: 'transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
+              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
               position: 'relative',
               overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
             }}
-            className="hover:scale-[1.02] hover:-translate-y-1 hover:border-purple-500/40 hover:shadow-2xl"
+            className="hover:scale-[1.02] hover:-translate-y-1 hover:border-sky-500/40 hover:shadow-2xl group"
           >
-            {/* Capsule Badge */}
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: '4px 12px',
-                borderRadius: '9999px',
-                background: feat.badgeColor,
-                border: `1px solid ${feat.badgeBorder}`,
-                fontSize: '10px',
-                fontWeight: 800,
-                color: feat.badgeText,
-                letterSpacing: '0.08em',
-                marginBottom: '18px',
-              }}
-            >
-              {feat.badge}
-            </div>
-
-            {/* Icon & Title Row */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+            <div>
+              {/* Capsule Badge */}
               <div
                 style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '12px',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  backdropFilter: 'blur(6px)',
+                  padding: '4px 12px',
+                  borderRadius: '9999px',
+                  background: feat.badgeColor,
+                  border: `1px solid ${feat.badgeBorder}`,
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  color: feat.badgeText,
+                  letterSpacing: '0.08em',
+                  marginBottom: '18px',
                 }}
               >
-                {feat.icon}
+                {feat.badge}
               </div>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff', margin: 0 }}>
-                {feat.title}
-              </h3>
+
+              {/* Icon & Title Row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backdropFilter: 'blur(6px)',
+                  }}
+                >
+                  {feat.icon}
+                </div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff', margin: 0 }}>
+                  {feat.title}
+                </h3>
+              </div>
+
+              {/* Description */}
+              <p style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.6, margin: 0 }}>
+                {feat.desc}
+              </p>
             </div>
 
-            {/* Description */}
-            <p style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.6, margin: 0 }}>
-              {feat.desc}
-            </p>
-          </div>
+            {/* Action Link Footer */}
+            <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: feat.badgeText }}>
+              <span>Explore Platform</span>
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </div>
+          </Link>
         ))}
       </div>
     </section>

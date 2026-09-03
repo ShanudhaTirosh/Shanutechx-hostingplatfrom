@@ -16,7 +16,7 @@ export default function BentoGrid() {
     <section
       style={{
         maxWidth: '1160px',
-        margin: '70px auto',
+        margin: '10px auto 50px',
         padding: '0 24px',
         fontFamily: "'Inter', sans-serif",
         color: '#f8fafc',
@@ -94,7 +94,7 @@ export default function BentoGrid() {
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             style={{
               minHeight: '250px',
-              background: '#0B0B0D',
+              background: 'rgba(11, 11, 15, 0.75)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '24px',
               padding: '28px',
@@ -155,7 +155,8 @@ export default function BentoGrid() {
             />
 
             {/* Content */}
-            <div style={{ position: 'relative', zIn              {/* Provider Logo Badges (Leaseweb, Linode, DigitalOcean, BreezeHost using user logo assets) */}
+            <div style={{ position: 'relative', zIndex: 10 }}>
+              {/* Provider Logo Badges (Leaseweb, Linode, DigitalOcean, BreezeHost using user logo assets) */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px', alignItems: 'center' }}>
                 {[
                   { name: 'Leaseweb', logo: '/images/provider-stx-big.png' },
@@ -184,7 +185,7 @@ export default function BentoGrid() {
                     </span>
                   </div>
                 ))}
-              </div>      </div>
+              </div>
 
               {/* Badges / Tech Tags */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px', alignItems: 'center' }}>
@@ -248,7 +249,7 @@ export default function BentoGrid() {
 
           {/* CARD 2: App & Repo Hosting */}
           <motion.a
-            href="/deployments"
+            href="/app-hosting"
             whileHover="hover"
             initial="initial"
             variants={{
@@ -258,7 +259,7 @@ export default function BentoGrid() {
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             style={{
               minHeight: '250px',
-              background: '#0B0B0D',
+              background: 'rgba(11, 11, 15, 0.75)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '24px',
               padding: '28px',
@@ -414,7 +415,7 @@ export default function BentoGrid() {
             style={{
               gridColumn: 'span 5',
               minHeight: '240px',
-              background: '#0B0B0D',
+              background: 'rgba(11, 11, 15, 0.75)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '24px',
               padding: '28px',
@@ -552,7 +553,7 @@ export default function BentoGrid() {
 
           {/* CARD 4: Managed Databases (span 7) */}
           <motion.a
-            href="/catalog"
+            href="/databases"
             whileHover="hover"
             initial="initial"
             variants={{
@@ -563,7 +564,7 @@ export default function BentoGrid() {
             style={{
               gridColumn: 'span 7',
               minHeight: '250px',
-              background: '#0B0B0D',
+              background: 'rgba(11, 11, 15, 0.75)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '24px',
               padding: '28px',
@@ -601,10 +602,10 @@ export default function BentoGrid() {
 
             {/* Animated Background Artwork */}
             <motion.img
-              src="/images/bento-db.svg"
+              src="/images/bento-db.png"
               alt="Managed Databases Background"
               variants={{
-                initial: { scale: 1, x: 0, opacity: 0.4 },
+                initial: { scale: 1, x: 0, opacity: 0.45 },
                 hover: { scale: 1.1, x: -8, opacity: 0.75 },
               }}
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
@@ -615,7 +616,7 @@ export default function BentoGrid() {
                 WebkitMaskImage: 'linear-gradient(to left, rgba(0,0,0,1) 40%, transparent 100%)',
                 pointerEvents: 'none',
               }}
-              onError={(e: any) => { e.target.src = '/images/bento-db.png'; }}
+              onError={(e: any) => { e.target.src = '/images/configs.png'; }}
             />
             <div
               style={{
@@ -743,10 +744,10 @@ export default function BentoGrid() {
 
           {/* Background Image / Banner */}
           <motion.img
-            src="/images/bento-catalog.svg"
+            src="/images/bento-catalog.png"
             alt="1-Click Catalog Background"
             variants={{
-              initial: { scale: 1, x: 0, opacity: 0.4 },
+              initial: { scale: 1, x: 0, opacity: 0.45 },
               hover: { scale: 1.08, x: -8, opacity: 0.75 },
             }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
@@ -758,7 +759,7 @@ export default function BentoGrid() {
               WebkitMaskImage: 'linear-gradient(to left, rgba(0,0,0,1) 50%, transparent 100%)',
               pointerEvents: 'none',
             }}
-            onError={(e: any) => { e.target.src = '/images/bento-catalog.png'; }}
+            onError={(e: any) => { e.target.src = '/images/dashboard.png'; }}
           />
           <div
             style={{
