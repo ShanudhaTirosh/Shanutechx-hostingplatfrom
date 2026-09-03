@@ -17,6 +17,7 @@ import {
   useToast,
 } from '@/components/ui';
 import { apiFetch } from '@/lib/useAuth';
+import InvoiceModal from '@/components/InvoiceModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,6 +120,7 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -171,86 +173,109 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
   }
 
   return (
-    <Card className="border border-white/[0.06] hover:border-white/10 transition-all">
-      {/* Header row */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-accent-violet/10 text-accent-violet-light flex items-center justify-center shrink-0">
-            <ReceiptIcon />
+    <>
+      <InvoiceModal
+        isOpen={showInvoiceModal}
+        onClose={() => setShowInvoiceModal(false)}
+        order={order}
+      />
+
+      <Card className="border border-white/[0.06] hover:border-white/10 transition-all">
+        {/* Header row */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-accent-violet/10 text-accent-violet-light flex items-center justify-center shrink-0">
+              <ReceiptIcon />
+            </div>
+            <div>
+              <p className="font-semibold text-text-primary text-sm">
+                Order <span className="font-mono text-text-muted">#{order.id.slice(0, 8).toUpperCase()}</span>
+              </p>
+              <p className="text-text-muted text-xs">{new Date(order.createdAt).toLocaleString()}</p>
+            </div>
           </div>
-          <div>
-            <p className="font-semibold text-text-primary text-sm">
-              Order <span className="font-mono text-text-muted">#{order.id.slice(0, 8).toUpperCase()}</span>
-            </p>
-            <p className="text-text-muted text-xs">{new Date(order.createdAt).toLocaleString()}</p>
-          </div>
+          <Badge status={order.status} />
         </div>
-        <Badge status={order.status} />
-      </div>
 
-      {/* Line items */}
-      <div className="space-y-1.5 mb-4 text-sm">
-        {order.items?.map((item) => (
-          <div key={item.id} className="flex justify-between">
-            <span className="text-text-muted">
-              {orderItemName(item)}
-              <span className="ml-1 text-[10px] text-text-faint">× {item.quantity}</span>
-            </span>
-            <span className="text-text-primary font-medium">{formatMoney(orderItemLineTotal(item))}</span>
-          </div>
-        ))}
-      </div>
+        {/* Line items */}
+        <div className="space-y-1.5 mb-4 text-sm">
+          {order.items?.map((item) => (
+            <div key={item.id} className="flex justify-between">
+              <span className="text-text-muted">
+                {orderItemName(item)}
+                <span className="ml-1 text-[10px] text-text-faint">× {item.quantity}</span>
+              </span>
+              <span className="text-text-primary font-medium">{formatMoney(orderItemLineTotal(item))}</span>
+            </div>
+          ))}
+        </div>
 
-      {/* Total */}
-      <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
-        <span className="text-xs text-text-muted font-medium uppercase tracking-wide">Total</span>
-        <span className="font-bold text-text-primary">{formatMoney(order.total)}</span>
-      </div>
+        {/* Total */}
+        <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
+          <span className="text-xs text-text-muted font-medium uppercase tracking-wide">Total</span>
+          <span className="font-bold text-text-primary">{formatMoney(order.total)}</span>
+        </div>
 
-      {error && <div className="mt-4"><ErrorBanner message={error} /></div>}
+        {error && <div className="mt-4"><ErrorBanner message={error} /></div>}
 
-      {latestPayment && order.status === 'awaiting_payment' && (
-        <p className="text-text-muted text-xs mt-3 flex items-center gap-2">
-          Last payment attempt:
-          <Badge status={latestPayment.status} />
-        </p>
-      )}
-
-      {/* Actions */}
-      <div className="flex gap-3 mt-4">
-        {order.status === 'awaiting_payment' && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf"
-              className="hidden"
-              onChange={handleFileSelected}
-            />
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              loading={uploading}
-              size="sm"
-            >
-              <UploadIcon />
-              {uploading ? 'Uploading...' : 'Upload payment proof'}
-            </Button>
-          </>
+        {latestPayment && order.status === 'awaiting_payment' && (
+          <p className="text-text-muted text-xs mt-3 flex items-center gap-2">
+            Last payment attempt:
+            <Badge status={latestPayment.status} />
+          </p>
         )}
 
-        {order.status === 'paid' && (
-          order.total === 0 ? (
-            <span className="text-xs font-medium text-emerald-400/90 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
-              ✓ Free Order (No Invoice Required)
-            </span>
-          ) : (
-            <Button variant="secondary" size="sm" onClick={handleDownloadInvoice} loading={downloading}>
-              <DownloadIcon />
-              {downloading ? 'Preparing...' : 'Download invoice'}
-            </Button>
-          )
-        )}
-      </div>
-    </Card>
+        {/* Actions */}
+        <div className="flex flex-wrap gap-2.5 mt-4">
+          {order.status === 'awaiting_payment' && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                className="hidden"
+                onChange={handleFileSelected}
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                loading={uploading}
+                size="sm"
+              >
+                <UploadIcon />
+                {uploading ? 'Uploading...' : 'Upload payment proof'}
+              </Button>
+            </>
+          )}
+
+          {order.status === 'paid' && (
+            order.total === 0 ? (
+              <span className="text-xs font-medium text-emerald-400/90 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
+                ✓ Free Order (No Invoice Required)
+              </span>
+            ) : (
+              <>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setShowInvoiceModal(true)}
+                >
+                  <ReceiptIcon />
+                  View Invoice
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDownloadInvoice}
+                  loading={downloading}
+                >
+                  <DownloadIcon />
+                  {downloading ? 'Preparing...' : 'Download PDF'}
+                </Button>
+              </>
+            )
+          )}
+        </div>
+      </Card>
+    </>
   );
 }

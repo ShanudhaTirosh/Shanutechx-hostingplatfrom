@@ -106,22 +106,22 @@ export default function BentoGrid() {
               initial: {
                 scale: 1,
                 y: 0,
-                borderColor: "rgba(255, 255, 255, 0.08)",
+                borderColor: "rgba(255, 255, 255, 0.12)",
                 boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
               },
               hover: {
                 scale: 1.015,
                 y: -6,
-                borderColor: "rgba(56, 189, 248, 0.45)",
+                borderColor: "rgba(56, 189, 248, 0.6)",
                 boxShadow:
-                  "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(56, 189, 248, 0.18)",
+                  "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(56, 189, 248, 0.25)",
               },
             }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             style={{
-              minHeight: "250px",
-              background: "rgba(11, 11, 15, 0.75)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              minHeight: "260px",
+              background: "linear-gradient(135deg, #0b182e 0%, #0a0b1c 100%)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
               borderRadius: "24px",
               padding: "28px",
               cursor: "pointer",
@@ -144,7 +144,7 @@ export default function BentoGrid() {
                 right: 0,
                 height: "2px",
                 background:
-                  "linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.8), transparent)",
+                  "linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.9), transparent)",
                 pointerEvents: "none",
                 zIndex: 12,
               }}
@@ -177,8 +177,8 @@ export default function BentoGrid() {
               src="/images/bento-vps.png"
               alt="Cloud VPS Background"
               variants={{
-                initial: { scale: 1, x: 0, opacity: 0.35 },
-                hover: { scale: 1.1, x: -8, opacity: 0.65 },
+                initial: { scale: 1, x: 0, opacity: 0.45 },
+                hover: { scale: 1.08, x: -6, opacity: 0.75 },
               }}
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
               style={{
@@ -189,10 +189,11 @@ export default function BentoGrid() {
                 width: "65%",
                 objectFit: "cover",
                 maskImage:
-                  "linear-gradient(to left, rgba(0,0,0,1) 35%, transparent 100%)",
+                  "linear-gradient(to left, rgba(0,0,0,1) 40%, transparent 100%)",
                 WebkitMaskImage:
-                  "linear-gradient(to left, rgba(0,0,0,1) 35%, transparent 100%)",
+                  "linear-gradient(to left, rgba(0,0,0,1) 40%, transparent 100%)",
                 pointerEvents: "none",
+                zIndex: 2,
               }}
               onError={(e: any) => {
                 e.target.src = "/images/vps.png";
@@ -203,13 +204,14 @@ export default function BentoGrid() {
                 position: "absolute",
                 inset: 0,
                 background:
-                  "linear-gradient(to right, #0B0B0D 0%, rgba(11,11,13,0.88) 55%, transparent 100%)",
+                  "linear-gradient(to right, #0b182e 0%, rgba(11,24,46,0.85) 50%, transparent 100%)",
+                zIndex: 3,
               }}
             />
 
             {/* Content */}
             <div style={{ position: "relative", zIndex: 10 }}>
-              {/* Provider Logo Badges (Leaseweb, Linode, DigitalOcean, BreezeHost using user logo assets) */}
+              {/* Provider Logo Badges */}
               <div
                 style={{
                   display: "flex",
@@ -235,8 +237,8 @@ export default function BentoGrid() {
                       height: "28px",
                       padding: "0 8px",
                       borderRadius: "7px",
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.1)",
+                      background: "rgba(255,255,255,0.08)",
+                      border: "1px solid rgba(255,255,255,0.15)",
                       display: "flex",
                       alignItems: "center",
                       gap: "6px",
@@ -256,7 +258,7 @@ export default function BentoGrid() {
                       style={{
                         fontSize: "11px",
                         fontWeight: 700,
-                        color: "rgba(255,255,255,0.85)",
+                        color: "#ffffff",
                       }}
                     >
                       {provider.name}
@@ -282,11 +284,11 @@ export default function BentoGrid() {
                     gap: "6px",
                     padding: "4px 10px",
                     borderRadius: "7px",
-                    background: "rgba(56, 189, 248, 0.1)",
-                    border: "1px solid rgba(56, 189, 248, 0.25)",
+                    background: "rgba(56, 189, 248, 0.15)",
+                    border: "1px solid rgba(56, 189, 248, 0.35)",
                     color: "#38bdf8",
                     fontSize: "11.5px",
-                    fontWeight: 600,
+                    fontWeight: 700,
                   }}
                 >
                   <Cpu size={13} /> NVMe Speed Nodes
@@ -298,11 +300,11 @@ export default function BentoGrid() {
                     gap: "6px",
                     padding: "4px 10px",
                     borderRadius: "7px",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid rgba(255, 255, 255, 0.12)",
-                    color: "rgba(255,255,255,0.8)",
+                    background: "rgba(255, 255, 255, 0.08)",
+                    border: "1px solid rgba(255, 255, 255, 0.18)",
+                    color: "#f8fafc",
                     fontSize: "11.5px",
-                    fontWeight: 600,
+                    fontWeight: 700,
                   }}
                 >
                   <Terminal size={13} /> Root SSH
@@ -312,10 +314,11 @@ export default function BentoGrid() {
               <h3
                 style={{
                   fontSize: "26px",
-                  fontWeight: 800,
+                  fontWeight: 900,
                   color: "#ffffff",
                   margin: "0 0 8px",
                   letterSpacing: "-0.01em",
+                  textShadow: "0 2px 10px rgba(0,0,0,0.8)",
                 }}
               >
                 Cloud VPS
@@ -323,10 +326,11 @@ export default function BentoGrid() {
               <p
                 style={{
                   fontSize: "14.5px",
-                  color: "#94a3b8",
+                  color: "#cbd5e1",
                   margin: 0,
-                  lineHeight: 1.45,
+                  lineHeight: 1.5,
                   maxWidth: "340px",
+                  textShadow: "0 1px 4px rgba(0,0,0,0.8)",
                 }}
               >
                 High-speed NVMe compute nodes with root SSH
@@ -340,25 +344,25 @@ export default function BentoGrid() {
               <motion.div
                 variants={{
                   initial: {
-                    backgroundColor: "rgba(255,255,255,0.05)",
-                    borderColor: "rgba(255,255,255,0.12)",
+                    backgroundColor: "rgba(255,255,255,0.08)",
+                    borderColor: "rgba(255,255,255,0.18)",
                   },
                   hover: {
-                    backgroundColor: "rgba(56, 189, 248, 0.18)",
-                    borderColor: "rgba(56, 189, 248, 0.45)",
+                    backgroundColor: "rgba(56, 189, 248, 0.22)",
+                    borderColor: "rgba(56, 189, 248, 0.6)",
                   },
                 }}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "8px",
-                  padding: "9px 20px",
+                  padding: "10px 22px",
                   borderRadius: "12px",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  background: "rgba(255,255,255,0.05)",
-                  color: "rgba(255,255,255,0.95)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#ffffff",
                   fontSize: "14px",
-                  fontWeight: 600,
+                  fontWeight: 700,
                   cursor: "pointer",
                   transition: "all 0.3s ease",
                 }}
@@ -384,22 +388,22 @@ export default function BentoGrid() {
               initial: {
                 scale: 1,
                 y: 0,
-                borderColor: "rgba(255, 255, 255, 0.08)",
+                borderColor: "rgba(255, 255, 255, 0.12)",
                 boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
               },
               hover: {
                 scale: 1.015,
                 y: -6,
-                borderColor: "rgba(168, 85, 247, 0.45)",
+                borderColor: "rgba(168, 85, 247, 0.6)",
                 boxShadow:
-                  "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(168, 85, 247, 0.18)",
+                  "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(168, 85, 247, 0.25)",
               },
             }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             style={{
-              minHeight: "250px",
-              background: "rgba(11, 11, 15, 0.75)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              minHeight: "260px",
+              background: "linear-gradient(135deg, #1d0f33 0%, #0a0b1c 100%)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
               borderRadius: "24px",
               padding: "28px",
               cursor: "pointer",
@@ -422,7 +426,7 @@ export default function BentoGrid() {
                 right: 0,
                 height: "2px",
                 background:
-                  "linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.8), transparent)",
+                  "linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.9), transparent)",
                 pointerEvents: "none",
                 zIndex: 12,
               }}
@@ -455,8 +459,8 @@ export default function BentoGrid() {
               src="/images/bento-app-repo.png"
               alt="App Hosting Background"
               variants={{
-                initial: { scale: 1, x: 0, opacity: 0.35 },
-                hover: { scale: 1.1, x: -8, opacity: 0.65 },
+                initial: { scale: 1, x: 0, opacity: 0.45 },
+                hover: { scale: 1.08, x: -6, opacity: 0.75 },
               }}
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
               style={{
@@ -467,10 +471,11 @@ export default function BentoGrid() {
                 width: "65%",
                 objectFit: "cover",
                 maskImage:
-                  "linear-gradient(to left, rgba(0,0,0,1) 35%, transparent 100%)",
+                  "linear-gradient(to left, rgba(0,0,0,1) 40%, transparent 100%)",
                 WebkitMaskImage:
-                  "linear-gradient(to left, rgba(0,0,0,1) 35%, transparent 100%)",
+                  "linear-gradient(to left, rgba(0,0,0,1) 40%, transparent 100%)",
                 pointerEvents: "none",
+                zIndex: 2,
               }}
               onError={(e: any) => {
                 e.target.src = "/images/technology.png";
@@ -481,7 +486,8 @@ export default function BentoGrid() {
                 position: "absolute",
                 inset: 0,
                 background:
-                  "linear-gradient(to right, #0B0B0D 0%, rgba(11,11,13,0.88) 55%, transparent 100%)",
+                  "linear-gradient(to right, #1d0f33 0%, rgba(29,15,51,0.85) 50%, transparent 100%)",
+                zIndex: 3,
               }}
             />
 
@@ -504,11 +510,11 @@ export default function BentoGrid() {
                     gap: "6px",
                     padding: "5px 12px",
                     borderRadius: "8px",
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.12)",
+                    background: "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.18)",
                     color: "#ffffff",
                     fontSize: "12px",
-                    fontWeight: 600,
+                    fontWeight: 700,
                   }}
                 >
                   <svg
@@ -528,11 +534,11 @@ export default function BentoGrid() {
                     gap: "6px",
                     padding: "5px 12px",
                     borderRadius: "8px",
-                    background: "rgba(252, 109, 38, 0.1)",
-                    border: "1px solid rgba(252, 109, 38, 0.25)",
+                    background: "rgba(252, 109, 38, 0.15)",
+                    border: "1px solid rgba(252, 109, 38, 0.35)",
                     color: "#fc6d26",
                     fontSize: "12px",
-                    fontWeight: 600,
+                    fontWeight: 700,
                   }}
                 >
                   <svg
@@ -552,11 +558,11 @@ export default function BentoGrid() {
                     gap: "6px",
                     padding: "5px 12px",
                     borderRadius: "8px",
-                    background: "rgba(168, 85, 247, 0.1)",
-                    border: "1px solid rgba(168, 85, 247, 0.25)",
+                    background: "rgba(168, 85, 247, 0.15)",
+                    border: "1px solid rgba(168, 85, 247, 0.35)",
                     color: "#c084fc",
                     fontSize: "12px",
-                    fontWeight: 600,
+                    fontWeight: 700,
                   }}
                 >
                   <Box size={14} /> ZIP Packages
@@ -566,10 +572,11 @@ export default function BentoGrid() {
               <h3
                 style={{
                   fontSize: "26px",
-                  fontWeight: 800,
+                  fontWeight: 900,
                   color: "#ffffff",
                   margin: "0 0 8px",
                   letterSpacing: "-0.01em",
+                  textShadow: "0 2px 10px rgba(0,0,0,0.8)",
                 }}
               >
                 App &amp; Repo Hosting
@@ -577,10 +584,11 @@ export default function BentoGrid() {
               <p
                 style={{
                   fontSize: "14.5px",
-                  color: "#94a3b8",
+                  color: "#cbd5e1",
                   margin: 0,
-                  lineHeight: 1.45,
+                  lineHeight: 1.5,
                   maxWidth: "340px",
+                  textShadow: "0 1px 4px rgba(0,0,0,0.8)",
                 }}
               >
                 Deploy from GitHub, GitLab, or ZIP packages
@@ -594,25 +602,25 @@ export default function BentoGrid() {
               <motion.div
                 variants={{
                   initial: {
-                    backgroundColor: "rgba(255,255,255,0.05)",
-                    borderColor: "rgba(255,255,255,0.12)",
+                    backgroundColor: "rgba(255,255,255,0.08)",
+                    borderColor: "rgba(255,255,255,0.18)",
                   },
                   hover: {
-                    backgroundColor: "rgba(168, 85, 247, 0.18)",
-                    borderColor: "rgba(168, 85, 247, 0.45)",
+                    backgroundColor: "rgba(168, 85, 247, 0.22)",
+                    borderColor: "rgba(168, 85, 247, 0.6)",
                   },
                 }}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "8px",
-                  padding: "9px 20px",
+                  padding: "10px 22px",
                   borderRadius: "12px",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  background: "rgba(255,255,255,0.05)",
-                  color: "rgba(255,255,255,0.95)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#ffffff",
                   fontSize: "14px",
-                  fontWeight: 600,
+                  fontWeight: 700,
                   cursor: "pointer",
                   transition: "all 0.3s ease",
                 }}
@@ -647,23 +655,23 @@ export default function BentoGrid() {
               initial: {
                 scale: 1,
                 y: 0,
-                borderColor: "rgba(255, 255, 255, 0.08)",
+                borderColor: "rgba(255, 255, 255, 0.12)",
                 boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
               },
               hover: {
                 scale: 1.015,
                 y: -6,
-                borderColor: "rgba(88, 101, 242, 0.45)",
+                borderColor: "rgba(88, 101, 242, 0.6)",
                 boxShadow:
-                  "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(88, 101, 242, 0.18)",
+                  "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(88, 101, 242, 0.25)",
               },
             }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             style={{
               gridColumn: "span 5",
-              minHeight: "240px",
-              background: "rgba(11, 11, 15, 0.75)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              minHeight: "260px",
+              background: "linear-gradient(135deg, #10163b 0%, #0a0b1c 100%)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
               borderRadius: "24px",
               padding: "28px",
               cursor: "pointer",
@@ -687,7 +695,7 @@ export default function BentoGrid() {
                 right: 0,
                 height: "2px",
                 background:
-                  "linear-gradient(90deg, transparent, rgba(88, 101, 242, 0.8), transparent)",
+                  "linear-gradient(90deg, transparent, rgba(88, 101, 242, 0.9), transparent)",
                 pointerEvents: "none",
                 zIndex: 12,
               }}
@@ -720,8 +728,8 @@ export default function BentoGrid() {
               src="/images/bento-bot-hosting.png"
               alt="Bot Hosting Background"
               variants={{
-                initial: { scale: 1, x: 0, opacity: 0.35 },
-                hover: { scale: 1.1, x: -8, opacity: 0.65 },
+                initial: { scale: 1, x: 0, opacity: 0.45 },
+                hover: { scale: 1.08, x: -6, opacity: 0.75 },
               }}
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
               style={{
@@ -732,10 +740,11 @@ export default function BentoGrid() {
                 width: "65%",
                 objectFit: "cover",
                 maskImage:
-                  "linear-gradient(to left, rgba(0,0,0,1) 35%, transparent 100%)",
+                  "linear-gradient(to left, rgba(0,0,0,1) 40%, transparent 100%)",
                 WebkitMaskImage:
-                  "linear-gradient(to left, rgba(0,0,0,1) 35%, transparent 100%)",
+                  "linear-gradient(to left, rgba(0,0,0,1) 40%, transparent 100%)",
                 pointerEvents: "none",
+                zIndex: 2,
               }}
               onError={(e: any) => {
                 e.target.src = "/images/category-bg-discord.png";
@@ -746,7 +755,8 @@ export default function BentoGrid() {
                 position: "absolute",
                 inset: 0,
                 background:
-                  "linear-gradient(to right, #0B0B0D 0%, rgba(11,11,13,0.88) 55%, transparent 100%)",
+                  "linear-gradient(to right, #10163b 0%, rgba(16,22,59,0.85) 50%, transparent 100%)",
+                zIndex: 3,
               }}
             />
 
@@ -766,8 +776,8 @@ export default function BentoGrid() {
                     width: "32px",
                     height: "32px",
                     borderRadius: "8px",
-                    background: "rgba(88, 101, 242, 0.12)",
-                    border: "1px solid rgba(88, 101, 242, 0.3)",
+                    background: "rgba(88, 101, 242, 0.2)",
+                    border: "1px solid rgba(88, 101, 242, 0.4)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -791,8 +801,8 @@ export default function BentoGrid() {
                     width: "32px",
                     height: "32px",
                     borderRadius: "8px",
-                    background: "rgba(38, 165, 228, 0.12)",
-                    border: "1px solid rgba(38, 165, 228, 0.3)",
+                    background: "rgba(38, 165, 228, 0.2)",
+                    border: "1px solid rgba(38, 165, 228, 0.4)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -814,8 +824,8 @@ export default function BentoGrid() {
                     width: "32px",
                     height: "32px",
                     borderRadius: "8px",
-                    background: "rgba(37, 211, 102, 0.12)",
-                    border: "1px solid rgba(37, 211, 102, 0.3)",
+                    background: "rgba(37, 211, 102, 0.2)",
+                    border: "1px solid rgba(37, 211, 102, 0.4)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -837,10 +847,11 @@ export default function BentoGrid() {
               <h3
                 style={{
                   fontSize: "24px",
-                  fontWeight: 800,
+                  fontWeight: 900,
                   color: "#ffffff",
                   margin: "0 0 8px",
                   letterSpacing: "-0.01em",
+                  textShadow: "0 2px 10px rgba(0,0,0,0.8)",
                 }}
               >
                 24/7 Bot Hosting
@@ -848,9 +859,10 @@ export default function BentoGrid() {
               <p
                 style={{
                   fontSize: "14px",
-                  color: "#94a3b8",
+                  color: "#cbd5e1",
                   margin: 0,
-                  lineHeight: 1.45,
+                  lineHeight: 1.5,
+                  textShadow: "0 1px 4px rgba(0,0,0,0.8)",
                 }}
               >
                 Discord, Telegram &amp; WhatsApp bot daemons
@@ -864,25 +876,25 @@ export default function BentoGrid() {
               <motion.div
                 variants={{
                   initial: {
-                    backgroundColor: "rgba(255,255,255,0.05)",
-                    borderColor: "rgba(255,255,255,0.12)",
+                    backgroundColor: "rgba(255,255,255,0.08)",
+                    borderColor: "rgba(255,255,255,0.18)",
                   },
                   hover: {
-                    backgroundColor: "rgba(88, 101, 242, 0.18)",
-                    borderColor: "rgba(88, 101, 242, 0.45)",
+                    backgroundColor: "rgba(88, 101, 242, 0.22)",
+                    borderColor: "rgba(88, 101, 242, 0.6)",
                   },
                 }}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "8px",
-                  padding: "9px 20px",
+                  padding: "10px 22px",
                   borderRadius: "12px",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  background: "rgba(255,255,255,0.05)",
-                  color: "rgba(255,255,255,0.95)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#ffffff",
                   fontSize: "14px",
-                  fontWeight: 600,
+                  fontWeight: 700,
                   cursor: "pointer",
                   transition: "all 0.3s ease",
                 }}
@@ -908,23 +920,23 @@ export default function BentoGrid() {
               initial: {
                 scale: 1,
                 y: 0,
-                borderColor: "rgba(255, 255, 255, 0.08)",
+                borderColor: "rgba(255, 255, 255, 0.12)",
                 boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
               },
               hover: {
                 scale: 1.015,
                 y: -6,
-                borderColor: "rgba(16, 185, 129, 0.45)",
+                borderColor: "rgba(16, 185, 129, 0.6)",
                 boxShadow:
-                  "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(16, 185, 129, 0.18)",
+                  "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(16, 185, 129, 0.25)",
               },
             }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             style={{
               gridColumn: "span 7",
-              minHeight: "250px",
-              background: "rgba(11, 11, 15, 0.75)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              minHeight: "260px",
+              background: "linear-gradient(135deg, #09241b 0%, #0a0b1c 100%)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
               borderRadius: "24px",
               padding: "28px",
               cursor: "pointer",
@@ -948,7 +960,7 @@ export default function BentoGrid() {
                 right: 0,
                 height: "2px",
                 background:
-                  "linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.8), transparent)",
+                  "linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.9), transparent)",
                 pointerEvents: "none",
                 zIndex: 12,
               }}
@@ -982,7 +994,7 @@ export default function BentoGrid() {
               alt="Managed Databases Background"
               variants={{
                 initial: { scale: 1, x: 0, opacity: 0.45 },
-                hover: { scale: 1.1, x: -8, opacity: 0.75 },
+                hover: { scale: 1.08, x: -6, opacity: 0.75 },
               }}
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
               style={{
@@ -997,6 +1009,7 @@ export default function BentoGrid() {
                 WebkitMaskImage:
                   "linear-gradient(to left, rgba(0,0,0,1) 40%, transparent 100%)",
                 pointerEvents: "none",
+                zIndex: 2,
               }}
               onError={(e: any) => {
                 e.target.src = "/images/configs.png";
@@ -1007,7 +1020,8 @@ export default function BentoGrid() {
                 position: "absolute",
                 inset: 0,
                 background:
-                  "linear-gradient(to right, #0B0B0D 0%, rgba(11,11,13,0.88) 55%, transparent 100%)",
+                  "linear-gradient(to right, #09241b 0%, rgba(9,36,27,0.85) 50%, transparent 100%)",
+                zIndex: 3,
               }}
             />
 
@@ -1036,8 +1050,8 @@ export default function BentoGrid() {
                       height: "28px",
                       padding: "0 8px",
                       borderRadius: "7px",
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.1)",
+                      background: "rgba(255,255,255,0.08)",
+                      border: "1px solid rgba(255,255,255,0.15)",
                       display: "flex",
                       alignItems: "center",
                       gap: "6px",
@@ -1057,7 +1071,7 @@ export default function BentoGrid() {
                       style={{
                         fontSize: "11px",
                         fontWeight: 700,
-                        color: "rgba(255,255,255,0.85)",
+                        color: "#ffffff",
                       }}
                     >
                       {db.name}
@@ -1069,10 +1083,11 @@ export default function BentoGrid() {
               <h3
                 style={{
                   fontSize: "26px",
-                  fontWeight: 800,
+                  fontWeight: 900,
                   color: "#ffffff",
                   margin: "0 0 8px",
                   letterSpacing: "-0.01em",
+                  textShadow: "0 2px 10px rgba(0,0,0,0.8)",
                 }}
               >
                 Managed Databases
@@ -1080,10 +1095,11 @@ export default function BentoGrid() {
               <p
                 style={{
                   fontSize: "14.5px",
-                  color: "#94a3b8",
+                  color: "#cbd5e1",
                   margin: 0,
-                  lineHeight: 1.45,
+                  lineHeight: 1.5,
                   maxWidth: "380px",
+                  textShadow: "0 1px 4px rgba(0,0,0,0.8)",
                 }}
               >
                 PostgreSQL, MySQL, Redis &amp; MongoDB clusters
@@ -1097,25 +1113,25 @@ export default function BentoGrid() {
               <motion.div
                 variants={{
                   initial: {
-                    backgroundColor: "rgba(255,255,255,0.05)",
-                    borderColor: "rgba(255,255,255,0.12)",
+                    backgroundColor: "rgba(255,255,255,0.08)",
+                    borderColor: "rgba(255,255,255,0.18)",
                   },
                   hover: {
-                    backgroundColor: "rgba(16, 185, 129, 0.18)",
-                    borderColor: "rgba(16, 185, 129, 0.45)",
+                    backgroundColor: "rgba(16, 185, 129, 0.22)",
+                    borderColor: "rgba(16, 185, 129, 0.6)",
                   },
                 }}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "8px",
-                  padding: "9px 20px",
+                  padding: "10px 22px",
                   borderRadius: "12px",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  background: "rgba(255,255,255,0.05)",
-                  color: "rgba(255,255,255,0.95)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#ffffff",
                   fontSize: "14px",
-                  fontWeight: 600,
+                  fontWeight: 700,
                   cursor: "pointer",
                   transition: "all 0.3s ease",
                 }}
@@ -1142,22 +1158,22 @@ export default function BentoGrid() {
             initial: {
               scale: 1,
               y: 0,
-              borderColor: "rgba(255, 255, 255, 0.08)",
+              borderColor: "rgba(255, 255, 255, 0.12)",
               boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
             },
             hover: {
               scale: 1.012,
               y: -6,
-              borderColor: "rgba(236, 72, 153, 0.45)",
+              borderColor: "rgba(236, 72, 153, 0.6)",
               boxShadow:
-                "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(236, 72, 153, 0.18)",
+                "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(236, 72, 153, 0.25)",
             },
           }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           style={{
-            minHeight: "250px",
-            background: "#0B0B0D",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
+            minHeight: "260px",
+            background: "linear-gradient(135deg, #2b0b23 0%, #0a0b1c 100%)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
             borderRadius: "24px",
             padding: "32px",
             cursor: "pointer",
@@ -1180,7 +1196,7 @@ export default function BentoGrid() {
               right: 0,
               height: "2px",
               background:
-                "linear-gradient(90deg, transparent, rgba(236, 72, 153, 0.8), transparent)",
+                "linear-gradient(90deg, transparent, rgba(236, 72, 153, 0.9), transparent)",
               pointerEvents: "none",
               zIndex: 12,
             }}
@@ -1214,7 +1230,7 @@ export default function BentoGrid() {
             alt="1-Click Catalog Background"
             variants={{
               initial: { scale: 1, x: 0, opacity: 0.45 },
-              hover: { scale: 1.08, x: -8, opacity: 0.75 },
+              hover: { scale: 1.08, x: -6, opacity: 0.75 },
             }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             style={{
@@ -1230,6 +1246,7 @@ export default function BentoGrid() {
               WebkitMaskImage:
                 "linear-gradient(to left, rgba(0,0,0,1) 50%, transparent 100%)",
               pointerEvents: "none",
+              zIndex: 2,
             }}
             onError={(e: any) => {
               e.target.src = "/images/dashboard.png";
@@ -1240,7 +1257,8 @@ export default function BentoGrid() {
               position: "absolute",
               inset: 0,
               background:
-                "linear-gradient(to right, #0B0B0D 0%, rgba(11,11,13,0.85) 50%, transparent 100%)",
+                "linear-gradient(to right, #2b0b23 0%, rgba(43,11,35,0.85) 50%, transparent 100%)",
+              zIndex: 3,
             }}
           />
 
@@ -1269,8 +1287,8 @@ export default function BentoGrid() {
                     height: "28px",
                     padding: "0 8px",
                     borderRadius: "7px",
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.1)",
+                    background: "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.15)",
                     display: "flex",
                     alignItems: "center",
                     gap: "6px",
@@ -1294,7 +1312,7 @@ export default function BentoGrid() {
                     style={{
                       fontSize: "11px",
                       fontWeight: 700,
-                      color: "rgba(255,255,255,0.85)",
+                      color: "#ffffff",
                     }}
                   >
                     {app.name}
@@ -1306,10 +1324,11 @@ export default function BentoGrid() {
             <h3
               style={{
                 fontSize: "28px",
-                fontWeight: 800,
+                fontWeight: 900,
                 color: "#ffffff",
                 margin: "0 0 10px",
                 letterSpacing: "-0.01em",
+                textShadow: "0 2px 10px rgba(0,0,0,0.8)",
               }}
             >
               1-Click Catalog
@@ -1317,9 +1336,10 @@ export default function BentoGrid() {
             <p
               style={{
                 fontSize: "15px",
-                color: "#94a3b8",
+                color: "#cbd5e1",
                 margin: "0 0 24px",
                 lineHeight: 1.5,
+                textShadow: "0 1px 4px rgba(0,0,0,0.8)",
               }}
             >
               WordPress, N8n, Plausible &amp; 15+ templates
@@ -1328,12 +1348,12 @@ export default function BentoGrid() {
             <motion.div
               variants={{
                 initial: {
-                  backgroundColor: "rgba(255,255,255,0.05)",
-                  borderColor: "rgba(255,255,255,0.12)",
+                  backgroundColor: "rgba(255,255,255,0.08)",
+                  borderColor: "rgba(255,255,255,0.18)",
                 },
                 hover: {
-                  backgroundColor: "rgba(236, 72, 153, 0.18)",
-                  borderColor: "rgba(236, 72, 153, 0.45)",
+                  backgroundColor: "rgba(236, 72, 153, 0.22)",
+                  borderColor: "rgba(236, 72, 153, 0.6)",
                 },
               }}
               style={{
@@ -1342,11 +1362,11 @@ export default function BentoGrid() {
                 gap: "8px",
                 padding: "10px 24px",
                 borderRadius: "12px",
-                border: "1px solid rgba(255,255,255,0.12)",
-                background: "rgba(255,255,255,0.05)",
-                color: "rgba(255,255,255,0.95)",
+                border: "1px solid rgba(255,255,255,0.18)",
+                background: "rgba(255,255,255,0.08)",
+                color: "#ffffff",
                 fontSize: "14px",
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: "pointer",
                 transition: "all 0.3s ease",
               }}
@@ -1380,22 +1400,22 @@ export default function BentoGrid() {
               initial: {
                 scale: 1,
                 y: 0,
-                borderColor: "rgba(255, 255, 255, 0.08)",
+                borderColor: "rgba(255, 255, 255, 0.12)",
                 boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
               },
               hover: {
                 scale: 1.015,
                 y: -6,
-                borderColor: "rgba(56, 189, 248, 0.45)",
+                borderColor: "rgba(56, 189, 248, 0.6)",
                 boxShadow:
-                  "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(56, 189, 248, 0.2)",
+                  "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(56, 189, 248, 0.25)",
               },
             }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             style={{
-              minHeight: "260px",
-              background: "rgba(11, 11, 15, 0.75)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              minHeight: "270px",
+              background: "linear-gradient(135deg, #0f122c 0%, #0a0b1c 100%)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
               borderRadius: "24px",
               padding: "28px",
               cursor: "pointer",
@@ -1417,13 +1437,47 @@ export default function BentoGrid() {
                 right: 0,
                 height: "2px",
                 background:
-                  "linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.8), transparent)",
+                  "linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.9), transparent)",
                 pointerEvents: "none",
                 zIndex: 12,
               }}
             />
 
-            <div>
+            {/* Background Image */}
+            <motion.img
+              src="/images/category-bg-v2ray.png.jpeg"
+              alt="V2Ray Proxy Background"
+              variants={{
+                initial: { scale: 1, x: 0, opacity: 0.5 },
+                hover: { scale: 1.08, x: -6, opacity: 0.8 },
+              }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              style={{
+                position: "absolute",
+                right: 0,
+                top: 0,
+                height: "100%",
+                width: "60%",
+                objectFit: "cover",
+                maskImage:
+                  "linear-gradient(to left, rgba(0,0,0,1) 40%, transparent 100%)",
+                WebkitMaskImage:
+                  "linear-gradient(to left, rgba(0,0,0,1) 40%, transparent 100%)",
+                pointerEvents: "none",
+                zIndex: 2,
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background:
+                  "linear-gradient(to right, #0f122c 0%, rgba(15,18,44,0.85) 45%, transparent 100%)",
+                zIndex: 3,
+              }}
+            />
+
+            <div style={{ position: "relative", zIndex: 10 }}>
               <div
                 style={{
                   display: "flex",
@@ -1437,11 +1491,12 @@ export default function BentoGrid() {
                     width: "42px",
                     height: "42px",
                     borderRadius: "12px",
-                    background: "rgba(56, 189, 248, 0.12)",
-                    border: "1px solid rgba(56, 189, 248, 0.25)",
+                    background: "rgba(56, 189, 248, 0.15)",
+                    border: "1px solid rgba(56, 189, 248, 0.35)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    boxShadow: "0 0 15px rgba(56, 189, 248, 0.2)",
                   }}
                 >
                   <ShieldCheck size={22} color="#38bdf8" />
@@ -1453,10 +1508,10 @@ export default function BentoGrid() {
                     color: "#38bdf8",
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
-                    background: "rgba(56, 189, 248, 0.1)",
+                    background: "rgba(56, 189, 248, 0.12)",
                     padding: "4px 10px",
                     borderRadius: "6px",
-                    border: "1px solid rgba(56, 189, 248, 0.2)",
+                    border: "1px solid rgba(56, 189, 248, 0.3)",
                   }}
                 >
                   Ultra-Fast VPN
@@ -1465,21 +1520,24 @@ export default function BentoGrid() {
 
               <h3
                 style={{
-                  fontSize: "24px",
-                  fontWeight: 800,
+                  fontSize: "26px",
+                  fontWeight: 900,
                   color: "#ffffff",
                   margin: "0 0 10px",
                   letterSpacing: "-0.01em",
+                  textShadow: "0 2px 10px rgba(0,0,0,0.8)",
                 }}
               >
                 V2Ray &amp; STX Proxies
               </h3>
               <p
                 style={{
-                  fontSize: "14px",
-                  color: "#94a3b8",
+                  fontSize: "14.5px",
+                  color: "#cbd5e1",
                   margin: "0 0 18px",
                   lineHeight: 1.5,
+                  maxWidth: "360px",
+                  textShadow: "0 1px 4px rgba(0,0,0,0.8)",
                 }}
               >
                 High-speed VMess, VLess &amp; Trojan obfuscated VPN nodes.
@@ -1505,12 +1563,12 @@ export default function BentoGrid() {
                     key={idx}
                     style={{
                       fontSize: "11px",
-                      fontWeight: 600,
-                      color: "rgba(255,255,255,0.8)",
-                      background: "rgba(255,255,255,0.05)",
-                      padding: "3px 9px",
+                      fontWeight: 700,
+                      color: "#f8fafc",
+                      background: "rgba(255,255,255,0.08)",
+                      padding: "4px 10px",
                       borderRadius: "6px",
-                      border: "1px solid rgba(255,255,255,0.08)",
+                      border: "1px solid rgba(255,255,255,0.18)",
                     }}
                   >
                     {tag}
@@ -1519,40 +1577,42 @@ export default function BentoGrid() {
               </div>
             </div>
 
-            <motion.div
-              variants={{
-                initial: {
-                  backgroundColor: "rgba(255,255,255,0.05)",
-                  borderColor: "rgba(255,255,255,0.12)",
-                },
-                hover: {
-                  backgroundColor: "rgba(56, 189, 248, 0.18)",
-                  borderColor: "rgba(56, 189, 248, 0.45)",
-                },
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "10px 20px",
-                borderRadius: "12px",
-                border: "1px solid rgba(255,255,255,0.12)",
-                background: "rgba(255,255,255,0.05)",
-                color: "rgba(255,255,255,0.95)",
-                fontSize: "13px",
-                fontWeight: 600,
-                width: "fit-content",
-                transition: "all 0.3s ease",
-              }}
-            >
-              Get V2Ray
-              <motion.span
-                variants={{ initial: { x: 0 }, hover: { x: 5 } }}
-                transition={{ duration: 0.3 }}
+            <div style={{ position: "relative", zIndex: 10 }}>
+              <motion.div
+                variants={{
+                  initial: {
+                    backgroundColor: "rgba(255,255,255,0.08)",
+                    borderColor: "rgba(255,255,255,0.18)",
+                  },
+                  hover: {
+                    backgroundColor: "rgba(56, 189, 248, 0.22)",
+                    borderColor: "rgba(56, 189, 248, 0.6)",
+                  },
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "10px 22px",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#ffffff",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  width: "fit-content",
+                  transition: "all 0.3s ease",
+                }}
               >
-                <ArrowRight size={14} color="#38bdf8" />
-              </motion.span>
-            </motion.div>
+                Get V2Ray
+                <motion.span
+                  variants={{ initial: { x: 0 }, hover: { x: 5 } }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ArrowRight size={15} color="#38bdf8" />
+                </motion.span>
+              </motion.div>
+            </div>
           </motion.a>
 
           {/* CARD 7: Digital Goods Store (store.shanutechx.com) */}
@@ -1566,22 +1626,22 @@ export default function BentoGrid() {
               initial: {
                 scale: 1,
                 y: 0,
-                borderColor: "rgba(255, 255, 255, 0.08)",
+                borderColor: "rgba(255, 255, 255, 0.12)",
                 boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
               },
               hover: {
                 scale: 1.015,
                 y: -6,
-                borderColor: "rgba(168, 85, 247, 0.45)",
+                borderColor: "rgba(168, 85, 247, 0.6)",
                 boxShadow:
-                  "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(168, 85, 247, 0.22)",
+                  "0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(168, 85, 247, 0.28)",
               },
             }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             style={{
-              minHeight: "260px",
-              background: "rgba(11, 11, 15, 0.75)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              minHeight: "270px",
+              background: "linear-gradient(135deg, #120e2e 0%, #0a0b1c 100%)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
               borderRadius: "24px",
               padding: "28px",
               cursor: "pointer",
@@ -1603,13 +1663,47 @@ export default function BentoGrid() {
                 right: 0,
                 height: "2px",
                 background:
-                  "linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.8), transparent)",
+                  "linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.9), transparent)",
                 pointerEvents: "none",
                 zIndex: 12,
               }}
             />
 
-            <div>
+            {/* Background Image with App Logos */}
+            <motion.img
+              src="/images/bento-digital-store.png"
+              alt="STX Digital Store Background"
+              variants={{
+                initial: { scale: 1, x: 0, opacity: 0.5 },
+                hover: { scale: 1.08, x: -6, opacity: 0.8 },
+              }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              style={{
+                position: "absolute",
+                right: 0,
+                top: 0,
+                height: "100%",
+                width: "60%",
+                objectFit: "cover",
+                maskImage:
+                  "linear-gradient(to left, rgba(0,0,0,1) 40%, transparent 100%)",
+                WebkitMaskImage:
+                  "linear-gradient(to left, rgba(0,0,0,1) 40%, transparent 100%)",
+                pointerEvents: "none",
+                zIndex: 2,
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background:
+                  "linear-gradient(to right, #120e2e 0%, rgba(18,14,46,0.85) 45%, transparent 100%)",
+                zIndex: 3,
+              }}
+            />
+
+            <div style={{ position: "relative", zIndex: 10 }}>
               <div
                 style={{
                   display: "flex",
@@ -1623,11 +1717,12 @@ export default function BentoGrid() {
                     width: "42px",
                     height: "42px",
                     borderRadius: "12px",
-                    background: "rgba(168, 85, 247, 0.12)",
-                    border: "1px solid rgba(168, 85, 247, 0.25)",
+                    background: "rgba(168, 85, 247, 0.15)",
+                    border: "1px solid rgba(168, 85, 247, 0.35)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    boxShadow: "0 0 15px rgba(168, 85, 247, 0.2)",
                   }}
                 >
                   <ShoppingBag size={22} color="#c084fc" />
@@ -1639,10 +1734,10 @@ export default function BentoGrid() {
                     color: "#c084fc",
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
-                    background: "rgba(168, 85, 247, 0.1)",
+                    background: "rgba(168, 85, 247, 0.12)",
                     padding: "4px 10px",
                     borderRadius: "6px",
-                    border: "1px solid rgba(168, 85, 247, 0.2)",
+                    border: "1px solid rgba(168, 85, 247, 0.3)",
                   }}
                 >
                   STX Digital Store
@@ -1651,28 +1746,31 @@ export default function BentoGrid() {
 
               <h3
                 style={{
-                  fontSize: "24px",
-                  fontWeight: 800,
+                  fontSize: "26px",
+                  fontWeight: 900,
                   color: "#ffffff",
                   margin: "0 0 10px",
                   letterSpacing: "-0.01em",
+                  textShadow: "0 2px 10px rgba(0,0,0,0.8)",
                 }}
               >
-                Digital Goods &amp; Premium Accounts
+                Digital Goods &amp; Accounts
               </h3>
               <p
                 style={{
-                  fontSize: "14px",
-                  color: "#94a3b8",
+                  fontSize: "14.5px",
+                  color: "#cbd5e1",
                   margin: "0 0 18px",
                   lineHeight: 1.5,
+                  maxWidth: "360px",
+                  textShadow: "0 1px 4px rgba(0,0,0,0.8)",
                 }}
               >
-                Buy premium subscriptions instantly: Netflix 4K, Spotify, CapCut
-                Pro, Google One AI Pro, Claude Pro &amp; ChatGPT Plus.
+                Buy premium subscriptions instantly: CapCut Pro, Netflix 4K, Spotify,
+                Google AI Pro, Claude Pro &amp; ChatGPT Plus.
               </p>
 
-              {/* Digital Goods Product Badges */}
+              {/* Digital Goods Product Badges with Icons */}
               <div
                 style={{
                   display: "flex",
@@ -1682,68 +1780,71 @@ export default function BentoGrid() {
                 }}
               >
                 {[
-                  { name: "Netflix 4K", color: "#ef4444" },
-                  { name: "Spotify Premium", color: "#22c55e" },
-                  { name: "CapCut Pro", color: "#38bdf8" },
-                  { name: "Google AI Pro", color: "#eab308" },
-                  { name: "Claude Pro", color: "#a855f7" },
-                  { name: "ChatGPT Plus", color: "#10b981" },
+                  { name: "CapCut Pro", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.15)" },
+                  { name: "Netflix 4K", color: "#ef4444", bg: "rgba(239, 68, 68, 0.15)" },
+                  { name: "Spotify Premium", color: "#22c55e", bg: "rgba(34, 197, 94, 0.15)" },
+                  { name: "ChatGPT Plus", color: "#10b981", bg: "rgba(16, 185, 129, 0.15)" },
+                  { name: "Claude Pro", color: "#c084fc", bg: "rgba(192, 132, 252, 0.15)" },
+                  { name: "Google AI Pro", color: "#eab308", bg: "rgba(234, 179, 8, 0.15)" },
                 ].map((item, idx) => (
                   <span
                     key={idx}
                     style={{
-                      fontSize: "10px",
+                      fontSize: "11px",
                       fontWeight: 700,
                       color: "#ffffff",
-                      background: "rgba(255,255,255,0.06)",
-                      padding: "3px 8px",
+                      background: item.bg,
+                      padding: "4px 10px",
                       borderRadius: "6px",
-                      border: `1px solid ${item.color}40`,
+                      border: `1px solid ${item.color}50`,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px",
                     }}
                   >
-                    <span style={{ color: item.color, marginRight: "4px" }}>
-                      ●
-                    </span>
+                    <span style={{ color: item.color }}>●</span>
                     {item.name}
                   </span>
                 ))}
               </div>
             </div>
 
-            <motion.div
-              variants={{
-                initial: {
-                  backgroundColor: "rgba(255,255,255,0.05)",
-                  borderColor: "rgba(255,255,255,0.12)",
-                },
-                hover: {
-                  backgroundColor: "rgba(168, 85, 247, 0.18)",
-                  borderColor: "rgba(168, 85, 247, 0.45)",
-                },
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "10px 20px",
-                borderRadius: "12px",
-                border: "1px solid rgba(255,255,255,0.12)",
-                background: "rgba(255,255,255,0.05)",
-                color: "rgba(255,255,255,0.95)",
-                fontSize: "13px",
-                fontWeight: 600,
-                width: "fit-content",
-                transition: "all 0.3s ease",
-              }}
-            >
-              Visit store.shanutechx.com
-              <motion.span
-                variants={{ initial: { x: 0 }, hover: { x: 5 } }}
-                transition={{ duration: 0.3 }}
+            <div style={{ position: "relative", zIndex: 10 }}>
+              <motion.div
+                variants={{
+                  initial: {
+                    backgroundColor: "rgba(255,255,255,0.08)",
+                    borderColor: "rgba(255,255,255,0.18)",
+                  },
+                  hover: {
+                    backgroundColor: "rgba(168, 85, 247, 0.22)",
+                    borderColor: "rgba(168, 85, 247, 0.6)",
+                  },
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "10px 22px",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#ffffff",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  width: "fit-content",
+                  transition: "all 0.3s ease",
+                }}
               >
-                <ExternalLink size={14} color="#c084fc" />
-              </motion.span>
-            </motion.div>
+                Visit store.shanutechx.com
+                <motion.span
+                  variants={{ initial: { x: 0 }, hover: { x: 5 } }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ExternalLink size={15} color="#c084fc" />
+                </motion.span>
+              </motion.div>
+            </div>
           </motion.a>
         </div>
       </div>

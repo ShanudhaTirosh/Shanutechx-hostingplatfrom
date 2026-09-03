@@ -244,11 +244,14 @@ export default function Navbar() {
           href="/"
           className="flex items-center gap-2.5 font-extrabold text-white tracking-tight text-base group shrink-0"
         >
-          <span className="h-8.5 w-8.5 rounded-xl bg-gradient-to-tr from-emerald-500 via-cyan-500 to-indigo-500 flex items-center justify-center text-white font-black text-xs shadow-[0_0_15px_rgba(16,185,129,0.5)] group-hover:scale-105 transition-transform">
-            STX
-          </span>
+          <img
+            src="/STX.png"
+            alt="STX HOSTING Logo"
+            className="w-7 h-7 max-w-[28px] max-h-[28px] shrink-0 rounded-lg object-contain shadow-[0_0_15px_rgba(16,185,129,0.5)] group-hover:scale-105 transition-transform"
+            style={{ filter: 'brightness(0) invert(1)' }}
+          />
           <span className="tracking-tighter font-extrabold text-white hidden sm:inline">
-            SHANUTECHX <span className="text-emerald-400 font-bold">.CLOUD</span>
+            STX <span className="text-emerald-400 font-bold">HOSTING</span>
           </span>
         </Link>
 

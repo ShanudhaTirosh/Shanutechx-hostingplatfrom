@@ -3,11 +3,12 @@ import './globals.css';
 import MeshBackground from '@/components/MeshBackground';
 
 export const metadata: Metadata = {
-  title: 'SHANUTECHX Dashboard',
-  description: 'Manage your hosting, deployments, and invoices.',
+  title: 'STX HOSTING Control Panel',
+  description: 'Manage your VPS hosting, cloud deployments, V2Ray proxies, and invoices.',
   icons: {
-    icon: '/favicon.ico',
-    apple: '/apple-icon.png',
+    icon: '/STX.png',
+    shortcut: '/STX.png',
+    apple: '/STX.png',
   },
   manifest: '/manifest.json',
 };

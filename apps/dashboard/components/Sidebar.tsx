@@ -174,13 +174,16 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <aside className="w-64 md:w-56 shrink-0 flex flex-col py-6 px-4 gap-1 border-r border-white/[0.05] min-h-screen bg-bg">
       {/* Logo */}
-      <div className="flex items-center gap-2 px-3 mb-6">
-        <span className="inline-flex h-7 w-7 rounded-lg bg-brand-gradient items-center justify-center shadow-glow-violet shrink-0">
-          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-            <path d="M7 1L13 4.5V9.5L7 13L1 9.5V4.5L7 1Z" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/>
-          </svg>
+      <div className="flex items-center gap-2.5 px-3 mb-6">
+        <img
+          src="/STX.png"
+          alt="STX HOSTING Logo"
+          className="w-6 h-6 max-w-[24px] max-h-[24px] shrink-0 rounded-md object-contain shadow-glow-violet"
+          style={{ filter: 'brightness(0) invert(1)' }}
+        />
+        <span className="font-extrabold text-sm tracking-tight text-white">
+          STX <span className="text-accent-teal">HOSTING</span>
         </span>
-        <span className="font-semibold text-sm text-text-primary">SHANUTECHX</span>
       </div>
 
       {/* Quick View Switcher for Dev and Admin Roles */}

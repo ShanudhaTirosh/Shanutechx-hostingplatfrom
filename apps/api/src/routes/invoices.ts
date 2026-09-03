@@ -70,3 +70,56 @@ invoicesRouter.get('/orders/:orderId/invoice', async (req: AuthedRequest, res) =
   res.setHeader('Content-Disposition', `attachment; filename="invoice-${order.id}.pdf"`);
   res.send(Buffer.from(pdfBytes));
 });
+
+/**
+ * Returns structured JSON invoice details for rendering invoice preview modals
+ */
+invoicesRouter.get('/orders/:orderId/invoice/json', async (req: AuthedRequest, res) => {
+  const order = await loadOwnedOrderWithItems(req, req.params.orderId);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+
+  const invoiceNumber = `INV-${order.createdAt.getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`;
+
+  const lineItems = order.items.map((item: any) => {
+    const name = item.service
+      ? item.service.name
+      : item.plan
+      ? `${item.plan.product?.name ?? 'Cloud Hosting'} — ${item.plan.name}`
+      : 'Cloud Resource Allocation';
+    const unitPrice = item.service ? item.service.price : item.plan ? item.plan.price : 0;
+    return {
+      id: item.id,
+      name,
+      quantity: item.quantity,
+      unitPrice,
+      total: unitPrice * item.quantity,
+    };
+  });
+
+  const orderAny = order as any;
+  res.json({
+    invoiceNumber,
+    orderId: order.id,
+    issuedAt: order.createdAt,
+    paidAt: orderAny.updatedAt || order.createdAt,
+    status: order.status,
+    customer: {
+      id: order.user.id,
+      name: order.user.displayName || order.user.email.split('@')[0],
+      email: order.user.email,
+      whatsapp: order.user.phoneNumber,
+    },
+    company: {
+      name: 'ShanuTechX Platform (Pvt) Ltd',
+      address: 'Level 18, Orion City Towers, Colombo 09, Sri Lanka',
+      taxId: 'LK-884920492-STX',
+      email: 'billing@shanutechx.com',
+      website: 'https://shanutechx.com',
+    },
+    items: lineItems,
+    subtotal: order.total,
+    tax: 0,
+    discount: 0,
+    total: order.total,
+  });
+});

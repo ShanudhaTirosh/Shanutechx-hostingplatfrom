@@ -8,15 +8,16 @@ import MeshBackground from '@/components/MeshBackground';
 export const metadata: Metadata = {
   ...siteMetadata,
   icons: {
-    icon: '/favicon.ico',
-    apple: '/apple-icon.png',
+    icon: '/STX.png',
+    shortcut: '/STX.png',
+    apple: '/STX.png',
   },
 };
 
 const jsonLdSchema = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
-  name: 'SHANUTECHX Cloud Platform',
+  name: 'STX HOSTING Autonomous Cloud Platform',
   operatingSystem: 'Linux, Docker',
   applicationCategory: 'BusinessApplication',
   offers: {
@@ -26,7 +27,7 @@ const jsonLdSchema = {
   },
   author: {
     '@type': 'Organization',
-    name: 'SHANUTECHX Cloud',
+    name: 'STX HOSTING',
     url: 'https://shanutechx.com',
   },
 };
