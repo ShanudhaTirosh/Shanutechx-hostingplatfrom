@@ -29,6 +29,7 @@ import {
   GitBranch,
   ExternalLink,
   Sparkles,
+  ShoppingBag,
 } from 'lucide-react';
 import DiscordIcon from './DiscordIcon';
 
@@ -76,6 +77,21 @@ const PRODUCTS = [
     href: '/catalog',
     icon: LayoutGrid,
     color: 'text-amber-400',
+  },
+  {
+    name: 'V2Ray & STX Proxies',
+    desc: 'Ultra-fast VMess, VLess & Trojan nodes',
+    href: '/v2ray',
+    icon: ShieldCheck,
+    color: 'text-sky-400',
+  },
+  {
+    name: 'STX Digital Goods Store',
+    desc: 'Netflix 4K, Spotify, CapCut Pro & AI Accounts',
+    href: 'https://store.shanutechx.com',
+    external: true,
+    icon: ShoppingBag,
+    color: 'text-purple-400',
   },
 ];
 

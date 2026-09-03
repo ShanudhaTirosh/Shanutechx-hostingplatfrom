@@ -109,6 +109,17 @@ export default function Footer() {
                 <li><Link href="/bot-hosting" className="hover:text-white transition-colors">Bot Hosting</Link></li>
                 <li><Link href="/databases" className="hover:text-white transition-colors">Managed Databases</Link></li>
                 <li><Link href="/catalog" className="hover:text-white transition-colors">App Catalog</Link></li>
+                <li><Link href="/v2ray" className="hover:text-white transition-colors">V2Ray Proxies</Link></li>
+                <li>
+                  <a
+                    href="https://store.shanutechx.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-white transition-colors text-purple-300 font-extrabold flex items-center gap-1"
+                  >
+                    STX Digital Store <span className="text-[10px]">↗</span>
+                  </a>
+                </li>
               </ul>
             </div>
 

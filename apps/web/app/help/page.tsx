@@ -159,7 +159,7 @@ export default function HelpPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#040510] text-slate-100 font-sans selection:bg-purple-500 selection:text-white relative overflow-hidden">
+    <div className="min-h-screen bg-transparent text-white font-sans selection:bg-purple-500 selection:text-white relative overflow-hidden">
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24 space-y-16 relative z-10">

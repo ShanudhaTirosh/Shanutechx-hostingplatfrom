@@ -8,7 +8,14 @@ import {
   Cpu, 
   Terminal, 
   Box,
-  Sparkles
+  Sparkles,
+  ShieldCheck,
+  ShoppingBag,
+  Globe,
+  ExternalLink,
+  Tv,
+  Zap,
+  Headphones
 } from 'lucide-react';
 
 export default function BentoGrid() {
@@ -837,6 +844,230 @@ export default function BentoGrid() {
             </motion.div>
           </div>
         </motion.a>
+
+        {/* ─── ROW 4: V2Ray Proxies (50%) & Digital Goods Store (50%) ─── */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '18px',
+          }}
+        >
+          {/* CARD 6: V2Ray & High-Speed Proxies */}
+          <motion.a
+            href="/v2ray"
+            whileHover="hover"
+            initial="initial"
+            variants={{
+              initial: { scale: 1, y: 0, borderColor: 'rgba(255, 255, 255, 0.08)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' },
+              hover: { scale: 1.015, y: -6, borderColor: 'rgba(56, 189, 248, 0.45)', boxShadow: '0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(56, 189, 248, 0.2)' },
+            }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              minHeight: '260px',
+              background: 'rgba(11, 11, 15, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '24px',
+              padding: '28px',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              textDecoration: 'none',
+            }}
+          >
+            <motion.div
+              variants={{ initial: { opacity: 0 }, hover: { opacity: 1 } }}
+              transition={{ duration: 0.4 }}
+              style={{
+                position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
+                background: 'linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.8), transparent)',
+                pointerEvents: 'none', zIndex: 12,
+              }}
+            />
+
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                <div
+                  style={{
+                    width: '42px', height: '42px', borderRadius: '12px',
+                    background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.25)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <ShieldCheck size={22} color="#38bdf8" />
+                </div>
+                <span
+                  style={{
+                    fontSize: '11px', fontWeight: 800, color: '#38bdf8', letterSpacing: '0.08em',
+                    textTransform: 'uppercase', background: 'rgba(56, 189, 248, 0.1)',
+                    padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(56, 189, 248, 0.2)',
+                  }}
+                >
+                  Ultra-Fast VPN
+                </span>
+              </div>
+
+              <h3 style={{ fontSize: '24px', fontWeight: 800, color: '#ffffff', margin: '0 0 10px', letterSpacing: '-0.01em' }}>
+                V2Ray &amp; STX Proxies
+              </h3>
+              <p style={{ fontSize: '14px', color: '#94a3b8', margin: '0 0 18px', lineHeight: 1.5 }}>
+                High-speed VMess, VLess &amp; Trojan obfuscated VPN nodes. Bypasses throttling with zero latency &amp; instant config keys.
+              </p>
+
+              {/* Protocol Badges */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
+                {['VMess / VLess', 'Trojan Protocol', 'ShadowSocks', 'Unlimited Bandwidth'].map((tag, idx) => (
+                  <span
+                    key={idx}
+                    style={{
+                      fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.8)',
+                      background: 'rgba(255,255,255,0.05)', padding: '3px 9px', borderRadius: '6px',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <motion.div
+              variants={{
+                initial: { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.12)' },
+                hover: { backgroundColor: 'rgba(56, 189, 248, 0.18)', borderColor: 'rgba(56, 189, 248, 0.45)' },
+              }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '8px',
+                padding: '10px 20px', borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.12)',
+                background: 'rgba(255,255,255,0.05)',
+                color: 'rgba(255,255,255,0.95)', fontSize: '13px', fontWeight: 600, width: 'fit-content',
+                transition: 'all 0.3s ease',
+              }}
+            >
+              Get V2Ray Credentials
+              <motion.span variants={{ initial: { x: 0 }, hover: { x: 5 } }} transition={{ duration: 0.3 }}>
+                <ArrowRight size={14} color="#38bdf8" />
+              </motion.span>
+            </motion.div>
+          </motion.a>
+
+          {/* CARD 7: Digital Goods Store (store.shanutechx.com) */}
+          <motion.a
+            href="https://store.shanutechx.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            whileHover="hover"
+            initial="initial"
+            variants={{
+              initial: { scale: 1, y: 0, borderColor: 'rgba(255, 255, 255, 0.08)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' },
+              hover: { scale: 1.015, y: -6, borderColor: 'rgba(168, 85, 247, 0.45)', boxShadow: '0 20px 45px rgba(0,0,0,0.8), 0 0 35px rgba(168, 85, 247, 0.22)' },
+            }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              minHeight: '260px',
+              background: 'rgba(11, 11, 15, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '24px',
+              padding: '28px',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              textDecoration: 'none',
+            }}
+          >
+            <motion.div
+              variants={{ initial: { opacity: 0 }, hover: { opacity: 1 } }}
+              transition={{ duration: 0.4 }}
+              style={{
+                position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
+                background: 'linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.8), transparent)',
+                pointerEvents: 'none', zIndex: 12,
+              }}
+            />
+
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                <div
+                  style={{
+                    width: '42px', height: '42px', borderRadius: '12px',
+                    background: 'rgba(168, 85, 247, 0.12)', border: '1px solid rgba(168, 85, 247, 0.25)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <ShoppingBag size={22} color="#c084fc" />
+                </div>
+                <span
+                  style={{
+                    fontSize: '11px', fontWeight: 800, color: '#c084fc', letterSpacing: '0.08em',
+                    textTransform: 'uppercase', background: 'rgba(168, 85, 247, 0.1)',
+                    padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(168, 85, 247, 0.2)',
+                  }}
+                >
+                  STX Digital Store
+                </span>
+              </div>
+
+              <h3 style={{ fontSize: '24px', fontWeight: 800, color: '#ffffff', margin: '0 0 10px', letterSpacing: '-0.01em' }}>
+                Digital Goods &amp; Premium Accounts
+              </h3>
+              <p style={{ fontSize: '14px', color: '#94a3b8', margin: '0 0 18px', lineHeight: 1.5 }}>
+                Buy premium subscriptions instantly: Netflix 4K, Spotify, CapCut Pro, Google One AI Pro, Claude Pro &amp; ChatGPT Plus.
+              </p>
+
+              {/* Digital Goods Product Badges */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
+                {[
+                  { name: 'Netflix 4K', color: '#ef4444' },
+                  { name: 'Spotify Premium', color: '#22c55e' },
+                  { name: 'CapCut Pro', color: '#38bdf8' },
+                  { name: 'Google AI Pro', color: '#eab308' },
+                  { name: 'Claude Pro', color: '#a855f7' },
+                  { name: 'ChatGPT Plus', color: '#10b981' },
+                ].map((item, idx) => (
+                  <span
+                    key={idx}
+                    style={{
+                      fontSize: '10px', fontWeight: 700, color: '#ffffff',
+                      background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: '6px',
+                      border: `1px solid ${item.color}40`,
+                    }}
+                  >
+                    <span style={{ color: item.color, marginRight: '4px' }}>●</span>
+                    {item.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <motion.div
+              variants={{
+                initial: { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.12)' },
+                hover: { backgroundColor: 'rgba(168, 85, 247, 0.18)', borderColor: 'rgba(168, 85, 247, 0.45)' },
+              }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '8px',
+                padding: '10px 20px', borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.12)',
+                background: 'rgba(255,255,255,0.05)',
+                color: 'rgba(255,255,255,0.95)', fontSize: '13px', fontWeight: 600, width: 'fit-content',
+                transition: 'all 0.3s ease',
+              }}
+            >
+              Visit store.shanutechx.com
+              <motion.span variants={{ initial: { x: 0 }, hover: { x: 5 } }} transition={{ duration: 0.3 }}>
+                <ExternalLink size={14} color="#c084fc" />
+              </motion.span>
+            </motion.div>
+          </motion.a>
+        </div>
+
 
       </div>
 
