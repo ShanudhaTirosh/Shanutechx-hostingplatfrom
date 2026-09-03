@@ -5,7 +5,6 @@ import BentoGrid from '@/components/BentoGrid';
 import FeaturesGrid from '@/components/FeaturesGrid';
 import Pricing from '@/components/Pricing';
 import FAQ from '@/components/FAQ';
-import Contact from '@/components/Contact';
 import StxFooter from '@/components/StxFooter';
 
 interface CmsContent {
@@ -42,7 +41,6 @@ export default async function HomePage() {
       <div id="faq">
         <FAQ items={content.faqItems} />
       </div>
-      <Contact />
       <StxFooter />
     </main>
   );
