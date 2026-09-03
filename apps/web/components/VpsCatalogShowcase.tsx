@@ -104,7 +104,7 @@ export default function VpsCatalogShowcase({ products, dashboardUrl }: VpsCatalo
             backdropFilter: 'blur(16px)',
             boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
             maxWidth: '820px',
-            margin: '0 auto',
+            margin: '36px auto 0 auto',
           }}
         >
           <p style={{ fontSize: '15px', color: '#94a3b8', margin: 0, fontWeight: 500 }}>

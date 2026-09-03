@@ -81,7 +81,6 @@ const PRODUCTS = [
 
 const MAIN_LINKS = [
   { label: 'Home', href: '/' },
-  { label: 'Cloud VPS', href: '/vps' },
   { label: 'Pricing', href: '/pricing' },
   { label: 'Status', href: '/status' },
   { label: 'About', href: '/about' },

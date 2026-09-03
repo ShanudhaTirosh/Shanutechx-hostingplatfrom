@@ -125,18 +125,11 @@ export default async function ManagedDatabasesPage() {
         </div>
 
         {allPlans.length === 0 ? (
-          <div className="bg-[#080918] border border-white/10 rounded-3xl p-12 text-center space-y-4 max-w-xl mx-auto">
-            <Package className="h-12 w-12 text-teal-400 mx-auto" />
-            <h3 className="text-xl font-bold text-white">No Database Plans Published Yet</h3>
-            <p className="text-xs text-text-muted">
-              Admins &amp; Devs can add Database products and plans in the Control Panel under <strong className="text-white">Admin &gt; Products &amp; Plans</strong>.
+          <div className="bg-[#080918] border border-white/10 rounded-3xl p-12 text-center space-y-3 max-w-xl mx-auto">
+            <Package className="h-10 w-10 text-teal-400 mx-auto" />
+            <p className="text-sm font-semibold text-slate-300">
+              No products are currently listed. Check back soon or contact support.
             </p>
-            <a
-              href={`${dashboardUrl}/admin/services`}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-glow-violet transition-all"
-            >
-              Open Admin Products Manager →
-            </a>
           </div>
         ) : (
           <div className="grid md:grid-cols-3 gap-8">
