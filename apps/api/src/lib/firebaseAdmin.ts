@@ -1,6 +1,7 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getDatabase } from 'firebase-admin/database';
+import { getFirestore } from 'firebase-admin/firestore';
 import { env } from '../env';
 import { logger } from './logger';
 
@@ -31,4 +32,4 @@ if (getApps().length === 0) {
 
 export const firebaseAuth = isInitialized ? getAuth() : null;
 export const firebaseDb = isInitialized && env.firebaseDatabaseUrl ? getDatabase() : null;
-
+export const firebaseFirestore = isInitialized ? getFirestore() : null;

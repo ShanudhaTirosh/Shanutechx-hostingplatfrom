@@ -1,11 +1,13 @@
 import { prisma } from './prisma';
 import { logger } from './logger';
+import { syncProductsToFirebase } from './firebaseSync';
 
 export async function ensureDefaultProductsSeeded(): Promise<void> {
   try {
     const existingCount = await prisma.product.count().catch(() => 0);
     if (existingCount > 0) {
-      // Products already exist in DB
+      // Sync existing products to Firebase on boot
+      void syncProductsToFirebase();
       return;
     }
 
@@ -238,6 +240,7 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     }
 
     logger.info(`Successfully seeded default products and plans! Created SMTP product ID: ${smtpProduct.id}`);
+    void syncProductsToFirebase();
   } catch (err: any) {
     logger.error({ err: err.message }, 'Failed to auto-seed default products');
   }

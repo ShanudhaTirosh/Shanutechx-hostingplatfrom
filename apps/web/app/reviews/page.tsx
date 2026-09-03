@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import Navbar from '../../components/Navbar';
 import StxFooter from '../../components/StxFooter';
 import GradientMeshOrb from '../../components/GradientMeshOrb';
-import { Star, CheckCircle, Shield, MessageSquare, Sparkles, Filter, ChevronLeft, ChevronRight, MessageSquarePlus, AlertCircle, CheckCircle2, X } from 'lucide-react';
+import { Star, CheckCircle, Shield, MessageSquare, Sparkles, Filter, ChevronLeft, ChevronRight, MessageSquarePlus, AlertCircle, CheckCircle2, X, Lock, ShoppingCart, UserCheck, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Review {
@@ -14,8 +15,15 @@ interface Review {
   rating: number;
   comment: string;
   productCategory: string;
+  productName?: string;
   isVerified: boolean;
   createdAt: string;
+}
+
+interface PurchasedItem {
+  id: string;
+  name: string;
+  category: string;
 }
 
 export default function ReviewsPage() {
@@ -26,6 +34,13 @@ export default function ReviewsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('all');
 
+  // User & Purchase State
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [purchasedItems, setPurchasedItems] = useState<PurchasedItem[]>([]);
+  const [hasPurchases, setHasPurchases] = useState(false);
+  const [loadingPurchases, setLoadingPurchases] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -33,11 +48,13 @@ export default function ReviewsPage() {
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
 
   // Form Fields
+  const [selectedItemId, setSelectedItemId] = useState<string>('');
   const [authorName, setAuthorName] = useState('');
   const [authorRole, setAuthorRole] = useState('');
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [productCategory, setProductCategory] = useState('vps');
+  const [productName, setProductName] = useState('');
 
   const categories = [
     { id: 'all', label: 'All Categories' },
@@ -76,52 +93,110 @@ export default function ReviewsPage() {
     setPage(1);
   };
 
+  // Open modal and load user's purchased items
+  const handleOpenModal = async () => {
+    setModalOpen(true);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+
+    const token = localStorage.getItem('stx_auth_token') || '';
+    const cachedUserStr = localStorage.getItem('stx_auth_user');
+
+    if (!token && !cachedUserStr) {
+      setIsLoggedIn(false);
+      return;
+    }
+
+    setIsLoggedIn(true);
+    setLoadingPurchases(true);
+
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+    try {
+      const res = await fetch(`${apiBase}/api/reviews/purchased-items`, {
+        headers: {
+          Authorization: `Bearer ${token || 'verified-session'}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setPurchasedItems(data.purchasedItems || []);
+        setHasPurchases(data.hasPurchases);
+        setIsAdmin(!!data.isAdmin);
+
+        if (data.purchasedItems && data.purchasedItems.length > 0) {
+          setSelectedItemId(data.purchasedItems[0].id);
+          setProductCategory(data.purchasedItems[0].category);
+          setProductName(data.purchasedItems[0].name);
+        }
+      } else {
+        setHasPurchases(false);
+      }
+    } catch (err) {
+      setHasPurchases(false);
+    } finally {
+      setLoadingPurchases(false);
+    }
+  };
+
+  const handleSelectItem = (itemId: string) => {
+    setSelectedItemId(itemId);
+    const item = purchasedItems.find((p) => p.id === itemId);
+    if (item) {
+      setProductCategory(item.category);
+      setProductName(item.name);
+    }
+  };
+
   // Submit verified review
   async function handleSubmitReview(e: React.FormEvent) {
     e.preventDefault();
     setSubmitError(null);
     setSubmitSuccess(null);
 
+    const token = localStorage.getItem('stx_auth_token') || '';
     const cachedUser = localStorage.getItem('stx_auth_user');
-    let token = localStorage.getItem('stx_auth_token') || '';
 
-    if (!cachedUser) {
-      setSubmitError('Please sign in to your STX HOSTING client space before writing a review.');
+    if (!token && !cachedUser) {
+      setSubmitError('Please sign in to your STX account before writing a review.');
       return;
     }
 
     let parsedUser;
     try {
-      parsedUser = JSON.parse(cachedUser);
+      parsedUser = JSON.parse(cachedUser || '{}');
     } catch (_) {}
 
     setSubmitting(true);
     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
+    const selectedItem = purchasedItems.find((p) => p.id === selectedItemId);
+
     try {
-      const res = await fetch(`${apiBase}/api/reviews`, {
+      const endpoint = isAdmin ? `${apiBase}/api/admin/reviews` : `${apiBase}/api/reviews`;
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token || 'verified-session'}`,
         },
         body: JSON.stringify({
-          authorName: authorName || parsedUser?.name || 'Verified Client',
+          authorName: authorName || parsedUser?.name || 'Verified Customer',
           authorRole: authorRole || 'Verified Client',
           rating,
           comment,
-          productCategory,
+          productCategory: selectedItem?.category || productCategory,
+          productName: selectedItem?.name || productName || 'Cloud Hosting Service',
+          productId: selectedItemId || null,
+          isVerified: true,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        if (res.status === 403) {
-          setSubmitError('🚫 Purchase Verification Required: Only clients with paid orders or active cloud subscriptions can submit a product review.');
-        } else {
-          setSubmitError(data.error || 'Failed to post review.');
-        }
+        setSubmitError(data.error || 'Failed to post review.');
         return;
       }
 
@@ -135,7 +210,7 @@ export default function ReviewsPage() {
         setSubmitSuccess(null);
       }, 1800);
     } catch (err: any) {
-      setSubmitError('Unable to connect to STX reviews server. Please try again.');
+      setSubmitError('Unable to submit review. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -166,11 +241,11 @@ export default function ReviewsPage() {
             </p>
             <div className="pt-2">
               <button
-                onClick={() => setModalOpen(true)}
+                onClick={handleOpenModal}
                 className="px-6 py-3 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-glow-violet transition-all flex items-center gap-2 mx-auto"
               >
                 <MessageSquarePlus className="h-4 w-4" />
-                Write a Verified Review
+                Write a Product Review
               </button>
             </div>
           </div>
@@ -249,6 +324,13 @@ export default function ReviewsPage() {
                       ))}
                     </div>
                   </div>
+
+                  {rev.productName && (
+                    <div className="text-[11px] font-mono text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-lg">
+                      Item: {rev.productName}
+                    </div>
+                  )}
+
                   <p className="text-xs text-slate-300 leading-relaxed font-sans">
                     &ldquo;{rev.comment}&rdquo;
                   </p>
@@ -321,7 +403,7 @@ export default function ReviewsPage() {
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div className="flex items-center gap-2">
                   <MessageSquarePlus className="h-5 w-5 text-purple-400" />
-                  <h3 className="font-extrabold text-white text-base">Write a Verified Client Review</h3>
+                  <h3 className="font-extrabold text-white text-base">Write a Product Review</h3>
                 </div>
                 <button
                   onClick={() => setModalOpen(false)}
@@ -331,65 +413,124 @@ export default function ReviewsPage() {
                 </button>
               </div>
 
-              {submitError && (
-                <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs flex items-start gap-2.5">
-                  <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
-                  <span>{submitError}</span>
-                </div>
-              )}
-
-              {submitSuccess && (
-                <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span>{submitSuccess}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleSubmitReview} className="space-y-4 text-xs font-semibold">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-slate-300 block">Your Name</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Kasun Perera"
-                      value={authorName}
-                      onChange={(e) => setAuthorName(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                    />
+              {/* NOT LOGGED IN STATE */}
+              {!isLoggedIn ? (
+                <div className="py-6 text-center space-y-4">
+                  <div className="w-12 h-12 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mx-auto text-purple-400">
+                    <Lock className="h-6 w-6" />
                   </div>
-
                   <div className="space-y-1">
-                    <label className="text-slate-300 block">Role / Company</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Full-Stack Developer"
-                      value={authorRole}
-                      onChange={(e) => setAuthorRole(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                    />
+                    <h4 className="font-extrabold text-white text-base">Authentication Required</h4>
+                    <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                      Please log in to your STX HOSTING client account to post a review for items you have purchased.
+                    </p>
                   </div>
+                  <Link
+                    href="http://localhost:3001/login"
+                    target="_blank"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-glow-violet transition-all"
+                  >
+                    <UserCheck className="h-4 w-4" />
+                    Sign In to Client Space →
+                  </Link>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
+              ) : loadingPurchases ? (
+                <div className="py-8 text-center text-xs font-mono text-slate-400">
+                  Verifying your purchased products...
+                </div>
+              ) : !hasPurchases && !isAdmin ? (
+                /* LOGGED IN BUT NO PURCHASES FOUND */
+                <div className="py-6 text-center space-y-4">
+                  <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto text-rose-400">
+                    <ShieldAlert className="h-6 w-6" />
+                  </div>
                   <div className="space-y-1">
-                    <label className="text-slate-300 block">Product Category</label>
-                    <select
-                      value={productCategory}
-                      onChange={(e) => setProductCategory(e.target.value)}
-                      className="w-full bg-[#0a0b24] border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                    <h4 className="font-extrabold text-white text-base">No Verified Purchases Identified</h4>
+                    <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
+                      Only customers who own a paid order or active cloud service can post a review. You can only review items you have actually purchased.
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    <Link
+                      href="/#pricing"
+                      onClick={() => setModalOpen(false)}
+                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs shadow-glow-violet transition-all"
                     >
-                      <option value="vps">Cloud VPS Hosting</option>
-                      <option value="app_hosting">App &amp; Repo Hosting</option>
-                      <option value="bot_hosting">24/7 Bot Hosting</option>
-                      <option value="database">Managed Databases</option>
-                      <option value="catalog">1-Click App Catalog</option>
-                    </select>
+                      <ShoppingCart className="h-4 w-4" />
+                      Browse Cloud Services &amp; VPS →
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                /* FORM STATE: LOGGED IN AND VERIFIED PURCHASE AVAILABLE */
+                <form onSubmit={handleSubmitReview} className="space-y-4 text-xs font-semibold">
+                  {isAdmin && (
+                    <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[11px] font-mono flex items-center gap-2">
+                      <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+                      <span>Admin Manual Review Mode Active</span>
+                    </div>
+                  )}
+
+                  {/* SELECT PURCHASED ITEM */}
+                  <div className="space-y-1">
+                    <label className="text-slate-300 block flex items-center justify-between">
+                      <span>Select Purchased Product to Review</span>
+                      <span className="text-emerald-400 font-mono text-[10px] flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" /> Verified Purchase
+                      </span>
+                    </label>
+
+                    {purchasedItems.length > 0 ? (
+                      <select
+                        value={selectedItemId}
+                        onChange={(e) => handleSelectItem(e.target.value)}
+                        className="w-full bg-[#0a0b24] border border-white/15 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-purple-500"
+                      >
+                        {purchasedItems.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name} ({item.category.toUpperCase()})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="Product Name (e.g. Cloud VPS Standard)"
+                        value={productName}
+                        onChange={(e) => setProductName(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                      />
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-slate-300 block">Your Name</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Kasun Perera"
+                        value={authorName}
+                        onChange={(e) => setAuthorName(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-slate-300 block">Role / Company</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Full-Stack Developer"
+                        value={authorRole}
+                        onChange={(e) => setAuthorRole(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-slate-300 block">Rating</label>
-                    <div className="flex items-center gap-1 pt-1.5">
+                    <div className="flex items-center gap-1 pt-1">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button
                           key={star}
@@ -406,30 +547,44 @@ export default function ReviewsPage() {
                       ))}
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-1">
-                  <label className="text-slate-300 block">Review Feedback</label>
-                  <textarea
-                    required
-                    rows={3}
-                    placeholder="Share your verified experience with STX HOSTING cloud performance..."
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                  />
-                </div>
+                  <div className="space-y-1">
+                    <label className="text-slate-300 block">Review Feedback</label>
+                    <textarea
+                      required
+                      rows={3}
+                      placeholder="Share your verified experience with this purchased cloud product..."
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
 
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs shadow-glow-violet transition-all flex items-center justify-center gap-2"
-                  >
-                    {submitting ? 'Verifying Purchase & Submitting...' : 'Post Verified Review →'}
-                  </button>
-                </div>
-              </form>
+                  {submitError && (
+                    <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs flex items-start gap-2.5">
+                      <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                      <span>{submitError}</span>
+                    </div>
+                  )}
+
+                  {submitSuccess && (
+                    <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                      <span>{submitSuccess}</span>
+                    </div>
+                  )}
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs shadow-glow-violet transition-all flex items-center justify-center gap-2"
+                    >
+                      {submitting ? 'Verifying Purchase & Publishing...' : 'Publish Verified Item Review →'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </motion.div>
           </div>
         )}

@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, ShieldCheck, Sparkles, ArrowRight, MessageSquarePlus, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { Star, ShieldCheck, Sparkles, ArrowRight, MessageSquarePlus, CheckCircle2, AlertCircle, X, Lock, ShoppingCart, UserCheck, ShieldAlert } from 'lucide-react';
 
 export interface ReviewItem {
   id?: string;
@@ -12,8 +12,15 @@ export interface ReviewItem {
   rating: number;
   comment: string;
   productCategory: string;
+  productName?: string;
   isVerified: boolean;
   createdAt?: string;
+}
+
+interface PurchasedItem {
+  id: string;
+  name: string;
+  category: string;
 }
 
 export default function ReviewCarousel() {
@@ -24,16 +31,23 @@ export default function ReviewCarousel() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
 
+  // User & Purchase State
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [purchasedItems, setPurchasedItems] = useState<PurchasedItem[]>([]);
+  const [hasPurchases, setHasPurchases] = useState(false);
+  const [loadingPurchases, setLoadingPurchases] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
   // Form State
+  const [selectedItemId, setSelectedItemId] = useState<string>('');
   const [authorName, setAuthorName] = useState('');
   const [authorRole, setAuthorRole] = useState('');
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [productCategory, setProductCategory] = useState('vps');
+  const [productName, setProductName] = useState('');
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Fetch reviews from API
+  // Fetch public reviews
   useEffect(() => {
     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
     fetch(`${apiBase}/api/reviews?limit=20`)
@@ -52,6 +66,7 @@ export default function ReviewCarousel() {
             rating: 5,
             comment: 'Migrated 12 Node.js microservices and PostgreSQL databases to STX HOSTING. 99.99% uptime and sub-20ms latency.',
             productCategory: 'vps',
+            productName: 'Cloud VPS KVM - 4 vCPU 8GB RAM',
             isVerified: true,
           },
           {
@@ -60,6 +75,7 @@ export default function ReviewCarousel() {
             rating: 5,
             comment: 'Our 24/7 Discord bot with 50,000+ members runs flawlessly. Zero dropouts, automatic reboot on memory spikes.',
             productCategory: 'bot_hosting',
+            productName: 'Discord Bot Python Daemon 2GB',
             isVerified: true,
           },
           {
@@ -68,6 +84,7 @@ export default function ReviewCarousel() {
             rating: 5,
             comment: 'The Cloud VPS allocations and 1-Click App Catalog saved us weeks of setup time. Instant provisioning!',
             productCategory: 'vps',
+            productName: 'Cloud VPS KVM - 8 vCPU 16GB RAM',
             isVerified: true,
           },
           {
@@ -75,63 +92,122 @@ export default function ReviewCarousel() {
             authorRole: 'E-commerce Founder',
             rating: 5,
             comment: 'Switched our Next.js storefront to STX Web App Hosting. Page load speed dropped from 2.4s to 420ms.',
-            productCategory: 'app_hosting',
+            productCategory: 'web_hosting',
+            productName: 'Next.js & Node Container Hosting',
             isVerified: true,
           },
         ]);
       });
   }, []);
 
-  // Handle Review Submission with Verified Client Purchase Gate
+  // Fetch logged in user's purchased items when modal opens
+  const handleOpenModal = async () => {
+    setModalOpen(true);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+
+    const token = localStorage.getItem('stx_auth_token') || '';
+    const cachedUserStr = localStorage.getItem('stx_auth_user');
+
+    if (!token && !cachedUserStr) {
+      setIsLoggedIn(false);
+      return;
+    }
+
+    setIsLoggedIn(true);
+    setLoadingPurchases(true);
+
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+    try {
+      const res = await fetch(`${apiBase}/api/reviews/purchased-items`, {
+        headers: {
+          Authorization: `Bearer ${token || 'verified-session'}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setPurchasedItems(data.purchasedItems || []);
+        setHasPurchases(data.hasPurchases);
+        setIsAdmin(!!data.isAdmin);
+
+        if (data.purchasedItems && data.purchasedItems.length > 0) {
+          setSelectedItemId(data.purchasedItems[0].id);
+          setProductCategory(data.purchasedItems[0].category);
+          setProductName(data.purchasedItems[0].name);
+        }
+      } else {
+        setHasPurchases(false);
+      }
+    } catch (err) {
+      setHasPurchases(false);
+    } finally {
+      setLoadingPurchases(false);
+    }
+  };
+
+  const handleSelectItem = (itemId: string) => {
+    setSelectedItemId(itemId);
+    const item = purchasedItems.find((p) => p.id === itemId);
+    if (item) {
+      setProductCategory(item.category);
+      setProductName(item.name);
+    }
+  };
+
+  // Submit Review (Item-Specific Verification)
   async function handleSubmitReview(e: React.FormEvent) {
     e.preventDefault();
     setSubmitError(null);
     setSubmitSuccess(null);
 
+    const token = localStorage.getItem('stx_auth_token') || '';
     const cachedUser = localStorage.getItem('stx_auth_user');
-    let token = localStorage.getItem('stx_auth_token') || '';
 
-    if (!cachedUser) {
-      setSubmitError('Please sign in to your STX HOSTING client space before writing a review.');
+    if (!token && !cachedUser) {
+      setSubmitError('Please log in to your STX account before posting a review.');
       return;
     }
 
     let parsedUser;
     try {
-      parsedUser = JSON.parse(cachedUser);
+      parsedUser = JSON.parse(cachedUser || '{}');
     } catch (_) {}
 
     setSubmitting(true);
     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
+    const selectedItem = purchasedItems.find((p) => p.id === selectedItemId);
+
     try {
-      const res = await fetch(`${apiBase}/api/reviews`, {
+      const endpoint = isAdmin ? `${apiBase}/api/admin/reviews` : `${apiBase}/api/reviews`;
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token || 'verified-session'}`,
         },
         body: JSON.stringify({
-          authorName: authorName || parsedUser?.name || 'Verified Client',
+          authorName: authorName || parsedUser?.name || 'Verified Customer',
           authorRole: authorRole || 'Verified Client',
           rating,
           comment,
-          productCategory,
+          productCategory: selectedItem?.category || productCategory,
+          productName: selectedItem?.name || productName || 'Cloud Hosting Service',
+          productId: selectedItemId || null,
+          isVerified: true,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        if (res.status === 403) {
-          setSubmitError('🚫 Purchase Verification Required: Only clients with paid orders or active cloud subscriptions can submit a product review.');
-        } else {
-          setSubmitError(data.error || 'Failed to post review.');
-        }
+        setSubmitError(data.error || 'Failed to post review.');
         return;
       }
 
-      setSubmitSuccess('✨ Thank you! Your verified client review has been published.');
+      setSubmitSuccess('✨ Thank you! Your verified product review has been published.');
       if (data.review) {
         setReviews((prev) => [data.review, ...prev]);
       }
@@ -143,18 +219,30 @@ export default function ReviewCarousel() {
         setSubmitSuccess(null);
       }, 1800);
     } catch (err: any) {
-      setSubmitError('Unable to connect to STX reviews server. Please try again.');
+      setSubmitError('Unable to submit review. Please try again.');
     } finally {
       setSubmitting(false);
     }
   }
 
-  // Double reviews for smooth infinite marquee looping
+  // Double array for continuous seamless marquee loop
   const displayReviews = [...reviews, ...reviews];
 
   return (
     <section className="py-24 relative overflow-hidden font-sans select-none">
-      {/* Glow Effects */}
+      {/* CSS Animation Keyframes for Smooth Seamless Marquee without Restarts */}
+      <style jsx global>{`
+        @keyframes marqueeLoop {
+          0% { transform: translateX(0%); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-marquee-loop {
+          display: flex;
+          width: max-content;
+          animation: marqueeLoop 40s linear infinite;
+        }
+      `}</style>
+
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-6 mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
@@ -173,7 +261,7 @@ export default function ReviewCarousel() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setModalOpen(true)}
+            onClick={handleOpenModal}
             className="px-5 py-2.5 rounded-full bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-200 font-bold text-xs flex items-center gap-2 shadow-lg transition-all hover:scale-105"
           >
             <MessageSquarePlus className="h-4 w-4 text-purple-400" />
@@ -189,30 +277,22 @@ export default function ReviewCarousel() {
         </div>
       </div>
 
-      {/* Infinite Scrolling Review Carousel (Hover to Pause & Resume Loop) */}
+      {/* Infinite Scrolling Review Carousel (Pauses IN PLACE on Hover, Resumes Smoothly) */}
       <div
         className="relative w-full overflow-hidden py-4"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
-        <motion.div
-          className="flex gap-6 w-max"
-          animate={{
-            x: isPaused ? undefined : ['0%', '-50%'],
-          }}
-          transition={{
-            x: {
-              repeat: Infinity,
-              repeatType: 'loop',
-              duration: 35,
-              ease: 'linear',
-            },
+        <div
+          className="animate-marquee-loop gap-6"
+          style={{
+            animationPlayState: isPaused ? 'paused' : 'running',
           }}
         >
           {displayReviews.map((rev, idx) => (
             <div
               key={idx}
-              className="w-[380px] bg-[#090a21]/90 backdrop-blur-2xl border border-white/12 rounded-3xl p-6 flex flex-col justify-between space-y-4 hover:border-purple-500/60 hover:shadow-[0_15px_40px_rgba(168,85,247,0.2)] transition-all cursor-pointer group"
+              className="w-[380px] bg-[#090a21]/90 backdrop-blur-2xl border border-white/12 rounded-3xl p-6 flex flex-col justify-between space-y-4 hover:border-purple-500/60 hover:shadow-[0_15px_40px_rgba(168,85,247,0.2)] transition-all cursor-pointer group shrink-0"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -230,6 +310,13 @@ export default function ReviewCarousel() {
                     ))}
                   </div>
                 </div>
+
+                {rev.productName && (
+                  <div className="text-[11px] font-mono text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-lg">
+                    Item: {rev.productName}
+                  </div>
+                )}
+
                 <p className="text-xs text-slate-300 leading-relaxed font-sans line-clamp-3">
                   &ldquo;{rev.comment}&rdquo;
                 </p>
@@ -245,10 +332,10 @@ export default function ReviewCarousel() {
               </div>
             </div>
           ))}
-        </motion.div>
+        </div>
       </div>
 
-      {/* Write a Review Modal (Verified Purchase Gated) */}
+      {/* Item-Gated Write a Review Modal */}
       <AnimatePresence>
         {modalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
@@ -261,7 +348,7 @@ export default function ReviewCarousel() {
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div className="flex items-center gap-2">
                   <MessageSquarePlus className="h-5 w-5 text-purple-400" />
-                  <h3 className="font-extrabold text-white text-base">Write a Verified Client Review</h3>
+                  <h3 className="font-extrabold text-white text-base">Write a Product Review</h3>
                 </div>
                 <button
                   onClick={() => setModalOpen(false)}
@@ -271,65 +358,124 @@ export default function ReviewCarousel() {
                 </button>
               </div>
 
-              {submitError && (
-                <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs flex items-start gap-2.5">
-                  <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
-                  <span>{submitError}</span>
-                </div>
-              )}
-
-              {submitSuccess && (
-                <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span>{submitSuccess}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleSubmitReview} className="space-y-4 text-xs font-semibold">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-slate-300 block">Your Name</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Kasun Perera"
-                      value={authorName}
-                      onChange={(e) => setAuthorName(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                    />
+              {/* NOT LOGGED IN STATE */}
+              {!isLoggedIn ? (
+                <div className="py-6 text-center space-y-4">
+                  <div className="w-12 h-12 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mx-auto text-purple-400">
+                    <Lock className="h-6 w-6" />
                   </div>
-
                   <div className="space-y-1">
-                    <label className="text-slate-300 block">Role / Company</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Full-Stack Developer"
-                      value={authorRole}
-                      onChange={(e) => setAuthorRole(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                    />
+                    <h4 className="font-extrabold text-white text-base">Authentication Required</h4>
+                    <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                      Please log in to your STX HOSTING client account to post a review for items you have purchased.
+                    </p>
                   </div>
+                  <Link
+                    href="http://localhost:3001/login"
+                    target="_blank"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-glow-violet transition-all"
+                  >
+                    <UserCheck className="h-4 w-4" />
+                    Sign In to Client Space →
+                  </Link>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
+              ) : loadingPurchases ? (
+                <div className="py-8 text-center text-xs font-mono text-slate-400">
+                  Verifying your purchased products...
+                </div>
+              ) : !hasPurchases && !isAdmin ? (
+                /* LOGGED IN BUT NO PURCHASES FOUND */
+                <div className="py-6 text-center space-y-4">
+                  <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto text-rose-400">
+                    <ShieldAlert className="h-6 w-6" />
+                  </div>
                   <div className="space-y-1">
-                    <label className="text-slate-300 block">Product Category</label>
-                    <select
-                      value={productCategory}
-                      onChange={(e) => setProductCategory(e.target.value)}
-                      className="w-full bg-[#0a0b24] border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                    <h4 className="font-extrabold text-white text-base">No Verified Purchases Identified</h4>
+                    <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
+                      Only customers who own a paid order or active cloud service can post a review. You can only review items you have actually purchased.
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    <a
+                      href="#pricing"
+                      onClick={() => setModalOpen(false)}
+                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs shadow-glow-violet transition-all"
                     >
-                      <option value="vps">Cloud VPS Hosting</option>
-                      <option value="app_hosting">App &amp; Repo Hosting</option>
-                      <option value="bot_hosting">24/7 Bot Hosting</option>
-                      <option value="database">Managed Databases</option>
-                      <option value="catalog">1-Click App Catalog</option>
-                    </select>
+                      <ShoppingCart className="h-4 w-4" />
+                      Browse Cloud Services &amp; VPS →
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                /* FORM STATE: LOGGED IN AND VERIFIED PURCHASE AVAILABLE */
+                <form onSubmit={handleSubmitReview} className="space-y-4 text-xs font-semibold">
+                  {isAdmin && (
+                    <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[11px] font-mono flex items-center gap-2">
+                      <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+                      <span>Admin Manual Review Mode Active</span>
+                    </div>
+                  )}
+
+                  {/* SELECT PURCHASED ITEM */}
+                  <div className="space-y-1">
+                    <label className="text-slate-300 block flex items-center justify-between">
+                      <span>Select Purchased Product to Review</span>
+                      <span className="text-emerald-400 font-mono text-[10px] flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" /> Verified Purchase
+                      </span>
+                    </label>
+
+                    {purchasedItems.length > 0 ? (
+                      <select
+                        value={selectedItemId}
+                        onChange={(e) => handleSelectItem(e.target.value)}
+                        className="w-full bg-[#0a0b24] border border-white/15 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-purple-500"
+                      >
+                        {purchasedItems.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name} ({item.category.toUpperCase()})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="Product Name (e.g. Cloud VPS Standard)"
+                        value={productName}
+                        onChange={(e) => setProductName(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                      />
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-slate-300 block">Your Name</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Kasun Perera"
+                        value={authorName}
+                        onChange={(e) => setAuthorName(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-slate-300 block">Role / Company</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Full-Stack Developer"
+                        value={authorRole}
+                        onChange={(e) => setAuthorRole(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-slate-300 block">Rating</label>
-                    <div className="flex items-center gap-1 pt-1.5">
+                    <div className="flex items-center gap-1 pt-1">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button
                           key={star}
@@ -346,30 +492,44 @@ export default function ReviewCarousel() {
                       ))}
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-1">
-                  <label className="text-slate-300 block">Review Feedback</label>
-                  <textarea
-                    required
-                    rows={3}
-                    placeholder="Share your verified experience with STX HOSTING cloud performance..."
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                  />
-                </div>
+                  <div className="space-y-1">
+                    <label className="text-slate-300 block">Review Feedback</label>
+                    <textarea
+                      required
+                      rows={3}
+                      placeholder="Share your verified experience with this purchased cloud product..."
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
 
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs shadow-glow-violet transition-all flex items-center justify-center gap-2"
-                  >
-                    {submitting ? 'Verifying Purchase & Submitting...' : 'Post Verified Review →'}
-                  </button>
-                </div>
-              </form>
+                  {submitError && (
+                    <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs flex items-start gap-2.5">
+                      <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                      <span>{submitError}</span>
+                    </div>
+                  )}
+
+                  {submitSuccess && (
+                    <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                      <span>{submitSuccess}</span>
+                    </div>
+                  )}
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs shadow-glow-violet transition-all flex items-center justify-center gap-2"
+                    >
+                      {submitting ? 'Verifying Purchase & Publishing...' : 'Publish Verified Item Review →'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </motion.div>
           </div>
         )}

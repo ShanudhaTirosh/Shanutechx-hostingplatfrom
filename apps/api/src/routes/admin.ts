@@ -6,6 +6,7 @@ import { requireAuth, requireFullAdmin, requireDev, AuthedRequest } from '../mid
 import { parsePagination } from '../lib/pagination';
 
 import { banUserAndTeardownResources, unbanUser } from '../lib/abuseDetector';
+import { fullFirebaseDataMigration, syncProductsToFirebase, syncPanelSettingsToFirebase } from '../lib/firebaseSync';
 
 export const adminRouter = Router();
 
@@ -308,3 +309,26 @@ adminRouter.post('/admin/users/:userId/unban', async (req: AuthedRequest, res) =
     message: `User ${targetUser.email} has been unbanned.`,
   });
 });
+
+/**
+ * Triggers a full migration and real-time sync of products, client accounts,
+ * settings, and orders from PostgreSQL to Firebase Firestore and Realtime Database.
+ */
+adminRouter.post('/admin/firebase-sync', async (req: AuthedRequest, res) => {
+  const syncResult = await fullFirebaseDataMigration();
+  
+  await prisma.auditLog.create({
+    data: {
+      adminId: req.user!.id,
+      action: 'firebase.full_sync',
+      target: `Synced ${syncResult.syncedUsersCount} users, products, orders & settings to Firestore`,
+    },
+  });
+
+  res.json({
+    ok: true,
+    message: 'Firebase Firestore & Realtime Database sync completed successfully!',
+    result: syncResult,
+  });
+});
+

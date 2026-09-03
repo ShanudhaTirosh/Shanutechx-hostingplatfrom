@@ -1576,6 +1576,8 @@ model Review {
   rating          Int      @default(5)
   comment         String
   productCategory String   @default("general")
+  productName     String?
+  productId       String?
   isVerified      Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
