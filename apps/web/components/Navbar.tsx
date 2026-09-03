@@ -30,6 +30,14 @@ import {
   ExternalLink,
   Sparkles,
   ShoppingBag,
+  Home,
+  Layers,
+  Tag,
+  Activity,
+  Info,
+  Mail,
+  Shield,
+  LogIn,
 } from 'lucide-react';
 import DiscordIcon from './DiscordIcon';
 
@@ -96,11 +104,37 @@ const PRODUCTS = [
 ];
 
 const MAIN_LINKS = [
-  { label: 'Home', href: '/' },
-  { label: 'Pricing', href: '/pricing' },
-  { label: 'Status', href: '/status' },
-  { label: 'About', href: '/about' },
-  { label: 'Contact', href: '/contact' },
+  { label: 'Pricing', href: '/pricing', icon: Tag, color: 'text-emerald-400' },
+  { label: 'Status', href: '/status', icon: Activity, color: 'text-amber-400' },
+  { label: 'About', href: '/about', icon: Info, color: 'text-sky-400' },
+  { label: 'Contact', href: '/contact', icon: Mail, color: 'text-pink-400' },
+];
+
+const ALL_SEARCHABLE_ITEMS = [
+  // Core Services
+  { name: 'Cloud VPS Hosting', desc: 'High-speed NVMe compute nodes with root SSH', href: '/vps', icon: Server, color: 'text-purple-400', category: 'Services' },
+  { name: 'App & Repo Hosting', desc: 'Deploy from GitHub, GitLab, or ZIP packages', href: '/app-hosting', icon: Code2, color: 'text-indigo-400', category: 'Services' },
+  { name: '24/7 Bot Hosting', desc: 'Discord, Telegram & WhatsApp bot daemons', href: '/bot-hosting', icon: Bot, color: 'text-pink-400', category: 'Services' },
+  { name: 'Managed Databases', desc: 'PostgreSQL, MySQL, Redis & MongoDB clusters', href: '/databases', icon: Database, color: 'text-teal-400', category: 'Services' },
+  { name: '1-Click Catalog', desc: 'WordPress, N8n, Plausible & 15+ templates', href: '/catalog', icon: LayoutGrid, color: 'text-amber-400', category: 'Services' },
+  { name: 'V2Ray & STX Proxies', desc: 'Ultra-fast VMess, VLess & Trojan nodes', href: '/v2ray', icon: ShieldCheck, color: 'text-sky-400', category: 'Services' },
+  { name: 'STX Digital Goods Store', desc: 'Netflix 4K, Spotify, CapCut Pro & AI Accounts', href: 'https://store.shanutechx.com', external: true, icon: ShoppingBag, color: 'text-purple-400', category: 'Digital Store' },
+  // Pages & Plans
+  { name: 'Plans & Pricing', desc: 'Transparent pricing for VPS, Databases, and Apps', href: '/pricing', icon: Tag, color: 'text-emerald-400', category: 'Pages' },
+  { name: 'System Status', desc: 'Live fleet uptime & real-time node metrics', href: '/status', icon: Activity, color: 'text-amber-400', category: 'Pages' },
+  { name: 'About STX HOSTING', desc: 'Learn about our autonomous cloud platform', href: '/about', icon: Info, color: 'text-sky-400', category: 'Pages' },
+  { name: '24/7 Support & Contact', desc: 'Get instant help from technical support staff', href: '/contact', icon: Mail, color: 'text-pink-400', category: 'Pages' },
+  { name: 'Terms of Service', desc: 'Platform usage agreement & SLA uptime guarantees', href: '/terms', icon: Shield, color: 'text-slate-400', category: 'Legal' },
+  { name: 'Privacy Policy', desc: 'Data protection and encryption policy', href: '/privacy', icon: Shield, color: 'text-slate-400', category: 'Legal' },
+  { name: 'Refund Policy', desc: '30-day money-back guarantee terms', href: '/refund', icon: Shield, color: 'text-slate-400', category: 'Legal' },
+  // 1-Click Templates & Databases
+  { name: 'WordPress 1-Click', desc: 'CMS template with MySQL and automatic SSL', href: '/catalog', icon: LayoutGrid, color: 'text-blue-400', category: 'Templates' },
+  { name: 'N8n Automation Engine', desc: 'Workflow automation daemon for AI agents', href: '/catalog', icon: Zap, color: 'text-rose-400', category: 'Templates' },
+  { name: 'Plausible Web Analytics', desc: 'Privacy-first light analytics instance', href: '/catalog', icon: Activity, color: 'text-indigo-400', category: 'Templates' },
+  { name: 'PostgreSQL Database Cluster', desc: 'Managed Postgres 16 with automated backups', href: '/databases', icon: Database, color: 'text-teal-400', category: 'Databases' },
+  { name: 'MySQL Database', desc: 'High-availability MySQL 8 database', href: '/databases', icon: Database, color: 'text-blue-400', category: 'Databases' },
+  { name: 'Redis Cache Cluster', desc: 'In-memory key-value cache with pub/sub', href: '/databases', icon: Database, color: 'text-red-400', category: 'Databases' },
+  { name: 'MongoDB NoSQL Database', desc: 'Document database with express dashboard', href: '/databases', icon: Database, color: 'text-emerald-400', category: 'Databases' },
 ];
 
 export default function Navbar() {
@@ -132,6 +166,21 @@ export default function Navbar() {
   const dashboardUrl =
     process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
   const loginUrl = `${dashboardUrl}/login`;
+
+  // Global Ctrl+K / Cmd+K & Escape keyboard listener for Search Modal
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+      if (e.key === 'Escape' && searchOpen) {
+        setSearchOpen(false);
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchOpen]);
 
   // Fetch REAL notifications from backend API
   useEffect(() => {
@@ -257,15 +306,26 @@ export default function Navbar() {
 
         {/* Desktop Links */}
         <div className="hidden md:flex items-center gap-5 text-xs font-semibold text-slate-300">
-          {/* Services Dropdown */}
+          {/* Home Link (1st Position) */}
+          <Link
+            href="/"
+            className="hover:text-white transition-colors relative group py-1 flex items-center gap-1.5 font-bold text-slate-200"
+          >
+            <Home className="h-3.5 w-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
+            <span>Home</span>
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-500 to-indigo-500 group-hover:w-full transition-all duration-300" />
+          </Link>
+
+          {/* Services Dropdown (2nd Position) */}
           <div
             ref={servicesRef}
             className="relative py-1"
             onMouseEnter={() => setServicesOpen(true)}
             onMouseLeave={() => setServicesOpen(false)}
           >
-            <button className="hover:text-white transition-colors flex items-center gap-1.5 focus:outline-none">
-              Services{' '}
+            <button className="hover:text-white transition-colors flex items-center gap-1.5 font-bold focus:outline-none group">
+              <Layers className="h-3.5 w-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
+              <span>Services</span>
               <ChevronDown
                 className={`h-3 w-3 transition-transform duration-200 ${
                   servicesOpen ? 'rotate-180 text-purple-400' : ''
@@ -316,17 +376,21 @@ export default function Navbar() {
             </AnimatePresence>
           </div>
 
-          {/* Standard Navigation Links */}
-          {MAIN_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="hover:text-white transition-colors relative group py-1"
-            >
-              {link.label}
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-500 to-indigo-500 group-hover:w-full transition-all duration-300" />
-            </Link>
-          ))}
+          {/* Standard Navigation Links (Pricing, Status, About, Contact) */}
+          {MAIN_LINKS.map((link) => {
+            const Icon = link.icon;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="hover:text-white transition-colors relative group py-1 flex items-center gap-1.5 font-bold text-slate-200"
+              >
+                <Icon className={`h-3.5 w-3.5 ${link.color} group-hover:scale-110 transition-transform`} />
+                <span>{link.label}</span>
+                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-500 to-indigo-500 group-hover:w-full transition-all duration-300" />
+              </Link>
+            );
+          })}
 
           {/* Legal Dropdown */}
           <div
@@ -335,8 +399,9 @@ export default function Navbar() {
             onMouseEnter={() => setLegalOpen(true)}
             onMouseLeave={() => setLegalOpen(false)}
           >
-            <button className="hover:text-white transition-colors flex items-center gap-1 focus:outline-none">
-              Legal{' '}
+            <button className="hover:text-white transition-colors flex items-center gap-1.5 font-bold focus:outline-none group">
+              <Shield className="h-3.5 w-3.5 text-slate-400 group-hover:scale-110 transition-transform" />
+              <span>Legal</span>
               <ChevronDown
                 className={`h-3 w-3 transition-transform duration-200 ${
                   legalOpen ? 'rotate-180 text-purple-400' : ''
@@ -567,13 +632,21 @@ export default function Navbar() {
               </AnimatePresence>
             </div>
           ) : (
-            /* Logged-Out CLIENT SPACE Button */
+            /* Logged-Out CLIENT SPACE / Professional Login Button */
             <a
               href={loginUrl}
-              className="rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-500 hover:to-indigo-500 px-4 sm:px-5 py-2 text-xs font-extrabold text-white shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_25px_rgba(168,85,247,0.6)] transition-all uppercase tracking-wider flex items-center gap-1.5 hover:scale-105"
+              className="relative group overflow-hidden rounded-full p-[1.5px] font-bold text-xs transition-all duration-300 hover:scale-[1.04] active:scale-[0.98] shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_30px_rgba(168,85,247,0.65)]"
             >
-              <User className="h-3.5 w-3.5" />
-              <span>CLIENT SPACE</span>
+              <span className="absolute inset-0 bg-gradient-to-r from-purple-500 via-indigo-500 to-emerald-400 animate-pulse rounded-full opacity-90 group-hover:opacity-100" />
+              <span className="relative flex items-center gap-2 rounded-full bg-[#0a0b1c]/90 group-hover:bg-[#0a0b1c]/75 backdrop-blur-xl px-4 py-2 text-white transition-colors">
+                <LogIn className="h-3.5 w-3.5 text-purple-400 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+                <span className="tracking-wider uppercase text-[11px] font-extrabold text-white">
+                  CLIENT SPACE
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/30 font-mono font-bold uppercase tracking-tight">
+                  LOGIN
+                </span>
+              </span>
             </a>
           )}
 
@@ -592,69 +665,132 @@ export default function Navbar() {
         </div>
       </motion.nav>
 
-      {/* 🔍 Search Modal Overlay */}
+      {/* 🔍 Interactive Real-Time Search Modal Overlay */}
       <AnimatePresence>
         {searchOpen && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 px-4 bg-black/70 backdrop-blur-md animate-fade-in">
+          <div
+            onClick={() => setSearchOpen(false)}
+            className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-black/80 backdrop-blur-md animate-fade-in"
+          >
             <motion.div
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              initial={{ opacity: 0, y: -20, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.95 }}
-              className="bg-[#080922] border border-white/15 rounded-3xl w-full max-w-xl p-6 shadow-2xl space-y-4 relative"
+              exit={{ opacity: 0, y: -20, scale: 0.96 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#080922]/95 border border-white/20 rounded-3xl w-full max-w-2xl p-6 shadow-[0_25px_70px_rgba(0,0,0,0.9),0_0_30px_rgba(168,85,247,0.15)] space-y-4 relative overflow-hidden backdrop-blur-2xl"
             >
-              <button
-                onClick={() => setSearchOpen(false)}
-                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-white/5"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              {/* Modal Top Bar */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-purple-400" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">
+                    STX Platform Search
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <kbd className="hidden sm:inline-block text-[10px] bg-white/10 border border-white/15 px-2 py-0.5 rounded-md font-mono text-slate-300">
+                    ESC to close
+                  </kbd>
+                  <button
+                    onClick={() => setSearchOpen(false)}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
 
-              <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
-                <Search className="h-5 w-5 text-purple-400 shrink-0" />
+              {/* Input Box */}
+              <div className="relative flex items-center bg-white/5 border border-white/15 focus-within:border-purple-500/80 rounded-2xl px-4 py-3 shadow-inner transition-all">
+                <Search className="h-5 w-5 text-purple-400 shrink-0 mr-3" />
                 <input
                   ref={searchInputRef}
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search Cloud VPS, Databases, 1-Click Apps..."
-                  className="bg-transparent text-white placeholder-slate-500 text-sm focus:outline-none w-full"
+                  placeholder="Search VPS, Databases, Bots, 1-Click Apps, Pricing..."
+                  className="bg-transparent text-white placeholder-slate-400 text-sm focus:outline-none w-full font-medium"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded-md bg-white/10 font-bold"
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
 
-              <div className="space-y-2">
-                <span className="text-[11px] font-mono uppercase text-slate-400 font-bold block">
-                  Quick Navigation
-                </span>
-                <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
-                  <Link
-                    href="/vps"
-                    onClick={() => setSearchOpen(false)}
-                    className="p-3 rounded-xl bg-white/5 border border-white/10 hover:border-purple-500/50 hover:bg-purple-500/10 text-white flex items-center gap-2 transition-all"
-                  >
-                    <Server className="h-4 w-4 text-purple-400" /> Cloud VPS Hosting
-                  </Link>
-                  <Link
-                    href="/catalog"
-                    onClick={() => setSearchOpen(false)}
-                    className="p-3 rounded-xl bg-white/5 border border-white/10 hover:border-purple-500/50 hover:bg-purple-500/10 text-white flex items-center gap-2 transition-all"
-                  >
-                    <LayoutGrid className="h-4 w-4 text-amber-400" /> 1-Click App Catalog
-                  </Link>
-                  <Link
-                    href="/databases"
-                    onClick={() => setSearchOpen(false)}
-                    className="p-3 rounded-xl bg-white/5 border border-white/10 hover:border-purple-500/50 hover:bg-purple-500/10 text-white flex items-center gap-2 transition-all"
-                  >
-                    <Database className="h-4 w-4 text-teal-400" /> Managed Databases
-                  </Link>
-                  <Link
-                    href="/bot-hosting"
-                    onClick={() => setSearchOpen(false)}
-                    className="p-3 rounded-xl bg-white/5 border border-white/10 hover:border-purple-500/50 hover:bg-purple-500/10 text-white flex items-center gap-2 transition-all"
-                  >
-                    <Bot className="h-4 w-4 text-pink-400" /> 24/7 Bot Hosting
-                  </Link>
-                </div>
+              {/* Live Search Results */}
+              <div className="max-h-96 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {(() => {
+                  const query = searchQuery.trim().toLowerCase();
+                  const results = query === ''
+                    ? ALL_SEARCHABLE_ITEMS.slice(0, 8)
+                    : ALL_SEARCHABLE_ITEMS.filter((item) =>
+                        item.name.toLowerCase().includes(query) ||
+                        item.desc.toLowerCase().includes(query) ||
+                        item.category.toLowerCase().includes(query)
+                      );
+
+                  if (results.length === 0) {
+                    return (
+                      <div className="text-center py-10 space-y-2">
+                        <Search className="h-10 w-10 text-slate-600 mx-auto" />
+                        <p className="text-sm font-bold text-white">No matches found for "{searchQuery}"</p>
+                        <p className="text-xs text-slate-400">
+                          Try searching for <span className="text-purple-400 font-semibold">VPS</span>, <span className="text-teal-400 font-semibold">PostgreSQL</span>, <span className="text-amber-400 font-semibold">WordPress</span>, or <span className="text-emerald-400 font-semibold">Pricing</span>.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-mono uppercase text-slate-400 font-bold px-1 pb-1">
+                        <span>{query === '' ? '⚡ Quick Suggestions' : `Results (${results.length})`}</span>
+                        <span className="text-purple-400 font-semibold">Click to Navigate</span>
+                      </div>
+                      {results.map((item, idx) => {
+                        const Icon = item.icon;
+                        const isExternal = (item as any).external;
+                        return (
+                          <Link
+                            key={idx}
+                            href={item.href}
+                            target={isExternal ? '_blank' : undefined}
+                            rel={isExternal ? 'noreferrer' : undefined}
+                            onClick={() => setSearchOpen(false)}
+                            className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-purple-500/50 hover:bg-white/[0.08] transition-all group"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-xl bg-white/5 border border-white/10 ${item.color} group-hover:scale-110 transition-transform`}>
+                                <Icon className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-white text-xs group-hover:text-purple-300 transition-colors">
+                                    {item.name}
+                                  </span>
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 border border-white/15 text-slate-300 font-mono">
+                                    {item.category}
+                                  </span>
+                                </div>
+                                <span className="text-[11px] text-slate-400 block mt-0.5">
+                                  {item.desc}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-slate-400 group-hover:text-white transition-colors">
+                              {isExternal ? <ExternalLink className="h-4 w-4" /> : <ChevronDown className="h-4 w-4 -rotate-90 text-purple-400" />}
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </motion.div>
           </div>
@@ -733,16 +869,28 @@ export default function Navbar() {
             Platform Navigation
           </span>
           <div className="flex flex-col gap-2">
-            {MAIN_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileOpen(false)}
-                className="text-xs font-semibold text-slate-300 hover:text-white py-1.5 transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
+            <Link
+              href="/"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2.5 text-xs font-bold text-slate-200 hover:text-white py-1.5 transition-colors"
+            >
+              <Home className="h-4 w-4 text-purple-400" />
+              <span>Home</span>
+            </Link>
+            {MAIN_LINKS.map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2.5 text-xs font-bold text-slate-200 hover:text-white py-1.5 transition-colors"
+                >
+                  <Icon className={`h-4 w-4 ${link.color}`} />
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
           </div>
 
           <div className="pt-3 border-t border-white/[0.08] flex items-center justify-between text-xs text-slate-400">
