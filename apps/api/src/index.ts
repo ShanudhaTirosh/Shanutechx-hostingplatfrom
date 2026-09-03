@@ -56,6 +56,7 @@ import { knowledgebaseRouter } from './routes/knowledgebase';
 import { emailRouter } from './routes/email';
 import { teamsRouter } from './routes/teams';
 import { internalBotRouter } from './routes/internalBot';
+import { reviewsRouter } from './routes/reviews';
 import { openapiRouter } from './routes/openapi';
 import { prWebhooksRouter } from './routes/prWebhooks';
 import { dockerDeploymentsRouter } from './routes/dockerDeployments';
@@ -188,6 +189,7 @@ app.use('/api/knowledgebase', knowledgebaseRouter);
 app.use('/api', emailRouter);
 app.use('/api', teamsRouter);
 app.use('/api', internalBotRouter);
+app.use('/api', reviewsRouter);
 
 
 // Catches any request that didn't match a route above. Without this,

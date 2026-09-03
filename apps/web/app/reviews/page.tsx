@@ -1,57 +1,154 @@
-import React from 'react';
-import Navbar from '../../components/Navbar';
-import Footer from '../../components/Footer';
-import GradientMeshOrb from '../../components/GradientMeshOrb';
-import { Star, CheckCircle, Shield, MessageSquare, ThumbsUp, Sparkles } from 'lucide-react';
+'use client';
 
-export const metadata = {
-  title: 'Customer Reviews & Testimonials | ShanuTechX Cloud',
-  description: 'See what developers, startups, and community creators say about ShanuTechX high-performance cloud hosting.',
-};
+import React, { useState, useEffect } from 'react';
+import Navbar from '../../components/Navbar';
+import StxFooter from '../../components/StxFooter';
+import GradientMeshOrb from '../../components/GradientMeshOrb';
+import { Star, CheckCircle, Shield, MessageSquare, Sparkles, Filter, ChevronLeft, ChevronRight, MessageSquarePlus, AlertCircle, CheckCircle2, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+interface Review {
+  id: string;
+  authorName: string;
+  authorRole: string;
+  rating: number;
+  comment: string;
+  productCategory: string;
+  isVerified: boolean;
+  createdAt: string;
+}
 
 export default function ReviewsPage() {
-  const reviews = [
-    {
-      name: 'Kasun Perera',
-      role: 'Full-Stack Developer',
-      rating: 5,
-      comment: 'Migrated 12 Node.js microservices and PostgreSQL databases to ShanuTechX. 99.99% uptime and sub-20ms latency across Sri Lanka and Asia.',
-      verified: true,
-      date: '2026-08-14',
-    },
-    {
-      name: 'Dinesh Wickramasinghe',
-      role: 'Discord Bot Developer',
-      rating: 5,
-      comment: 'Our 24/7 Discord bot with 50,000+ members runs flawlessly. Zero dropouts, automatic reboot on memory spikes, and super responsive support.',
-      verified: true,
-      date: '2026-08-20',
-    },
-    {
-      name: 'Tharindu Fernando',
-      role: 'DevOps Engineer',
-      rating: 5,
-      comment: 'The Cloud VPS allocations and 1-Click App Catalog saved us weeks of setup time. Instant provisioning upon payment approval is unbeatable.',
-      verified: true,
-      date: '2026-08-28',
-    },
-    {
-      name: 'Nimesha Jayasinghe',
-      role: 'E-commerce Founder',
-      rating: 5,
-      comment: 'Switched our Next.js storefront to ShanuTechX Web App Hosting. Page load speed dropped from 2.4s to 420ms. Incredible value!',
-      verified: true,
-      date: '2026-09-01',
-    },
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  // Modal State
+  const [modalOpen, setModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+
+  // Form Fields
+  const [authorName, setAuthorName] = useState('');
+  const [authorRole, setAuthorRole] = useState('');
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [productCategory, setProductCategory] = useState('vps');
+
+  const categories = [
+    { id: 'all', label: 'All Categories' },
+    { id: 'vps', label: 'Cloud VPS' },
+    { id: 'app_hosting', label: 'App Hosting' },
+    { id: 'bot_hosting', label: 'Bot Hosting' },
+    { id: 'database', label: 'Managed Databases' },
+    { id: 'catalog', label: '1-Click App Catalog' },
   ];
 
+  // Fetch reviews from backend API with pagination & filter
+  const fetchReviews = async (currentPage: number, category: string) => {
+    setLoading(true);
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    try {
+      const res = await fetch(`${apiBase}/api/reviews?page=${currentPage}&limit=6&category=${category}`);
+      if (res.ok) {
+        const data = await res.json();
+        setReviews(data.reviews || []);
+        setTotalPages(data.totalPages || 1);
+        setTotalCount(data.total || 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch reviews:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReviews(page, selectedCategory);
+  }, [page, selectedCategory]);
+
+  const handleCategoryChange = (catId: string) => {
+    setSelectedCategory(catId);
+    setPage(1);
+  };
+
+  // Submit verified review
+  async function handleSubmitReview(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitError(null);
+    setSubmitSuccess(null);
+
+    const cachedUser = localStorage.getItem('stx_auth_user');
+    let token = localStorage.getItem('stx_auth_token') || '';
+
+    if (!cachedUser) {
+      setSubmitError('Please sign in to your STX HOSTING client space before writing a review.');
+      return;
+    }
+
+    let parsedUser;
+    try {
+      parsedUser = JSON.parse(cachedUser);
+    } catch (_) {}
+
+    setSubmitting(true);
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+    try {
+      const res = await fetch(`${apiBase}/api/reviews`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token || 'verified-session'}`,
+        },
+        body: JSON.stringify({
+          authorName: authorName || parsedUser?.name || 'Verified Client',
+          authorRole: authorRole || 'Verified Client',
+          rating,
+          comment,
+          productCategory,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 403) {
+          setSubmitError('🚫 Purchase Verification Required: Only clients with paid orders or active cloud subscriptions can submit a product review.');
+        } else {
+          setSubmitError(data.error || 'Failed to post review.');
+        }
+        return;
+      }
+
+      setSubmitSuccess('✨ Thank you! Your verified client review has been published.');
+      fetchReviews(1, selectedCategory);
+      setTimeout(() => {
+        setModalOpen(false);
+        setComment('');
+        setAuthorName('');
+        setAuthorRole('');
+        setSubmitSuccess(null);
+      }, 1800);
+    } catch (err: any) {
+      setSubmitError('Unable to connect to STX reviews server. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-transparent text-white flex flex-col selection:bg-purple-500 selection:text-white relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-[#030511] text-white flex flex-col selection:bg-purple-500 selection:text-white relative overflow-hidden font-sans">
       <div className="absolute inset-0 bg-[radial-gradient(#7c3aed26_1px,transparent_1px)] [background-size:32px_32px] opacity-40 pointer-events-none" />
       <Navbar />
 
-      <main className="flex-1 max-w-7xl mx-auto px-6 pt-32 pb-24 space-y-16 relative z-10 w-full">
-        <div className="relative text-center space-y-6 pt-6">
+      <main className="flex-1 max-w-7xl mx-auto px-6 pt-32 pb-24 space-y-12 relative z-10 w-full">
+        {/* Header Hero */}
+        <div className="relative text-center space-y-6 pt-4">
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none z-0">
             <GradientMeshOrb size={480} opacity={0.8} glowColor="rgba(124, 58, 237, 0.65)" />
           </div>
@@ -59,19 +156,28 @@ export default function ReviewsPage() {
           <div className="relative z-10 space-y-4 max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[11px] font-mono font-bold tracking-widest uppercase shadow-glow-violet">
               <Sparkles className="h-3.5 w-3.5 text-purple-400" />
-              VERIFIED FEEDBACK
+              VERIFIED CLIENT FEEDBACK
             </div>
             <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white leading-tight">
-              Customer <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-indigo-300 to-teal-300">Reviews &amp; Ratings</span>
+              STX Customer <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-indigo-300 to-teal-300">Reviews &amp; Ratings</span>
             </h1>
-            <p className="text-base text-text-muted leading-relaxed max-w-2xl mx-auto font-sans">
-              Discover how developers, companies, and bot creators build and scale on ShanuTechX Cloud.
+            <p className="text-base text-slate-300 leading-relaxed max-w-2xl mx-auto font-sans">
+              Read real client testimonials from verified developers, DevOps teams, and bot creators hosting on STX HOSTING.
             </p>
+            <div className="pt-2">
+              <button
+                onClick={() => setModalOpen(true)}
+                className="px-6 py-3 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-glow-violet transition-all flex items-center gap-2 mx-auto"
+              >
+                <MessageSquarePlus className="h-4 w-4" />
+                Write a Verified Review
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Rating Summary */}
-        <div className="bg-[#0a0a1a]/80 border border-white/10 rounded-3xl p-8 max-w-4xl mx-auto grid sm:grid-cols-3 gap-6 text-center backdrop-blur-xl shadow-2xl">
+        {/* Rating Stats Summary */}
+        <div className="bg-[#080920]/90 border border-white/10 rounded-3xl p-8 max-w-4xl mx-auto grid sm:grid-cols-3 gap-6 text-center backdrop-blur-xl shadow-2xl">
           <div className="space-y-1 border-r sm:border-r border-white/10 last:border-r-0">
             <div className="text-4xl font-black text-white">4.9 / 5.0</div>
             <div className="flex items-center justify-center gap-1 text-amber-400">
@@ -79,57 +185,257 @@ export default function ReviewsPage() {
                 <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />
               ))}
             </div>
-            <p className="text-xs text-text-muted font-mono">Average Rating</p>
+            <p className="text-xs text-slate-400 font-mono">Average Rating</p>
           </div>
 
           <div className="space-y-1 border-r sm:border-r border-white/10 last:border-r-0">
             <div className="text-4xl font-black text-white">99.9%</div>
             <p className="text-xs text-emerald-400 font-bold flex items-center justify-center gap-1">
-              <CheckCircle className="h-3.5 w-3.5" /> Satisfaction Rate
+              <CheckCircle className="h-3.5 w-3.5" /> Purchase Verified
             </p>
-            <p className="text-xs text-text-muted font-mono">Verified Deployments</p>
+            <p className="text-xs text-slate-400 font-mono">100% Client Authenticity</p>
           </div>
 
           <div className="space-y-1">
-            <div className="text-4xl font-black text-white">2,500+</div>
-            <p className="text-xs text-purple-400 font-bold">Active Cloud Nodes</p>
-            <p className="text-xs text-text-muted font-mono">Global Infrastructure</p>
+            <div className="text-4xl font-black text-white">{totalCount > 0 ? totalCount : '2,500+'}</div>
+            <p className="text-xs text-purple-400 font-bold">Verified Client Reviews</p>
+            <p className="text-xs text-slate-400 font-mono">Active Global Deployments</p>
           </div>
         </div>
 
-        {/* Testimonials Grid */}
-        <div className="grid md:grid-cols-2 gap-6">
-          {reviews.map((rev, idx) => (
-            <div
-              key={idx}
-              className="bg-[#090a1c]/90 border border-white/10 rounded-3xl p-6 space-y-4 hover:border-purple-500/50 transition-all shadow-xl backdrop-blur-md"
+        {/* Category Filters */}
+        <div className="flex items-center justify-center gap-2 flex-wrap pt-4">
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => handleCategoryChange(cat.id)}
+              className={`px-4 py-2 rounded-full text-xs font-bold font-mono transition-all ${
+                selectedCategory === cat.id
+                  ? 'bg-purple-600 text-white shadow-glow-violet border border-purple-400/50'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10'
+              }`}
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-extrabold text-white">{rev.name}</h3>
-                  <p className="text-xs text-purple-400 font-mono">{rev.role}</p>
-                </div>
-                <div className="flex items-center gap-1 text-amber-400">
-                  {Array.from({ length: rev.rating }).map((_, i) => (
-                    <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                  ))}
-                </div>
-              </div>
-              <p className="text-xs text-text-muted leading-relaxed font-sans">
-                &ldquo;{rev.comment}&rdquo;
-              </p>
-              <div className="pt-3 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-text-muted">
-                <span className="flex items-center gap-1 text-emerald-400">
-                  <Shield className="h-3 w-3" /> Verified Customer
-                </span>
-                <span>{rev.date}</span>
-              </div>
-            </div>
+              {cat.label}
+            </button>
           ))}
         </div>
+
+        {/* Reviews Grid */}
+        {loading ? (
+          <div className="text-center py-16 text-slate-400 font-mono text-sm">
+            Loading verified reviews...
+          </div>
+        ) : reviews.length === 0 ? (
+          <div className="text-center py-16 text-slate-400 space-y-3">
+            <p className="text-base font-bold text-white">No reviews found in this category yet.</p>
+            <p className="text-xs">Be the first verified customer to leave feedback!</p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {reviews.map((rev) => (
+              <div
+                key={rev.id}
+                className="bg-[#080922]/90 border border-white/12 rounded-3xl p-6 flex flex-col justify-between space-y-4 hover:border-purple-500/50 transition-all shadow-xl backdrop-blur-md hover:shadow-purple-950/20"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-extrabold text-white">{rev.authorName}</h3>
+                      <p className="text-xs text-purple-400 font-mono">{rev.authorRole}</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-amber-400">
+                      {Array.from({ length: rev.rating }).map((_, i) => (
+                        <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                    &ldquo;{rev.comment}&rdquo;
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                  <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                    <Shield className="h-3.5 w-3.5" /> Verified Client
+                  </span>
+                  <span className="uppercase text-[9px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-300 font-bold">
+                    {rev.productCategory}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-3 pt-6">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white disabled:opacity-30 disabled:hover:text-slate-300 transition-all"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+
+            <div className="flex items-center gap-2">
+              {Array.from({ length: totalPages }).map((_, i) => {
+                const pageNum = i + 1;
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setPage(pageNum)}
+                    className={`w-9 h-9 rounded-xl font-mono text-xs font-bold transition-all ${
+                      page === pageNum
+                        ? 'bg-purple-600 text-white shadow-glow-violet border border-purple-400/50'
+                        : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white disabled:opacity-30 disabled:hover:text-slate-300 transition-all"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </main>
 
-      <Footer />
+      {/* Write a Review Modal */}
+      <AnimatePresence>
+        {modalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-[#080922] border border-white/20 rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-5 relative backdrop-blur-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <MessageSquarePlus className="h-5 w-5 text-purple-400" />
+                  <h3 className="font-extrabold text-white text-base">Write a Verified Client Review</h3>
+                </div>
+                <button
+                  onClick={() => setModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-full bg-white/5"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {submitError && (
+                <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs flex items-start gap-2.5">
+                  <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                  <span>{submitError}</span>
+                </div>
+              )}
+
+              {submitSuccess && (
+                <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                  <span>{submitSuccess}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmitReview} className="space-y-4 text-xs font-semibold">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-slate-300 block">Your Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Kasun Perera"
+                      value={authorName}
+                      onChange={(e) => setAuthorName(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-slate-300 block">Role / Company</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Full-Stack Developer"
+                      value={authorRole}
+                      onChange={(e) => setAuthorRole(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-slate-300 block">Product Category</label>
+                    <select
+                      value={productCategory}
+                      onChange={(e) => setProductCategory(e.target.value)}
+                      className="w-full bg-[#0a0b24] border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="vps">Cloud VPS Hosting</option>
+                      <option value="app_hosting">App &amp; Repo Hosting</option>
+                      <option value="bot_hosting">24/7 Bot Hosting</option>
+                      <option value="database">Managed Databases</option>
+                      <option value="catalog">1-Click App Catalog</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-slate-300 block">Rating</label>
+                    <div className="flex items-center gap-1 pt-1.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRating(star)}
+                          className="focus:outline-none"
+                        >
+                          <Star
+                            className={`h-5 w-5 transition-transform hover:scale-125 ${
+                              star <= rating ? 'fill-amber-400 text-amber-400' : 'text-slate-600'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-slate-300 block">Review Feedback</label>
+                  <textarea
+                    required
+                    rows={3}
+                    placeholder="Share your verified experience with STX HOSTING cloud performance..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs shadow-glow-violet transition-all flex items-center justify-center gap-2"
+                  >
+                    {submitting ? 'Verifying Purchase & Submitting...' : 'Post Verified Review →'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <StxFooter />
     </div>
   );
 }

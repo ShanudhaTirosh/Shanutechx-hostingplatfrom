@@ -4,6 +4,7 @@ import MarqueeStrips from '@/components/MarqueeStrips';
 import BentoGrid from '@/components/BentoGrid';
 import FeaturesGrid from '@/components/FeaturesGrid';
 import Pricing from '@/components/Pricing';
+import ReviewCarousel from '@/components/ReviewCarousel';
 import StxFooter from '@/components/StxFooter';
 
 export default async function HomePage() {
@@ -15,7 +16,9 @@ export default async function HomePage() {
       <BentoGrid />
       <FeaturesGrid />
       <Pricing />
+      <ReviewCarousel />
       <StxFooter />
     </main>
   );
 }
+

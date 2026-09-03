@@ -186,6 +186,7 @@ model User {
   webmailAutoReplies   WebmailAutoReply[]
   webmailBlockedSenders WebmailBlockedSender[]
   webmailCalendarSyncs WebmailCalendarSync[]
+  reviews              Review[]
 }
 
 // Real Expo push tokens, registered by the mobile admin app
@@ -1565,4 +1566,22 @@ model ResourcePermission {
 
   @@unique([teamMemberId, resourceType, resourceId])
 }
+
+model Review {
+  id              String   @id @default(cuid())
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  authorName      String
+  authorRole      String?  @default("Verified Client")
+  rating          Int      @default(5)
+  comment         String
+  productCategory String   @default("general")
+  isVerified      Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([productCategory])
+}
+
 
