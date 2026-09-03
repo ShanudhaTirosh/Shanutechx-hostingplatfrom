@@ -79,9 +79,9 @@ export default function DevWebhooksPage() {
     setTestResult(null);
     try {
       const result = await api.discordWebhooks.test(webhookUrl.trim());
-      setTestResult(result.ok ? '✅ Test message sent — check your Discord channel.' : `❌ Failed (HTTP ${result.status ?? '?'})`);
+      setTestResult(result.ok ? 'Test message sent — check your Discord channel.' : `Failed (HTTP ${result.status ?? '?'})`);
     } catch (err: any) {
-      setTestResult(`❌ ${err.message}`);
+      setTestResult(`Failed: ${err.message}`);
     } finally {
       setTesting(false);
     }

@@ -80,8 +80,14 @@ function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { childre
         router.replace('/admin/tickets');
         return;
       }
+    } else if (userRole === 'admin') {
+      // Admin role cannot access dev infrastructure routes (/dev/*)
+      if (pathname.startsWith('/dev')) {
+        router.replace('/admin/review-queue');
+        return;
+      }
     }
-    // Dev and Admin roles have full access to all routes (admin, dev, catalog, storefront)
+    // Dev role (system owner) has full access to all routes
   }, [apiUser, apiUserLoading, pathname, router, mounted]);
 
   if (apiUserLoading) {
@@ -132,20 +138,32 @@ function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { childre
   const parts = host.split('.');
   const subdomain = parts.length > 2 ? parts[0].toLowerCase() : '';
 
-  return (
-    <>
-      {/* Mobile top bar */}
-      <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-white/[0.06] sticky top-0 z-40 bg-bg/80 backdrop-blur-md">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-7 w-7 rounded-lg bg-brand-gradient items-center justify-center shadow-glow-violet">
-            <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-              <path d="M7 1L13 4.5V9.5L7 13L1 9.5V4.5L7 1Z" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/>
-            </svg>
-          </span>
-          <span className="font-semibold text-sm">
-            {subdomain === 'admin' ? 'SHANUTECHX ADMIN' : subdomain === 'dev' ? 'SHANUTECHX DEV' : 'SHANUTECHX'}
-          </span>
-        </div>
+    const isDevRoute = pathname.startsWith('/dev') || pathname.startsWith('/admin/projects') || pathname.startsWith('/admin/nodes');
+    const isSupportRoute = pathname.startsWith('/admin/tickets') || pathname.startsWith('/admin/chat');
+    const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/settings');
+
+    const panelTitle = isDevRoute
+      ? 'STX DEV INFRASTRUCTURE'
+      : isSupportRoute
+      ? 'STX SUPPORT GATEWAY'
+      : isAdminRoute
+      ? 'STX ADMIN PANEL'
+      : 'STX CUSTOMER STOREFRONT';
+
+    return (
+      <>
+        {/* Mobile top bar */}
+        <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-white/[0.06] sticky top-0 z-40 bg-bg/80 backdrop-blur-md">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 rounded-lg bg-brand-gradient items-center justify-center shadow-glow-violet">
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path d="M7 1L13 4.5V9.5L7 13L1 9.5V4.5L7 1Z" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/>
+              </svg>
+            </span>
+            <span className="font-semibold text-sm tracking-tight text-white">
+              {panelTitle}
+            </span>
+          </div>
         <div className="flex items-center gap-2">
           <DevRightClickToggle />
           <button
@@ -171,7 +189,7 @@ function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { childre
       <div className="flex min-h-screen max-w-[1400px] mx-auto">
         {/* Sidebar */}
         <div className={`
-          fixed md:relative top-0 left-0 z-40 h-full transition-transform duration-300
+          fixed md:sticky top-0 left-0 z-40 h-screen transition-transform duration-300
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}>
           <Sidebar onNavigate={() => setSidebarOpen(false)} />

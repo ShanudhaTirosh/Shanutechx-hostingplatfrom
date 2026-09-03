@@ -1,12 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { signOut } from 'firebase/auth';
 import { firebaseAuth } from '@/lib/firebaseClient';
 import { useAppUser } from '@/lib/AppUserContext';
-import { IconStore, IconSettings } from '@/components/Icons';
 
 // ── Icons (inline SVG, no deps) ─────────────────────────────────────────────
 function Icon({ d, viewBox = '0 0 24 24' }: { d: string | React.ReactNode; viewBox?: string }) {
@@ -54,113 +53,181 @@ const ICONS: Record<string, React.ReactNode> = {
   settings: <Icon d="M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />,
 };
 
+type SpaceKey = 'customer' | 'admin' | 'dev' | 'support';
 
-interface NavGroup {
+interface PanelSpace {
+  key: SpaceKey;
   label: string;
+  badge: string;
+  badgeBg: string;
+  badgeText: string;
+  defaultHref: string;
   links: { href: string; label: string; icon: keyof typeof ICONS }[];
 }
 
-const CUSTOMER_GROUP: NavGroup = {
-  label: 'Customer',
-  links: [
-    { href: '/dashboard', label: 'Overview', icon: 'overview' },
-    { href: '/services', label: 'Services', icon: 'services' },
-    { href: '/cart', label: 'Cart', icon: 'cart' },
-    { href: '/orders', label: 'Orders & Invoices', icon: 'orders' },
-    { href: '/billing', label: 'Subscriptions', icon: 'billing' },
-    { href: '/deployments', label: 'Deployments', icon: 'deployments' },
-    { href: '/email', label: 'Shared SMTP & Webmail', icon: 'smtp' },
-    { href: '/vps', label: 'VPS', icon: 'vps' },
-    { href: '/tickets', label: 'Support', icon: 'tickets' },
-    { href: '/knowledgebase', label: 'Documentation & Knowledge Base', icon: 'knowledgebase' },
-    { href: '/catalog', label: 'App Catalog', icon: 'catalog' },
-    { href: '/profile', label: 'Profile', icon: 'profile' },
-  ],
+const SPACE_ICONS: Record<SpaceKey, React.ReactNode> = {
+  customer: <Icon d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />,
+  admin: <Icon d="M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />,
+  dev: <Icon d="M5 12H3l9-9 9 9h-2M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />,
+  support: <Icon d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />,
 };
 
-const STAFF_GROUP: NavGroup = {
-  label: 'Support',
-  links: [
-    { href: '/admin/tickets', label: 'Tickets', icon: 'tickets' },
-    { href: '/admin/chat', label: 'Live Chat', icon: 'chat' },
-  ],
+const SPACES: Record<SpaceKey, PanelSpace> = {
+  customer: {
+    key: 'customer',
+    label: 'Customer Storefront',
+    badge: 'Client',
+    badgeBg: 'bg-emerald-500/10 border-emerald-500/20',
+    badgeText: 'text-emerald-400',
+    defaultHref: '/dashboard',
+    links: [
+      { href: '/dashboard', label: 'Overview', icon: 'overview' },
+      { href: '/services', label: 'Services', icon: 'services' },
+      { href: '/cart', label: 'Cart', icon: 'cart' },
+      { href: '/orders', label: 'Orders & Invoices', icon: 'orders' },
+      { href: '/billing', label: 'Subscriptions', icon: 'billing' },
+      { href: '/deployments', label: 'Deployments', icon: 'deployments' },
+      { href: '/email', label: 'Shared SMTP & Webmail', icon: 'smtp' },
+      { href: '/vps', label: 'VPS', icon: 'vps' },
+      { href: '/tickets', label: 'Support', icon: 'tickets' },
+      { href: '/knowledgebase', label: 'Knowledge Base', icon: 'knowledgebase' },
+      { href: '/catalog', label: 'App Catalog', icon: 'catalog' },
+      { href: '/profile', label: 'Profile', icon: 'profile' },
+    ],
+  },
+  admin: {
+    key: 'admin',
+    label: 'Admin Control Panel',
+    badge: 'Admin',
+    badgeBg: 'bg-amber-500/10 border-amber-500/20',
+    badgeText: 'text-amber-400',
+    defaultHref: '/admin/review-queue',
+    links: [
+      { href: '/admin', label: 'Admin Dashboard', icon: 'overview' },
+      { href: '/admin/review-queue', label: 'Payment Review', icon: 'review' },
+      { href: '/admin/customers', label: 'Customers', icon: 'customers' },
+      { href: '/admin/services', label: 'Products & Plans', icon: 'services' },
+      { href: '/admin/email', label: 'Shared SMTP Manager', icon: 'smtp' },
+      { href: '/admin/staff', label: 'Staff Directory', icon: 'staff' },
+      { href: '/admin/analytics', label: 'Analytics', icon: 'analytics' },
+      { href: '/admin/cms', label: 'Site Content', icon: 'cms' },
+      { href: '/admin/audit-log', label: 'Audit Log', icon: 'audit' },
+      { href: '/admin/knowledgebase', label: 'Knowledge Base Mgr', icon: 'knowledgebase' },
+      { href: '/settings', label: 'Protected Settings', icon: 'settings' },
+      { href: '/catalog', label: 'App Catalog', icon: 'catalog' },
+    ],
+  },
+  dev: {
+    key: 'dev',
+    label: 'Dev & Infrastructure',
+    badge: 'Dev',
+    badgeBg: 'bg-violet-500/10 border-violet-500/20',
+    badgeText: 'text-violet-300',
+    defaultHref: '/dev',
+    links: [
+      { href: '/dev', label: 'Dev Dashboard', icon: 'infra' },
+      { href: '/admin/projects', label: 'Projects & Supabase Stack', icon: 'projects' },
+      { href: '/admin/nodes', label: 'Nodes Engine', icon: 'nodes' },
+      { href: '/dev/containers', label: 'Containers', icon: 'containers' },
+      { href: '/dev/reverse-proxy', label: 'Reverse Proxy', icon: 'proxy' },
+      { href: '/dev/monitoring', label: 'Monitoring', icon: 'monitoring' },
+      { href: '/dev/logs', label: 'Logs', icon: 'logs' },
+      { href: '/admin/leaseweb', label: 'Leaseweb', icon: 'leaseweb' },
+      { href: '/admin/databases', label: 'Databases', icon: 'databases' },
+      { href: '/vps-plans', label: 'VPS Plans', icon: 'vps' },
+      { href: '/settings', label: 'Protected Settings', icon: 'settings' },
+    ],
+  },
+  support: {
+    key: 'support',
+    label: 'Support Operations',
+    badge: 'Support',
+    badgeBg: 'bg-cyan-500/10 border-cyan-500/20',
+    badgeText: 'text-cyan-300',
+    defaultHref: '/admin/tickets',
+    links: [
+      { href: '/admin/tickets', label: 'Ticket Queue', icon: 'tickets' },
+      { href: '/admin/chat', label: 'Live Support Chat', icon: 'chat' },
+      { href: '/knowledgebase', label: 'Knowledge Base', icon: 'knowledgebase' },
+    ],
+  },
 };
 
-const ADMIN_GROUP: NavGroup = {
-  label: 'Admin',
-  links: [
-    { href: '/admin', label: 'Admin Dashboard', icon: 'overview' },
-    { href: '/admin/review-queue', label: 'Payment Review', icon: 'review' },
-    { href: '/admin/customers', label: 'Customers', icon: 'customers' },
-    { href: '/admin/services', label: 'Products & Plans', icon: 'services' },
-    { href: '/admin/email', label: 'Shared SMTP Manager', icon: 'smtp' },
-    { href: '/admin/staff', label: 'Staff', icon: 'staff' },
-    { href: '/admin/analytics', label: 'Analytics', icon: 'analytics' },
-    { href: '/admin/cms', label: 'Site Content', icon: 'cms' },
-    { href: '/admin/audit-log', label: 'Audit Log', icon: 'audit' },
-    { href: '/admin/knowledgebase', label: 'Knowledge Base Mgr', icon: 'knowledgebase' },
-    { href: '/settings', label: 'Protected Settings', icon: 'settings' },
-    { href: '/catalog', label: 'App Catalog', icon: 'catalog' },
-  ],
-};
-
-
-const INFRA_GROUP: NavGroup = {
-  label: 'Infrastructure',
-  links: [
-    { href: '/dev', label: 'Dev Dashboard', icon: 'infra' },
-    { href: '/settings', label: 'Protected Settings', icon: 'settings' },
-    { href: '/admin/projects', label: 'Projects & Supabase Stack', icon: 'projects' },
-    { href: '/admin/nodes', label: 'Nodes Engine', icon: 'nodes' },
-    { href: '/dev/containers', label: 'Containers', icon: 'containers' },
-    { href: '/dev/reverse-proxy', label: 'Reverse Proxy', icon: 'proxy' },
-    { href: '/dev/monitoring', label: 'Monitoring', icon: 'monitoring' },
-    { href: '/dev/logs', label: 'Logs', icon: 'logs' },
-    { href: '/admin/leaseweb', label: 'Leaseweb', icon: 'leaseweb' },
-    { href: '/admin/databases', label: 'Databases', icon: 'databases' },
-    { href: '/vps-plans', label: 'VPS Plans', icon: 'vps' },
-  ],
-};
-
-function NavGroup({ group, pathname }: { group: NavGroup; pathname: string }) {
-  return (
-    <div>
-      <p className="px-3 mb-1 text-[10px] uppercase tracking-widest text-text-faint font-semibold">{group.label}</p>
-      {group.links.map((link) => {
-        const active = pathname === link.href || (link.href !== '/dashboard' && pathname.startsWith(link.href));
-        return (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all group relative ${
-              active
-                ? 'bg-white/[0.08] text-text-primary'
-                : 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]'
-            }`}
-          >
-            {active && (
-              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-brand-gradient" />
-            )}
-            <span className={active ? 'text-accent-violet-light' : 'text-text-faint group-hover:text-text-muted transition-colors'}>
-              {ICONS[link.icon]}
-            </span>
-            {link.label}
-          </Link>
-        );
-      })}
-    </div>
-  );
+function getSpaceFromPathname(pathname: string): SpaceKey {
+  if (
+    pathname.startsWith('/dev') ||
+    pathname.startsWith('/admin/projects') ||
+    pathname.startsWith('/admin/nodes') ||
+    pathname.startsWith('/admin/leaseweb') ||
+    pathname.startsWith('/admin/databases') ||
+    pathname.startsWith('/vps-plans')
+  ) {
+    return 'dev';
+  }
+  if (pathname.startsWith('/admin/tickets') || pathname.startsWith('/admin/chat')) {
+    return 'support';
+  }
+  if (pathname.startsWith('/admin') || pathname.startsWith('/settings')) {
+    return 'admin';
+  }
+  return 'customer';
 }
 
 export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { apiUser } = useAppUser();
   const [signingOut, setSigningOut] = useState(false);
 
-  const isDev   = apiUser?.role === 'dev';
-  const isAdmin  = apiUser?.role === 'admin';
+  const isDev = apiUser?.role === 'dev';
+  const isAdmin = apiUser?.role === 'admin';
   const isSupport = apiUser?.role === 'support';
   const isCustomer = apiUser?.role === 'customer';
+
+  // Determine allowed spaces based strictly on user role
+  const allowedSpaces: SpaceKey[] = [];
+  if (isDev) {
+    // Dev role (system owner) gets access to all 4 spaces
+    allowedSpaces.push('dev', 'admin', 'support', 'customer');
+  } else if (isAdmin) {
+    // Admin role gets access to Admin, Support, and Customer spaces (NO Dev space)
+    allowedSpaces.push('admin', 'support', 'customer');
+  } else if (isSupport) {
+    // Support role gets access to Support and Customer spaces (NO Admin or Dev spaces)
+    allowedSpaces.push('support', 'customer');
+  } else {
+    // Customer role gets access strictly to Customer space (NO switcher shown)
+    allowedSpaces.push('customer');
+  }
+
+  // Detect active space from pathname, falling back to first allowed space
+  const detectedSpace = getSpaceFromPathname(pathname);
+  const [selectedSpace, setSelectedSpace] = useState<SpaceKey>(() => {
+    return allowedSpaces.includes(detectedSpace) ? detectedSpace : allowedSpaces[0] || 'customer';
+  });
+
+  // Keep selected space synced with pathname when user navigates directly
+  useEffect(() => {
+    const spaceForPath = getSpaceFromPathname(pathname);
+    if (allowedSpaces.includes(spaceForPath)) {
+      setSelectedSpace(spaceForPath);
+    } else if (!allowedSpaces.includes(selectedSpace)) {
+      setSelectedSpace(allowedSpaces[0] || 'customer');
+    }
+  }, [pathname, isDev, isAdmin, isSupport]);
+
+  const activePanel = SPACES[selectedSpace] || SPACES.customer;
+
+  function handleSpaceSwitch(spaceKey: SpaceKey) {
+    if (!allowedSpaces.includes(spaceKey)) return;
+    setSelectedSpace(spaceKey);
+    const spaceObj = SPACES[spaceKey];
+    // If current path is not in the newly selected space, navigate to default route for that space
+    const pathSpace = getSpaceFromPathname(pathname);
+    if (pathSpace !== spaceKey && spaceObj) {
+      router.push(spaceObj.defaultHref);
+    }
+  }
 
   const initials = apiUser?.email
     ? apiUser.email.slice(0, 2).toUpperCase()
@@ -172,93 +239,116 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   return (
-    <aside className="w-64 md:w-56 shrink-0 flex flex-col py-6 px-4 gap-1 border-r border-white/[0.05] min-h-screen bg-bg">
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 px-3 mb-6">
-        <img
-          src="/STX.png"
-          alt="STX HOSTING Logo"
-          className="w-6 h-6 max-w-[24px] max-h-[24px] shrink-0 rounded-md object-contain shadow-glow-violet"
-          style={{ filter: 'brightness(0) invert(1)' }}
-        />
-        <span className="font-extrabold text-sm tracking-tight text-white">
-          STX <span className="text-accent-teal">HOSTING</span>
-        </span>
+    <aside className="w-72 md:w-64 lg:w-72 shrink-0 flex flex-col py-6 px-4 gap-1 border-r border-white/[0.05] h-screen overflow-y-auto bg-bg">
+      {/* Brand Header */}
+      <div className="flex items-center justify-between px-3 mb-4">
+        <div className="flex items-center gap-2.5">
+          <img
+            src="/STX.png"
+            alt="STX HOSTING Logo"
+            className="w-6 h-6 max-w-[24px] max-h-[24px] shrink-0 rounded-md object-contain shadow-glow-violet"
+            style={{ filter: 'brightness(0) invert(1)' }}
+          />
+          <span className="font-extrabold text-sm tracking-tight text-white">
+            STX <span className="text-accent-teal">HOSTING</span>
+          </span>
+        </div>
       </div>
 
-      {/* Quick View Switcher for Dev and Admin Roles */}
-      {(isDev || isAdmin) && (
-        <div className="px-3 mb-4">
-          {pathname.startsWith('/admin') || pathname.startsWith('/dev') ? (
-            <Link
-              href="/dashboard"
-              className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold rounded-xl bg-accent-violet/10 text-accent-violet-light border border-accent-violet/20 hover:bg-accent-violet/20 transition-all shadow-sm"
-            >
-              <span className="flex items-center gap-2">
-                <IconStore size={15} /> Customer Storefront
-              </span>
-              <span>→</span>
-            </Link>
-          ) : (
-            <Link
-              href={isDev ? '/dev' : '/admin/review-queue'}
-              className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold rounded-xl bg-teal-500/10 text-teal-300 border border-teal-500/20 hover:bg-teal-500/20 transition-all shadow-sm"
-            >
-              <span className="flex items-center gap-2">
-                <IconSettings size={15} /> Control Panel
-              </span>
-              <span>→</span>
-            </Link>
-          )}
+      {/* Dynamic Panel Switcher Tabs (Only shown for staff with >1 allowed space) */}
+      {allowedSpaces.length > 1 && (
+        <div className="px-1 mb-5">
+          <p className="px-2 mb-1.5 text-[10px] uppercase tracking-widest text-text-faint font-semibold">
+            PANEL SPACES
+          </p>
+          <div className={`grid gap-1.5 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl ${
+            allowedSpaces.length === 2 ? 'grid-cols-2' : 'grid-cols-2'
+          }`}>
+            {allowedSpaces.map((spaceKey) => {
+              const space = SPACES[spaceKey];
+              const isActive = selectedSpace === spaceKey;
+              return (
+                <button
+                  key={spaceKey}
+                  onClick={() => handleSpaceSwitch(spaceKey)}
+                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2 text-xs font-semibold rounded-lg transition-all border ${
+                    isActive
+                      ? `${space.badgeBg} ${space.badgeText} shadow-sm font-bold border-white/10`
+                      : 'text-text-muted hover:text-white border-transparent hover:bg-white/[0.04]'
+                  }`}
+                  title={space.label}
+                >
+                  <span className={isActive ? space.badgeText : 'text-text-faint'}>
+                    {SPACE_ICONS[spaceKey]}
+                  </span>
+                  <span className="truncate text-[11px]">{space.badge}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Nav Groups */}
-      <nav className="flex flex-col gap-5 flex-1 overflow-y-auto pr-1">
-        {/* Dev users (system owner) see Infrastructure, Admin, Support, and Customer menus */}
-        {isDev && (
-          <>
-            <NavGroup group={INFRA_GROUP} pathname={pathname} />
-            <NavGroup group={ADMIN_GROUP} pathname={pathname} />
-            <NavGroup group={STAFF_GROUP} pathname={pathname} />
-            <NavGroup group={CUSTOMER_GROUP} pathname={pathname} />
-          </>
-        )}
-        
-        {/* Admin users see Admin, Support, and Customer menus */}
-        {isAdmin && !isDev && (
-          <>
-            <NavGroup group={ADMIN_GROUP} pathname={pathname} />
-            <NavGroup group={STAFF_GROUP} pathname={pathname} />
-            <NavGroup group={CUSTOMER_GROUP} pathname={pathname} />
-          </>
-        )}
-        
-        {/* Support users see Staff and Customer menus */}
-        {isSupport && !isAdmin && !isDev && (
-          <>
-            <NavGroup group={STAFF_GROUP} pathname={pathname} />
-            <NavGroup group={CUSTOMER_GROUP} pathname={pathname} />
-          </>
-        )}
-        
-        {/* Customer users see customer menu */}
-        {isCustomer && <NavGroup group={CUSTOMER_GROUP} pathname={pathname} />}
+      {/* Active Panel Category Header */}
+      <div className="px-3 mb-2 flex items-center justify-between">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-text-faint">
+          {activePanel.label}
+        </span>
+        <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold ${activePanel.badgeBg} ${activePanel.badgeText}`}>
+          {activePanel.badge}
+        </span>
+      </div>
+
+      {/* Active Panel Navigation Links */}
+      <nav className="flex flex-col gap-1 flex-1 overflow-y-auto pr-1">
+        {activePanel.links.map((link) => {
+          const active = pathname === link.href || (link.href !== '/dashboard' && link.href !== '/admin' && link.href !== '/dev' && pathname.startsWith(link.href));
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => onNavigate?.()}
+              className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all group relative ${
+                active
+                  ? 'bg-white/[0.08] text-text-primary font-medium shadow-sm'
+                  : 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]'
+              }`}
+            >
+              {active && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-brand-gradient" />
+              )}
+              <span className={active ? 'text-accent-teal-bright' : 'text-text-faint group-hover:text-text-muted transition-colors'}>
+                {ICONS[link.icon]}
+              </span>
+              <span className="truncate">{link.label}</span>
+            </Link>
+          );
+        })}
       </nav>
 
-      {/* User Footer */}
+      {/* User Profile Footer */}
       <div className="mt-4 pt-4 border-t border-white/[0.06] px-3">
         {apiUser && (
           <div className="flex items-center gap-2.5 mb-3">
-            <div className="h-8 w-8 rounded-full bg-brand-gradient flex items-center justify-center text-white text-xs font-semibold shrink-0">
+            <div className="h-8 w-8 rounded-full bg-brand-gradient flex items-center justify-center text-white text-xs font-semibold shrink-0 shadow-glow-teal">
               {initials}
             </div>
             <div className="min-w-0">
               <p className="text-xs text-text-primary font-medium truncate">{apiUser.email}</p>
-              <p className="text-[10px] capitalize"
-                style={{ color: apiUser.role === 'admin' ? '#f59e0b' : apiUser.role === 'dev' ? '#8b5cf6' : apiUser.role === 'support' ? '#06b6d4' : '#6b7280' }}
+              <p
+                className="text-[10px] capitalize font-semibold tracking-wide"
+                style={{
+                  color:
+                    apiUser.role === 'admin'
+                      ? '#f59e0b'
+                      : apiUser.role === 'dev'
+                      ? '#a855f7'
+                      : apiUser.role === 'support'
+                      ? '#06b6d4'
+                      : '#10b981',
+                }}
               >
-                {apiUser.role}
+                {apiUser.role} Account
               </p>
             </div>
           </div>
@@ -277,3 +367,4 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     </aside>
   );
 }
+

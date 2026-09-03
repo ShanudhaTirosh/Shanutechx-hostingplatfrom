@@ -59,7 +59,7 @@ export default function SecretsOverviewPage() {
           href="/secrets/audit"
           className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-text-muted hover:text-text-primary text-xs font-medium border border-white/[0.08] transition-all"
         >
-          📜 View Access Audit Logs
+          View Access Audit Logs
         </Link>
       </div>
 

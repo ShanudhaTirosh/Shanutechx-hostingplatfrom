@@ -123,51 +123,51 @@ const ADMIN_PANELS = [
     href: '/admin/review-queue',
     label: 'Payment Review Queue',
     description: 'Verify customer uploaded bank slips & payment proofs for manual order approvals.',
-    icon: '💳',
+    icon: <ShieldIcon />,
     badgeKey: 'pendingPayments',
   },
   {
     href: '/admin/customers',
     label: 'Customer Directory',
     description: 'Manage customer accounts, assigned admins, spend totals, and account details.',
-    icon: '👥',
+    icon: <ServerIcon />,
     badgeKey: 'customers',
   },
   {
     href: '/admin/services',
     label: 'Products & Plans',
     description: 'Manage services, pricing tiers, plans, and subscription packages.',
-    icon: '📦',
+    icon: <DatabaseIcon />,
   },
   {
     href: '/admin/staff',
     label: 'Staff & Roles',
     description: 'View staff members, manage support staff, and update role assignments.',
-    icon: '🛡️',
+    icon: <ShieldIcon />,
   },
   {
     href: '/admin/cms',
     label: 'Site Content (CMS)',
     description: 'Edit landing page copy, promotional banners, feature blocks, and public pricing text.',
-    icon: '📝',
+    icon: <CloudIcon />,
   },
   {
     href: '/admin/analytics',
     label: 'Platform Analytics',
     description: 'View sales performance metrics, revenue charts, user conversion, and order statistics.',
-    icon: '📊',
+    icon: <ServerIcon />,
   },
   {
     href: '/admin/audit-log',
     label: 'Audit Log',
     description: 'Inspect full audit trail of staff actions, payment approvals, and role updates.',
-    icon: '📜',
+    icon: <ShieldIcon />,
   },
   {
     href: '/admin/tickets',
     label: 'Support Tickets & Chat',
     description: 'Manage support tickets and engage in live customer chat.',
-    icon: '🎫',
+    icon: <CloudIcon />,
     badgeKey: 'tickets',
   },
 ];
@@ -210,7 +210,7 @@ export default function DevLandingPage() {
     secrets: 'Open Vault',
     leaseweb: health === null ? '…' : (health?.apiKeyConfigured ? 'Connected' : 'Not configured'),
     databases: dbCount === null ? '…' : `${dbCount}`,
-    settings: 'Protected 🔒',
+    settings: 'Protected',
     containers: 'Inspect',
     catalog: 'Browse',
   };
@@ -231,8 +231,8 @@ export default function DevLandingPage() {
       {/* Tabs */}
       <Tabs
         tabs={[
-          { label: '⚡ Infrastructure & Tech Stack', value: 'infra' },
-          { label: '👑 Admin & Business Control', value: 'admin', count: pendingPayments > 0 ? pendingPayments : undefined },
+          { label: 'Infrastructure & Tech Stack', value: 'infra' },
+          { label: 'Admin & Business Control', value: 'admin', count: pendingPayments > 0 ? pendingPayments : undefined },
         ]}
         active={activeTab}
         onChange={(v) => setActiveTab(v as 'infra' | 'admin')}
@@ -317,7 +317,7 @@ export default function DevLandingPage() {
       {activeTab === 'admin' && (
         <div className="space-y-6 animate-fade-in">
           <div className="bg-accent-violet/10 border border-accent-violet/20 rounded-2xl p-4 text-xs text-accent-violet-light flex items-center justify-between">
-            <span>👑 Full Admin Control Mode: You have complete access to review payments, manage staff roles, edit products, update CMS, and inspect audit logs.</span>
+            <span>Full Admin Control Mode: You have complete access to review payments, manage staff roles, edit products, update CMS, and inspect audit logs.</span>
             <Link href="/admin">
               <span className="font-semibold underline hover:text-white">Open Admin Dashboard →</span>
             </Link>

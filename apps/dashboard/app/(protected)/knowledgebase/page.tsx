@@ -110,7 +110,12 @@ export default function CustomerKnowledgeBasePage() {
               : 'bg-white/[0.02] border-white/10 text-text-muted hover:bg-white/[0.04] hover:text-white'
           }`}
         >
-          <p className="text-2xl">📚</p>
+          <div className="h-8 w-8 text-accent-cyan flex items-center justify-center">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+          </div>
           <div>
             <h4 className="text-xs font-semibold">All Categories</h4>
             <p className="text-[10px] text-text-faint">Full Documentation</p>
@@ -130,7 +135,9 @@ export default function CustomerKnowledgeBasePage() {
                   : 'bg-white/[0.02] border-white/10 text-text-muted hover:bg-white/[0.04] hover:text-white'
               }`}
             >
-              <p className="text-2xl">{cat.icon}</p>
+              <div className="h-6 w-6 text-accent-violet flex items-center justify-center font-bold text-sm">
+                #
+              </div>
               <div>
                 <h4 className="text-xs font-semibold truncate">{cat.name}</h4>
                 <p className="text-[10px] text-text-faint truncate">{cat.description}</p>
@@ -177,8 +184,8 @@ export default function CustomerKnowledgeBasePage() {
                   {article.summary}
                 </p>
                 <div className="flex items-center justify-between text-[11px] text-text-faint font-mono pt-2 border-t border-white/[0.04]">
-                  <span>👁 {article.views} views</span>
-                  <span>👍 {article.helpfulCount} helpful</span>
+                  <span>{article.views} views</span>
+                  <span>{article.helpfulCount} helpful votes</span>
                 </div>
               </div>
             ))}
@@ -225,7 +232,7 @@ export default function CustomerKnowledgeBasePage() {
                 variant={votedHelpful[selectedArticle.id] ? 'secondary' : 'primary'}
                 onClick={() => handleVoteHelpful(selectedArticle.id)}
               >
-                {votedHelpful[selectedArticle.id] ? '👍 Marked Helpful' : `👍 Was this article helpful? (${selectedArticle.helpfulCount})`}
+                {votedHelpful[selectedArticle.id] ? 'Marked Helpful' : `Was this article helpful? (${selectedArticle.helpfulCount})`}
               </Button>
             </div>
           </div>

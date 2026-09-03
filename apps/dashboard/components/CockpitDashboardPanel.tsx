@@ -454,7 +454,7 @@ export function CockpitDashboardPanel({ nodeId, nodeLabel, ipAddress }: CockpitD
           <div className="flex justify-between items-center">
             <div>
               <h3 className="text-sm font-semibold text-text-primary">Network Firewall</h3>
-              <p className="text-xs text-text-muted">Status: {firewall?.active ? '🟢 Active' : '🔴 Inactive'}</p>
+              <p className="text-xs text-text-muted">Status: {firewall?.active ? 'Active' : 'Inactive'}</p>
             </div>
             <Button size="sm" variant="primary" onClick={() => setShowAddRuleModal(true)}>+ Add Rule</Button>
           </div>
