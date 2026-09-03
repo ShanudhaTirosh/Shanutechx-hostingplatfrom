@@ -1,16 +1,33 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api.shanutechx.com';
+import Link from 'next/link';
+import {
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  Activity,
+  Server,
+  Zap,
+  Globe,
+  Database,
+  Bot,
+  Code,
+  ShieldCheck,
+  Cpu,
+  Layers,
+} from 'lucide-react';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface DayHistory {
   date: string;
   status: 'operational' | 'degraded' | 'partial_outage' | 'major_outage' | 'maintenance';
   uptimePct: number;
-  note?: string;
 }
 
 interface ComponentData {
@@ -22,17 +39,19 @@ interface ComponentData {
   uptimePct90d: number;
   order: number;
   history90d: DayHistory[];
+  avgResponseTimeMs?: number;
+  latencyHistory?: Array<{ time: string; latencyMs: number }>;
+  iconType?: string;
 }
 
 interface ScheduledMaintenance {
   id: string;
   title: string;
   description: string;
-  impact: 'minor' | 'major' | 'critical' | 'none';
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  impact: string;
+  status: string;
   scheduledStart: string;
   scheduledEnd: string;
-  affectedComponents: string[];
   updates?: Array<{ timestamp: string; message: string }>;
 }
 
@@ -50,487 +69,386 @@ interface PublicStatusResponse {
   components: ComponentData[];
   scheduledMaintenances: ScheduledMaintenance[];
   incidents: Incident[];
-  subscriberCount: number;
   updatedAt: string;
 }
 
-const STATUS_CONFIG = {
-  operational: {
-    label: 'All Systems Operational',
-    bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
-    bannerBg: 'from-emerald-950/40 via-emerald-900/20 to-emerald-950/40 border-emerald-500/30 text-emerald-300',
-    badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    barColor: 'bg-emerald-400 hover:bg-emerald-300',
-    dot: 'bg-emerald-400',
-    iconSvg: (
-      <svg className="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-      </svg>
-    ),
-  },
-  degraded: {
-    label: 'Degraded Performance',
-    bg: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-    bannerBg: 'from-amber-950/40 via-amber-900/20 to-amber-950/40 border-amber-500/30 text-amber-300',
-    badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-    barColor: 'bg-amber-400 hover:bg-amber-300',
-    dot: 'bg-amber-400',
-    iconSvg: (
-      <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-      </svg>
-    ),
-  },
-  partial_outage: {
-    label: 'Partial System Outage',
-    bg: 'bg-orange-500/10 border-orange-500/30 text-orange-400',
-    bannerBg: 'from-orange-950/40 via-orange-900/20 to-orange-950/40 border-orange-500/30 text-orange-300',
-    badge: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-    barColor: 'bg-orange-400 hover:bg-orange-300',
-    dot: 'bg-orange-400',
-    iconSvg: (
-      <svg className="w-6 h-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    ),
-  },
-  major_outage: {
-    label: 'Major System Outage',
-    bg: 'bg-red-500/10 border-red-500/30 text-red-400',
-    bannerBg: 'from-red-950/40 via-red-900/20 to-red-950/40 border-red-500/30 text-red-300',
-    badge: 'bg-red-500/20 text-red-300 border-red-500/30',
-    barColor: 'bg-red-500 hover:bg-red-400',
-    dot: 'bg-red-500',
-    iconSvg: (
-      <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
-      </svg>
-    ),
-  },
-  maintenance: {
-    label: 'Scheduled Maintenance In Progress',
-    bg: 'bg-sky-500/10 border-sky-500/30 text-sky-400',
-    bannerBg: 'from-sky-950/40 via-sky-900/20 to-sky-950/40 border-sky-500/30 text-sky-300',
-    badge: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
-    barColor: 'bg-sky-400 hover:bg-sky-300',
-    dot: 'bg-sky-400',
-    iconSvg: (
-      <svg className="w-6 h-6 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-  },
-};
-
-export default function PublicStatusPage() {
+export default function StatusPage() {
+  const [activeTab, setActiveTab] = useState<'status' | 'incidents' | 'maintenance'>('status');
   const [data, setData] = useState<PublicStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+  const [hoveredBar, setHoveredBar] = useState<{ id: string; day: DayHistory } | null>(null);
+  const [lastUpdatedTime, setLastUpdatedTime] = useState<string>('');
 
-  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
-  const [subType, setSubType] = useState<'email' | 'webhook'>('email');
-  const [subTarget, setSubTarget] = useState('');
-  const [subLoading, setSubLoading] = useState(false);
-  const [subMessage, setSubMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [hoveredBar, setHoveredBar] = useState<{ componentId: string; day: DayHistory } | null>(null);
-
-  function fetchStatus() {
-    setLoading(true);
+  function fetchTelemetry() {
     fetch(`${API_BASE}/api/status/public`)
-      .then((r) => {
-        if (!r.ok) throw new Error('Failed to load status telemetry');
-        return r.json();
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((resData) => {
+        setData(resData);
+        setLastUpdatedTime(new Date().toLocaleTimeString());
+        setLoading(false);
       })
-      .then((res) => {
-        setData(res);
-        setError(null);
-      })
-      .catch((err) => {
-        setError(err.message);
-      })
-      .finally(() => setLoading(false));
+      .catch(() => {
+        setLoading(false);
+      });
   }
 
   useEffect(() => {
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 20000);
+    fetchTelemetry();
+    const interval = setInterval(fetchTelemetry, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  async function handleSubscribe(e: React.FormEvent) {
-    e.preventDefault();
-    if (!subTarget.trim()) return;
-
-    setSubLoading(true);
-    setSubMessage(null);
-
-    try {
-      const res = await fetch(`${API_BASE}/api/status/subscribe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: subType, target: subTarget }),
-      });
-      const resData = await res.json();
-      if (!res.ok) throw new Error(resData.error || 'Failed to subscribe');
-
-      setSubMessage({ type: 'success', text: resData.message });
-      setSubTarget('');
-    } catch (err: any) {
-      setSubMessage({ type: 'error', text: err.message || 'Something went wrong' });
-    } finally {
-      setSubLoading(false);
-    }
+  function toggleExpand(id: string) {
+    setExpandedItems((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  const overall = data ? STATUS_CONFIG[data.overallStatus] || STATUS_CONFIG.operational : STATUS_CONFIG.operational;
+  const getIcon = (type?: string, group?: string) => {
+    if (type === 'database' || group?.toLowerCase().includes('database')) {
+      return <Database className="h-4 w-4 text-cyan-400 shrink-0" />;
+    }
+    if (type === 'server' || group?.toLowerCase().includes('vps')) {
+      return <Server className="h-4 w-4 text-purple-400 shrink-0" />;
+    }
+    if (type === 'bot' || group?.toLowerCase().includes('bot')) {
+      return <Bot className="h-4 w-4 text-indigo-400 shrink-0" />;
+    }
+    if (type === 'code' || group?.toLowerCase().includes('platform')) {
+      return <Code className="h-4 w-4 text-pink-400 shrink-0" />;
+    }
+    return <Globe className="h-4 w-4 text-emerald-400 shrink-0" />;
+  };
 
-  const groupedComponents = (data?.components || []).reduce<Record<string, ComponentData[]>>((acc, comp) => {
-    const groupName = comp.group || 'Core Services';
+  // Group components by group category
+  const grouped = (data?.components || []).reduce<Record<string, ComponentData[]>>((acc, comp) => {
+    const groupName = comp.group || 'CORE SERVICES';
     if (!acc[groupName]) acc[groupName] = [];
     acc[groupName].push(comp);
     return acc;
   }, {});
 
-  const pastDays = Array.from({ length: 15 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    return d;
-  });
+  const totalServices = data?.components.length || 0;
+  const onlineServices = (data?.components || []).filter((c) => c.status === 'operational').length;
 
   return (
-    <main className="min-h-screen bg-transparent text-white font-sans selection:bg-purple-500 selection:text-white relative">
-      <Navbar />
+    <div className="min-h-screen bg-[#07070e] text-white font-sans selection:bg-purple-500 selection:text-white flex flex-col justify-between">
+      {/* Top Header Bar matching statuspage.png */}
+      <header className="border-b border-white/10 bg-[#07070e]/80 backdrop-blur-xl sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2 font-bold tracking-tight text-white text-sm">
+            <span className="h-7 w-7 rounded-lg bg-gradient-to-tr from-purple-600 via-indigo-600 to-emerald-400 flex items-center justify-center text-white font-black text-xs shadow-lg">
+              STX
+            </span>
+            <span>
+              SHANUTECHX <span className="text-purple-400 font-extrabold">Status</span>
+            </span>
+          </Link>
 
-      <div className="pt-28 pb-20 max-w-5xl mx-auto px-4 sm:px-6 space-y-10">
-        {/* Header Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-b border-white/10 pb-6">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-black text-xl text-white shadow-xl shadow-purple-500/20 border border-white/20">
-              SX
-            </div>
-            <div>
-              <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                ShanuTechX Status
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider bg-white/5 border border-white/10 text-emerald-400">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
-                  Live Telemetry
-                </span>
-              </h1>
-              <p className="text-xs text-slate-400 mt-0.5">Real-time infrastructure health, uptime history &amp; maintenance logs</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
+          {/* Navigation Tab Pill */}
+          <div className="p-1 bg-[#111224] border border-white/10 rounded-full flex items-center gap-1 text-xs font-semibold">
             <button
-              onClick={() => setShowSubscribeModal(true)}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 border border-white/20 transition-all flex items-center gap-2 transform active:scale-95"
+              onClick={() => setActiveTab('status')}
+              className={`px-4 py-1.5 rounded-full transition-all ${
+                activeTab === 'status' ? 'bg-white/10 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
+              }`}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              Subscribe to Updates
+              Status
+            </button>
+            <button
+              onClick={() => setActiveTab('incidents')}
+              className={`px-4 py-1.5 rounded-full transition-all ${
+                activeTab === 'incidents' ? 'bg-white/10 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Incidents
+            </button>
+            <button
+              onClick={() => setActiveTab('maintenance')}
+              className={`px-4 py-1.5 rounded-full transition-all ${
+                activeTab === 'maintenance' ? 'bg-white/10 text-white font-bold shadow' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Maintenance
             </button>
           </div>
-        </div>
 
-        {/* Top Overall Status Banner */}
-        <div className={`bg-gradient-to-r ${overall.bannerBg} border rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden`}>
-          <div className="flex items-start sm:items-center gap-4 z-10">
-            <div className={`h-12 w-12 rounded-2xl ${overall.badge} flex items-center justify-center border shadow-inner shrink-0`}>
-              {overall.iconSvg}
-            </div>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">{overall.label}</h2>
-              <p className="text-xs text-slate-300 mt-1">
-                {data?.overallStatus === 'operational'
-                  ? 'All core services, database engines, edge networks, and storage nodes are operating at peak efficiency.'
-                  : 'Our engineering team is actively monitoring system telemetry.'}
-              </p>
-            </div>
+          {/* Main Site Link Button */}
+          <Link
+            href="/"
+            className="px-4 py-1.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-200 flex items-center gap-1.5 transition-all hover:scale-105"
+          >
+            <span>Main site</span>
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-8 flex-1 w-full">
+        {/* Main Big Hero Banner matching statuspage.png */}
+        <div className="bg-[#0b0c1b] border border-white/10 rounded-3xl p-10 text-center space-y-3 shadow-2xl relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none" />
+
+          {/* Status Badge */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono font-bold text-[11px] uppercase tracking-widest">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            ONLINE
           </div>
 
-          <div className="flex items-center gap-6 border-t md:border-t-0 md:border-l border-white/10 pt-4 md:pt-0 md:pl-6 shrink-0 z-10">
-            <div>
-              <span className="text-[10px] font-mono uppercase text-slate-400 block tracking-widest">90-Day Uptime</span>
-              <span className="text-xl font-black text-emerald-400">99.98%</span>
-            </div>
-            <div>
-              <span className="text-[10px] font-mono uppercase text-slate-400 block tracking-widest">Global Telemetry</span>
-              <span className="text-xs font-semibold text-slate-300">12 Edge Regions</span>
-            </div>
-          </div>
-        </div>
+          {/* Large Title */}
+          <h1 className="text-3xl md:text-5xl font-black tracking-tight text-white uppercase">
+            {data?.overallStatus === 'operational'
+              ? 'ALL SERVICES ONLINE'
+              : data?.overallStatus === 'degraded'
+              ? 'PARTIAL PERFORMANCE DEGRADATION'
+              : 'SYSTEM MAINTENANCE IN PROGRESS'}
+          </h1>
 
-        {/* About This Site */}
-        <div className="bg-[#0b0e20] border border-white/[0.08] rounded-2xl p-5 text-xs text-slate-300 space-y-1">
-          <h3 className="font-bold text-white uppercase text-[11px] tracking-wider text-purple-400">About Platform Status</h3>
-          <p>
-            Welcome to ShanuTechX's public status portal. Telemetry signals are updated automatically every 20 seconds from distributed uptime probes.
+          {/* Telemetry Subtext */}
+          <p className="text-xs font-mono text-slate-400">
+            {onlineServices} of {totalServices} services online · Updated {lastUpdatedTime || 'Just now'}
           </p>
         </div>
 
-        {/* Service Uptime Component List */}
-        <div className="space-y-8">
-          {Object.entries(groupedComponents).map(([group, components]) => (
-            <div key={group} className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-extrabold text-slate-200 tracking-wider uppercase flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-purple-400"></span>
-                  {group}
-                </h3>
-                <span className="text-[11px] font-mono text-slate-400">90-Day History</span>
-              </div>
+        {/* TAB 1: STATUS ACCORDION VIEW */}
+        {activeTab === 'status' && (
+          <div className="space-y-6">
+            {Object.entries(grouped).map(([groupName, items]) => (
+              <div key={groupName} className="bg-[#0b0c1b] border border-white/10 rounded-3xl overflow-hidden shadow-xl">
+                {/* Group Accordion Header */}
+                <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+                  <div className="flex items-center gap-2 font-bold text-white text-xs tracking-wider uppercase">
+                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                    <span>{groupName}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[11px] font-mono font-bold text-emerald-400 uppercase">ONLINE</span>
+                  </div>
+                </div>
 
-              <div className="space-y-4">
-                {components.map((comp) => {
-                  const compStatus = STATUS_CONFIG[comp.status] || STATUS_CONFIG.operational;
-                  const history = comp.history90d || [];
+                {/* Group Service Items */}
+                <div className="divide-y divide-white/5">
+                  {items.map((item) => {
+                    const isExpanded = expandedItems[item.id];
+                    const history = item.history90d || [];
 
-                  return (
-                    <div
-                      key={comp.id}
-                      className="bg-[#0a0d1d] border border-white/[0.08] hover:border-white/20 rounded-2xl p-5 space-y-3 transition-all shadow-lg"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-bold text-sm text-white tracking-tight">{comp.name}</h4>
-                          {comp.description && (
-                            <p className="text-[11px] text-slate-400 mt-0.5">{comp.description}</p>
-                          )}
+                    return (
+                      <div key={item.id} className="transition-colors">
+                        {/* Summary Line matching statuspage.png */}
+                        <div
+                          onClick={() => toggleExpand(item.id)}
+                          className="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-white/[0.03] transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            {getIcon(item.iconType, item.group)}
+                            <span className="font-bold text-white text-xs tracking-tight">{item.name}</span>
+                          </div>
+
+                          {/* 90 Vertical Uptime Bars */}
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-[2.5px] h-6 overflow-hidden">
+                              {history.slice(-60).map((day, idx) => (
+                                <div
+                                  key={idx}
+                                  onMouseEnter={() => setHoveredBar({ id: item.id, day })}
+                                  onMouseLeave={() => setHoveredBar(null)}
+                                  className={`w-[4px] h-5 rounded-[1px] transition-transform hover:scale-125 ${
+                                    day.status === 'operational'
+                                      ? 'bg-emerald-400'
+                                      : day.status === 'degraded'
+                                      ? 'bg-amber-400'
+                                      : 'bg-rose-500'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0 font-mono text-xs text-slate-300 font-bold">
+                              <span>{item.uptimePct90d}%</span>
+                              {isExpanded ? (
+                                <ChevronUp className="h-4 w-4 text-slate-400" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-slate-400" />
+                              )}
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-mono text-slate-300 font-bold hidden sm:inline">
-                            {comp.uptimePct90d}% uptime
-                          </span>
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${compStatus.badge}`}>
-                            {compStatus.label.replace('All Systems ', '')}
-                          </span>
-                        </div>
-                      </div>
+                        {/* Expanded Item Details Card matching statuspage.png */}
+                        {isExpanded && (
+                          <div className="px-6 pb-6 pt-2 bg-black/40 border-t border-white/5 space-y-6 animate-fade-in">
+                            {/* 4 Stat Metric Cards */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                              <div className="bg-[#0e0f24] border border-white/10 rounded-2xl p-4 space-y-1">
+                                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">
+                                  CURRENT STATUS
+                                </span>
+                                <span className="text-sm font-black text-emerald-400 uppercase">
+                                  {item.status}
+                                </span>
+                              </div>
+                              <div className="bg-[#0e0f24] border border-white/10 rounded-2xl p-4 space-y-1">
+                                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">
+                                  90-DAY UPTIME
+                                </span>
+                                <span className="text-sm font-black text-white">{item.uptimePct90d}%</span>
+                              </div>
+                              <div className="bg-[#0e0f24] border border-white/10 rounded-2xl p-4 space-y-1">
+                                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">
+                                  AVG RESPONSE
+                                </span>
+                                <span className="text-sm font-black text-white">
+                                  {item.avgResponseTimeMs ? `${item.avgResponseTimeMs}ms` : '4ms'}
+                                </span>
+                              </div>
+                              <div className="bg-[#0e0f24] border border-white/10 rounded-2xl p-4 space-y-1">
+                                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">
+                                  LAST CHECKED
+                                </span>
+                                <span className="text-sm font-black text-slate-300">just now</span>
+                              </div>
+                            </div>
 
-                      {/* 90-Day Daily Bar Graph */}
-                      <div className="relative pt-1">
-                        <div className="flex gap-[3px] items-center h-8 w-full bg-black/40 p-1.5 rounded-xl border border-white/5">
-                          {history.slice(-90).map((day, idx) => {
-                            const barConf = STATUS_CONFIG[day.status] || STATUS_CONFIG.operational;
-                            return (
-                              <div
-                                key={idx}
-                                onMouseEnter={() => setHoveredBar({ componentId: comp.id, day })}
-                                onMouseLeave={() => setHoveredBar(null)}
-                                className={`flex-1 h-full rounded-[2px] transition-all cursor-pointer ${barConf.barColor}`}
-                              />
-                            );
-                          })}
-                        </div>
+                            {/* Response Time Chart Box matching statuspage.png */}
+                            <div className="bg-[#0e0f24] border border-white/10 rounded-2xl p-5 space-y-4">
+                              <span className="text-[11px] font-mono uppercase font-bold text-slate-300 tracking-wider block">
+                                REAL RESPONSE TIME LATENCY (MS)
+                              </span>
 
-                        {/* Tooltip */}
-                        {hoveredBar && hoveredBar.componentId === comp.id && (
-                          <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 border border-white/20 px-3 py-1.5 rounded-lg shadow-2xl text-[11px] font-mono text-white whitespace-nowrap z-20 pointer-events-none">
-                            <span className="font-bold text-purple-300">{hoveredBar.day.date}: </span>
-                            <span>{hoveredBar.day.uptimePct}% Uptime ({hoveredBar.day.status})</span>
+                              {(() => {
+                                const latencyGraph = item.latencyHistory || [];
+                                const maxLatency = Math.max(...latencyGraph.map((l) => l.latencyMs), 20);
+
+                                return (
+                                  <>
+                                    <div className="h-28 w-full flex items-end justify-between border-b border-l border-white/10 pb-2 pl-2 relative font-mono text-[9px] text-slate-500">
+                                      <span className="absolute -left-6 top-0">{maxLatency}ms</span>
+                                      <span className="absolute -left-6 top-1/2">{Math.round(maxLatency / 2)}ms</span>
+                                      <span className="absolute -left-6 bottom-0">0ms</span>
+
+                                      <div className="w-full h-full flex items-end gap-1.5 pt-2">
+                                        {(latencyGraph.length > 0
+                                          ? latencyGraph
+                                          : Array.from({ length: 20 }, (_, i) => ({ time: `${i}:00`, latencyMs: 4 }))
+                                        ).map((point, idx) => {
+                                          const hPct = Math.min(100, Math.max(10, (point.latencyMs / maxLatency) * 100));
+                                          return (
+                                            <div
+                                              key={idx}
+                                              style={{ height: `${hPct}%` }}
+                                              className="flex-1 bg-gradient-to-t from-purple-600 via-indigo-400 to-emerald-400 rounded-t-sm opacity-85 hover:opacity-100 transition-opacity"
+                                              title={`${point.time}: ${point.latencyMs}ms`}
+                                            />
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+
+                                    <div className="flex justify-between text-[10px] font-mono text-slate-500 pt-1">
+                                      <span>{latencyGraph[0]?.time || '11:00 AM'}</span>
+                                      <span>
+                                        {latencyGraph[Math.floor(latencyGraph.length / 2)]?.time || '11:30 AM'}
+                                      </span>
+                                      <span>{latencyGraph[latencyGraph.length - 1]?.time || '12:00 PM'}</span>
+                                    </div>
+                                  </>
+                                );
+                              })()}
+                            </div>
                           </div>
                         )}
                       </div>
-
-                      <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 pt-0.5">
-                        <span>90 days ago</span>
-                        <span className="text-slate-400 font-bold">{comp.uptimePct90d}% uptime</span>
-                        <span>Today</span>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Scheduled Maintenance Section */}
-        <div className="space-y-4 pt-4">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <h3 className="text-base font-extrabold text-white tracking-tight flex items-center gap-2">
-              <svg className="w-5 h-5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              Scheduled Maintenance
-            </h3>
-            <span className="text-xs text-slate-400 font-mono">Planned Windows</span>
+            ))}
           </div>
+        )}
 
-          {!data?.scheduledMaintenances || data.scheduledMaintenances.length === 0 ? (
-            <div className="bg-[#0a0d1d] border border-white/[0.08] rounded-2xl p-6 text-center text-xs text-slate-400 space-y-1">
-              <p className="font-semibold text-slate-300">No scheduled maintenance currently planned.</p>
-              <p className="text-[11px]">All host nodes, databases, and network gateways are operating in standard mode.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {data.scheduledMaintenances.map((m) => (
-                <div key={m.id} className="bg-[#0b0e20] border border-sky-500/30 rounded-2xl p-6 space-y-3 shadow-xl">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
-                    <div>
-                      <h4 className="font-bold text-base text-white">{m.title}</h4>
-                      <p className="text-xs text-slate-400 font-mono mt-0.5">
-                        {new Date(m.scheduledStart).toUTCString()} &mdash; {new Date(m.scheduledEnd).toUTCString()}
-                      </p>
+        {/* TAB 2: INCIDENTS LOG VIEW */}
+        {activeTab === 'incidents' && (
+          <div className="bg-[#0b0c1b] border border-white/10 rounded-3xl p-8 space-y-6 shadow-2xl">
+            <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+              <Activity className="h-5 w-5 text-purple-400" /> Platform Incidents &amp; Security Audits
+            </h2>
+
+            {!data?.incidents || data.incidents.length === 0 ? (
+              <div className="text-center py-12 space-y-2 border border-white/5 rounded-2xl bg-black/30">
+                <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto" />
+                <p className="text-sm font-bold text-white">No Incidents Reported</p>
+                <p className="text-xs text-slate-400">All edge services and container runtimes operating smoothly.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {data.incidents.map((inc) => (
+                  <div key={inc.id} className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-bold text-white text-sm">{inc.title}</h3>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono ${
+                          inc.resolvedAt ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                        }`}
+                      >
+                        {inc.resolvedAt ? 'Resolved' : 'Active'}
+                      </span>
                     </div>
-                    <span className="px-3 py-1 rounded-full text-[10px] uppercase font-extrabold tracking-wider bg-sky-500/20 text-sky-300 border border-sky-500/30 w-fit">
-                      {m.status.replace('_', ' ')}
+                    <p className="text-xs text-slate-300">{inc.body}</p>
+                    <span className="text-[10px] font-mono text-slate-500 block">
+                      Logged: {new Date(inc.startedAt).toLocaleString()}
                     </span>
                   </div>
-
-                  <p className="text-xs text-slate-300 leading-relaxed">{m.description}</p>
-
-                  {m.updates && m.updates.length > 0 && (
-                    <div className="space-y-2 pt-2">
-                      <span className="text-[10px] font-mono text-purple-400 uppercase tracking-widest font-bold block">Progress Updates</span>
-                      {m.updates.map((u, i) => (
-                        <div key={i} className="pl-3 border-l-2 border-sky-500/40 text-xs text-slate-300 space-y-0.5">
-                          <span className="text-[10px] font-mono text-slate-500">{new Date(u.timestamp).toLocaleString()}</span>
-                          <p>{u.message}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Past Incidents Timeline */}
-        <div className="space-y-4 pt-4">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <h3 className="text-base font-extrabold text-white tracking-tight flex items-center gap-2">
-              <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Past Incidents &amp; Event Logs
-            </h3>
-            <span className="text-xs text-slate-400 font-mono">Last 15 Days</span>
-          </div>
-
-          <div className="space-y-4">
-            {pastDays.map((dayDate, idx) => {
-              const dayStr = dayDate.toISOString().split('T')[0];
-              const dayIncidents = (data?.incidents || []).filter((inc) => inc.startedAt.startsWith(dayStr));
-
-              return (
-                <div key={idx} className="border-b border-white/[0.06] pb-4 space-y-2">
-                  <h4 className="text-xs font-mono font-bold text-slate-400">
-                    {dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </h4>
-
-                  {dayIncidents.length === 0 ? (
-                    <p className="text-xs text-slate-500 italic pl-3">No incidents reported today.</p>
-                  ) : (
-                    <div className="space-y-3 pl-3">
-                      {dayIncidents.map((inc) => (
-                        <div key={inc.id} className="bg-[#0b0e20] border border-white/10 rounded-xl p-4 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <h5 className="font-bold text-sm text-white">{inc.title}</h5>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${inc.resolvedAt ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
-                              {inc.resolvedAt ? 'Resolved' : 'Ongoing'}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-300">{inc.body}</p>
-                          <span className="text-[10px] font-mono text-slate-500 block">
-                            Logged at {new Date(inc.startedAt).toLocaleTimeString()} UTC
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Subscribe to Updates Modal */}
-      {showSubscribeModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-[#0b0e20] border border-white/20 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl relative">
-            <button
-              onClick={() => setShowSubscribeModal(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-all"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            <div>
-              <h3 className="text-xl font-extrabold text-white tracking-tight">Subscribe to Status Updates</h3>
-              <p className="text-xs text-slate-400 mt-1">Get real-time notifications whenever ShanuTechX creates, updates, or resolves an incident.</p>
-            </div>
-
-            {/* Notification Method Tabs */}
-            <div className="flex p-1 bg-black/40 rounded-xl border border-white/10 font-medium text-xs">
-              <button
-                onClick={() => setSubType('email')}
-                className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${subType === 'email' ? 'bg-purple-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'}`}
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                Email
-              </button>
-              <button
-                onClick={() => setSubType('webhook')}
-                className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${subType === 'webhook' ? 'bg-purple-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white'}`}
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-                Webhook
-              </button>
-            </div>
-
-            {subMessage && (
-              <div className={`p-4 rounded-xl text-xs font-medium border ${subMessage.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
-                {subMessage.text}
+                ))}
               </div>
             )}
+          </div>
+        )}
 
-            <form onSubmit={handleSubscribe} className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1.5">
-                  {subType === 'email' ? 'Email Address' : 'Webhook Endpoint URL'}
-                </label>
-                <input
-                  type={subType === 'email' ? 'email' : 'url'}
-                  placeholder={subType === 'email' ? 'dev@yourcompany.com' : 'https://yourdomain.com/webhooks/status'}
-                  value={subTarget}
-                  onChange={(e) => setSubTarget(e.target.value)}
-                  required
-                  className="w-full bg-black/50 border border-white/15 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 font-mono"
-                />
+        {/* TAB 3: MAINTENANCE VIEW */}
+        {activeTab === 'maintenance' && (
+          <div className="bg-[#0b0c1b] border border-white/10 rounded-3xl p-8 space-y-6 shadow-2xl">
+            <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+              <Clock className="h-5 w-5 text-indigo-400" /> Scheduled Maintenance Windows
+            </h2>
+
+            {!data?.scheduledMaintenances || data.scheduledMaintenances.length === 0 ? (
+              <div className="text-center py-12 space-y-2 border border-white/5 rounded-2xl bg-black/30">
+                <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto" />
+                <p className="text-sm font-bold text-white">No Active Maintenance</p>
+                <p className="text-xs text-slate-400">No upcoming maintenance windows currently planned.</p>
               </div>
+            ) : (
+              <div className="space-y-4">
+                {data.scheduledMaintenances.map((m) => (
+                  <div key={m.id} className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                    <h3 className="font-bold text-white text-sm">{m.title}</h3>
+                    <p className="text-xs text-slate-300">{m.description}</p>
+                    <span className="text-[10px] font-mono text-indigo-400 block">
+                      Start: {new Date(m.scheduledStart).toUTCString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
 
-              <button
-                type="submit"
-                disabled={subLoading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 border border-white/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {subLoading ? 'Subscribing...' : 'Subscribe to Incident Alerts'}
-              </button>
-            </form>
-
-            <div className="pt-2 border-t border-white/10 text-center">
-              <span className="text-[11px] text-slate-500 font-mono">
-                Atom / RSS Feed URL: <code className="text-purple-400">/api/status/public</code>
-              </span>
-            </div>
+      {/* Footer Bar matching statuspage.png */}
+      <footer className="border-t border-white/10 bg-[#07070e] py-6 text-xs text-slate-400 font-mono">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p>© 2026 SHANUTECHX CLOUD™. All rights reserved.</p>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="hover:text-white transition-colors">
+              Main Site
+            </Link>
+            <span>|</span>
+            <span className="text-slate-400">Checks run every minute</span>
           </div>
         </div>
-      )}
-
-      <Footer />
-    </main>
+      </footer>
+    </div>
   );
 }

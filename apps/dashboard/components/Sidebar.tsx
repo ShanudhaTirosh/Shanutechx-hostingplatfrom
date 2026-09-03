@@ -72,7 +72,7 @@ const CUSTOMER_GROUP: NavGroup = {
     { href: '/email', label: 'Shared SMTP & Webmail', icon: 'smtp' },
     { href: '/vps', label: 'VPS', icon: 'vps' },
     { href: '/tickets', label: 'Support', icon: 'tickets' },
-    { href: '/knowledgebase', label: 'Knowledge Base', icon: 'knowledgebase' },
+    { href: '/knowledgebase', label: 'Documentation & Knowledge Base', icon: 'knowledgebase' },
     { href: '/catalog', label: 'App Catalog', icon: 'catalog' },
     { href: '/profile', label: 'Profile', icon: 'profile' },
   ],

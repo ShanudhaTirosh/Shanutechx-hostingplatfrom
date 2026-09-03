@@ -176,6 +176,27 @@ export async function runUptimeChecks(): Promise<{ checked: number; up: number; 
         Status: stateStr,
         URL: url,
       });
+
+      // Automatically record or resolve automated status incident
+      if (!isUp && deployment.subdomain) {
+        await prisma.statusIncident.create({
+          data: {
+            title: `Automated Detection: ${deployment.subdomain} service disruption`,
+            body: `Synthetic uptime probe to ${url} failed. Response status: ${statusCode ?? 'Timeout'}. Error: ${errorMessage ?? 'Service unreachable'}.`,
+            severity: 'major',
+          },
+        }).catch((err) => logger.warn({ err }, 'Failed to log automated status incident'));
+      } else if (isUp && deployment.subdomain) {
+        const openIncident = await prisma.statusIncident.findFirst({
+          where: { title: { contains: deployment.subdomain }, resolvedAt: null },
+        });
+        if (openIncident) {
+          await prisma.statusIncident.update({
+            where: { id: openIncident.id },
+            data: { resolvedAt: new Date() },
+          }).catch((err) => logger.warn({ err }, 'Failed to resolve automated status incident'));
+        }
+      }
     }
 
     isUp ? up++ : down++;

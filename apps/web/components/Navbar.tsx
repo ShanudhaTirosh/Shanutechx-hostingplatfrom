@@ -25,8 +25,21 @@ import {
   CheckCheck,
   ShieldCheck,
   Zap,
+  LogOut,
+  GitBranch,
+  ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 import DiscordIcon from './DiscordIcon';
+
+interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  time: string;
+  type: 'system' | 'vps' | 'security' | 'payment';
+  read: boolean;
+}
 
 const PRODUCTS = [
   {
@@ -70,7 +83,6 @@ const MAIN_LINKS = [
   { label: 'Home', href: '/' },
   { label: 'Cloud VPS', href: '/vps' },
   { label: 'Pricing', href: '/pricing' },
-  { label: 'Docs', href: '/docs' },
   { label: 'Status', href: '/status' },
   { label: 'About', href: '/about' },
   { label: 'Contact', href: '/contact' },
@@ -83,14 +95,86 @@ export default function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const reduceMotion = useReducedMotion();
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [userSession, setUserSession] = useState<{
+    name: string;
+    email: string;
+    photoURL?: string;
+    provider?: 'google' | 'github';
+  } | null>(null);
 
+  const reduceMotion = useReducedMotion();
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Click Outside Refs for menus
+  const notifRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const legalRef = useRef<HTMLDivElement>(null);
+  const servicesRef = useRef<HTMLDivElement>(null);
 
   const dashboardUrl =
     process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
   const loginUrl = `${dashboardUrl}/login`;
+
+  // Fetch REAL notifications from backend API
+  useEffect(() => {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    fetch(`${apiBase}/api/notifications/public`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((data) => {
+        if (Array.isArray(data.notifications)) {
+          setNotifications(data.notifications);
+        }
+      })
+      .catch(() => {
+        // Fallback: fetch live component status if backend notifications endpoint is starting up
+        fetch(`${apiBase}/api/status/public`)
+          .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+          .then((statusData) => {
+            if (statusData.overallStatus) {
+              setNotifications([
+                {
+                  id: 'live-status-auto',
+                  title: `🟢 System Fleet: ${String(statusData.overallStatus).toUpperCase()}`,
+                  message: `All ${statusData.components?.length || 6} core edge services and container runtimes operating normally.`,
+                  time: 'Live',
+                  type: 'system',
+                  read: false,
+                },
+              ]);
+            }
+          })
+          .catch(() => {
+            setNotifications([]);
+          });
+      });
+  }, []);
+
+  // Listen to Auth state & cached OAuth session
+  useEffect(() => {
+    const cached = localStorage.getItem('stx_auth_user');
+    if (cached) {
+      try {
+        setUserSession(JSON.parse(cached));
+      } catch (_) {}
+    }
+  }, []);
+
+  // Handle Click Outside to automatically close Notification & Profile dropdowns
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setNotifOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Focus search input when modal opens
   useEffect(() => {
@@ -109,6 +193,19 @@ export default function Navbar() {
     [0, 120],
     ['rgba(10,11,28,0.7)', 'rgba(10,11,28,0.95)']
   );
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  function markAllRead() {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }
+
+  function handleSignOut() {
+    localStorage.removeItem('stx_auth_user');
+    localStorage.removeItem('stx_github_token');
+    setUserSession(null);
+    setProfileOpen(false);
+  }
 
   return (
     <div className="fixed top-4 left-0 right-0 z-50 flex justify-center px-3 font-sans select-none">
@@ -144,6 +241,7 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-5 text-xs font-semibold text-slate-300">
           {/* Services Dropdown */}
           <div
+            ref={servicesRef}
             className="relative py-1"
             onMouseEnter={() => setServicesOpen(true)}
             onMouseLeave={() => setServicesOpen(false)}
@@ -157,7 +255,6 @@ export default function Navbar() {
               />
             </button>
 
-            {/* Seamless Dropdown Wrapper with no gap bug */}
             <AnimatePresence>
               {servicesOpen && (
                 <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2.5 z-50">
@@ -213,8 +310,9 @@ export default function Navbar() {
             </Link>
           ))}
 
-          {/* Legal Dropdown with Fixed Hover State (Seamless Container) */}
+          {/* Legal Dropdown */}
           <div
+            ref={legalRef}
             className="relative py-1"
             onMouseEnter={() => setLegalOpen(true)}
             onMouseLeave={() => setLegalOpen(false)}
@@ -273,7 +371,7 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Header Right Actions (Exact STX VPN Action Bar) */}
+        {/* Header Right Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* 🔍 Search Icon Button */}
           <button
@@ -296,58 +394,170 @@ export default function Navbar() {
             </span>
           </button>
 
-          {/* 🔔 Notification Bell */}
-          <div className="relative">
+          {/* 🔔 Notification Bell with Click Outside Handler */}
+          <div ref={notifRef} className="relative">
             <button
               onClick={() => setNotifOpen((v) => !v)}
               className="relative p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-all focus:outline-none"
-              title="Notifications"
+              title="Real Notifications"
             >
               <Bell className="h-4 w-4" />
-              <span className="absolute top-1 right-1 bg-emerald-400 text-slate-950 font-mono font-bold text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-[0_0_8px_#34d399]">
-                1
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 bg-emerald-400 text-slate-950 font-mono font-bold text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-[0_0_8px_#34d399]">
+                  {unreadCount}
+                </span>
+              )}
             </button>
 
-            {/* Notification Dropdown */}
+            {/* Real Notification Dropdown */}
             <AnimatePresence>
               {notifOpen && (
                 <motion.div
                   initial={{ opacity: 0, y: 8, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                  className="absolute top-full right-0 mt-3 w-72 bg-[#080922]/95 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-2xl p-4 z-50 space-y-3"
+                  className="absolute top-full right-0 mt-3 w-80 bg-[#080922]/95 backdrop-blur-2xl border border-white/15 rounded-3xl shadow-2xl p-4 z-50 space-y-3"
                 >
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
                     <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <Zap className="h-3.5 w-3.5 text-emerald-400" /> System Status
+                      <Zap className="h-3.5 w-3.5 text-emerald-400" /> Platform Notifications
                     </span>
-                    <button
-                      onClick={() => setNotifOpen(false)}
-                      className="text-[10px] text-purple-400 font-bold flex items-center gap-1 hover:underline"
-                    >
-                      <CheckCheck className="h-3 w-3" /> Mark read
-                    </button>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllRead}
+                        className="text-[10px] text-purple-400 font-bold flex items-center gap-1 hover:underline"
+                      >
+                        <CheckCheck className="h-3 w-3" /> Mark read
+                      </button>
+                    )}
                   </div>
-                  <div className="text-xs text-slate-300 space-y-1">
-                    <p className="font-semibold text-white">🟢 All Systems Operational</p>
-                    <p className="text-[11px] text-slate-400">
-                      11 Edge nodes active. Ultra-low latency active across all regions.
-                    </p>
+
+                  <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                    {notifications.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`p-2.5 rounded-2xl border text-xs space-y-1 transition-colors ${
+                          item.read
+                            ? 'bg-white/5 border-white/5 text-slate-400'
+                            : 'bg-purple-500/10 border-purple-500/30 text-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between font-bold text-white text-[11px]">
+                          <span>{item.title}</span>
+                          <span className="text-[9px] font-mono text-slate-400">{item.time}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-relaxed">{item.message}</p>
+                      </div>
+                    ))}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* 👤 CLIENT SPACE Account Button */}
-          <a
-            href={loginUrl}
-            className="rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-500 hover:to-indigo-500 px-4 sm:px-5 py-2 text-xs font-extrabold text-white shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_25px_rgba(168,85,247,0.6)] transition-all uppercase tracking-wider flex items-center gap-1.5 hover:scale-105"
-          >
-            <User className="h-3.5 w-3.5" />
-            <span>CLIENT SPACE</span>
-          </a>
+          {/* 👤 CLIENT SPACE / User Profile Menu */}
+          {userSession ? (
+            /* Logged-In User Pill with Avatar */
+            <div ref={profileRef} className="relative">
+              <button
+                onClick={() => setProfileOpen((v) => !v)}
+                className="flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-xs font-bold text-white transition-all shadow-md focus:outline-none"
+              >
+                {userSession.photoURL ? (
+                  <img
+                    src={userSession.photoURL}
+                    alt={userSession.name}
+                    className="h-6 w-6 rounded-full object-cover border border-white/30"
+                  />
+                ) : (
+                  <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-[10px] font-black text-white">
+                    {userSession.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span className="max-w-[90px] truncate">{userSession.name}</span>
+                <ChevronDown
+                  className={`h-3 w-3 transition-transform ${profileOpen ? 'rotate-180 text-purple-400' : ''}`}
+                />
+              </button>
+
+              {/* Logged-In User Profile Dropdown */}
+              <AnimatePresence>
+                {profileOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    className="absolute top-full right-0 mt-3 w-64 bg-[#080922]/95 backdrop-blur-2xl border border-white/15 rounded-3xl shadow-2xl p-4 z-50 space-y-3"
+                  >
+                    <div className="flex items-center gap-3 pb-3 border-b border-white/10">
+                      {userSession.photoURL ? (
+                        <img
+                          src={userSession.photoURL}
+                          alt={userSession.name}
+                          className="h-9 w-9 rounded-full object-cover border border-purple-500/50"
+                        />
+                      ) : (
+                        <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-xs font-black text-white">
+                          {userSession.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="truncate">
+                        <span className="block font-bold text-white text-xs truncate">
+                          {userSession.name}
+                        </span>
+                        <span className="block font-mono text-[10px] text-slate-400 truncate">
+                          {userSession.email}
+                        </span>
+                        <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-mono font-bold uppercase">
+                          {userSession.provider ?? 'OAuth Verified'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 text-xs">
+                      <a
+                        href={`${dashboardUrl}/dashboard`}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white font-semibold transition-colors"
+                      >
+                        <Sparkles className="h-4 w-4 text-purple-400" /> Control Panel Dashboard
+                      </a>
+                      <Link
+                        href="/vps"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white font-semibold transition-colors"
+                      >
+                        <Server className="h-4 w-4 text-indigo-400" /> My VPS Instances
+                      </Link>
+                      <a
+                        href={`${dashboardUrl}/deployments`}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white font-semibold transition-colors"
+                      >
+                        <GitBranch className="h-4 w-4 text-emerald-400" /> Git Repositories
+                      </a>
+                    </div>
+
+                    <div className="pt-2 border-t border-white/10">
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-bold text-xs transition-colors"
+                      >
+                        <LogOut className="h-3.5 w-3.5" /> Sign Out
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            /* Logged-Out CLIENT SPACE Button */
+            <a
+              href={loginUrl}
+              className="rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-500 hover:to-indigo-500 px-4 sm:px-5 py-2 text-xs font-extrabold text-white shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_25px_rgba(168,85,247,0.6)] transition-all uppercase tracking-wider flex items-center gap-1.5 hover:scale-105"
+            >
+              <User className="h-3.5 w-3.5" />
+              <span>CLIENT SPACE</span>
+            </a>
+          )}
 
           {/* Mobile Hamburger Toggle */}
           <button

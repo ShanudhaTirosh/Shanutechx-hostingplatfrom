@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, GithubAuthProvider } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -11,4 +11,11 @@ const firebaseConfig = {
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
 export const firebaseAuth = getAuth(app);
+
 export const googleProvider = new GoogleAuthProvider();
+
+export const githubProvider = new GithubAuthProvider();
+// Request repo & user scopes so GitHub repositories are directly accessible upon login
+githubProvider.addScope('repo');
+githubProvider.addScope('read:user');
+githubProvider.addScope('user:email');

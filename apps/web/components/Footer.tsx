@@ -127,9 +127,10 @@ export default function Footer() {
             {/* Support */}
             <div>
               <h4 className="text-xs font-extrabold uppercase tracking-widest text-purple-400 mb-4 font-mono">
-                Support
+                Support &amp; Docs
               </h4>
               <ul className="space-y-3 text-xs text-slate-400">
+                <li><Link href="/docs" className="hover:text-white transition-colors font-bold text-purple-300">Documentation &amp; API Docs</Link></li>
                 <li><Link href="/help" className="hover:text-white transition-colors">Help Center</Link></li>
                 <li><Link href="/faqs" className="hover:text-white transition-colors">FAQs</Link></li>
                 <li><Link href="/discord" className="hover:text-white transition-colors">Discord Support</Link></li>
