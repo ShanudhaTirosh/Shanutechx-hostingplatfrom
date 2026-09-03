@@ -137,7 +137,7 @@ export function requireFullAdmin(
   res: Response,
   next: NextFunction
 ) {
-  if (req.user?.role !== 'admin') {
+  if (req.user?.role !== 'admin' && req.user?.role !== 'dev') {
     return res.status(403).json({ error: 'Full admin access required' });
   }
   next();

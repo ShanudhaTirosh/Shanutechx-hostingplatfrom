@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { requireAuth, requireFullAdmin, AuthedRequest } from '../middleware/auth';
+import { requireAuth, requireAdmin, AuthedRequest } from '../middleware/auth';
 
 export const cmsRouter = Router();
 
@@ -26,7 +26,7 @@ const upsertSchema = z.object({
 });
 
 /** Admin-only — replaces (or creates) one or more keys for a page in one call. */
-cmsRouter.put('/cms/:page', requireAuth, requireFullAdmin, async (req: AuthedRequest, res) => {
+cmsRouter.put('/cms/:page', requireAuth, requireAdmin, async (req: AuthedRequest, res) => {
   const parsed = upsertSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
