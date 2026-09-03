@@ -23,7 +23,7 @@ export default function PrivacyPage() {
       <Navbar />
       <section className="px-4 pt-44 pb-24 max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">Privacy Policy</h1>
-        <p className="text-text-muted text-sm mb-8">Last updated: [date]</p>
+        <p className="text-text-muted text-sm mb-8">Last updated: September 3, 2026</p>
 
         <div className="glass rounded-2xl p-6 mb-8 text-xs text-yellow-300/90 border border-yellow-500/20">
           This draft accurately lists the third-party services this platform actually sends data
@@ -99,7 +99,7 @@ export default function PrivacyPage() {
           </Section>
 
           <Section title="9. Contact">
-            <p>Questions about this policy, or to make a data request: [support email].</p>
+            <p>Questions about this policy, or to make a data request: support@shanutechx.com.</p>
           </Section>
         </div>
       </section>

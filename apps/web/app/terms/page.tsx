@@ -23,7 +23,7 @@ export default function TermsPage() {
       <Navbar />
       <section className="px-4 pt-44 pb-24 max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">Terms of Service</h1>
-        <p className="text-text-muted text-sm mb-8">Last updated: [date]</p>
+        <p className="text-text-muted text-sm mb-8">Last updated: September 3, 2026</p>
 
         <div className="glass rounded-2xl p-6 mb-8 text-xs text-yellow-300/90 border border-yellow-500/20">
           This is a starting draft covering the platform's actual features (hosting, VPS
@@ -138,7 +138,7 @@ export default function TermsPage() {
           </Section>
 
           <Section title="12. Contact">
-            <p>Questions about these Terms: [support email].</p>
+            <p>Questions about these Terms: support@shanutechx.com.</p>
           </Section>
         </div>
       </section>
