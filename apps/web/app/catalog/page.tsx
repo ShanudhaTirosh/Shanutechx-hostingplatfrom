@@ -61,18 +61,22 @@ export default async function AppCatalogPage() {
         </div>
 
         {products.length === 0 ? (
-          <div className="bg-[#080918] border border-white/10 rounded-3xl p-12 text-center space-y-4 max-w-xl mx-auto">
-            <Package className="h-12 w-12 text-purple-400 mx-auto" />
-            <h3 className="text-xl font-bold text-white">No Catalog Products Published Yet</h3>
-            <p className="text-xs text-text-muted">
-              Admins &amp; Devs can add 1-click app catalog products in the Control Panel under <strong className="text-white">Admin &gt; Products &amp; Plans</strong>.
+          <div
+            style={{
+              background: 'rgba(13, 11, 26, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '24px',
+              padding: '48px 32px',
+              textAlign: 'center',
+              backdropFilter: 'blur(16px)',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+              maxWidth: '820px',
+              margin: '0 auto',
+            }}
+          >
+            <p style={{ fontSize: '15px', color: '#94a3b8', margin: 0, fontWeight: 500 }}>
+              No products are currently listed. Check back soon or contact support.
             </p>
-            <a
-              href={`${dashboardUrl}/admin/services`}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-glow-violet transition-all"
-            >
-              Open Admin Products Manager →
-            </a>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

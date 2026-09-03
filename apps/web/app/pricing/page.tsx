@@ -83,8 +83,22 @@ export default async function PricingPage() {
 
         {/* Products & Plans from DB */}
         {products.length === 0 ? (
-          <div className="text-center py-16 glass rounded-2xl border border-white/[0.06]">
-            <p className="text-text-muted text-sm">No products are currently listed. Check back soon or contact support.</p>
+          <div
+            style={{
+              background: 'rgba(13, 11, 26, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '24px',
+              padding: '48px 32px',
+              textAlign: 'center',
+              backdropFilter: 'blur(16px)',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+              maxWidth: '820px',
+              margin: '0 auto',
+            }}
+          >
+            <p style={{ fontSize: '15px', color: '#94a3b8', margin: 0, fontWeight: 500 }}>
+              No products are currently listed. Check back soon or contact support.
+            </p>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-8 animate-slide-up delay-100">
