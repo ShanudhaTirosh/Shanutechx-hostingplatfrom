@@ -45,7 +45,7 @@ export default function MeshBackground() {
       <div className="orb orb-3" />
       <div className="orb orb-4" />
       <div className="dot-grid" />
-      <style jsx global>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .mesh-bg {
           --mx: 0px;
           --my: 0px;
@@ -105,7 +105,7 @@ export default function MeshBackground() {
           background-image: radial-gradient(circle, rgba(167, 139, 250, 0.2) 1.1px, transparent 1.1px);
           background-size: 24px 24px;
         }
-      `}</style>
+      ` }} />
     </div>
   );
 }

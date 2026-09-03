@@ -112,7 +112,7 @@ export default function GradientMeshOrb({
         </g>
       </svg>
 
-      <style jsx global>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @keyframes stxOrbBreathe {
           0%, 100% { transform: scale(1); opacity: 0.9; }
           50% { transform: scale(1.08); opacity: 1; }
@@ -121,7 +121,7 @@ export default function GradientMeshOrb({
           from { transform: rotate(0deg); }
           to   { transform: rotate(360deg); }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 }

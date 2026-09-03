@@ -33,14 +33,14 @@ const jsonLdSchema = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`dark ${GeistSans.variable} ${GeistMono.variable}`}>
+    <html lang="en" className={`dark ${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdSchema) }}
         />
       </head>
-      <body className="bg-[#030014] text-white antialiased relative selection:bg-purple-500 selection:text-white min-h-screen">
+      <body suppressHydrationWarning className="bg-[#030014] text-white antialiased relative selection:bg-purple-500 selection:text-white min-h-screen">
         <MeshBackground />
         <div className="grain-overlay" aria-hidden="true" />
         <div className="relative z-10">

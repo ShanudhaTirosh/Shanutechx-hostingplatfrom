@@ -375,7 +375,7 @@ export default function OrbitHero() {
       </div>
 
       {/* Keyframe animations */}
-      <style jsx global>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @keyframes stxCenterFloat {
           0%, 100% { transform: translateY(0px) scale(1); }
           50% { transform: translateY(-12px) scale(1.04); }
@@ -384,7 +384,7 @@ export default function OrbitHero() {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-16px); }
         }
-      `}</style>
+      ` }} />
     </section>
   );
 }

@@ -221,7 +221,7 @@ export default function BentoGrid() {
 
             {/* CTA */}
             <div style={{ position: 'relative', zIndex: 10, marginTop: '24px' }}>
-              <motion.button
+              <motion.div
                 variants={{
                   initial: { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.12)' },
                   hover: { backgroundColor: 'rgba(56, 189, 248, 0.18)', borderColor: 'rgba(56, 189, 248, 0.45)' },
@@ -243,7 +243,7 @@ export default function BentoGrid() {
                 >
                   <ArrowRight size={15} color="#38bdf8" />
                 </motion.span>
-              </motion.button>
+              </motion.div>
             </div>
           </motion.a>
 
@@ -367,7 +367,7 @@ export default function BentoGrid() {
 
             {/* CTA */}
             <div style={{ position: 'relative', zIndex: 10, marginTop: '24px' }}>
-              <motion.button
+              <motion.div
                 variants={{
                   initial: { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.12)' },
                   hover: { backgroundColor: 'rgba(168, 85, 247, 0.18)', borderColor: 'rgba(168, 85, 247, 0.45)' },
@@ -389,7 +389,7 @@ export default function BentoGrid() {
                 >
                   <ArrowRight size={15} color="#c084fc" />
                 </motion.span>
-              </motion.button>
+              </motion.div>
             </div>
           </motion.a>
         </div>
@@ -525,7 +525,7 @@ export default function BentoGrid() {
 
             {/* CTA */}
             <div style={{ position: 'relative', zIndex: 10, marginTop: '20px' }}>
-              <motion.button
+              <motion.div
                 variants={{
                   initial: { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.12)' },
                   hover: { backgroundColor: 'rgba(88, 101, 242, 0.18)', borderColor: 'rgba(88, 101, 242, 0.45)' },
@@ -547,7 +547,7 @@ export default function BentoGrid() {
                 >
                   <ArrowRight size={15} color="#5865F2" />
                 </motion.span>
-              </motion.button>
+              </motion.div>
             </div>
           </motion.a>
 
@@ -668,7 +668,7 @@ export default function BentoGrid() {
 
             {/* CTA */}
             <div style={{ position: 'relative', zIndex: 10, marginTop: '20px' }}>
-              <motion.button
+              <motion.div
                 variants={{
                   initial: { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.12)' },
                   hover: { backgroundColor: 'rgba(16, 185, 129, 0.18)', borderColor: 'rgba(16, 185, 129, 0.45)' },
@@ -690,7 +690,7 @@ export default function BentoGrid() {
                 >
                   <ArrowRight size={15} color="#10b981" />
                 </motion.span>
-              </motion.button>
+              </motion.div>
             </div>
           </motion.a>
         </div>
@@ -812,7 +812,7 @@ export default function BentoGrid() {
               WordPress, N8n, Plausible &amp; 15+ templates
             </p>
 
-            <motion.button
+            <motion.div
               variants={{
                 initial: { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.12)' },
                 hover: { backgroundColor: 'rgba(236, 72, 153, 0.18)', borderColor: 'rgba(236, 72, 153, 0.45)' },
@@ -834,18 +834,18 @@ export default function BentoGrid() {
               >
                 <ArrowRight size={15} color="#ec4899" />
               </motion.span>
-            </motion.button>
+            </motion.div>
           </div>
         </motion.a>
 
       </div>
 
       {/* Responsive Grid Breakpoints */}
-      <style jsx global>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @media (max-width: 868px) {
           .bento-card-responsive { grid-column: span 12 !important; min-height: 220px !important; }
         }
-      `}</style>
+      ` }} />
     </section>
   );
 }

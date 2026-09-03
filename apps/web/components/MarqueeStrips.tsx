@@ -193,7 +193,7 @@ export default function MarqueeStrips() {
       </div>
 
       {/* Infinite marquee CSS keyframes */}
-      <style jsx global>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @keyframes marqueeLeft {
           0% {
             transform: translateX(0%);
@@ -210,7 +210,7 @@ export default function MarqueeStrips() {
             transform: translateX(0%);
           }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 }
