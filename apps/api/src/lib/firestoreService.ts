@@ -145,10 +145,16 @@ export async function getKbArticlesFromFirestore(categorySlug?: string, searchQu
   try {
     // 1. Fetch categories
     const catSnapshot = await firebaseFirestore.collection('kb_categories').get();
-    const categories = catSnapshot.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    }));
+    const categories = catSnapshot.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        name: (data.name as string) || '',
+        slug: (data.slug as string) || d.id,
+        description: (data.description as string) || '',
+        icon: (data.icon as string) || 'book',
+      };
+    });
 
     // 2. Fetch published articles
     let queryRef: FirebaseFirestore.Query = firebaseFirestore
