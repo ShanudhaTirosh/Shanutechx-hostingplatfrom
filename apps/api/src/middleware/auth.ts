@@ -74,17 +74,42 @@ export async function requireAuth(
       return res.status(401).json({ error: 'Invalid or expired token', detail: firebaseErr.code ?? firebaseErr.message });
     }
 
-    let user: { id: string; firebaseUid: string; email: string; role: 'customer' | 'admin' | 'support' | 'dev'; isBanned: boolean; banReason?: string | null };
+    let user: { id: string; firebaseUid: string; email: string; role: 'customer' | 'admin' | 'support' | 'dev'; isBanned: boolean; banReason?: string | null } | null = null;
     try {
-      user = await prisma.user.upsert({
+      user = await prisma.user.findUnique({
         where: { firebaseUid: decoded.uid },
-        update: { email: decoded.email ?? '' },
-        create: {
-          firebaseUid: decoded.uid,
-          email: decoded.email ?? '',
-          displayName: decoded.name ?? null,
-        },
       });
+
+      if (!user && decoded.email) {
+        const existingByEmail = await prisma.user.findUnique({
+          where: { email: decoded.email },
+        });
+
+        if (existingByEmail) {
+          user = await prisma.user.update({
+            where: { id: existingByEmail.id },
+            data: {
+              firebaseUid: decoded.uid,
+              displayName: existingByEmail.displayName || decoded.name || null,
+            },
+          });
+        }
+      }
+
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            firebaseUid: decoded.uid,
+            email: decoded.email ?? '',
+            displayName: decoded.name ?? null,
+          },
+        });
+      } else if (decoded.email && user.email !== decoded.email) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { email: decoded.email },
+        });
+      }
     } catch (dbErr: any) {
       return res.status(503).json({ error: 'Database unavailable — cannot authenticate. Please try again shortly.', detail: dbErr.message });
     }
