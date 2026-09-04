@@ -81,7 +81,7 @@ describe('requireDev', () => {
   it('blocks support', async () => assert.equal(await requestAs('support', '/dev-only'), 403));
 });
 
-describe('requireAdminOrDev (nodes/Leaseweb/managed-databases/templates/vps/livekit)', () => {
+describe('requireAdminOrDev (nodes/managed-databases/templates/vps/livekit)', () => {
   it('allows admin', async () => assert.equal(await requestAs('admin', '/admin-or-dev'), 200));
   it('allows dev', async () => assert.equal(await requestAs('dev', '/admin-or-dev'), 200));
   it('blocks support (the exact bug class caught twice during this build: wrong role reaching infra)', async () =>

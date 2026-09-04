@@ -27,7 +27,6 @@ const vpsplanSchema = z.object({
   currency: z.enum(['LKR', 'USD']).default('LKR'),
   billingPeriod: z.enum(['one_time', 'monthly', 'yearly']).default('monthly'),
   isActive: z.boolean().default(true),
-  leasewebProductCode: z.string().optional(),
 });
 
 /**
@@ -71,7 +70,6 @@ describe('VPS Plan Specification Validation (Property 4)', () => {
     currency: fc.constantFrom('LKR', 'USD'),
     billingPeriod: fc.constantFrom('one_time', 'monthly', 'yearly'),
     isActive: fc.boolean(),
-    leasewebProductCode: fc.option(fc.string({ minLength: 1, maxLength: 50 }), { nil: undefined }),
   });
 
   // Generator for invalid VPS plan specifications (with various types of invalid values)
@@ -294,7 +292,7 @@ describe('VPS Plan Specification Validation (Property 4)', () => {
             ramGb: validPlan.ramGb,
             storageGb: validPlan.storageGb,
             price: validPlan.price,
-            // currency, billingPeriod, isActive, leasewebProductCode are optional or have defaults
+            // currency, billingPeriod, isActive are optional or have defaults
           };
           
           const result = validateVpsPlan(minimalPlan);
