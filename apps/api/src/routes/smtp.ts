@@ -114,6 +114,30 @@ function isSsrfTarget(host: string): boolean {
   return h === 'localhost' || isPrivateIp(h) || /^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.|127\.|169\.254\.)/.test(h);
 }
 
+// 0. Platform Mail Admin Telemetry
+smtpRouter.get('/admin/mail/telemetry', async (_req: AuthedRequest, res) => {
+  try {
+    const [totalMailboxes, totalStorage, sentTodayCount, accounts] = await Promise.all([
+      prisma.smtpAccount.count(),
+      prisma.smtpAccount.aggregate({ _sum: { storageQuotaMb: true } }),
+      prisma.webmailMessage.count({ where: { folder: 'sent', createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }),
+      prisma.smtpAccount.findMany({ select: { customDomain: true } }),
+    ]);
+
+    const domains = new Set(accounts.map((a) => a.customDomain).filter(Boolean));
+
+    res.json({
+      totalMailboxes,
+      totalStorageMb: totalStorage._sum.storageQuotaMb || 0,
+      totalSentToday: sentTodayCount,
+      totalDomains: domains.size,
+      activeRelayNodes: 1,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Telemetry query failed' });
+  }
+});
+
 // 1. General Outbound Global SMTP Configuration
 smtpRouter.get('/smtp/global-config', requireDev, async (_req: AuthedRequest, res) => {
   const config = await getGlobalSmtpConfig();

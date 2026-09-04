@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { PageHeader, Card, Spinner, ErrorBanner, Button, Modal, Input, useToast } from '@/components/ui';
+import { PageHeader, Card, Spinner, ErrorBanner, Button, useToast } from '@/components/ui';
 import { api } from '@/lib/api';
 
 interface Mailbox {
@@ -33,9 +33,17 @@ interface UserOption {
 
 export default function AdminEmailPage() {
   const [stats, setStats] = useState<any>(null);
+  const [telemetry, setTelemetry] = useState<any>(null);
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Global SMTP Tester State
+  const [testingSmtp, setTestingSmtp] = useState(false);
+  const [smtpResult, setSmtpResult] = useState<any>(null);
+
+  // Password Reveal State
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, string>>({});
 
   // Provisioning Modal State
   const [showProvisionModal, setShowProvisionModal] = useState(false);
@@ -53,12 +61,17 @@ export default function AdminEmailPage() {
   async function loadAdminData() {
     setLoading(true);
     try {
-      const [statsRes, mbRes, usersRes] = await Promise.all([
+      const [statsRes, mbRes, usersRes, telemetryRes] = await Promise.all([
         api.email.adminStats(),
         api.email.mailboxes(),
         api.admin.allUsers().catch(() => ({ users: [] })),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/admin/mail/telemetry`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        }).then((r) => r.json()).catch(() => null),
       ]);
+
       setStats(statsRes);
+      if (telemetryRes && !telemetryRes.error) setTelemetry(telemetryRes);
       setMailboxes(mbRes.mailboxes || []);
       setUsers(usersRes.users || []);
       if (usersRes.users?.length > 0 && !targetUserId) {
@@ -75,6 +88,44 @@ export default function AdminEmailPage() {
   useEffect(() => {
     loadAdminData();
   }, []);
+
+  async function handleTestGlobalSmtp() {
+    setTestingSmtp(true);
+    try {
+      const res = await api.smtp.verifyConnection();
+      setSmtpResult(res);
+      if (res.ok) {
+        toast(`SMTP Relay Handshake Successful (${res.latencyMs}ms)`, 'success');
+      } else {
+        toast(`SMTP Verification Failed: ${res.message}`, 'error');
+      }
+    } catch (err: any) {
+      toast(`SMTP Error: ${err.message}`, 'error');
+    } finally {
+      setTestingSmtp(false);
+    }
+  }
+
+  async function handleRevealPassword(id: string) {
+    try {
+      const res = await api.smtp.revealPassword(id);
+      setRevealedPasswords((prev) => ({ ...prev, [id]: res.password }));
+      toast('Decrypted mailbox password (Audit Logged)', 'info');
+    } catch (err: any) {
+      toast(err.message || 'Failed to reveal password', 'error');
+    }
+  }
+
+  async function handleLaunchSso(id: string) {
+    try {
+      const res = await api.smtp.getSsoTicket(id);
+      if (res.webmailUrl) {
+        window.open(res.webmailUrl, '_blank');
+      }
+    } catch (err: any) {
+      toast(err.message || 'Failed to launch SSO ticket', 'error');
+    }
+  }
 
   async function handleProvisionSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -117,58 +168,73 @@ export default function AdminEmailPage() {
     }
   }
 
-  if (loading) return <Spinner label="Loading Business Email & SMTP Host Manager..." />;
+  if (loading) return <Spinner label="Loading Platform Mail Admin Control Center..." />;
 
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title="Business Email & SMTP Host Manager"
-        description="Monitor mail relay nodes, provision corporate mail accounts, configure custom resource quotas, and assign limits."
+        title="Business Email & Platform Mail Cluster Admin"
+        description="Monitor mail relay nodes, provision corporate mail accounts, test global SMTP relays, and inspect custom customer quotas."
         action={
-          <Button size="sm" onClick={() => setShowProvisionModal(true)}>
-            + Provision Mail Account
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={handleTestGlobalSmtp} loading={testingSmtp}>
+              ⚡ Test Outbound SMTP Relay
+            </Button>
+            <Button size="sm" onClick={() => setShowProvisionModal(true)}>
+              + Provision Mail Account
+            </Button>
+          </div>
         }
       />
 
       {error && <ErrorBanner message={error} />}
 
-      {/* Admin Stats Grid */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-4 border border-white/10 rounded-2xl bg-white/[0.02] space-y-1">
-            <p className="text-xs text-text-muted">Total Active Mailboxes</p>
-            <p className="text-xl font-bold text-white font-mono">{stats.totalMailboxes}</p>
+      {/* Global SMTP Connection Verification Banner */}
+      {smtpResult && (
+        <div className={`p-4 rounded-2xl border ${smtpResult.ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'} text-xs flex items-center justify-between`}>
+          <div className="flex items-center gap-2">
+            <span className="font-bold">{smtpResult.ok ? '✓ Global Outbound SMTP Active' : '✕ Outbound SMTP Failure:'}</span>
+            <span>{smtpResult.message}</span>
           </div>
-          <div className="p-4 border border-white/10 rounded-2xl bg-white/[0.02] space-y-1">
-            <p className="text-xs text-text-muted">Allocated Storage Quota</p>
-            <p className="text-xl font-bold text-accent-cyan font-mono">{stats.totalStorageMb} MB</p>
-          </div>
-          <div className="p-4 border border-white/10 rounded-2xl bg-white/[0.02] space-y-1">
-            <p className="text-xs text-text-muted">Emails Sent Today</p>
-            <p className="text-xl font-bold text-emerald-400 font-mono">{stats.totalSentToday}</p>
-          </div>
-          <div className="p-4 border border-white/10 rounded-2xl bg-white/[0.02] space-y-1">
-            <p className="text-xs text-text-muted">Verified Email Domains</p>
-            <p className="text-xl font-bold text-accent-violet-light font-mono">{stats.totalDomains}</p>
-          </div>
+          {smtpResult.latencyMs && <span className="font-mono text-[11px] bg-slate-900 px-2 py-0.5 rounded">{smtpResult.latencyMs}ms Latency</span>}
         </div>
       )}
+
+      {/* Admin Telemetry Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="p-4 border border-white/10 rounded-2xl bg-white/[0.02] space-y-1">
+          <p className="text-xs text-text-muted">Total Active Mailboxes</p>
+          <p className="text-xl font-bold text-white font-mono">{telemetry?.totalMailboxes ?? stats?.totalMailboxes ?? 0}</p>
+        </div>
+        <div className="p-4 border border-white/10 rounded-2xl bg-white/[0.02] space-y-1">
+          <p className="text-xs text-text-muted">Allocated Storage Quota</p>
+          <p className="text-xl font-bold text-accent-cyan font-mono">{telemetry?.totalStorageMb ?? stats?.totalStorageMb ?? 0} MB</p>
+        </div>
+        <div className="p-4 border border-white/10 rounded-2xl bg-white/[0.02] space-y-1">
+          <p className="text-xs text-text-muted">Emails Sent Today</p>
+          <p className="text-xl font-bold text-emerald-400 font-mono">{telemetry?.totalSentToday ?? stats?.totalSentToday ?? 0}</p>
+        </div>
+        <div className="p-4 border border-white/10 rounded-2xl bg-white/[0.02] space-y-1">
+          <p className="text-xs text-text-muted">Managed Custom Domains</p>
+          <p className="text-xl font-bold text-accent-violet-light font-mono">{telemetry?.totalDomains ?? stats?.totalDomains ?? 0}</p>
+        </div>
+      </div>
 
       {/* Customer Mailboxes Table */}
       <Card
         title="Customer Mailbox Quotas & Access Control"
-        description="Manage storage limits, daily send quotas, and assigned user accounts for business email & SMTP hosts."
+        description="Manage storage limits, daily send quotas, reveal credentials (audit logged), and launch standalone webmail portals."
       >
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs font-mono">
             <thead className="bg-white/[0.03] text-text-muted border-b border-white/10 uppercase">
               <tr>
                 <th className="p-3">Assigned User</th>
-                <th className="p-3">Email Address / Username</th>
+                <th className="p-3">Email Address</th>
                 <th className="p-3">SMTP Host</th>
+                <th className="p-3">Password</th>
                 <th className="p-3">Storage Quota</th>
-                <th className="p-3">Daily Send Limit</th>
+                <th className="p-3">Send Limit</th>
                 <th className="p-3">Status</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>
@@ -176,7 +242,7 @@ export default function AdminEmailPage() {
             <tbody className="divide-y divide-white/5 text-xs">
               {mailboxes.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-text-muted font-sans">
+                  <td colSpan={8} className="p-8 text-center text-text-muted font-sans">
                     No mailboxes provisioned yet. Click <strong>+ Provision Mail Account</strong> above to add one.
                   </td>
                 </tr>
@@ -194,6 +260,18 @@ export default function AdminEmailPage() {
                     <td className="p-3 font-mono text-white">
                       {mb.smtpHost}:{mb.smtpPort}
                     </td>
+                    <td className="p-3 font-mono">
+                      {revealedPasswords[mb.id] ? (
+                        <span className="text-emerald-400 font-bold">{revealedPasswords[mb.id]}</span>
+                      ) : (
+                        <button
+                          onClick={() => handleRevealPassword(mb.id)}
+                          className="text-[11px] text-text-muted hover:text-white underline"
+                        >
+                          Reveal Password
+                        </button>
+                      )}
+                    </td>
                     <td className="p-3 text-white font-mono">
                       {mb.storageUsedMb} / {mb.storageQuotaMb} MB
                     </td>
@@ -210,6 +288,13 @@ export default function AdminEmailPage() {
                       </span>
                     </td>
                     <td className="p-3 text-right space-x-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handleLaunchSso(mb.id)}
+                      >
+                        Launch Webmail ↗
+                      </Button>
                       <Button
                         size="sm"
                         variant="danger"

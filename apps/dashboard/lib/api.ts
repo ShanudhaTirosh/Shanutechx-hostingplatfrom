@@ -673,6 +673,10 @@ export const api = {
           expectedDns: Array<{ type: string; name: string; value: string; priority?: number; status: string }>;
         }>(r)
       ),
+    getSsoTicket: (smtpAccountId?: string) =>
+      apiFetch('/api/webmail/auth/sso-ticket', { method: 'POST', body: JSON.stringify({ smtpAccountId }) }).then((r) =>
+        asJson<{ ssoToken: string; webmailUrl: string }>(r)
+      ),
   },
 
   webmail: {
