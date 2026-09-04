@@ -16,6 +16,9 @@ import {
 import {
   IconPlus,
   IconAlert,
+  IconTerminal,
+  IconFolder,
+  IconCheck,
 } from '@/components/Icons';
 import { CustomerVpsPanel } from '@/components/CustomerVpsPanel';
 
@@ -36,6 +39,13 @@ export default function VpsPage() {
   const [manualUsername, setManualUsername] = useState<string>('root');
   const [manualPassword, setManualPassword] = useState<string>('');
   const [manualProvider, setManualProvider] = useState<string>('STX Enterprise');
+
+  // Pre-Delivery Connection Test state
+  const [testingConnection, setTestingConnection] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<{
+    ssh?: { success: boolean; message: string };
+    sftp?: { success: boolean; message: string };
+  } | null>(null);
 
   const { toast } = useToast();
   const isStaff = apiUser?.role === 'admin' || apiUser?.role === 'dev';
@@ -60,6 +70,46 @@ export default function VpsPage() {
         .catch(() => {});
     }
   }, [addVpsModal, isStaff, customerOptions.length]);
+
+  async function handleTestConnection(testType: 'ssh' | 'sftp' | 'both') {
+    if (!manualIp) {
+      toast('Please enter the server IP address to test connection', 'error');
+      return;
+    }
+    if (!manualPassword) {
+      toast('Please enter the root password or private key to test connection', 'error');
+      return;
+    }
+
+    setTestingConnection(testType);
+    setTestResults(null);
+
+    try {
+      const res = await api.vps.testConnection({
+        ip: manualIp,
+        sshPort: manualPort,
+        username: manualUsername,
+        password: manualPassword,
+        testType,
+      });
+
+      setTestResults({
+        ...(res.ssh ? { ssh: res.ssh } : {}),
+        ...(res.sftp ? { sftp: res.sftp } : {}),
+      });
+
+      if (res.ok) {
+        toast(`Connection Test Passed! (${testType.toUpperCase()})`, 'success');
+      } else {
+        const failMsg = res.ssh?.message || res.sftp?.message || 'Connection test failed';
+        toast(`Connection Test Failed: ${failMsg}`, 'error');
+      }
+    } catch (err: any) {
+      toast(`Action failed: ${err.message}`, 'error');
+    } finally {
+      setTestingConnection(null);
+    }
+  }
 
   async function handleAddManualVps() {
     if (!manualIp) {
@@ -225,6 +275,68 @@ export default function VpsPage() {
                     className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
                   />
                 </div>
+              </div>
+
+              {/* Pre-Delivery Connection Test Diagnostics */}
+              <div className="pt-3 border-t border-white/10 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">
+                    Pre-Delivery Connection Diagnostics
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleTestConnection('ssh')}
+                      loading={testingConnection === 'ssh'}
+                      className="flex items-center gap-1 text-[11px] border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+                    >
+                      <IconTerminal size={12} /> Test SSH
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleTestConnection('sftp')}
+                      loading={testingConnection === 'sftp'}
+                      className="flex items-center gap-1 text-[11px] border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10"
+                    >
+                      <IconFolder size={12} /> Test SFTP / FTP
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleTestConnection('both')}
+                      loading={testingConnection === 'both'}
+                      className="flex items-center gap-1 text-[11px] border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
+                    >
+                      Test Both
+                    </Button>
+                  </div>
+                </div>
+
+                {testResults && (
+                  <div className="space-y-1.5 text-xs bg-black/40 border border-white/10 rounded-lg p-2.5">
+                    {testResults.ssh && (
+                      <div className={`flex items-start gap-2 ${testResults.ssh.success ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {testResults.ssh.success ? <IconCheck size={14} className="shrink-0 mt-0.5" /> : <IconAlert size={14} className="shrink-0 mt-0.5" />}
+                        <div>
+                          <strong className="font-semibold">SSH Connection:</strong> {testResults.ssh.message}
+                        </div>
+                      </div>
+                    )}
+                    {testResults.sftp && (
+                      <div className={`flex items-start gap-2 ${testResults.sftp.success ? 'text-cyan-400' : 'text-rose-400'}`}>
+                        {testResults.sftp.success ? <IconCheck size={14} className="shrink-0 mt-0.5" /> : <IconAlert size={14} className="shrink-0 mt-0.5" />}
+                        <div>
+                          <strong className="font-semibold">SFTP / FTP Subsystem:</strong> {testResults.sftp.message}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

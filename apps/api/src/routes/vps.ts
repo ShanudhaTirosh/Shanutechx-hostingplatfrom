@@ -25,6 +25,7 @@ import {
   toggleVpsFirewallSsh,
   addVpsFirewallRuleSsh,
   deleteVpsFirewallRuleSsh,
+  testVpsConnectionRaw,
 } from '../lib/vpsSshClient';
 
 export const vpsRouter = Router();
@@ -45,6 +46,51 @@ const provisionSchema = z.object({
   sshPort: z.number().int().positive().default(22),
   username: z.string().min(1).default('root'),
   password: z.string().min(1),
+});
+
+const testConnectionSchema = z.object({
+  ip: z.string().min(1),
+  sshPort: z.number().int().positive().default(22),
+  username: z.string().min(1).default('root'),
+  password: z.string().min(1),
+  testType: z.enum(['ssh', 'sftp', 'both']).default('both'),
+});
+
+/**
+ * POST /api/vps-provisions/test-connection
+ * Pre-delivery diagnostic: tests SSH and/or SFTP connectivity before assigning VPS to customer.
+ */
+vpsRouter.post('/vps-provisions/test-connection', requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+  const parsed = testConnectionSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const result = await testVpsConnectionRaw(parsed.data);
+  res.json(result);
+});
+
+/**
+ * POST /api/vps-provisions/:id/test-connection
+ * Diagnostic check: tests live SSH/SFTP connection for an existing VPS provision.
+ */
+vpsRouter.post('/vps-provisions/:id/test-connection', async (req: AuthedRequest, res: Response) => {
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision || !provision.credentialRef) return res.status(404).json({ error: 'VPS provision or credentials not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  const password = decryptSecret(provision.credentialRef, env.secretsEncryptionKey);
+  const testType = (req.body.testType as 'ssh' | 'sftp' | 'both') || 'both';
+
+  const result = await testVpsConnectionRaw({
+    ip: provision.ip || provision.externalId || '',
+    sshPort: provision.sshPort || 22,
+    username: provision.username || 'root',
+    password,
+    testType,
+  });
+
+  res.json(result);
 });
 
 /**

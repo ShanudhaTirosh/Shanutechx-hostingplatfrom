@@ -447,3 +447,163 @@ export async function deleteVpsFirewallRuleSsh(provision: VpsProvision, ruleInde
   }
   return { success: true };
 }
+
+export interface TestConnectionParams {
+  ip: string;
+  sshPort?: number;
+  username?: string;
+  password: string;
+  testType?: 'ssh' | 'sftp' | 'both';
+}
+
+export async function testVpsConnectionRaw(params: TestConnectionParams): Promise<{
+  ok: boolean;
+  ssh: { success: boolean; message: string };
+  sftp: { success: boolean; message: string };
+}> {
+  const host = params.ip.trim();
+  const port = params.sshPort || 22;
+  const username = params.username?.trim() || 'root';
+  const passwordOrKey = params.password;
+  const testType = params.testType || 'both';
+
+  let privateKey: string | undefined;
+  let password: string | undefined;
+
+  if (passwordOrKey.startsWith('-----BEGIN') || passwordOrKey.includes('PRIVATE KEY')) {
+    privateKey = passwordOrKey;
+  } else {
+    password = passwordOrKey;
+  }
+
+  const config: ConnectConfig = {
+    host,
+    port,
+    username,
+    readyTimeout: 10_000,
+    ...(privateKey ? { privateKey } : {}),
+    ...(password && !privateKey ? { password } : {}),
+  };
+
+  const conn = new SshClient();
+
+  return new Promise((resolve) => {
+    let sshRes = { success: false, message: 'SSH test not requested' };
+    let sftpRes = { success: false, message: 'SFTP test not requested' };
+    let resolved = false;
+
+    const cleanup = () => {
+      try {
+        conn.end();
+      } catch {}
+    };
+
+    conn.on('error', (err) => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      resolve({
+        ok: false,
+        ssh: { success: false, message: `SSH connection failed (${host}:${port}): ${err.message}` },
+        sftp: { success: false, message: 'SFTP connection skipped due to SSH error' },
+      });
+    });
+
+    conn.on('ready', () => {
+      if (testType === 'ssh' || testType === 'both') {
+        conn.exec('uptime 2>/dev/null || uname -a', (err, stream) => {
+          if (err) {
+            sshRes = { success: false, message: `SSH exec error: ${err.message}` };
+          } else {
+            let out = '';
+            stream.on('data', (d: Buffer) => {
+              out += d.toString();
+            });
+            stream.on('close', () => {
+              sshRes = {
+                success: true,
+                message: `SSH Authentication Successful! Server Uptime: ${out.trim() || 'OK'}`,
+              };
+              if (testType === 'both') {
+                runSftpTest();
+              } else {
+                finish();
+              }
+            });
+            return;
+          }
+
+          if (testType === 'both') {
+            runSftpTest();
+          } else {
+            finish();
+          }
+        });
+      } else if (testType === 'sftp') {
+        runSftpTest();
+      }
+    });
+
+    function runSftpTest() {
+      conn.sftp((err, sftp) => {
+        if (err) {
+          sftpRes = { success: false, message: `SFTP subsystem error: ${err.message}` };
+          finish();
+          return;
+        }
+        sftp.readdir('/', (readErr, list) => {
+          if (readErr) {
+            sftp.readdir('/root', (rErr2, list2) => {
+              if (rErr2) {
+                sftpRes = { success: false, message: `SFTP readdir error: ${rErr2.message}` };
+              } else {
+                sftpRes = {
+                  success: true,
+                  message: `SFTP Functional! Verified access to /root directory (${list2.length} items found).`,
+                };
+              }
+              finish();
+            });
+          } else {
+            sftpRes = {
+              success: true,
+              message: `SFTP Functional! Verified root directory access (${list.length} items found).`,
+            };
+            finish();
+          }
+        });
+      });
+    }
+
+    function finish() {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      const isOk =
+        testType === 'ssh'
+          ? sshRes.success
+          : testType === 'sftp'
+          ? sftpRes.success
+          : sshRes.success && sftpRes.success;
+      resolve({
+        ok: isOk,
+        ssh: sshRes,
+        sftp: sftpRes,
+      });
+    }
+
+    try {
+      conn.connect(config);
+    } catch (err: any) {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      resolve({
+        ok: false,
+        ssh: { success: false, message: `Connection initialization error: ${err.message}` },
+        sftp: { success: false, message: 'SFTP connection skipped' },
+      });
+    }
+  });
+}
+

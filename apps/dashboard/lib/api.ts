@@ -973,6 +973,34 @@ export const api = {
       apiFetch('/api/vps-provisions', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<{ provision: VpsProvision; notice?: string }>(r)
       ),
+    testConnection: (data: {
+      ip: string;
+      sshPort?: number;
+      username?: string;
+      password: string;
+      testType?: 'ssh' | 'sftp' | 'both';
+    }) =>
+      apiFetch('/api/vps-provisions/test-connection', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) =>
+        asJson<{
+          ok: boolean;
+          ssh: { success: boolean; message: string };
+          sftp: { success: boolean; message: string };
+        }>(r)
+      ),
+    testExistingConnection: (id: string, testType: 'ssh' | 'sftp' | 'both' = 'both') =>
+      apiFetch(`/api/vps-provisions/${id}/test-connection`, {
+        method: 'POST',
+        body: JSON.stringify({ testType }),
+      }).then((r) =>
+        asJson<{
+          ok: boolean;
+          ssh: { success: boolean; message: string };
+          sftp: { success: boolean; message: string };
+        }>(r)
+      ),
   },
 
   tickets: {

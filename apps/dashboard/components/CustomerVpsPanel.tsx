@@ -136,6 +136,23 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
     }
   }
 
+  async function handleTestExistingConnection(testType: 'ssh' | 'sftp' | 'both' = 'both') {
+    setBusyAction(`test_${testType}`);
+    try {
+      const res = await api.vps.testExistingConnection(p.id, testType);
+      if (res.ok) {
+        toast(`Connection Test Passed! SSH: ${res.ssh.message} | SFTP: ${res.sftp.message}`, 'success');
+      } else {
+        const err = !res.ssh.success ? res.ssh.message : res.sftp.message;
+        toast(`Connection Test Failed: ${err}`, 'error');
+      }
+    } catch (err: any) {
+      toast(`Test Connection Error: ${err.message}`, 'error');
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   async function handleSyncCredentialsSubmit() {
     setBusyAction('sync');
     try {
@@ -304,7 +321,17 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
 
           {/* Secondary Utilities */}
           <div className="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={busyAction?.startsWith('test_')}
+                onClick={() => handleTestExistingConnection('both')}
+                className="flex items-center gap-1.5 text-xs text-purple-300 hover:text-purple-200"
+              >
+                <IconActivity size={13} /> Test SSH & SFTP
+              </Button>
+
               <Button
                 size="sm"
                 variant={showFirewall ? 'secondary' : 'ghost'}
