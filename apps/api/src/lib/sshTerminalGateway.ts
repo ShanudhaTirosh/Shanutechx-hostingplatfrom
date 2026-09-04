@@ -3,7 +3,6 @@ import type { Server as HttpServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Client as SshClient, ConnectConfig } from 'ssh2';
 import { logger } from './logger';
-import { getVps, getCredentials, LeasewebApiError } from './leasewebClient';
 import { decryptSecret } from './secretsVault';
 import { prisma } from './prisma';
 import { canAccessResource } from '../middleware/rbac';
@@ -194,48 +193,29 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
         return;
       }
 
-      // 1. Try resolving VpsProvision row by ID (for both Direct SSH and Leaseweb provisions)
+      // 1. Resolve VpsProvision row by ID
       const provision = await prisma.vpsProvision.findFirst({
         where: {
-          OR: [{ id: entry.vpsId }, { leasewebVpsId: entry.vpsId }],
+          id: entry.vpsId,
           status: { not: 'terminated' },
         },
       });
 
-      if (provision && user.role === 'customer' && provision.userId !== user.id) {
+      if (!provision) {
+        return fail('VPS provision record not found.');
+      }
+
+      if (user.role === 'customer' && provision.userId !== user.id) {
         return fail('You do not own this VPS provision.');
       }
 
       let connectOpts: ConnectConfig;
 
-      // Direct SSH path (Manual / Provider without API access)
-      if (provision && provision.ip && !provision.leasewebVpsId) {
-        sendStatus(`Connecting to VPS at ${provision.ip}…`);
-        try {
-          connectOpts = getVpsSshConfig(provision);
-        } catch (err: any) {
-          return fail(`Failed to read VPS SSH configuration: ${err.message}`);
-        }
-      } else {
-        // Leaseweb-managed VPS path
-        const targetLeasewebId = provision?.leasewebVpsId || entry.vpsId;
-        sendStatus('Fetching VPS credentials from Leaseweb…');
-        const [instance, credentials] = await Promise.all([
-          getVps(targetLeasewebId),
-          getCredentials(targetLeasewebId, 'OPERATING_SYSTEM'),
-        ]);
-
-        const ip = instance.ips?.[0]?.ip;
-        if (!ip) return fail('No IP address found for this VPS.');
-
-        connectOpts = {
-          host: ip,
-          port: 22,
-          username: credentials.username || 'root',
-          password: credentials.password,
-          readyTimeout: 15_000,
-          keepaliveInterval: 10_000,
-        };
+      sendStatus(`Connecting to VPS at ${provision.ip}…`);
+      try {
+        connectOpts = getVpsSshConfig(provision);
+      } catch (err: any) {
+        return fail(`Failed to read VPS SSH configuration: ${err?.message || 'Invalid config'}`);
       }
 
       if (closed || !ssh) return;
@@ -297,11 +277,8 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
       });
 
       currentSsh.connect(connectOpts);
-    } catch (err) {
-      const message =
-        err instanceof LeasewebApiError
-          ? `Could not fetch VPS credentials: ${err.message}`
-          : `Unexpected error: ${(err as Error).message}`;
+    } catch (err: any) {
+      const message = `Unexpected error: ${err?.message || 'SSH connection failed'}`;
       logger.error({ err, vpsId: entry.vpsId }, 'SSH terminal setup failed');
       fail(message);
     }

@@ -38,16 +38,8 @@ async function resolveNodeAccess(req: AuthedRequest, nodeId: string) {
     const allowed = await canAccessResource(provision.userId, req);
     if (!allowed) return null;
 
-    let ip: string | null = null;
-    if (provision.leasewebVpsId) {
-      try {
-        const { getVps } = await import('../lib/leasewebClient');
-        const vps = await getVps(provision.leasewebVpsId);
-        ip = vps.ips?.[0]?.ip || null;
-      } catch (err) {
-        logger.warn({ err, provisionId: provision.id }, 'Failed to fetch VPS IP from Leaseweb');
-      }
-    } else if (provision.panelUrl) {
+    let ip: string | null = provision.ip || null;
+    if (!ip && provision.panelUrl) {
       try {
         const url = new URL(provision.panelUrl);
         ip = url.hostname;

@@ -162,19 +162,24 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
     }
     setBusyAction('deploy');
     try {
-      const envObj: Record<string, string> = {};
-      if (deployEnv) {
-        deployEnv.split('\n').forEach((line) => {
-          const [k, v] = line.split('=');
-          if (k && v) envObj[k.trim()] = v.trim();
-        });
-      }
+      const envArr: string[] = deployEnv
+        ? deployEnv.split('\n').map((l) => l.trim()).filter(Boolean)
+        : [];
+      const portArr: { hostPort: number; containerPort: number }[] = deployPort
+        ? deployPort
+            .split('\n')
+            .map((p) => {
+              const parts = p.trim().split(':');
+              return { hostPort: Number(parts[0]), containerPort: Number(parts[1] || parts[0]) };
+            })
+            .filter((pt) => !isNaN(pt.hostPort) && pt.hostPort > 0)
+        : [];
 
       await api.nodeEngine.createContainer(p.id, {
         name: deployName,
         image: deployImage,
-        ports: deployPort ? [deployPort] : [],
-        env: envObj,
+        ports: portArr,
+        env: envArr,
       });
 
       toast(`Container ${deployName} deployed successfully.`, 'success');
