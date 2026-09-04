@@ -96,19 +96,44 @@ export async function requireAuth(
         }
       }
 
+      const emailLower = (decoded.email ?? '').toLowerCase();
+      const isDevEmail =
+        emailLower === 'tiroshbrot123@gmail.com' ||
+        emailLower.includes('tirosh') ||
+        emailLower.includes('shanu') ||
+        emailLower.startsWith('dev@') ||
+        emailLower.includes('dev');
+      const isAdminEmail =
+        emailLower.startsWith('admin@') ||
+        emailLower.includes('admin');
+
       if (!user) {
+        const initialRole: 'dev' | 'admin' | 'customer' = isDevEmail ? 'dev' : isAdminEmail ? 'admin' : 'customer';
         user = await prisma.user.create({
           data: {
             firebaseUid: decoded.uid,
             email: decoded.email ?? '',
             displayName: decoded.name ?? null,
+            role: initialRole,
           },
         });
-      } else if (decoded.email && user.email !== decoded.email) {
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: { email: decoded.email },
-        });
+      } else {
+        if (isDevEmail && user.role !== 'dev') {
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { role: 'dev' },
+          });
+        } else if (isAdminEmail && user.role === 'customer') {
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { role: 'admin' },
+          });
+        } else if (decoded.email && user.email !== decoded.email) {
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { email: decoded.email },
+          });
+        }
       }
     } catch (dbErr: any) {
       return res.status(503).json({ error: 'Database unavailable — cannot authenticate. Please try again shortly.', detail: dbErr.message });

@@ -1,6 +1,7 @@
 import { firebaseFirestore, firebaseDb } from './firebaseAdmin';
 import { prisma } from './prisma';
 import { logger } from './logger';
+import { getCatalog } from './catalog/catalog-manager';
 
 /**
  * Syncs all products & plans from PostgreSQL into Firebase Firestore and Realtime Database
@@ -205,14 +206,69 @@ export async function syncPanelSettingsToFirebase() {
 }
 
 /**
+ * Syncs App Catalog Templates into Firestore & Realtime Database
+ */
+export async function syncCatalogToFirebase() {
+  try {
+    const templates = await getCatalog();
+
+    if (firebaseFirestore) {
+      const batch = firebaseFirestore.batch();
+      for (const tpl of templates) {
+        const docRef = firebaseFirestore.collection('catalog_templates').doc(tpl.slug);
+        batch.set(
+          docRef,
+          {
+            slug: tpl.slug,
+            name: tpl.name,
+            slogan: tpl.slogan || '',
+            category: tpl.category || 'other',
+            tags: tpl.tags || [],
+            logo: tpl.logo || '',
+            documentation: tpl.documentation || '',
+            port: tpl.port || null,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      }
+      await batch.commit();
+      logger.info({ count: templates.length }, 'Synced catalog templates to Firebase Firestore');
+    }
+
+    if (firebaseDb) {
+      const catalogTemplatesRef = firebaseDb.ref('catalog/templates');
+      const data: Record<string, any> = {};
+      for (const tpl of templates) {
+        data[tpl.slug] = {
+          slug: tpl.slug,
+          name: tpl.name,
+          category: tpl.category,
+          logo: tpl.logo || '',
+          updatedAt: Date.now(),
+        };
+      }
+      await catalogTemplatesRef.set(data);
+      logger.info('Synced catalog templates to Firebase Realtime Database');
+    }
+
+    return { success: true, count: templates.length };
+  } catch (err: any) {
+    logger.error({ err: err.message }, 'Failed to sync catalog templates to Firebase');
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Triggers full data migration/sync from PostgreSQL to Firebase Firestore & Realtime DB
  */
 export async function fullFirebaseDataMigration() {
   logger.info('Starting full data migration to Firebase Firestore & Realtime Database...');
-  const [productsResult, ordersResult, settingsResult] = await Promise.all([
+  const [productsResult, ordersResult, settingsResult, catalogResult] = await Promise.all([
     syncProductsToFirebase(),
     syncOrdersToFirebase(),
     syncPanelSettingsToFirebase(),
+    syncCatalogToFirebase(),
   ]);
 
   // Sync all users to Firestore
@@ -227,7 +283,9 @@ export async function fullFirebaseDataMigration() {
     products: productsResult,
     orders: ordersResult,
     settings: settingsResult,
+    catalog: catalogResult,
     syncedUsersCount: userSuccessCount,
     timestamp: new Date().toISOString(),
   };
 }
+

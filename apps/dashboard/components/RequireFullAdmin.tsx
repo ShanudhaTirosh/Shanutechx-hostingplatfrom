@@ -18,7 +18,11 @@ export default function RequireFullAdmin({ children }: { children: React.ReactNo
 
   useEffect(() => {
     if (!loading && apiUser && !allowed) {
-      router.replace('/dashboard');
+      if (apiUser.role === 'support') {
+        router.replace('/admin/tickets');
+      } else {
+        router.replace('/dashboard');
+      }
     }
   }, [loading, apiUser, allowed, router]);
 

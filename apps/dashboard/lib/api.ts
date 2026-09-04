@@ -47,6 +47,11 @@ export const api = {
       asJson<{ user: ApiUser }>(r)
     ),
 
+  updateRole: (role: 'customer' | 'support' | 'dev' | 'admin') =>
+    apiFetch('/api/me/role', { method: 'PATCH', body: JSON.stringify({ role }) }).then((r) =>
+      asJson<{ user: ApiUser; rootDomain: string }>(r)
+    ),
+
   admin: {
     customers: (takeOrSearch?: number | string, skip = 0, search?: string) => {
       let takeVal = 50;

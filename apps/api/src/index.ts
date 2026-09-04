@@ -63,7 +63,7 @@ import { dockerDeploymentsRouter } from './routes/dockerDeployments';
 import { uploadDeploymentsRouter } from './routes/zipDeployments';
 import { cockpitRouter } from './routes/cockpit';
 import { ensureDefaultProductsSeeded } from './lib/seedProducts';
-
+import { fullFirebaseDataMigration } from './lib/firebaseSync';
 
 import { globalLimiter } from './middleware/rateLimit';
 import { csrfProtection, isOriginAllowed } from './middleware/csrfProtection';
@@ -256,6 +256,9 @@ attachSshTerminalGateway(server);
 server.listen(env.port, () => {
   logger.info({ port: env.port }, 'SHANUTECHX API listening (HTTP + /ws/vps-ssh)');
   void ensureDefaultProductsSeeded();
+  void fullFirebaseDataMigration().catch((err) => {
+    logger.error({ err: err.message }, 'Initial startup Firebase data sync error');
+  });
 });
 
 async function gracefulShutdown(signal: string) {

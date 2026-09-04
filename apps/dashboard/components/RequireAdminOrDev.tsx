@@ -20,7 +20,11 @@ export default function RequireAdminOrDev({ children }: { children: React.ReactN
 
   useEffect(() => {
     if (!loading && apiUser && !allowed) {
-      router.replace('/dashboard');
+      if (apiUser.role === 'support') {
+        router.replace('/admin/tickets');
+      } else {
+        router.replace('/dashboard');
+      }
     }
   }, [loading, apiUser, allowed, router]);
 

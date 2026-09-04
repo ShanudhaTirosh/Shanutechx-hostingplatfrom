@@ -13,6 +13,7 @@ interface AppUserContextValue {
   loading: boolean;
   error: string | null;
   refetchUser: () => Promise<void>;
+  switchRole: (role: 'customer' | 'support' | 'dev' | 'admin') => Promise<void>;
 }
 
 const AppUserContext = createContext<AppUserContextValue>({
@@ -21,6 +22,7 @@ const AppUserContext = createContext<AppUserContextValue>({
   loading: true,
   error: null,
   refetchUser: async () => {},
+  switchRole: async () => {},
 });
 
 const USER_CACHE_KEY = 'shanutechx_user_cache';
@@ -82,6 +84,26 @@ export function AppUserProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const switchRole = async (role: 'customer' | 'support' | 'dev' | 'admin') => {
+    try {
+      setLoading(true);
+      const data = await api.updateRole(role);
+      setApiUser(data.user);
+      if (data.rootDomain) setRootDomain(data.rootDomain);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data.user));
+          localStorage.setItem(USER_CACHE_TIMESTAMP_KEY, Date.now().toString());
+        } catch {}
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to switch role');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Wait for Firebase auth state to resolve before fetching user
     const unsubscribe = onAuthStateChanged(firebaseAuth, (firebaseUser) => {
@@ -99,36 +121,15 @@ export function AppUserProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Firebase user is signed in — fetch real user data from API
-      if (apiUser) {
-        // Have cached data — verify in background
-        api.me()
-          .then((data) => {
-            setApiUser(data.user);
-            setRootDomain(data.rootDomain);
-            if (typeof window !== 'undefined') {
-              try {
-                localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data.user));
-                localStorage.setItem('shanutechx_root_domain', data.rootDomain);
-                localStorage.setItem(USER_CACHE_TIMESTAMP_KEY, Date.now().toString());
-              } catch {}
-            }
-          })
-          .catch(() => {
-            // Background refresh failed — keep cached data, next hard refresh will re-auth
-          })
-          .finally(() => setLoading(false));
-      } else {
-        // No cache — fetch immediately
-        fetchUser();
-      }
+      // Always fetch fresh user context from API on auth change to ensure role accuracy
+      fetchUser();
     });
 
     return () => unsubscribe();
   }, []);
 
   return (
-    <AppUserContext.Provider value={{ apiUser, rootDomain, loading, error, refetchUser: fetchUser }}>
+    <AppUserContext.Provider value={{ apiUser, rootDomain, loading, error, refetchUser: fetchUser, switchRole }}>
       {children}
     </AppUserContext.Provider>
   );

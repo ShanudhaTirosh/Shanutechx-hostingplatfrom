@@ -67,3 +67,39 @@ meRouter.patch('/me', requireAuth, async (req: AuthedRequest, res) => {
     },
   });
 });
+
+const updateRoleSchema = z.object({
+  role: z.enum(['customer', 'support', 'dev', 'admin']),
+});
+
+meRouter.patch('/me/role', requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = updateRoleSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const updatedUser = await prisma.user.update({
+    where: { id: req.user!.id },
+    data: { role: parsed.data.role },
+    select: {
+      id: true,
+      firebaseUid: true,
+      email: true,
+      role: true,
+      displayName: true,
+      phoneNumber: true,
+      discordUserId: true,
+      isBanned: true,
+      createdAt: true,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      adminId: req.user!.id,
+      action: 'user.switch_role',
+      target: `${req.user!.email} -> ${parsed.data.role}`,
+    },
+  }).catch(() => null);
+
+  res.json({ user: updatedUser, rootDomain: env.rootDomain });
+});
+

@@ -135,6 +135,12 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
       { href: '/admin/leaseweb', label: 'Leaseweb', icon: 'leaseweb' },
       { href: '/admin/databases', label: 'Databases', icon: 'databases' },
       { href: '/vps-plans', label: 'VPS Plans', icon: 'vps' },
+      { href: '/admin/review-queue', label: 'Payment Review', icon: 'review' },
+      { href: '/admin/customers', label: 'Customers', icon: 'customers' },
+      { href: '/admin/staff', label: 'Staff Directory', icon: 'staff' },
+      { href: '/admin/analytics', label: 'Analytics', icon: 'analytics' },
+      { href: '/admin/cms', label: 'Site Content', icon: 'cms' },
+      { href: '/admin/audit-log', label: 'Audit Log', icon: 'audit' },
       { href: '/settings', label: 'Protected Settings', icon: 'settings' },
     ],
   },
@@ -184,7 +190,7 @@ function getSpaceFromPathname(pathname: string): SpaceKey {
 export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { apiUser } = useAppUser();
+  const { apiUser, loading, switchRole } = useAppUser();
   const [signingOut, setSigningOut] = useState(false);
 
   const isDev = apiUser?.role === 'dev';
@@ -192,16 +198,13 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const isSupport = apiUser?.role === 'support';
   const isCustomer = apiUser?.role === 'customer';
 
-  // Determine allowed spaces based strictly on user role
+  // Determine allowed spaces based strictly on user role (while loading, retain full spaces)
   const allowedSpaces: SpaceKey[] = [];
-  if (isDev || isAdmin) {
-    // Admin & Dev roles (system administrators & owners) get access to all 4 spaces
+  if (loading || !apiUser || isDev || isAdmin) {
     allowedSpaces.push('admin', 'dev', 'support', 'customer');
   } else if (isSupport) {
-    // Support role gets access to Support and Customer spaces (NO Admin or Dev spaces)
     allowedSpaces.push('support', 'customer');
   } else {
-    // Customer role gets access strictly to Customer space (NO switcher shown)
     allowedSpaces.push('customer');
   }
 
@@ -221,6 +224,8 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   // Keep selected space synced with pathname only if pathname leaves current space
   useEffect(() => {
+    if (loading || !apiUser) return;
+
     if (isPathInSpace(pathname, selectedSpace) && allowedSpaces.includes(selectedSpace)) {
       return;
     }
@@ -237,7 +242,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         try { localStorage.setItem('shanutechx_active_space', fallback); } catch {}
       }
     }
-  }, [pathname, isDev, isAdmin, isSupport, selectedSpace]);
+  }, [pathname, loading, apiUser, isDev, isAdmin, isSupport, selectedSpace]);
 
   const activePanel = SPACES[selectedSpace] || SPACES.customer;
 
@@ -357,23 +362,35 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <div className="h-8 w-8 rounded-full bg-brand-gradient flex items-center justify-center text-white text-xs font-semibold shrink-0 shadow-glow-teal">
               {initials}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-text-primary font-medium truncate">{apiUser.email}</p>
-              <p
-                className="text-[10px] capitalize font-semibold tracking-wide"
-                style={{
-                  color:
-                    apiUser.role === 'admin'
-                      ? '#f59e0b'
-                      : apiUser.role === 'dev'
-                      ? '#a855f7'
-                      : apiUser.role === 'support'
-                      ? '#06b6d4'
-                      : '#10b981',
-                }}
-              >
-                {apiUser.role} Account
-              </p>
+              <div className="flex items-center gap-1 mt-0.5">
+                <select
+                  value={apiUser.role}
+                  onChange={async (e) => {
+                    const newRole = e.target.value as any;
+                    try {
+                      await switchRole(newRole);
+                    } catch {}
+                  }}
+                  className="text-[10px] capitalize font-semibold tracking-wide bg-white/5 border border-white/10 rounded px-1.5 py-0.5 cursor-pointer focus:outline-none focus:border-accent-teal"
+                  style={{
+                    color:
+                      apiUser.role === 'admin'
+                        ? '#f59e0b'
+                        : apiUser.role === 'dev'
+                        ? '#a855f7'
+                        : apiUser.role === 'support'
+                        ? '#06b6d4'
+                        : '#10b981',
+                  }}
+                >
+                  <option value="dev" className="bg-[#0a0a14] text-violet-400">Dev Account</option>
+                  <option value="admin" className="bg-[#0a0a14] text-amber-400">Admin Account</option>
+                  <option value="support" className="bg-[#0a0a14] text-cyan-400">Support Account</option>
+                  <option value="customer" className="bg-[#0a0a14] text-emerald-400">Customer Account</option>
+                </select>
+              </div>
             </div>
           </div>
         )}

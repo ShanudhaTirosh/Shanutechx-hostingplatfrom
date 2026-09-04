@@ -29,6 +29,66 @@ function catColor(cat: string) {
   return CAT_COLOR[cat.toLowerCase()] ?? CAT_COLOR.other;
 }
 
+// ── Template Logo component with multi-tier fallbacks ────────────────────────
+function TemplateLogo({ logo, name, slug, color }: { logo?: string; name: string; slug: string; color: string }) {
+  const initials = name
+    .split(/[\s-]+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+
+  const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  const candidates: string[] = [];
+  if (logo) {
+    if (logo.startsWith('http://') || logo.startsWith('https://') || logo.startsWith('data:')) {
+      candidates.push(logo);
+    } else if (logo.startsWith('/')) {
+      candidates.push(logo);
+    } else {
+      candidates.push(`https://raw.githubusercontent.com/coollabsio/coolify/main/public/uploads/${logo}`);
+    }
+  }
+
+  if (cleanSlug) {
+    candidates.push(`https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/${cleanSlug}.png`);
+    candidates.push(`https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/${cleanSlug}.svg`);
+    candidates.push(`https://cdn.simpleicons.org/${cleanSlug}`);
+  }
+
+  const [candidateIndex, setCandidateIndex] = useState(0);
+  const [hasError, setHasError] = useState(false);
+
+  const currentSrc = candidates[candidateIndex];
+
+  const handleError = () => {
+    if (candidateIndex + 1 < candidates.length) {
+      setCandidateIndex((prev) => prev + 1);
+    } else {
+      setHasError(true);
+    }
+  };
+
+  return (
+    <div
+      className="flex items-center justify-center w-11 h-11 rounded-xl text-white text-sm font-bold shrink-0 shadow-lg overflow-hidden"
+      style={{ background: `linear-gradient(135deg, ${color}cc, ${color}55)`, border: `1px solid ${color}44` }}
+    >
+      {!hasError && currentSrc ? (
+        <img
+          src={currentSrc}
+          alt={name}
+          className="w-7 h-7 object-contain"
+          onError={handleError}
+        />
+      ) : (
+        <span>{initials}</span>
+      )}
+    </div>
+  );
+}
+
 // ── Template card ─────────────────────────────────────────────────────────────
 function TemplateCard({
   tpl,
@@ -45,12 +105,6 @@ function TemplateCard({
 }) {
   const [hovered, setHovered] = useState(false);
   const color = catColor(tpl.category);
-  const initials = tpl.name
-    .split(/[\s-]+/)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase();
 
   return (
     <div
@@ -68,21 +122,7 @@ function TemplateCard({
       <div className="flex flex-col flex-1 p-5 gap-4">
         {/* header */}
         <div className="flex items-start gap-3">
-          <div
-            className="flex items-center justify-center w-11 h-11 rounded-xl text-white text-sm font-bold shrink-0 shadow-lg"
-            style={{ background: `linear-gradient(135deg, ${color}cc, ${color}55)`, border: `1px solid ${color}44` }}
-          >
-            {tpl.logo ? (
-              <img
-                src={`https://raw.githubusercontent.com/coollabsio/coolify/main/public/uploads/${tpl.logo}`}
-                alt={tpl.name}
-                className="w-7 h-7 object-contain"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-            ) : (
-              <span>{initials}</span>
-            )}
-          </div>
+          <TemplateLogo logo={tpl.logo} name={tpl.name} slug={tpl.slug} color={color} />
 
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-text-primary leading-tight truncate">{tpl.name}</h3>
