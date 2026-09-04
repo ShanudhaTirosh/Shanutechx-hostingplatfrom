@@ -57,7 +57,10 @@ const createDeploymentSchema = z.object({
   gitAccountId: z.string().optional(),
   gitToken: z.string().optional(),
   preferredName: z.string().min(1),
-  customSubdomain: z.string().min(2).max(63).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Subdomain can only contain lowercase letters, numbers, and hyphens').optional(),
+  customSubdomain: z.string().min(2).max(63)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Subdomain can only contain lowercase letters, numbers, and hyphens')
+    .refine((val) => /[a-z]/.test(val), { message: 'Subdomain must contain at least one simple lowercase letter (a-z)' })
+    .optional(),
   internalPort: z.number().int().positive().optional(),
   envVars: z.record(z.string()).optional(),
   nodeId: z.string().optional(),
@@ -669,6 +672,12 @@ const updateSubdomainSchema = z.object({
 deploymentsRouter.patch('/deployments/:id/subdomain', async (req: AuthedRequest, res) => {
   const deployment = await loadOwnedDeployment(req, req.params.id);
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
+
+  if (req.user?.role !== 'admin' && req.user?.role !== 'dev') {
+    return res.status(403).json({
+      error: 'Subdomains can only be set once during application creation and cannot be modified later by customers.',
+    });
+  }
 
   const parsed = updateSubdomainSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });

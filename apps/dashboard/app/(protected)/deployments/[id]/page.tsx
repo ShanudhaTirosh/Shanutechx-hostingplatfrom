@@ -20,7 +20,7 @@ import { EnvVarsPanel } from '@/components/EnvVarsPanel';
 import { FileManagerPanel } from '@/components/FileManagerPanel';
 import { DeployWebhookPanel } from '@/components/DeployWebhookPanel';
 import { RoutingFirewallPanel } from '@/components/RoutingFirewallPanel';
-
+import { useAppUser } from '@/lib/AppUserContext';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +51,8 @@ export default function DeploymentDetailPage() {
   const params = useParams();
   const router = useRouter();
   const deploymentId = params.id as string;
+  const { apiUser } = useAppUser();
+  const isStaff = apiUser?.role === 'admin' || apiUser?.role === 'dev';
 
   const [activeTab, setActiveTab] = useState<TabType>('console');
   const [deployment, setDeployment] = useState<any>(null);
@@ -275,12 +277,12 @@ export default function DeploymentDetailPage() {
               <>
                 <span>·</span>
                 <a
-                  href={`https://${deployment.subdomain}.shanutechx.com`}
+                  href={`https://${deployment.subdomain}.app.shanutechx.com`}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-accent-cyan hover:underline flex items-center gap-1"
+                  className="text-accent-cyan hover:underline flex items-center gap-1 font-mono"
                 >
-                  🌐 {deployment.subdomain}.shanutechx.com
+                  {deployment.subdomain}.app.shanutechx.com
                 </a>
               </>
             )}
@@ -434,23 +436,33 @@ export default function DeploymentDetailPage() {
           <Card title="Subdomain Routing & Custom Domains" description="Customize your application domain slug or connect custom CNAME/A records via Traefik.">
             <form onSubmit={handleSubdomainUpdate} className="space-y-4 mb-6">
               <div>
-                <label className="text-xs font-medium text-text-muted block mb-1.5">Desired Subdomain</label>
+                <label className="text-xs font-medium text-text-muted block mb-1.5">Application Subdomain</label>
                 <div className="flex items-center gap-2 max-w-md">
                   <input
                     type="text"
                     required
+                    readOnly={!isStaff}
+                    disabled={!isStaff}
                     value={desiredSubdomain}
                     onChange={(e) => setDesiredSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                     placeholder="my-cool-app"
-                    className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-accent-cyan"
+                    className={`flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none ${
+                      !isStaff ? 'opacity-70 cursor-not-allowed' : 'focus:border-accent-cyan'
+                    }`}
                   />
-                  <span className="text-xs font-mono text-text-muted">.shanutechx.com</span>
-                  <Button type="submit" size="sm" loading={updatingSubdomain}>
-                    Update
-                  </Button>
+                  <span className="text-xs font-mono text-text-muted">.app.shanutechx.com</span>
+                  {isStaff && (
+                    <Button type="submit" size="sm" loading={updatingSubdomain}>
+                      Update
+                    </Button>
+                  )}
                 </div>
                 <p className="text-[11px] text-text-faint mt-1.5">
-                  Preview URL: <span className="font-mono text-accent-cyan">https://{desiredSubdomain || 'your-app'}.shanutechx.com</span>
+                  {isStaff ? (
+                    <>Preview URL: <span className="font-mono text-accent-cyan">https://{desiredSubdomain || 'your-app'}.app.shanutechx.com</span></>
+                  ) : (
+                    <span className="text-amber-400/90 font-sans">Subdomain is locked and can only be set once during application creation.</span>
+                  )}
                 </p>
               </div>
             </form>
