@@ -6,6 +6,8 @@ import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { env } from '../env';
 import { verifySmtpConnection, sendSmtpEmail } from '../lib/smtpDispatcher';
 
+import { createSubdomainRecord } from '../lib/cloudflare';
+
 export const supabaseRouter = Router();
 
 const SUPABASE_KONG_URL = process.env.SUPABASE_KONG_URL || 'http://localhost:8001';
@@ -41,8 +43,12 @@ export interface ClientProject {
 }
 
 function serializeProject(p: any): ClientProject {
-  const nodeHost = p.nodeIp || 'localhost';
   const studioPort = p.studioPort ?? 8000;
+  const rootDomain = env.rootDomain || 'shanutechx.com';
+  const cleanSlug = p.name ? p.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '') : 'default';
+  const hostSubdomain = `supabase-${cleanSlug}.${rootDomain}`;
+  const studioUrl = `http://${hostSubdomain}:${studioPort}`;
+
   return {
     id: p.id,
     name: p.name,
@@ -62,7 +68,7 @@ function serializeProject(p: any): ClientProject {
     poolerSettingsJson: p.poolerSettingsJson ?? { mode: 'transaction', poolSize: 20, port: 6543 },
     nodeId: p.nodeId ?? null,
     nodeIp: p.nodeIp ?? null,
-    studioUrl: `http://${nodeHost}:${studioPort}`,
+    studioUrl,
     createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
   };
 }
@@ -184,7 +190,15 @@ supabaseRouter.post('/supabase/projects', requireAuth, requireAdminOrDev, async 
   }
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 20);
+  const cleanSlug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '');
   const id = `proj_${slug}_${Date.now().toString().slice(-4)}`;
+
+  if (selectedNode?.ip) {
+    const hostSubdomain = `supabase-${cleanSlug}`;
+    await createSubdomainRecord(hostSubdomain, selectedNode.ip).catch((err: any) => {
+      logger.warn(`Failed to auto-create Cloudflare DNS for Supabase project ${hostSubdomain}: ${err?.message || err}`);
+    });
+  }
 
   const newProject = await prisma.supabaseClientProject.create({
     data: {
