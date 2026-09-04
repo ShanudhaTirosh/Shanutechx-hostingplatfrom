@@ -106,7 +106,7 @@ export async function getCmsPageFromFirestore(page: string) {
 /**
  * Reads Knowledge Base categories & articles from Firestore `knowledge_base` & `kb_categories`
  */
-export async function getKbArticlesFromFirestore(categorySlug?: string, searchQuery?: string) {
+export async function getKbArticlesFromFirestore(categorySlug?: string, searchQuery?: string, targetRole?: string) {
   if (!firebaseFirestore) {
     return { categories: [], articles: [], total: 0 };
   }
@@ -144,12 +144,19 @@ export async function getKbArticlesFromFirestore(categorySlug?: string, searchQu
         category: data.category || 'deployments',
         summary: data.summary || '',
         content: data.content || '',
+        targetRole: data.targetRole || 'customer',
         published: Boolean(data.published),
         views: Number(data.views || 0),
         helpfulCount: Number(data.helpfulCount || 0),
         updatedAt: data.updatedAt || new Date().toISOString(),
       };
     });
+
+    if (targetRole && targetRole !== 'all') {
+      articles = articles.filter(
+        (a) => !a.targetRole || a.targetRole === 'all' || a.targetRole === targetRole
+      );
+    }
 
     // Client-side text search filtering if query parameter provided
     if (searchQuery && searchQuery.trim()) {

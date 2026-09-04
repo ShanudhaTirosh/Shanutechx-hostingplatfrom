@@ -473,3 +473,30 @@ export interface WebmailAiSummary {
   sentiment: string;
 }
 
+// ── Knowledge Base Interfaces ──────────────────────────────────────────────
+
+export type KbTargetRole = 'all' | 'customer' | 'support' | 'dev' | 'admin';
+
+export interface KbCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  icon: string;
+}
+
+export interface KbArticle {
+  id: string;
+  slug: string;
+  title: string;
+  category: string;
+  summary: string;
+  content: string;
+  targetRole?: KbTargetRole;
+  tags?: string[];
+  published: boolean;
+  views: number;
+  helpfulCount: number;
+  updatedAt: string;
+}
+

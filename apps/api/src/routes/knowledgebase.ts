@@ -21,9 +21,10 @@ function serializeArticle(a: { category: { slug: string } } & Record<string, any
 // GET /api/knowledgebase - Authenticated: List categories & articles
 // Automatically fails over to Firebase Firestore if PostgreSQL is offline
 knowledgebaseRouter.get('/', requireAuth, async (req: Request, res: Response) => {
-  const { category, q } = req.query;
+  const { category, q, targetRole } = req.query;
   const categoryStr = typeof category === 'string' ? category : undefined;
   const searchStr = typeof q === 'string' ? q : undefined;
+  const targetRoleStr = typeof targetRole === 'string' ? targetRole : undefined;
 
   const result = await withDbFallback(
     async () => {
@@ -31,12 +32,28 @@ knowledgebaseRouter.get('/', requireAuth, async (req: Request, res: Response) =>
       if (categoryStr && categoryStr !== 'all') {
         where.category = { slug: categoryStr };
       }
-      if (searchStr && searchStr.trim()) {
+      if (targetRoleStr && targetRoleStr !== 'all') {
         where.OR = [
+          { targetRole: targetRoleStr },
+          { targetRole: 'all' },
+          { targetRole: null },
+        ];
+      }
+      if (searchStr && searchStr.trim()) {
+        const searchConditions = [
           { title: { contains: searchStr, mode: 'insensitive' } },
           { summary: { contains: searchStr, mode: 'insensitive' } },
           { content: { contains: searchStr, mode: 'insensitive' } },
         ];
+        if (where.OR) {
+          where.AND = [
+            { OR: where.OR },
+            { OR: searchConditions },
+          ];
+          delete where.OR;
+        } else {
+          where.OR = searchConditions;
+        }
       }
 
       const [categories, articles] = await Promise.all([
@@ -51,7 +68,7 @@ knowledgebaseRouter.get('/', requireAuth, async (req: Request, res: Response) =>
       };
     },
     async () => {
-      return await getKbArticlesFromFirestore(categoryStr, searchStr);
+      return await getKbArticlesFromFirestore(categoryStr, searchStr, targetRoleStr);
     }
   );
 
@@ -107,6 +124,7 @@ const articleSchema = z.object({
   category: z.enum(CATEGORY_SLUGS),
   summary: z.string().min(5),
   content: z.string().min(10),
+  targetRole: z.enum(['all', 'customer', 'support', 'dev', 'admin']).optional().default('customer'),
   published: z.boolean().default(true),
 });
 

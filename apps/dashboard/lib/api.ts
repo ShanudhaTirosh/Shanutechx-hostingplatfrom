@@ -234,28 +234,29 @@ export const api = {
   },
 
   knowledgebase: {
-    list: (category?: string, query?: string) => {
+    list: (category?: string, query?: string, targetRole?: string) => {
       const params = new URLSearchParams();
       if (category && category !== 'all') params.append('category', category);
       if (query && query.trim()) params.append('q', query.trim());
+      if (targetRole && targetRole !== 'all') params.append('targetRole', targetRole);
       const qs = params.toString() ? `?${params.toString()}` : '';
       return apiFetch(`/api/knowledgebase${qs}`).then((r) =>
-        asJson<{ categories: any[]; articles: any[]; total: number }>(r)
+        asJson<{ categories: import('./types').KbCategory[]; articles: import('./types').KbArticle[]; total: number }>(r)
       );
     },
     getArticle: (id: string) =>
-      apiFetch(`/api/knowledgebase/articles/${id}`).then((r) => asJson<{ article: any }>(r)),
+      apiFetch(`/api/knowledgebase/articles/${id}`).then((r) => asJson<{ article: import('./types').KbArticle }>(r)),
     voteHelpful: (id: string) =>
       apiFetch(`/api/knowledgebase/articles/${id}/helpful`, { method: 'POST' }).then((r) =>
-        asJson<{ article: any }>(r)
+        asJson<{ article: import('./types').KbArticle }>(r)
       ),
-    createArticle: (data: { title: string; category: string; summary: string; content: string; published: boolean }) =>
+    createArticle: (data: { title: string; category: string; summary: string; content: string; targetRole?: string; published: boolean }) =>
       apiFetch('/api/knowledgebase/articles', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
-        asJson<{ article: any }>(r)
+        asJson<{ article: import('./types').KbArticle }>(r)
       ),
-    updateArticle: (id: string, data: Partial<{ title: string; category: string; summary: string; content: string; published: boolean }>) =>
+    updateArticle: (id: string, data: Partial<{ title: string; category: string; summary: string; content: string; targetRole?: string; published: boolean }>) =>
       apiFetch(`/api/knowledgebase/articles/${id}`, { method: 'PUT', body: JSON.stringify(data) }).then((r) =>
-        asJson<{ article: any }>(r)
+        asJson<{ article: import('./types').KbArticle }>(r)
       ),
     deleteArticle: (id: string) =>
       apiFetch(`/api/knowledgebase/articles/${id}`, { method: 'DELETE' }).then((r) =>

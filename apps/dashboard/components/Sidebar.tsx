@@ -126,6 +126,7 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
     defaultHref: '/dev',
     links: [
       { href: '/dev', label: 'Dev Dashboard', icon: 'infra' },
+      { href: '/dev/docs', label: 'Dev & API Docs', icon: 'knowledgebase' },
       { href: '/admin/nodes', label: 'Compute Nodes', icon: 'nodes' },
       { href: '/admin/vps', label: 'Global VPS Fleet', icon: 'vps' },
       { href: '/admin/projects', label: 'Projects & Supabase Stack', icon: 'projects' },
@@ -154,9 +155,9 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
     defaultHref: '/support',
     links: [
       { href: '/support', label: 'Support Operations', icon: 'overview' },
+      { href: '/support/kb', label: 'Support Runbooks', icon: 'knowledgebase' },
       { href: '/admin/tickets', label: 'Ticket Queue', icon: 'tickets' },
       { href: '/admin/chat', label: 'Live Support Chat', icon: 'chat' },
-      { href: '/knowledgebase', label: 'Knowledge Base', icon: 'knowledgebase' },
     ],
   },
 };
