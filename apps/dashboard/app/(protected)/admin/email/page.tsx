@@ -158,7 +158,7 @@ export default function AdminEmailPage() {
       {/* Customer Mailboxes Table */}
       <Card
         title="Customer Mailbox Quotas & Access Control"
-        description="Manage storage limits, daily send quotas, and assigned user accounts for shared SMTP host."
+        description="Manage storage limits, daily send quotas, and assigned user accounts for business email & SMTP hosts."
       >
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs font-mono">

@@ -76,7 +76,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
       continue;
     }
 
-    // 1. Shared SMTP & Mailbox Hosting
+    // 1. Business Email & Mailbox Hosting
     const isSmtp =
       productCategory === 'smtp_hosting' ||
       productCategory === 'smtp' ||
