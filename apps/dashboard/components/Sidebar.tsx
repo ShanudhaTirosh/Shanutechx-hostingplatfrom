@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
 import { signOut } from 'firebase/auth';
 import { firebaseAuth } from '@/lib/firebaseClient';
 import { useAppUser } from '@/lib/AppUserContext';
@@ -83,8 +83,8 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
     links: [
       { href: '/dashboard', label: 'Overview', icon: 'overview' },
       { href: '/services', label: 'Services', icon: 'services' },
-      { href: '/cart', label: 'Shopping Cart', icon: 'cart' },
-      { href: '/orders', label: 'Subscriptions & Invoices', icon: 'billing' },
+      { href: '/orders?tab=cart', label: 'Shopping Cart', icon: 'cart' },
+      { href: '/orders?tab=subscriptions', label: 'Subscriptions & Invoices', icon: 'billing' },
       { href: '/deployments', label: 'Deployments', icon: 'deployments' },
       { href: '/email', label: 'Business Email & Webmail', icon: 'smtp' },
       { href: '/vps', label: 'VPS', icon: 'vps' },
@@ -162,9 +162,16 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
 function isPathInSpace(pathname: string, spaceKey: SpaceKey): boolean {
   const space = SPACES[spaceKey];
   if (!space) return false;
-  return space.links.some(
-    (link) => pathname === link.href || (link.href !== '/dashboard' && link.href !== '/admin' && link.href !== '/dev' && pathname.startsWith(link.href))
-  );
+  return space.links.some((link) => {
+    const [linkPath] = link.href.split('?');
+    return (
+      pathname === linkPath ||
+      (linkPath !== '/dashboard' &&
+        linkPath !== '/admin' &&
+        linkPath !== '/dev' &&
+        pathname.startsWith(linkPath))
+    );
+  });
 }
 
 function getSpaceFromPathname(pathname: string): SpaceKey {
@@ -187,8 +194,51 @@ function getSpaceFromPathname(pathname: string): SpaceKey {
   return 'customer';
 }
 
+function isSidebarLinkActive(
+  linkHref: string,
+  pathname: string,
+  searchParams: ReturnType<typeof useSearchParams>
+): boolean {
+  const [linkPath, linkQuery] = linkHref.split('?');
+  const linkParams = new URLSearchParams(linkQuery || '');
+  const activeTabParam = searchParams.get('tab');
+
+  // Shopping Cart link matching (/cart or /orders?tab=cart)
+  if (linkPath === '/cart' || (linkPath === '/orders' && linkParams.get('tab') === 'cart')) {
+    if (pathname === '/cart') return true;
+    if (pathname === '/orders' && activeTabParam === 'cart') return true;
+    return false;
+  }
+
+  // Subscriptions & Invoices link matching (/billing or /orders?tab=subscriptions)
+  if (
+    linkPath === '/billing' ||
+    (linkPath === '/orders' && (!linkParams.has('tab') || linkParams.get('tab') !== 'cart'))
+  ) {
+    if (pathname === '/billing') return true;
+    if (pathname === '/orders' && activeTabParam !== 'cart') return true;
+    return false;
+  }
+
+  // Base root spaces matching
+  if (linkHref === '/dashboard' || linkHref === '/admin' || linkHref === '/dev') {
+    return pathname === linkHref;
+  }
+
+  return pathname === linkPath || pathname.startsWith(linkPath);
+}
+
 export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <Suspense fallback={null}>
+      <SidebarContent onNavigate={onNavigate} />
+    </Suspense>
+  );
+}
+
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { apiUser, loading, switchRole } = useAppUser();
   const [signingOut, setSigningOut] = useState(false);
@@ -331,7 +381,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       {/* Active Panel Navigation Links */}
       <nav className="flex flex-col gap-1 flex-1 overflow-y-auto pr-1">
         {activePanel.links.map((link) => {
-          const active = pathname === link.href || (link.href !== '/dashboard' && link.href !== '/admin' && link.href !== '/dev' && pathname.startsWith(link.href));
+          const active = isSidebarLinkActive(link.href, pathname, searchParams);
           return (
             <Link
               key={link.href}
@@ -417,4 +467,3 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     </aside>
   );
 }
-
