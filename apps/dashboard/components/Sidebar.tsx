@@ -194,12 +194,9 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   // Determine allowed spaces based strictly on user role
   const allowedSpaces: SpaceKey[] = [];
-  if (isDev) {
-    // Dev role (system owner) gets access to all 4 spaces
-    allowedSpaces.push('dev', 'admin', 'support', 'customer');
-  } else if (isAdmin) {
-    // Admin role gets access to Admin, Support, and Customer spaces (NO Dev space)
-    allowedSpaces.push('admin', 'support', 'customer');
+  if (isDev || isAdmin) {
+    // Admin & Dev roles (system administrators & owners) get access to all 4 spaces
+    allowedSpaces.push('admin', 'dev', 'support', 'customer');
   } else if (isSupport) {
     // Support role gets access to Support and Customer spaces (NO Admin or Dev spaces)
     allowedSpaces.push('support', 'customer');

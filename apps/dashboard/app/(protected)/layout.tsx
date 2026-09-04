@@ -58,36 +58,29 @@ function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { childre
     const userRole = apiUser.role;
 
     // Role-based route gating
-    // /projects is dev-only
-    if (userRole !== 'dev' && (pathname.startsWith('/projects') || pathname.startsWith('/admin/projects'))) {
-      router.replace(userRole === 'customer' ? '/dashboard' : '/admin/review-queue');
-      return;
-    }
-
     if (userRole === 'customer') {
-      // Customers cannot access /admin/*, /dev/*, or /settings routes
-      if (pathname.startsWith('/admin') || pathname.startsWith('/dev') || pathname.startsWith('/settings')) {
+      // Customers cannot access /admin/*, /dev/*, /settings, or /projects routes
+      if (
+        pathname.startsWith('/admin') ||
+        pathname.startsWith('/dev') ||
+        pathname.startsWith('/settings') ||
+        pathname.startsWith('/projects')
+      ) {
         router.replace('/dashboard');
         return;
       }
     } else if (userRole === 'support') {
-      // Support staff can access tickets, chat, and customer pages
+      // Support staff can access tickets, chat, and customer pages (NO admin/dev infrastructure or settings)
       if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/tickets') && !pathname.startsWith('/admin/chat')) {
         router.replace('/admin/tickets');
         return;
       }
-      if (pathname.startsWith('/dev') || pathname.startsWith('/settings')) {
+      if (pathname.startsWith('/dev') || pathname.startsWith('/settings') || pathname.startsWith('/projects')) {
         router.replace('/admin/tickets');
         return;
       }
-    } else if (userRole === 'admin') {
-      // Admin role cannot access dev infrastructure routes (/dev/*)
-      if (pathname.startsWith('/dev')) {
-        router.replace('/admin/review-queue');
-        return;
-      }
     }
-    // Dev role (system owner) has full access to all routes
+    // Admin and Dev roles (system administrators & system owners) have full access to all routes
   }, [apiUser, apiUserLoading, pathname, router, mounted]);
 
   if (apiUserLoading) {
