@@ -41,9 +41,16 @@ const CATEGORY_LABEL: Record<ProductCategory, string> = {
   whatsappbot_hosting: 'WhatsApp Bot Hosting',
   lavalink_hosting: 'Lavalink Hosting',
   vps: 'VPS',
+  vps_hosting: 'VPS Hosting',
   ai_subscription: 'AI Subscriptions',
   smtp_hosting: 'SMTP / Mail Hosting',
+  email_hosting: 'Email Hosting',
   database_hosting: 'Databases',
+  managed_database: 'Managed Database',
+  app_container: 'App Container',
+  media_livekit: 'LiveKit Media Engine',
+  cloud_storage: 'Cloud Storage S3',
+  custom_service: 'Custom Service',
   app_catalog: 'App Catalog',
 };
 
@@ -56,9 +63,16 @@ const CATEGORY_COLOR: Record<ProductCategory, string> = {
   whatsappbot_hosting: 'bg-green-500/10 text-green-400 border border-green-500/20',
   lavalink_hosting: 'bg-pink-500/10 text-pink-300 border border-pink-500/20',
   vps: 'bg-orange-500/10 text-orange-300 border border-orange-500/20',
+  vps_hosting: 'bg-orange-500/10 text-orange-300 border border-orange-500/20',
   ai_subscription: 'bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-500/20',
   smtp_hosting: 'bg-teal-500/10 text-teal-300 border border-teal-500/20',
+  email_hosting: 'bg-teal-500/10 text-teal-300 border border-teal-500/20',
   database_hosting: 'bg-sky-500/10 text-sky-400 border border-sky-500/20',
+  managed_database: 'bg-sky-500/10 text-sky-400 border border-sky-500/20',
+  app_container: 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20',
+  media_livekit: 'bg-rose-500/10 text-rose-300 border border-rose-500/20',
+  cloud_storage: 'bg-amber-500/10 text-amber-300 border border-amber-500/20',
+  custom_service: 'bg-slate-500/10 text-slate-300 border border-slate-500/20',
   app_catalog: 'bg-rose-500/10 text-rose-300 border border-rose-500/20',
 };
 

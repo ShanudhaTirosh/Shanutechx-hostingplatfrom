@@ -34,10 +34,15 @@ export interface ClientProject {
   extensions?: string[];
   authSettingsJson?: any;
   poolerSettingsJson?: any;
+  nodeId?: string | null;
+  nodeIp?: string | null;
+  studioUrl?: string;
   createdAt: string;
 }
 
 function serializeProject(p: any): ClientProject {
+  const nodeHost = p.nodeIp || 'localhost';
+  const studioPort = p.studioPort ?? 8000;
   return {
     id: p.id,
     name: p.name,
@@ -48,13 +53,16 @@ function serializeProject(p: any): ClientProject {
     anonKey: p.anonKey || SUPABASE_ANON_KEY,
     serviceKey: p.serviceKey || SUPABASE_SERVICE_ROLE_KEY,
     smtpConfigured: p.smtpConfigured,
-    studioPort: p.studioPort ?? 8000,
+    studioPort,
     apiPort: p.apiPort ?? 8001,
     dbPort: p.dbPort ?? 5432,
     storageLimitMb: p.storageLimitMb ?? 5120,
     extensions: p.extensions ?? ['uuid-ossp', 'pgcrypto', 'pgvector'],
     authSettingsJson: p.authSettingsJson ?? { emailEnabled: true, githubEnabled: true, googleEnabled: false },
     poolerSettingsJson: p.poolerSettingsJson ?? { mode: 'transaction', poolSize: 20, port: 6543 },
+    nodeId: p.nodeId ?? null,
+    nodeIp: p.nodeIp ?? null,
+    studioUrl: `http://${nodeHost}:${studioPort}`,
     createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
   };
 }
@@ -162,9 +170,17 @@ supabaseRouter.get('/supabase/projects', requireAuth, requireAdminOrDev, async (
 });
 
 supabaseRouter.post('/supabase/projects', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
-  const { name, clientEmail, region } = req.body;
+  const { name, clientEmail, region, nodeId } = req.body;
   if (!name || !clientEmail) {
     return res.status(400).json({ error: 'Project name and client email are required' });
+  }
+
+  let selectedNode = null;
+  if (nodeId) {
+    selectedNode = await prisma.node.findUnique({ where: { id: nodeId } });
+  }
+  if (!selectedNode) {
+    selectedNode = await prisma.node.findFirst({ where: { isActive: true } });
   }
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 20);
@@ -181,6 +197,8 @@ supabaseRouter.post('/supabase/projects', requireAuth, requireAdminOrDev, async 
       anonKey: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.anon_${id}`,
       serviceKey: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.service_${id}`,
       smtpConfigured: true,
+      nodeId: selectedNode?.id || null,
+      nodeIp: selectedNode?.ip || null,
     },
   });
 

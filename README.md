@@ -35,7 +35,10 @@ This platform leverages world-class open-source engines and reference architectu
 
 ## ⚡ Core Platform Capabilities
 
-### 1. 🤖 Fully Automated Provisioning Pipeline
+### 1. 🤖 Fully Automated Provisioning Pipeline & Unified Dev Studio Hub
+- **Unified Dev Studio & Databases Hub**: Centralized workspace for Self-Hosted Supabase Stacks, Managed Databases, and Node Port Exposures with target VPS node selection and direct Launch Studio UI button (`http://<nodeIp>:<studioPort>`).
+- **Global Compute Node Registration**: Automatic Cloudflare DNS A-record (`node-<label>.<rootDomain>`) creation upon host node registration without requiring manual usage tag setup.
+- **Node Port Exposure Engine**: Instant mapping of container/node ports to auto-created Cloudflare DNS subdomains (`node-label-port-8080.shanutechx.com`).
 - **Zero-Touch Fulfillment**: The ONLY manual step on the entire platform is **Manual Payment Verification** (upload proof/SMS review).
 - Once payment is approved, the system automatically:
   - Provisions the purchased product (web/node/python hosting, VPS, SMTP account, managed database, LiveKit, catalog app).

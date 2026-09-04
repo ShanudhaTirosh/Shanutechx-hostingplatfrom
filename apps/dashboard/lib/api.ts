@@ -574,7 +574,7 @@ export const api = {
       password?: string;
       privateKey?: string;
       label: string;
-      roleTags: string[];
+      roleTags?: string[];
     }) => apiFetch('/api/nodes/connect', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ success: boolean; message: string; node?: Node; logs?: string[] }>(r)),
     /**
      * Open a Server-Sent Events stream for live provisioning progress.
@@ -583,7 +583,7 @@ export const api = {
      */
     connectSSHStream: (data: {
       ip: string; port?: number; username?: string; password?: string;
-      privateKey?: string; label: string; roleTags: string[];
+      privateKey?: string; label: string; roleTags?: string[];
     }) => {
       // SSE via fetch (EventSource doesn't support POST + body)
       // Returns the raw Response; consumer should iterate the ReadableStream.
@@ -596,8 +596,14 @@ export const api = {
       cpuCores: number;
       ramMb: number;
       diskGb: number;
-      roleTags: string[];
-    }) => apiFetch('/api/nodes', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ node: Node }>(r)),
+      roleTags?: string[];
+    }) => apiFetch('/api/nodes', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ node: Node; domain?: string }>(r)),
+    getPortExposures: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/ports/exposures`).then((r) => asJson<{ exposures: any[] }>(r)),
+    exposePort: (nodeId: string, data: { port: number; subdomain?: string; protocol?: string; label?: string }) =>
+      apiFetch(`/api/nodes/${nodeId}/ports/expose`, { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ exposure: any }>(r)),
+    deletePortExposure: (nodeId: string, exposureId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/ports/exposures/${exposureId}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
   },
 
 
@@ -1706,6 +1712,7 @@ export const api = {
       ),
   },
 
+
   devSupabase: {
     health: () =>
       apiFetch('/api/supabase/health').then((r) =>
@@ -1713,7 +1720,7 @@ export const api = {
       ),
     listProjects: () =>
       apiFetch('/api/supabase/projects').then((r) => asJson<{ projects: SupabaseClientProject[]; total: number }>(r)),
-    createProject: (data: { name: string; clientEmail: string; region?: string }) =>
+    createProject: (data: { name: string; clientEmail: string; region?: string; nodeId?: string }) =>
       apiFetch('/api/supabase/projects', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<{ project: SupabaseClientProject }>(r)
       ),

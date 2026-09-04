@@ -229,6 +229,7 @@ model Node {
   services         Service[]
   deployments      Deployment[]
   managedDatabases ManagedDatabase[]
+  portExposures    NodePortExposure[]
 
   // Set when this Node IS a VPS the admin/dev bought manually through
   // Leaseweb's portal and then linked here via the "import as a node" flow
@@ -987,6 +988,9 @@ model SupabaseClientProject {
   poolerSettingsJson Json?
   storageLimitMb     Int?     @default(5120)
   extensions         String[] @default(["uuid-ossp", "pgcrypto", "pgvector"])
+  // Target VPS node for this Supabase stack
+  nodeId             String?  // Node.id this stack is provisioned on
+  nodeIp             String?  // Cached node IP for direct Studio URL: http://nodeIp:studioPort
   createdAt          DateTime @default(now())
 }
 
@@ -1632,4 +1636,21 @@ model Review {
 
   @@index([userId])
   @@index([productCategory])
+}
+
+// Maps a port on a registered compute node to an auto-created platform subdomain.
+// e.g. port 3000 on node-01 (IP 1.2.3.4) becomes http://myapp.shanutechx.com -> 1.2.3.4:3000
+model NodePortExposure {
+  id             String   @id @default(cuid())
+  nodeId         String
+  node           Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  port           Int
+  protocol       String   @default("http") // http | https | tcp
+  subdomain      String   @unique // e.g. 'myapp'  -> myapp.<rootDomain>
+  cfDnsRecordId  String?  // Cloudflare DNS A-record ID for cleanup
+  label          String?  // optional human-readable label
+  createdAt      DateTime @default(now())
+
+  @@unique([nodeId, port])
+  @@index([nodeId])
 }

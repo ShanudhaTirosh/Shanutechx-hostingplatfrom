@@ -8,6 +8,7 @@ import { env } from '../env';
 import { encryptSecret } from '../lib/secretsVault';
 import { verifySharedSecret } from '../lib/gateAuth';
 import { logger } from '../lib/logger';
+import { createSubdomainRecord, deleteSubdomainRecord } from '../lib/cloudflare';
 
 export const nodesRouter = Router();
 
@@ -135,6 +136,8 @@ echo "============================================================"
   res.send(script);
 });
 
+const DEFAULT_NODE_ROLE_TAGS = ['global', 'web-hosting', 'node-hosting', 'database-hosting', 'supabase-hosting'];
+
 const registerNodeSchema = z.object({
   label: z.string().min(1),
   ip: z.string().min(1),
@@ -142,7 +145,7 @@ const registerNodeSchema = z.object({
   cpuCores: z.number().int().positive(),
   ramMb: z.number().int().positive(),
   diskGb: z.number().int().positive(),
-  roleTags: z.array(z.string()).min(1),
+  roleTags: z.array(z.string()).optional().default(DEFAULT_NODE_ROLE_TAGS),
 });
 
 /**
@@ -160,6 +163,16 @@ nodesRouter.post('/nodes/register', async (req: Request, res: Response) => {
   }
 
   const { label, ip, cpuCores, ramMb, diskGb, roleTags } = parsed.data;
+
+  // Auto-point node subdomain via Cloudflare DNS if possible
+  const cleanLabel = label.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '') || 'node';
+  const nodeSubdomain = `node-${cleanLabel}`;
+  try {
+    await createSubdomainRecord(nodeSubdomain, ip);
+    logger.info({ nodeSubdomain, ip }, 'Auto-created Cloudflare DNS record for registered node');
+  } catch (dnsErr) {
+    logger.warn({ dnsErr, nodeSubdomain, ip }, 'Cloudflare DNS auto-record registration skipped or failed');
+  }
 
   // Upsert node by IP or Label
   const existing = await prisma.node.findFirst({
@@ -200,7 +213,11 @@ nodesRouter.post('/nodes/register', async (req: Request, res: Response) => {
     });
   }
 
-  res.status(200).json({ success: true, node });
+  res.status(200).json({
+    success: true,
+    node,
+    domain: `${nodeSubdomain}.${env.rootDomain}`,
+  });
 });
 
 // ── BUG-08 FIX: Node agent stats endpoint BEFORE admin middleware ──
@@ -264,7 +281,7 @@ const createNodeSchema = z.object({
   cpuCores: z.number().int().positive(),
   ramMb: z.number().int().positive(),
   diskGb: z.number().int().positive(),
-  roleTags: z.array(z.string()).min(1),
+  roleTags: z.array(z.string()).optional().default(DEFAULT_NODE_ROLE_TAGS),
   monthlyBandwidthGb: z.number().int().positive().default(30000),
 });
 
@@ -272,6 +289,14 @@ nodesRouter.post('/nodes', async (req: AuthedRequest, res: Response) => {
   const parsed = createNodeSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const cleanLabel = parsed.data.label.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '') || 'node';
+  const nodeSubdomain = `node-${cleanLabel}`;
+  try {
+    await createSubdomainRecord(nodeSubdomain, parsed.data.ip);
+  } catch (dnsErr) {
+    logger.warn({ dnsErr }, 'Could not create DNS for node');
   }
 
   const node = await prisma.node.create({
@@ -290,7 +315,91 @@ nodesRouter.post('/nodes', async (req: AuthedRequest, res: Response) => {
     },
   });
 
-  res.status(201).json({ node });
+  res.status(201).json({ node, domain: `${nodeSubdomain}.${env.rootDomain}` });
+});
+
+// ── Node Port Exposure & Domain Pointing Endpoints ──
+
+nodesRouter.get('/nodes/:id/ports/exposures', async (req: AuthedRequest, res: Response) => {
+  const exposures = await prisma.nodePortExposure.findMany({
+    where: { nodeId: req.params.id },
+    orderBy: { port: 'asc' },
+  });
+  res.json({
+    exposures: exposures.map((e) => ({
+      ...e,
+      domain: `${e.subdomain}.${env.rootDomain}`,
+      url: `${e.protocol}://${e.subdomain}.${env.rootDomain}`,
+    })),
+  });
+});
+
+const exposePortSchema = z.object({
+  port: z.number().int().min(1).max(65535),
+  subdomain: z.string().optional(),
+  protocol: z.enum(['http', 'https', 'tcp']).default('http'),
+  label: z.string().optional(),
+});
+
+nodesRouter.post('/nodes/:id/ports/expose', async (req: AuthedRequest, res: Response) => {
+  const parsed = exposePortSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const node = await prisma.node.findUnique({ where: { id: req.params.id } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+
+  const { port, protocol, label } = parsed.data;
+  const cleanNodeLabel = node.label.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '') || node.id.slice(-6);
+  const rawSubdomain = parsed.data.subdomain?.trim() || `${cleanNodeLabel}-port-${port}`;
+  const subdomain = rawSubdomain.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '');
+
+  let cfRecordId: string | null = null;
+  try {
+    const cf = await createSubdomainRecord(subdomain, node.ip);
+    cfRecordId = cf.recordId;
+  } catch (err: any) {
+    logger.warn({ err, subdomain, nodeIp: node.ip }, 'Failed to create Cloudflare DNS record for port exposure');
+  }
+
+  const exposure = await prisma.nodePortExposure.upsert({
+    where: { nodeId_port: { nodeId: node.id, port } },
+    create: {
+      nodeId: node.id,
+      port,
+      protocol,
+      subdomain,
+      cfDnsRecordId: cfRecordId,
+      label: label || `Port ${port} (${protocol.toUpperCase()})`,
+    },
+    update: {
+      protocol,
+      subdomain,
+      cfDnsRecordId: cfRecordId || undefined,
+      label: label || `Port ${port} (${protocol.toUpperCase()})`,
+    },
+  });
+
+  res.status(201).json({
+    exposure: {
+      ...exposure,
+      domain: `${subdomain}.${env.rootDomain}`,
+      url: `${protocol}://${subdomain}.${env.rootDomain}`,
+    },
+  });
+});
+
+nodesRouter.delete('/nodes/:id/ports/exposures/:exposureId', async (req: AuthedRequest, res: Response) => {
+  const exposure = await prisma.nodePortExposure.findUnique({ where: { id: req.params.exposureId } });
+  if (!exposure || exposure.nodeId !== req.params.id) {
+    return res.status(404).json({ error: 'Port exposure not found' });
+  }
+
+  if (exposure.subdomain) {
+    await deleteSubdomainRecord(exposure.subdomain).catch(() => {});
+  }
+
+  await prisma.nodePortExposure.delete({ where: { id: exposure.id } });
+  res.json({ ok: true });
 });
 
 const connectSSHSchema = z.object({
@@ -300,7 +409,7 @@ const connectSSHSchema = z.object({
   password: z.string().optional(),
   privateKey: z.string().optional(),
   label: z.string().min(1),
-  roleTags: z.array(z.string()).default(['web-hosting', 'node-hosting']),
+  roleTags: z.array(z.string()).optional().default(DEFAULT_NODE_ROLE_TAGS),
   monthlyBandwidthGb: z.number().int().positive().default(30000),
 });
 

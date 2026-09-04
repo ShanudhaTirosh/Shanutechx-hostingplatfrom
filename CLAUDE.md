@@ -12,9 +12,11 @@ Defect audit report & vulnerability fixes: see [BUG_AUDIT.md](file:///c:/Users/t
 ShanuTechX integrates full-lifecycle cloud hosting, container builds, managed infrastructure, and customer management:
 
 ### 1. Core Hosting & Container Provisioning
+- **Unified Dev Studio & Databases Hub:** Consolidated management of Self-Hosted Supabase Stacks, Managed Databases (PostgreSQL 16, MySQL 8, Redis 7, MongoDB), and custom projects with target VPS host node selection and direct Launch Studio UI button (`http://<nodeIp>:<studioPort>`).
+- **Global Compute Node Registration & Auto-DNS:** Registering a VPS host node defaults to global hosting capabilities without requiring manual usage tag configuration, automatically creating a Cloudflare DNS A-record (`node-<label>.<rootDomain>`) pointing to the node IP.
+- **Node Port Exposure Engine:** Expose any container/node port to an auto-created platform subdomain (e.g. `http://node1-port-8080.shanutechx.com`) backed by Cloudflare DNS and tracked via `NodePortExposure`.
 - **Git Push-to-Deploy & Zip Uploads:** Automated container building via Dockerfile or framework presets (Node.js, Python, Static Web) with automatic build log streaming via Server-Sent Events (SSE).
 - **One-Click App Catalog:** Deploy 15+ pre-configured stacks (WordPress + MySQL, N8N, Grafana, Hermes AI Agent, PostgreSQL, MinIO, Redis, etc.) using Docker Compose templates from [`templates/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/templates).
-- **Managed Databases:** Instant automated creation and connection string generation for PostgreSQL 16, MySQL 8, Redis 7, and MongoDB.
 - **Interactive In-Browser SSH Terminal:** Real-time PTY terminal gateway ([`sshTerminalGateway.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/sshTerminalGateway.ts)) over WebSockets with xterm.js support.
 - **Webmail & Shared SMTP Hosting:** Automated postal org/mailbox creation with webmail studio integration ([`smtpProvisioner.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/smtpProvisioner.ts)).
 - **LiveKit WebRTC Infrastructure:** Real-time audio/video room key generation and node registration ([`livekit.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/livekit.ts)).

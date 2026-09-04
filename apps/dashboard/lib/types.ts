@@ -552,6 +552,10 @@ export interface SupabaseClientProject {
   extensions?: string[];
   authSettingsJson?: any;
   poolerSettingsJson?: any;
+  nodeId?: string | null;
+  nodeIp?: string | null;
+  studioUrl?: string;
   createdAt: string;
 }
+
 

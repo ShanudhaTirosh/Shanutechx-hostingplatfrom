@@ -140,7 +140,7 @@ export default function AdminDatabasesPage() {
     setBusy(true);
     setError(null);
     try {
-      await api.managedDatabases.create(selectedUser.id, type);
+      await api.managedDatabases.create({ userId: selectedUser.id, type });
       toast(`Managed ${type} database provisioned successfully`, 'success');
       load();
     } catch (err: any) {
@@ -396,7 +396,7 @@ export default function AdminDatabasesPage() {
                     <button
                       onClick={async () => {
                         try {
-                          const res = await api.managedDatabases.connection(db.id);
+                          const res = await api.managedDatabases.getConnection(db.id);
                           navigator.clipboard.writeText(res.connectionString);
                           toast(`Copied ${db.type.toUpperCase()} DSN connection URI!`, 'success');
                         } catch (e: any) {
