@@ -10,24 +10,15 @@ import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/aut
 export const productsRouter = Router();
 
 const CATEGORIES = [
-  'web_hosting',
-  'node_app_hosting',
-  'python_app_hosting',
-  'discordbot_node',
-  'discordbot_python',
-  'whatsappbot_hosting',
-  'lavalink_hosting',
-  'vps',
   'vps_hosting',
-  'ai_subscription',
-  'smtp_hosting',
-  'email_hosting',
-  'database_hosting',
   'managed_database',
   'app_container',
+  'email_hosting',
   'media_livekit',
   'cloud_storage',
   'custom_service',
+  'web_hosting',
+  'ai_subscription',
   'app_catalog',
 ] as const;
 

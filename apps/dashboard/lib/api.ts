@@ -204,34 +204,6 @@ export const api = {
       apiFetch(`/api/services/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
   },
 
-  products: {
-    list: (category?: ProductCategory) =>
-      apiFetch(`/api/products${category ? `?category=${category}` : ''}`).then((r) =>
-        asJson<{ products: Product[] }>(r)
-      ),
-    get: (id: string) => apiFetch(`/api/products/${id}`).then((r) => asJson<{ product: Product }>(r)),
-    create: (data: { category: ProductCategory; name: string; description?: string; iconUrl?: string }) =>
-      apiFetch('/api/products', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
-        asJson<{ product: Product }>(r)
-      ),
-    update: (id: string, data: Partial<{ category: ProductCategory; name: string; description: string | null; isActive: boolean }>) =>
-      apiFetch(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }).then((r) =>
-        asJson<{ product: Product }>(r)
-      ),
-    delete: (id: string) =>
-      apiFetch(`/api/products/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
-    createPlan: (
-      productId: string,
-      data: { name: string; price: number; currency?: string; billingType: PlanBillingType; specsJson?: Record<string, unknown> }
-    ) =>
-      apiFetch(`/api/products/${productId}/plans`, { method: 'POST', body: JSON.stringify(data) }).then((r) =>
-        asJson<{ plan: Plan }>(r)
-      ),
-    updatePlan: (id: string, data: Partial<{ name: string; price: number; billingType: PlanBillingType; isActive: boolean; specsJson: Record<string, unknown> }>) =>
-      apiFetch(`/api/plans/${id}`, { method: 'PUT', body: JSON.stringify(data) }).then((r) => asJson<{ plan: Plan }>(r)),
-    deletePlan: (id: string) =>
-      apiFetch(`/api/plans/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean; plan: Plan }>(r)),
-  },
 
   knowledgebase: {
     list: (category?: string, query?: string, targetRole?: string) => {

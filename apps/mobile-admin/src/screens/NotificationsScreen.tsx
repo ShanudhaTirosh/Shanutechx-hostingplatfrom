@@ -89,7 +89,7 @@ export function NotificationsScreen() {
         }
         renderItem={({ item }) => (
           <GlassCard style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <Text style={{ fontSize: 12, fontFamily: fontFamily.mono, color: colors.primary }}>{ACTION_ICON[item.action] ?? '[LOG]'}</Text>
+            <Text style={{ fontSize: 12, fontFamily: fontFamily.headSemibold, color: colors.primary }}>{ACTION_ICON[item.action] ?? '[LOG]'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.action}>{actionLabel(item.action)}</Text>
               <Text style={styles.meta}>

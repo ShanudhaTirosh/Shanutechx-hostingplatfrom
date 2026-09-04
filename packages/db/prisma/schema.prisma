@@ -49,7 +49,6 @@ enum PaymentStatus {
   rejected
 }
 
-
 enum PaymentMethod {
   manual
   sms
@@ -122,17 +121,17 @@ enum ManagedDatabaseStatus {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  firebaseUid String   @unique
-  email       String   @unique
-  displayName String?
-  phoneNumber String?  // for WhatsApp order/payment notifications
+  id            String    @id @default(cuid())
+  firebaseUid   String    @unique
+  email         String    @unique
+  displayName   String?
+  phoneNumber   String? // for WhatsApp order/payment notifications
   discordUserId String? // for Discord DM notifications, if linked
-  role        Role     @default(customer)
-  isBanned    Boolean  @default(false)
-  bannedAt    DateTime?
-  banReason   String?
-  createdAt   DateTime @default(now())
+  role          Role      @default(customer)
+  isBanned      Boolean   @default(false)
+  bannedAt      DateTime?
+  banReason     String?
+  createdAt     DateTime  @default(now())
 
   // Bcrypt hash of this user's "Settings Protection" PIN (see
   // routes/settings.ts). Null until the user explicitly sets one — there
@@ -149,44 +148,44 @@ model User {
   // deployments, orders, payments, tickets, domains, managed databases)
   // once assigned here. dev is never restricted by this. See
   // middleware/rbac.ts's verifyResourceOwnershipAsync/ownedResourceWhere.
-  assignedAdminId String?
-  assignedAdmin   User?   @relation("AdminAssignment", fields: [assignedAdminId], references: [id])
-  assignedCustomers User[] @relation("AdminAssignment")
+  assignedAdminId   String?
+  assignedAdmin     User?   @relation("AdminAssignment", fields: [assignedAdminId], references: [id])
+  assignedCustomers User[]  @relation("AdminAssignment")
 
-  orders        Order[]
-  deployments   Deployment[]
-  smtpAccounts  SmtpAccount[]
-  liveKitProjs  LiveKitProject[]
-  vpsProvisions VpsProvision[]
-  tickets       Ticket[]
-  ticketMessages TicketMessage[]
-  subscriptions  Subscription[]
-  apiKeys        ApiKey[]
-  webhooks       Webhook[]
-  managedDatabases ManagedDatabase[]
-  auditLogs     AuditLog[] @relation("AdminAuditLogs")
-  projects      Project[]
-  reviewedPayments Payment[] @relation("PaymentReviewer")
-  pushTokens    PushToken[]
-  emailMessages EmailMessage[]
-  webmailMessages      WebmailMessage[]
-  gitHubInstallations  GitHubInstallation[]
-  gitLabConnections    GitLabConnection[]
-  emailDomains         EmailDomain[]
-  secretAuditEntries   SecretAuditEntry[]
-  ownedTeams           Team[]               @relation("TeamOwner")
-  teamMemberships      TeamMember[]
-  sentTeamInvites      TeamInvite[]
-  emailContacts        EmailContact[]
-  webmailFolders       WebmailFolder[]
-  webmailLabels        WebmailLabel[]
-  webmailFilters       WebmailFilter[]
-  webmailSignatures    WebmailSignature[]
-  webmailTemplates     WebmailTemplate[]
-  webmailAutoReplies   WebmailAutoReply[]
+  orders                Order[]
+  deployments           Deployment[]
+  smtpAccounts          SmtpAccount[]
+  liveKitProjs          LiveKitProject[]
+  vpsProvisions         VpsProvision[]
+  tickets               Ticket[]
+  ticketMessages        TicketMessage[]
+  subscriptions         Subscription[]
+  apiKeys               ApiKey[]
+  webhooks              Webhook[]
+  managedDatabases      ManagedDatabase[]
+  auditLogs             AuditLog[]             @relation("AdminAuditLogs")
+  projects              Project[]
+  reviewedPayments      Payment[]              @relation("PaymentReviewer")
+  pushTokens            PushToken[]
+  emailMessages         EmailMessage[]
+  webmailMessages       WebmailMessage[]
+  gitHubInstallations   GitHubInstallation[]
+  gitLabConnections     GitLabConnection[]
+  emailDomains          EmailDomain[]
+  secretAuditEntries    SecretAuditEntry[]
+  ownedTeams            Team[]                 @relation("TeamOwner")
+  teamMemberships       TeamMember[]
+  sentTeamInvites       TeamInvite[]
+  emailContacts         EmailContact[]
+  webmailFolders        WebmailFolder[]
+  webmailLabels         WebmailLabel[]
+  webmailFilters        WebmailFilter[]
+  webmailSignatures     WebmailSignature[]
+  webmailTemplates      WebmailTemplate[]
+  webmailAutoReplies    WebmailAutoReply[]
   webmailBlockedSenders WebmailBlockedSender[]
-  webmailCalendarSyncs WebmailCalendarSync[]
-  reviews              Review[]
+  webmailCalendarSyncs  WebmailCalendarSync[]
+  reviews               Review[]
 }
 
 // Real Expo push tokens, registered by the mobile admin app
@@ -199,36 +198,36 @@ model User {
 // never been exercised end-to-end. Verify with a real device before
 // relying on it.
 model PushToken {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  expoToken   String   @unique
-  platform    String   // 'ios' | 'android'
-  createdAt   DateTime @default(now())
-  lastSeenAt  DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  expoToken  String   @unique
+  platform   String // 'ios' | 'android'
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
 }
 
 model Node {
-  id         String   @id @default(cuid())
-  label      String
-  ip         String
-  sshKeyRef  String   // reference into the secrets vault, never the raw key
-  cpuCores   Int
-  ramMb      Int
-  diskGb     Int
-  roleTags   String[] // e.g. ["web-hosting", "node-hosting", "python-hosting"]
-  isActive   Boolean  @default(true)
-  monthlyBandwidthGb Int @default(30000)
-  createdAt  DateTime @default(now())
+  id                 String   @id @default(cuid())
+  label              String
+  ip                 String
+  sshKeyRef          String // reference into the secrets vault, never the raw key
+  cpuCores           Int
+  ramMb              Int
+  diskGb             Int
+  roleTags           String[] // e.g. ["web-hosting", "node-hosting", "python-hosting"]
+  isActive           Boolean  @default(true)
+  monthlyBandwidthGb Int      @default(30000)
+  createdAt          DateTime @default(now())
 
   // Live utilization, updated by the node stats collector
-  cpuUsedPct  Float? 
-  ramUsedMb   Int?
-  diskUsedGb  Int?
-  lastSeenAt  DateTime?
+  cpuUsedPct Float?
+  ramUsedMb  Int?
+  diskUsedGb Int?
+  lastSeenAt DateTime?
 
-  services    Service[]
-  deployments Deployment[]
+  services         Service[]
+  deployments      Deployment[]
   managedDatabases ManagedDatabase[]
 
   // Set when this Node IS a VPS the admin/dev bought manually through
@@ -252,7 +251,7 @@ model Service {
   id            String        @id @default(cuid())
   type          ServiceType
   name          String
-  price         Int           // smallest currency unit, per billing period, in `currency`
+  price         Int // smallest currency unit, per billing period, in `currency`
   currency      Currency      @default(LKR)
   billingPeriod BillingPeriod @default(one_time)
   nodeId        String?
@@ -263,33 +262,34 @@ model Service {
 }
 
 enum ProductCategory {
+  vps_hosting
+  managed_database
+  app_container
+  email_hosting
+  media_livekit
+  cloud_storage
+  custom_service
   web_hosting
+  ai_subscription
+  app_catalog
+  // Legacy DB compatibility variants
+  vps
+  database_hosting
+  smtp_hosting
   node_app_hosting
   python_app_hosting
   discordbot_node
   discordbot_python
   whatsappbot_hosting
   lavalink_hosting
-  vps
-  vps_hosting
-  ai_subscription
-  smtp_hosting
-  email_hosting
-  database_hosting // redis, mongo, postgres, mysql
-  managed_database
-  app_container
-  media_livekit
-  cloud_storage
-  custom_service
-  app_catalog      // one-click apps — not storage/cloud-drive products
 }
 
 enum PlanBillingType {
   one_time
   monthly
-  quarterly  // 3 months
+  quarterly // 3 months
   semiannual // 6 months
-  yearly     // 12 months
+  yearly // 12 months
 }
 
 // The current, category-aware product catalog. Admin (or dev, who has full
@@ -303,7 +303,7 @@ model Product {
   description String?
   iconUrl     String?
   isPopular   Boolean         @default(false)
-  badge       String?         // e.g. "Popular Choice", "Enterprise", "Pro"
+  badge       String? // e.g. "Popular Choice", "Enterprise", "Pro"
   isActive    Boolean         @default(true)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
@@ -317,12 +317,12 @@ model Plan {
   id          String          @id @default(cuid())
   productId   String
   product     Product         @relation(fields: [productId], references: [id])
-  name        String          // e.g. "Starter", "Pro", "Gemini Pro Seat"
-  price       Int             // smallest currency unit
+  name        String // e.g. "Starter", "Pro", "Gemini Pro Seat"
+  price       Int // smallest currency unit
   currency    Currency        @default(LKR)
   billingType PlanBillingType
   isPopular   Boolean         @default(false)
-  badge       String?         // e.g. "Best Value", "Recommended"
+  badge       String? // e.g. "Best Value", "Recommended"
   // Free-form specs shown on the plan card and used by provisioning, e.g.
   // { ramMB, cpuCores, storageGB, maxBots, maxDbs, mailboxLimit, aliasLimit }
   specsJson   Json?
@@ -341,7 +341,7 @@ model Order {
   teamId    String?
   team      Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
   status    String   @default("draft") // draft | awaiting_payment | paid | cancelled
-  total     Int      // in `currency`
+  total     Int // in `currency`
   currency  Currency @default(LKR)
   // Always the LKR-equivalent of `total` at the exchange rate snapshotted
   // at checkout — payment proof screenshots and SMS payment matching are
@@ -370,14 +370,14 @@ model OrderItem {
   plan       Plan?    @relation(fields: [planId], references: [id])
   priceLkr   Int?     @default(0)
   quantity   Int      @default(1)
-  configJson Json?    // e.g. { repoUrl, runtime, envVars }
+  configJson Json? // e.g. { repoUrl, runtime, envVars }
 
-  deployment          Deployment?
-  smtpAccount         SmtpAccount?
-  liveKitProject      LiveKitProject?
-  vpsProvision        VpsProvision?
-  managedDatabase     ManagedDatabase?
-  subscription        Subscription?
+  deployment            Deployment?
+  smtpAccount           SmtpAccount?
+  liveKitProject        LiveKitProject?
+  vpsProvision          VpsProvision?
+  managedDatabase       ManagedDatabase?
+  subscription          Subscription?
   aiSubscriptionRequest AiSubscriptionRequest?
 }
 
@@ -416,7 +416,7 @@ model Payment {
   // clicks Approve or Decline. rejectionReason is required by the API layer
   // whenever status is set to `rejected` (never null in that case).
   reviewedById    String?
-  reviewedBy      User?         @relation("PaymentReviewer", fields: [reviewedById], references: [id])
+  reviewedBy      User?     @relation("PaymentReviewer", fields: [reviewedById], references: [id])
   reviewedAt      DateTime?
   rejectionReason String?
 
@@ -424,60 +424,60 @@ model Payment {
 }
 
 model SmsEvent {
-  id           String   @id @default(cuid())
-  source       String   // ezcash | combank | sampath | other
-  rawText      String
-  parsedJson   Json?
-  matchedPaymentId String? @unique
+  id               String   @id @default(cuid())
+  source           String // ezcash | combank | sampath | other
+  rawText          String
+  parsedJson       Json?
+  matchedPaymentId String?  @unique
   matchedPayment   Payment? @relation(fields: [matchedPaymentId], references: [id])
-  createdAt    DateTime @default(now())
+  createdAt        DateTime @default(now())
 }
 
 model Invoice {
-  id        String   @id @default(cuid())
-  orderId   String   @unique
-  order     Order    @relation(fields: [orderId], references: [id])
-  pdfUrl    String?
-  issuedAt  DateTime @default(now())
+  id       String   @id @default(cuid())
+  orderId  String   @unique
+  order    Order    @relation(fields: [orderId], references: [id])
+  pdfUrl   String?
+  issuedAt DateTime @default(now())
 }
 
 model Deployment {
-  id          String           @id @default(cuid())
-  orderItemId String?          @unique
-  orderItem   OrderItem?       @relation(fields: [orderItemId], references: [id])
+  id          String     @id @default(cuid())
+  orderItemId String?    @unique
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id])
   userId      String
-  user        User             @relation(fields: [userId], references: [id])
+  user        User       @relation(fields: [userId], references: [id])
   teamId      String?
-  team        Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  team        Team?      @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   // Node assignment:
   // - Customer deployments: nodeId is set by selectNodeForDeployment() (auto only).
   // - Admin-only deployments: isAdminDeployment = true, nodeId may be chosen manually
   //   via the admin dashboard. The API rejects manual nodeId for non-admin requests.
   nodeId            String
-  node              Node             @relation(fields: [nodeId], references: [id])
-  isAdminDeployment Boolean          @default(false)
+  node              Node    @relation(fields: [nodeId], references: [id])
+  isAdminDeployment Boolean @default(false)
 
-  repoUrl      String?
-  runtime      String?  // detected by the builder: nodejs | python
-  containerId  String?
-  subdomain    String?  @unique // null for non-public deployments (e.g. discord bots)
-  internalPort Int?
-  status       DeploymentStatus @default(pending)
-  createdAt    DateTime @default(now())
-  lastDeployAt DateTime?
+  repoUrl             String?
+  runtime             String? // detected by the builder: nodejs | python
+  containerId         String?
+  subdomain           String?          @unique // null for non-public deployments (e.g. discord bots)
+  internalPort        Int?
+  status              DeploymentStatus @default(pending)
+  createdAt           DateTime         @default(now())
+  lastDeployAt        DateTime?
   // Set once "Enable Deploy on Push" is turned on for this deployment (see
   // routes/deployWebhooks.ts). Verifies GitHub's X-Hub-Signature-256 HMAC
   // or GitLab's X-Gitlab-Token header against this value — never accepted
   // as a bare query-string secret, to avoid it leaking through server logs.
-  deployWebhookSecret String? @unique
+  deployWebhookSecret String?          @unique
 
   // Customer-owned custom domain pointed at this deployment (in addition to
   // the auto-assigned subdomain, which always keeps working). See
   // lib/customDomain.ts for the verify-then-route flow.
-  customDomain       String?             @unique
-  customDomainStatus CustomDomainStatus  @default(none)
-  customDomainToken  String?             // not currently used (CNAME-based verification), kept for a future TXT-based path
+  customDomain                   String?            @unique
+  customDomainStatus             CustomDomainStatus @default(none)
+  customDomainToken              String? // not currently used (CNAME-based verification), kept for a future TXT-based path
   // Set once addCustomDomainRoute() successfully creates the record via
   // the Cloudflare API auto-DNS path (see lib/cloudflareDns.ts) — lets the
   // UI distinguish "we created this CNAME for you" from "you added it
@@ -488,46 +488,46 @@ model Deployment {
   // Preview deployments: a lightweight second environment tied to a git
   // branch, created from and linked back to a "parent" production
   // deployment. Previews get their own subdomain but never a custom domain.
-  isPreview            Boolean      @default(false)
-  parentDeploymentId   String?
-  parentDeployment     Deployment?  @relation("DeploymentPreviews", fields: [parentDeploymentId], references: [id])
-  previews             Deployment[] @relation("DeploymentPreviews")
-  branch               String?
+  isPreview          Boolean      @default(false)
+  parentDeploymentId String?
+  parentDeployment   Deployment?  @relation("DeploymentPreviews", fields: [parentDeploymentId], references: [id])
+  previews           Deployment[] @relation("DeploymentPreviews")
+  branch             String?
 
   templateId String?
   template   DeploymentTemplate? @relation(fields: [templateId], references: [id])
 
   // Resource limits for catalog deployments (Requirements 17.1-17.3)
-  cpuLimit        Float?  // CPU cores limit
-  memoryLimit     Int?    // Memory in MB
-  storageLimit    Int?    // Storage in GB
+  cpuLimit     Float? // CPU cores limit
+  memoryLimit  Int? // Memory in MB
+  storageLimit Int? // Storage in GB
 
   // Environment variables for deployment (encrypted) - Requirements 12.10-12.11
   envVarsEncrypted String? // Encrypted JSON string of environment variables
 
   // Dedicated platform shadow backup repository fields (non-Git deployments)
-  backupRepoFullName String?   // Dedicated platform backup repo name (e.g. shanutechx-backups/deploy-{id})
+  backupRepoFullName String? // Dedicated platform backup repo name (e.g. shanutechx-backups/deploy-{id})
   backupLastPushedAt DateTime? // Last timestamp when workspace state was backed up
   workspaceCleanedAt DateTime? // Timestamp when node-local workspace was purged (24h retention)
 
   // Advanced bot & web hosting options: custom start commands, entry files, framework presets, flexible SSL exposure
-  startCommand    String?   // Custom start command (e.g. "java -jar Lavalink.jar", "node index.js", "python bot.py")
-  entryFile       String?   // Config or entry file (e.g. "application.yml", "Lavalink.jar", "index.js")
-  frameworkPreset String?   @default("auto") // auto | nextjs | react_vite | nodejs_bot | whatsapp_baileys | python_bot | lavalink_java | static_html | custom
-  exposureMode    String    @default("ssl_with_proxy") // ssl_with_proxy | ssl_direct | no_ssl
-  publishedPort   Int?      // Direct host port mapping for no_ssl / direct TCP exposure
+  startCommand    String? // Custom start command (e.g. "java -jar Lavalink.jar", "node index.js", "python bot.py")
+  entryFile       String? // Config or entry file (e.g. "application.yml", "Lavalink.jar", "index.js")
+  frameworkPreset String? @default("auto") // auto | nextjs | react_vite | nodejs_bot | whatsapp_baileys | python_bot | lavalink_java | static_html | custom
+  exposureMode    String  @default("ssl_with_proxy") // ssl_with_proxy | ssl_direct | no_ssl
+  publishedPort   Int? // Direct host port mapping for no_ssl / direct TCP exposure
 
   // GitHub private repository & auto-deployment commit metadata fields
-  githubTokenEncrypted String?   // Encrypted GitHub Personal Access Token (PAT) for private repos
-  gitCommitHash        String?   // Latest deployed git commit SHA
-  gitCommitMessage     String?   // Latest deployed git commit message
-  autoDeploy           Boolean   @default(true) // Autonomous deploy on git push
-  webHostingType       String?   // static | node | python | fullstack
-  zipSourceUrl         String?   // ZIP archive file source path/URL for non-git deployments
-  sourceType           String?   @default("git") // git | zip | template
+  githubTokenEncrypted String? // Encrypted GitHub Personal Access Token (PAT) for private repos
+  gitCommitHash        String? // Latest deployed git commit SHA
+  gitCommitMessage     String? // Latest deployed git commit message
+  autoDeploy           Boolean @default(true) // Autonomous deploy on git push
+  webHostingType       String? // static | node | python | fullstack
+  zipSourceUrl         String? // ZIP archive file source path/URL for non-git deployments
+  sourceType           String? @default("git") // git | zip | template
 
-  uptimeChecks    UptimeCheck[]
-  customDomains   CustomDomain[]
+  uptimeChecks  UptimeCheck[]
+  customDomains CustomDomain[]
 }
 
 // One-click app templates — pre-filled repo URL, runtime, and default env
@@ -535,51 +535,51 @@ model Deployment {
 // Seeded by an admin (e.g. "Deploy WordPress", "Discord bot starter"), not
 // customer-created.
 model DeploymentTemplate {
-  id            String   @id @default(cuid())
-  name          String
-  description   String
-  iconUrl       String?
-  repoUrl       String
-  branch        String   @default("main")
-  runtime       String   // nodejs | python | static
-  internalPort  Int
-  defaultEnvVars Json?   // { KEY: "default value" } — customer can override at deploy time
-  isPublic      Boolean  @default(true)
-  createdAt     DateTime @default(now())
+  id             String   @id @default(cuid())
+  name           String
+  description    String
+  iconUrl        String?
+  repoUrl        String
+  branch         String   @default("main")
+  runtime        String // nodejs | python | static
+  internalPort   Int
+  defaultEnvVars Json? // { KEY: "default value" } — customer can override at deploy time
+  isPublic       Boolean  @default(true)
+  createdAt      DateTime @default(now())
 
   deployments Deployment[]
 }
 
 // Webmail messages owned per user and filtered by userId.
 model WebmailMessage {
-  id             String   @id @default(cuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  smtpAccountId  String?
-  smtpAccount    SmtpAccount? @relation(fields: [smtpAccountId], references: [id], onDelete: SetNull)
-  folder         String   // 'inbox' | 'sent' | 'drafts' | 'spam' | 'trash' | 'archive' | 'snoozed'
-  threadId       String?
-  senderName     String
-  senderEmail    String
-  recipientEmail String
-  subject        String
-  snippet        String
-  htmlBody       String
-  replyTo        String?
-  inReplyTo      String?
-  tag            String?
-  category       String   @default("primary") // 'primary' | 'social' | 'promotions' | 'updates'
-  priority       String   @default("normal")  // 'low' | 'normal' | 'high'
-  isRead         Boolean  @default(false)
-  isStarred      Boolean  @default(false)
-  isPinned       Boolean  @default(false)
-  snoozedUntil   DateTime?
-  scheduledAt    DateTime?
-  readReceipt    Boolean  @default(false)
-  hasAttachments Boolean  @default(false)
+  id              String       @id @default(cuid())
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  smtpAccountId   String?
+  smtpAccount     SmtpAccount? @relation(fields: [smtpAccountId], references: [id], onDelete: SetNull)
+  folder          String // 'inbox' | 'sent' | 'drafts' | 'spam' | 'trash' | 'archive' | 'snoozed'
+  threadId        String?
+  senderName      String
+  senderEmail     String
+  recipientEmail  String
+  subject         String
+  snippet         String
+  htmlBody        String
+  replyTo         String?
+  inReplyTo       String?
+  tag             String?
+  category        String       @default("primary") // 'primary' | 'social' | 'promotions' | 'updates'
+  priority        String       @default("normal") // 'low' | 'normal' | 'high'
+  isRead          Boolean      @default(false)
+  isStarred       Boolean      @default(false)
+  isPinned        Boolean      @default(false)
+  snoozedUntil    DateTime?
+  scheduledAt     DateTime?
+  readReceipt     Boolean      @default(false)
+  hasAttachments  Boolean      @default(false)
   attachmentsJson Json?
-  labels         String[] @default([])
-  createdAt      DateTime @default(now())
+  labels          String[]     @default([])
+  createdAt       DateTime     @default(now())
 
   @@index([userId, folder])
   @@index([userId, threadId])
@@ -619,8 +619,8 @@ model WebmailFilter {
   userId         String
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name           String
-  conditionsJson Json     // e.g. { fromContains, subjectContains, hasKeywords }
-  actionsJson    Json     // e.g. { moveToFolder, applyLabel, markRead, star }
+  conditionsJson Json // e.g. { fromContains, subjectContains, hasKeywords }
+  actionsJson    Json // e.g. { moveToFolder, applyLabel, markRead, star }
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
 
@@ -687,11 +687,11 @@ model WebmailCalendarSync {
   id              String    @id @default(cuid())
   userId          String
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider        String    // 'google' | 'ical' | 'outlook'
+  provider        String // 'google' | 'ical' | 'outlook'
   name            String
-  calendarUrl     String?   // For iCal feed
-  accessTokenEnc  String?   // Encrypted OAuth access token
-  refreshTokenEnc String?   // Encrypted OAuth refresh token
+  calendarUrl     String? // For iCal feed
+  accessTokenEnc  String? // Encrypted OAuth access token
+  refreshTokenEnc String? // Encrypted OAuth refresh token
   lastSyncedAt    DateTime?
   createdAt       DateTime  @default(now())
 
@@ -715,69 +715,69 @@ model EmailContact {
 }
 
 model SmtpAccount {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
-  orderItemId   String?  @unique
-  orderItem     OrderItem? @relation(fields: [orderItemId], references: [id])
-  postalOrgId   String?
-  wildduckUserId String?
+  id                String           @id @default(cuid())
+  userId            String
+  user              User             @relation(fields: [userId], references: [id])
+  orderItemId       String?          @unique
+  orderItem         OrderItem?       @relation(fields: [orderItemId], references: [id])
+  postalOrgId       String?
+  wildduckUserId    String?
   wildduckAddressId String?
-  smtpHost      String
-  smtpPort      Int      @default(587)
-  smtpUsername  String
-  credentialRef String   // encrypted SMTP password — see lib/secretsVault.ts
+  smtpHost          String
+  smtpPort          Int              @default(587)
+  smtpUsername      String
+  credentialRef     String // encrypted SMTP password — see lib/secretsVault.ts
   // Link to the webmail WebUI for this mailbox, if the admin's Postal setup
   // exposes one (e.g. https://mail.shanutechx.com/org/webmail). Optional —
   // some SMTP-only packages (transactional sending) have no mailbox/webmail
   // at all, just SMTP credentials, so this is deliberately nullable.
-  webmailUrl    String?
-  storageQuotaMb Int     @default(1024)
-  dailySendLimit Int     @default(1000)
-  storageUsedMb  Int     @default(0)
-  dailySendCount Int     @default(0)
-  createdAt     DateTime @default(now())
-  expiresAt     DateTime?
-  isSuspended   Boolean  @default(false)
-  isInternal    Boolean  @default(false) // True for dev/system accounts (free, unlimited quota, permanent)
-  billingModel  String   @default("paid_upfront") // "free_trial_first_month" | "paid_upfront" | "permanent_free"
-  webmailMessages WebmailMessage[]
+  webmailUrl        String?
+  storageQuotaMb    Int              @default(1024)
+  dailySendLimit    Int              @default(1000)
+  storageUsedMb     Int              @default(0)
+  dailySendCount    Int              @default(0)
+  createdAt         DateTime         @default(now())
+  expiresAt         DateTime?
+  isSuspended       Boolean          @default(false)
+  isInternal        Boolean          @default(false) // True for dev/system accounts (free, unlimited quota, permanent)
+  billingModel      String           @default("paid_upfront") // "free_trial_first_month" | "paid_upfront" | "permanent_free"
+  webmailMessages   WebmailMessage[]
 
   // Per-account custom domain + alias list + plan tier
 
-  customDomain  String?
-  aliases       String[] @default([])
-  maxAliases    Int      @default(10)
-  planTier      String   @default("pro")
+  customDomain    String?
+  aliases         String[] @default([])
+  maxAliases      Int      @default(10)
+  planTier        String   @default("pro")
   allowedAdminIds String[] @default([]) // Dev-assigned admin user IDs allowed to read/write/send via this mailbox
 }
 
 // Platform-wide outbound mailer config (singleton row, id "global").
 model PlatformSmtpConfig {
-  id            String  @id @default("global")
-  provider      String  @default("custom")
-  host          String
-  port          Int     @default(587)
-  user          String
+  id          String   @id @default("global")
+  provider    String   @default("custom")
+  host        String
+  port        Int      @default(587)
+  user        String
   // Encrypted via lib/secretsVault.ts -- never stored/logged in plaintext.
-  passwordEnc   String
-  senderEmail   String
-  senderName    String  @default("ShanuTechX Cloud Mailer")
-  secure        Boolean @default(false)
-  updatedAt     DateTime @updatedAt
+  passwordEnc String
+  senderEmail String
+  senderName  String   @default("ShanuTechX Cloud Mailer")
+  secure      Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
 }
 
 model LiveKitProject {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id])
-  orderItemId  String?  @unique
+  user         User       @relation(fields: [userId], references: [id])
+  orderItemId  String?    @unique
   orderItem    OrderItem? @relation(fields: [orderItemId], references: [id])
   apiKey       String
-  apiSecretRef String   // encrypted API secret — see lib/secretsVault.ts
+  apiSecretRef String // encrypted API secret — see lib/secretsVault.ts
   nodeId       String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
 }
 
 enum VpsProvisionStatus {
@@ -799,13 +799,13 @@ model VpsProvision {
   user          User               @relation(fields: [userId], references: [id])
   orderItemId   String             @unique
   orderItem     OrderItem          @relation(fields: [orderItemId], references: [id])
-  provider      String             // e.g. "leaseweb", "contabo", "vultr", "ovh", "custom"
-  externalId    String?            // the upstream provider's VPS/instance ID
+  provider      String // e.g. "leaseweb", "contabo", "vultr", "ovh", "custom"
+  externalId    String? // the upstream provider's VPS/instance ID
   panelUrl      String?
-  ip            String?            // Public IP address for direct SSH & SFTP management
+  ip            String? // Public IP address for direct SSH & SFTP management
   sshPort       Int                @default(22) // SSH port (default 22)
-  username      String?            // root or primary login username
-  credentialRef String?            // encrypted password or SSH private key — see lib/secretsVault.ts
+  username      String? // root or primary login username
+  credentialRef String? // encrypted password or SSH private key — see lib/secretsVault.ts
   status        VpsProvisionStatus @default(pending)
   createdAt     DateTime           @default(now())
   provisionedAt DateTime?
@@ -838,7 +838,7 @@ enum NotificationEvent {
 model DiscordWebhookConfig {
   id         String            @id @default(cuid())
   event      NotificationEvent
-  webhookUrl String            // encrypted at rest via secretsVault, see lib/discordWebhooks.ts
+  webhookUrl String // encrypted at rest via secretsVault, see lib/discordWebhooks.ts
   isActive   Boolean           @default(true)
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
@@ -848,7 +848,7 @@ model DiscordWebhookConfig {
 
 model ContentBlock {
   id        String   @id @default(cuid())
-  page      String   // home | about | faq | pricing | terms | privacy
+  page      String // home | about | faq | pricing | terms | privacy
   key       String
   valueJson Json
   updatedAt DateTime @updatedAt
@@ -872,12 +872,12 @@ model GitHubInstallation {
 }
 
 model GitLabConnection {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  gitlabUserId String
-  username    String
-  avatarUrl   String?
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gitlabUserId    String
+  username        String
+  avatarUrl       String?
   // AES-256-GCM ciphertext via lib/secretsVault.ts -- never stored/logged
   // in plaintext.
   accessTokenEnc  String
@@ -892,27 +892,27 @@ model GitLabConnection {
 
 // Knowledge Base categories and articles.
 model KbCategory {
-  id          String     @id @default(cuid())
+  id          String      @id @default(cuid())
   name        String
-  slug        String     @unique
+  slug        String      @unique
   description String
   icon        String
   articles    KbArticle[]
 }
 
 model KbArticle {
-  id            String     @id @default(cuid())
-  slug          String     @unique
-  title         String
-  categoryId    String
-  category      KbCategory @relation(fields: [categoryId], references: [id])
-  summary       String
-  content       String     @db.Text
-  published     Boolean    @default(true)
-  views         Int        @default(0)
-  helpfulCount  Int        @default(0)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id           String     @id @default(cuid())
+  slug         String     @unique
+  title        String
+  categoryId   String
+  category     KbCategory @relation(fields: [categoryId], references: [id])
+  summary      String
+  content      String     @db.Text
+  published    Boolean    @default(true)
+  views        Int        @default(0)
+  helpfulCount Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   @@index([categoryId, published])
 }
@@ -932,16 +932,16 @@ model EmailDomain {
 
 // Secrets Vault for encrypted environment secret storage (AES-256-GCM).
 model SecretProject {
-  id          String       @id @default(cuid())
-  name        String
-  environment String       @default("production") // 'production' | 'staging' | 'development'
-  createdAt   DateTime     @default(now())
-  secrets     SecretItem[]
+  id           String             @id @default(cuid())
+  name         String
+  environment  String             @default("production") // 'production' | 'staging' | 'development'
+  createdAt    DateTime           @default(now())
+  secrets      SecretItem[]
   auditEntries SecretAuditEntry[]
 }
 
 model SecretItem {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   projectId String
   project   SecretProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   key       String
@@ -949,20 +949,20 @@ model SecretItem {
   // in plaintext.
   valueEnc  String
   comment   String?
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime      @updatedAt
 
   @@unique([projectId, key])
 }
 
 model SecretAuditEntry {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   projectId String
   project   SecretProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  action    String   // 'CREATE' | 'READ' | 'UPDATE' | 'DELETE' | 'EXPORT' | 'IMPORT'
+  action    String // 'CREATE' | 'READ' | 'UPDATE' | 'DELETE' | 'EXPORT' | 'IMPORT'
   secretKey String?
   actorId   String
-  actor     User     @relation(fields: [actorId], references: [id])
-  createdAt DateTime @default(now())
+  actor     User          @relation(fields: [actorId], references: [id])
+  createdAt DateTime      @default(now())
 
   @@index([projectId])
 }
@@ -985,16 +985,16 @@ model SupabaseClientProject {
 // config -- distinct from PlatformSmtpConfig (the platform's own
 // transactional mail), since real Supabase separates these concerns too.
 model SupabaseAuthSmtpConfig {
-  id                 String  @id @default("global")
-  host               String
-  port               Int     @default(587)
-  user               String
-  passwordEnc        String
-  senderEmail        String
-  senderName         String
-  enableEmailSignup  Boolean @default(true)
-  enableAutoconfirm  Boolean @default(true)
-  updatedAt          DateTime @updatedAt
+  id                String   @id @default("global")
+  host              String
+  port              Int      @default(587)
+  user              String
+  passwordEnc       String
+  senderEmail       String
+  senderName        String
+  enableEmailSignup Boolean  @default(true)
+  enableAutoconfirm Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
 }
 
 model SupabaseEmailTemplate {
@@ -1047,19 +1047,19 @@ model Ticket {
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
-  messages TicketMessage[]
+  messages              TicketMessage[]
   aiSubscriptionRequest AiSubscriptionRequest?
 }
 
 model TicketMessage {
-  id         String            @id @default(cuid())
+  id         String           @id @default(cuid())
   ticketId   String
-  ticket     Ticket            @relation(fields: [ticketId], references: [id])
+  ticket     Ticket           @relation(fields: [ticketId], references: [id])
   senderId   String
-  sender     User              @relation(fields: [senderId], references: [id])
+  sender     User             @relation(fields: [senderId], references: [id])
   senderRole TicketSenderRole
   body       String
-  createdAt  DateTime          @default(now())
+  createdAt  DateTime         @default(now())
 }
 
 // Tracks recurring services (monthly/yearly hosting plans, SMTP, LiveKit,
@@ -1069,16 +1069,16 @@ model TicketMessage {
 // renewal-extends-from-the-later-of-now-or-expiry logic and the
 // past_due -> cancelled grace-period sweep.
 model Subscription {
-  id              String             @id @default(cuid())
-  userId          String
-  user            User               @relation(fields: [userId], references: [id])
-  orderItemId     String             @unique
-  orderItem       OrderItem          @relation(fields: [orderItemId], references: [id])
-  status          SubscriptionStatus @default(active)
+  id               String             @id @default(cuid())
+  userId           String
+  user             User               @relation(fields: [userId], references: [id])
+  orderItemId      String             @unique
+  orderItem        OrderItem          @relation(fields: [orderItemId], references: [id])
+  status           SubscriptionStatus @default(active)
   currentPeriodEnd DateTime
-  createdAt       DateTime           @default(now())
-  pastDueAt       DateTime?
-  cancelledAt     DateTime?
+  createdAt        DateTime           @default(now())
+  pastDueAt        DateTime?
+  cancelledAt      DateTime?
 }
 
 // One row per periodic HTTP check against a deployment's public subdomain
@@ -1122,7 +1122,7 @@ model ApiKey {
   user       User      @relation(fields: [userId], references: [id])
   label      String
   keyHash    String    @unique // SHA-256 of the raw key; raw key is never stored
-  keyPrefix  String    // first 8 chars, shown in the UI so a customer can tell keys apart without re-revealing them
+  keyPrefix  String // first 8 chars, shown in the UI so a customer can tell keys apart without re-revealing them
   lastUsedAt DateTime?
   createdAt  DateTime  @default(now())
   revokedAt  DateTime?
@@ -1139,7 +1139,7 @@ model Webhook {
   user      User         @relation(fields: [userId], references: [id])
   url       String
   event     WebhookEvent
-  secret    String       // encrypted at rest — see lib/secretsVault.ts. Raw value shown once at creation.
+  secret    String // encrypted at rest — see lib/secretsVault.ts. Raw value shown once at creation.
   isActive  Boolean      @default(true)
   createdAt DateTime     @default(now())
 
@@ -1176,9 +1176,9 @@ model ManagedDatabase {
   type          ManagedDatabaseType
   status        ManagedDatabaseStatus @default(pending)
   containerId   String?
-  internalHost  String?               // container name, reachable only on the node's internal Docker network
+  internalHost  String? // container name, reachable only on the node's internal Docker network
   internalPort  Int?
-  credentialRef String?               // encrypted password — see lib/secretsVault.ts
+  credentialRef String? // encrypted password — see lib/secretsVault.ts
   createdAt     DateTime              @default(now())
 }
 
@@ -1208,9 +1208,9 @@ model Project {
   node         Node     @relation(fields: [nodeId], references: [id])
   dbName       String
   dbUsername   String
-  dbPassword   String   // encrypted
-  apiPort      Int?     // Port where this project's custom API lives
-  containerId  String?  // Container ID of the project API database/CRUD container
+  dbPassword   String // encrypted
+  apiPort      Int? // Port where this project's custom API lives
+  containerId  String? // Container ID of the project API database/CRUD container
   status       String   @default("pending") // pending | running | failed
   // Set once a dev provisions object storage for this project (Dev
   // Dashboard -> Projects -> Storage). Uses the platform's shared R2
@@ -1230,7 +1230,7 @@ model Project {
 // for the Dev Dashboard -> Backups history list.
 model BackupRun {
   id          String   @id @default(cuid())
-  triggeredBy String   // 'manual:<userId>' or 'cron'
+  triggeredBy String // 'manual:<userId>' or 'cron'
   success     Boolean
   r2Key       String?
   sizeBytes   Int?
@@ -1328,39 +1328,39 @@ model NodeBootstrapLog {
 // VPS plans for customer browsing and provisioning
 model VpsPlan {
   id            String        @id @default(cuid())
-  provider      String        // e.g., "leaseweb"
+  provider      String // e.g., "leaseweb"
   name          String
-  bandwidth     String        // e.g., "1TB", "unlimited"
-  category      String        // e.g., "web_hosting", "app_server", "database_server", "storage_server"
+  bandwidth     String // e.g., "1TB", "unlimited"
+  category      String // e.g., "web_hosting", "app_server", "database_server", "storage_server"
   cpuCores      Int
   ramGb         Int
   storageGb     Int
-  price         Int           // in smallest currency unit (cents)
+  price         Int // in smallest currency unit (cents)
   currency      Currency      @default(LKR)
   billingPeriod BillingPeriod @default(monthly)
   isActive      Boolean       @default(true)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  
+
   // Link to Leaseweb product code for automated provisioning
   leasewebProductCode String?
 }
 
 // Custom domain management with CNAME verification and SSL
 model CustomDomain {
-  id            String              @id @default(cuid())
-  deploymentId  String
-  deployment    Deployment          @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
-  domain        String              @unique
-  cnameTarget   String              // Platform-generated CNAME target
-  status        CustomDomainStatus  @default(pending)
-  sslCertId     String?             // Cloudflare certificate ID
-  verifiedAt    DateTime?
-  wildduckDkimKey String?
+  id                   String             @id @default(cuid())
+  deploymentId         String
+  deployment           Deployment         @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  domain               String             @unique
+  cnameTarget          String // Platform-generated CNAME target
+  status               CustomDomainStatus @default(pending)
+  sslCertId            String? // Cloudflare certificate ID
+  verifiedAt           DateTime?
+  wildduckDkimKey      String?
   wildduckDkimSelector String?
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
   @@index([deploymentId])
 }
 
@@ -1369,7 +1369,7 @@ model StatusPageConfig {
   id                String   @id @default(cuid())
   platformName      String   @default("ShanuTechX Platform")
   logoUrl           String?
-  uptimeKumaUrl     String?  // Uptime Kuma integration endpoint
+  uptimeKumaUrl     String? // Uptime Kuma integration endpoint
   showUptimeMetrics Boolean  @default(true)
   updatedAt         DateTime @updatedAt
 }
@@ -1377,13 +1377,13 @@ model StatusPageConfig {
 model SystemComponent {
   id           String   @id @default(cuid())
   name         String
-  group        String   // "Core Platform" | "Compute & Edge" | "Databases & Storage" | "Email & Messaging"
+  group        String // "Core Platform" | "Compute & Edge" | "Databases & Storage" | "Email & Messaging"
   description  String?
   status       String   @default("operational") // operational | degraded | partial_outage | major_outage | maintenance
   uptimePct90d Float    @default(99.99)
   order        Int      @default(0)
   isPublic     Boolean  @default(true)
-  history90d   Json?    // Array of { date: string, status: string, uptimePct: number, note?: string }
+  history90d   Json? // Array of { date: string, status: string, uptimePct: number, note?: string }
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -1397,15 +1397,15 @@ model ScheduledMaintenance {
   scheduledStart     DateTime
   scheduledEnd       DateTime
   affectedComponents String[] @default([])
-  updates            Json?    // Array of { timestamp: string, message: string }
+  updates            Json? // Array of { timestamp: string, message: string }
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
 
 model StatusSubscriber {
   id          String   @id @default(cuid())
-  type        String   // "email" | "webhook" | "push"
-  target      String   // email or webhook URL
+  type        String // "email" | "webhook" | "push"
+  target      String // email or webhook URL
   secretToken String   @unique
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -1434,7 +1434,7 @@ model Incident {
   title            String
   description      String
   severity         IncidentSeverity
-  affectedServices String[]         // Array of service identifiers
+  affectedServices String[] // Array of service identifiers
   status           IncidentStatus   @default(investigating)
   createdAt        DateTime         @default(now())
   resolvedAt       DateTime?
@@ -1449,7 +1449,7 @@ model IncidentUpdate {
   incident    Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
   description String
   createdAt   DateTime @default(now())
-  
+
   @@index([incidentId])
 }
 
@@ -1461,7 +1461,7 @@ model MailAccount {
   quotaMb   Int      @default(1024)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@unique([username, domain])
 }
 
@@ -1470,7 +1470,7 @@ model TermsOfService {
   id          String   @id @default(cuid())
   content     String   @db.Text
   lastUpdated DateTime @default(now())
-  contactInfo Json     // { email, phone, address }
+  contactInfo Json // { email, phone, address }
 }
 
 // Privacy policy page content
@@ -1478,7 +1478,7 @@ model PrivacyPolicy {
   id          String   @id @default(cuid())
   content     String   @db.Text
   lastUpdated DateTime @default(now())
-  contactInfo Json     // { email, phone }
+  contactInfo Json // { email, phone }
 }
 
 // Webmail messages
@@ -1531,12 +1531,12 @@ enum ResourcePermissionLevel {
 }
 
 model Team {
-  id        String       @id @default(cuid())
+  id        String   @id @default(cuid())
   name      String
   ownerId   String
-  owner     User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  owner     User     @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   members     TeamMember[]
   invites     TeamInvite[]
@@ -1545,13 +1545,13 @@ model Team {
 }
 
 model TeamMember {
-  id        String             @id @default(cuid())
+  id        String   @id @default(cuid())
   teamId    String
-  team      Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
   userId    String
-  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      TeamRole           @default(developer)
-  createdAt DateTime           @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      TeamRole @default(developer)
+  createdAt DateTime @default(now())
 
   permissions ResourcePermission[]
 
@@ -1559,18 +1559,18 @@ model TeamMember {
 }
 
 model TeamInvite {
-  id              String       @id @default(cuid())
-  teamId          String
-  team            Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  email           String
-  role            TeamRole     @default(developer)
+  id                  String       @id @default(cuid())
+  teamId              String
+  team                Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  email               String
+  role                TeamRole     @default(developer)
   resourcePermissions Json?
-  token           String       @unique
-  invitedByUserId String
-  invitedByUser   User         @relation(fields: [invitedByUserId], references: [id], onDelete: Cascade)
-  status          InviteStatus @default(pending)
-  expiresAt       DateTime
-  createdAt       DateTime     @default(now())
+  token               String       @unique
+  invitedByUserId     String
+  invitedByUser       User         @relation(fields: [invitedByUserId], references: [id], onDelete: Cascade)
+  status              InviteStatus @default(pending)
+  expiresAt           DateTime
+  createdAt           DateTime     @default(now())
 
   @@index([token])
   @@index([email])
@@ -1606,5 +1606,3 @@ model Review {
   @@index([userId])
   @@index([productCategory])
 }
-
-

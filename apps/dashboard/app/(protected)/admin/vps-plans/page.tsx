@@ -4,19 +4,19 @@ import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { Product, Plan, ProductCategory, PlanBillingType } from '@/lib/types';
 import {
-  ServerIcon,
-  DatabaseIcon,
-  CpuIcon,
-  SparklesIcon,
-  ShieldCheckIcon,
-  PlusIcon,
-  PencilIcon,
-  TrashIcon,
-  CheckIcon,
-  TagIcon,
-  CloudIcon,
-  ActivityIcon,
-} from '@/components/Icons';
+  Server as ServerIcon,
+  Database as DatabaseIcon,
+  Cpu as CpuIcon,
+  Sparkles as SparklesIcon,
+  ShieldCheck as ShieldCheckIcon,
+  Plus as PlusIcon,
+  Pencil as PencilIcon,
+  Trash2 as TrashIcon,
+  Check as CheckIcon,
+  Tag as TagIcon,
+  Cloud as CloudIcon,
+  Activity as ActivityIcon,
+} from 'lucide-react';
 
 const CATEGORY_TABS: Array<{ id: string; label: string }> = [
   { id: 'all', label: 'All Products & Plans' },
