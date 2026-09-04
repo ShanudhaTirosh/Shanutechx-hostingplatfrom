@@ -504,6 +504,38 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }).then((r) => asJson<{ deployment: Deployment }>(r)),
+    uploadZip: async (
+      id: string,
+      file: File,
+      onEvent: (event: BuildEvent) => void
+    ): Promise<void> => {
+      const formData = new FormData();
+      formData.append('zipFile', file);
+      const res = await apiFetch(`/api/deployments/${id}/upload-zip`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}: ${res.statusText}` }));
+        throw new Error(errData.error || errData.message || `HTTP ${res.status}`);
+      }
+      if (!res.body) throw new Error('No response stream from server');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffered = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffered += decoder.decode(value, { stream: true });
+        const lines = buffered.split('\n');
+        buffered = lines.pop() ?? '';
+        for (const line of lines) {
+          if (line.trim()) onEvent(JSON.parse(line));
+        }
+      }
+    },
   },
 
   domains: {

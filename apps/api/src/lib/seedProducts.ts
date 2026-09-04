@@ -268,6 +268,151 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
       });
     }
 
+    // 5. Python Application Hosting (FastAPI / Django / Flask)
+    let pythonProduct = await prisma.product.findFirst({ where: { category: 'python_app_hosting' } });
+    if (!pythonProduct) {
+      await prisma.product.create({
+        data: {
+          category: 'python_app_hosting',
+          name: 'Python Application Hosting (FastAPI / Django / Flask)',
+          slug: 'python-app-hosting',
+          description: 'High-performance Python hosting with Gunicorn/Uvicorn, custom domain SSL routing, and environment secrets.',
+          isActive: true,
+          plans: {
+            create: [
+              {
+                name: 'Python Dev Plan',
+                price: 150000, // LKR 1,500.00 / mo
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: { memoryMB: 1024, cpuCores: 1, customDomain: true },
+                isActive: true,
+              },
+              {
+                name: 'Python Pro Plan',
+                price: 350000, // LKR 3,500.00 / mo
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: { memoryMB: 4096, cpuCores: 2, customDomain: true },
+                isActive: true,
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    // 6. Discord Bot Hosting (Node.js & Python)
+    let discordNodeProduct = await prisma.product.findFirst({ where: { category: 'discordbot_node' } });
+    if (!discordNodeProduct) {
+      await prisma.product.create({
+        data: {
+          category: 'discordbot_node',
+          name: 'Discord Bot Hosting (Node.js)',
+          slug: 'discord-bot-node',
+          description: '24/7 continuous process runner for Node.js Discord bots (discord.js / erela.js) with live logs and auto-restart.',
+          isActive: true,
+          plans: {
+            create: [
+              {
+                name: 'Bot Starter (512MB RAM)',
+                price: 80000, // LKR 800.00 / mo
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: { memoryMB: 512, cpuCores: 0.5, continuousRuntime: true },
+                isActive: true,
+              },
+              {
+                name: 'Bot Pro (2GB RAM)',
+                price: 180000, // LKR 1,800.00 / mo
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: { memoryMB: 2048, cpuCores: 1, continuousRuntime: true },
+                isActive: true,
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    let discordPyProduct = await prisma.product.findFirst({ where: { category: 'discordbot_python' } });
+    if (!discordPyProduct) {
+      await prisma.product.create({
+        data: {
+          category: 'discordbot_python',
+          name: 'Discord Bot Hosting (Python)',
+          slug: 'discord-bot-python',
+          description: '24/7 continuous process runner for Python Discord bots (discord.py / nextcord) with automatic dependency caching.',
+          isActive: true,
+          plans: {
+            create: [
+              {
+                name: 'Python Bot Plan (1GB RAM)',
+                price: 95000, // LKR 950.00 / mo
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: { memoryMB: 1024, cpuCores: 0.5, continuousRuntime: true },
+                isActive: true,
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    // 7. WhatsApp Bot Hosting (Baileys / web.js)
+    let waProduct = await prisma.product.findFirst({ where: { category: 'whatsappbot_hosting' } });
+    if (!waProduct) {
+      await prisma.product.create({
+        data: {
+          category: 'whatsappbot_hosting',
+          name: 'WhatsApp Bot Hosting (Baileys / web.js)',
+          slug: 'whatsapp-bot-hosting',
+          description: 'Dedicated persistent container hosting for WhatsApp automation bots with persistent QR session storage.',
+          isActive: true,
+          plans: {
+            create: [
+              {
+                name: 'WhatsApp Bot Starter',
+                price: 150000, // LKR 1,500.00 / mo
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: { memoryMB: 1024, storageGB: 5, persistentSession: true },
+                isActive: true,
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    // 8. Lavalink Audio Node Hosting
+    let lavalinkProduct = await prisma.product.findFirst({ where: { category: 'lavalink_hosting' } });
+    if (!lavalinkProduct) {
+      await prisma.product.create({
+        data: {
+          category: 'lavalink_hosting',
+          name: 'Lavalink Audio Node Hosting (Java)',
+          slug: 'lavalink-audio-node',
+          description: 'High-performance audio routing node for Discord music bots running Java 17+ and application.yml config.',
+          isActive: true,
+          plans: {
+            create: [
+              {
+                name: 'Lavalink Node (2GB RAM)',
+                price: 220000, // LKR 2,200.00 / mo
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: { memoryMB: 2048, cpuCores: 1.5, directPortExposure: true },
+                isActive: true,
+              },
+            ],
+          },
+        },
+      });
+    }
+
     // 5. Ensure Primary Compute Node exists with all tags for local & deployment hosting
     const nodeCount = await prisma.node.count().catch(() => 0);
     if (nodeCount === 0) {

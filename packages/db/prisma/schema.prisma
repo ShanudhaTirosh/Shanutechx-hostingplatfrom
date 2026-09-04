@@ -511,6 +511,8 @@ model Deployment {
   gitCommitMessage     String?   // Latest deployed git commit message
   autoDeploy           Boolean   @default(true) // Autonomous deploy on git push
   webHostingType       String?   // static | node | python | fullstack
+  zipSourceUrl         String?   // ZIP archive file source path/URL for non-git deployments
+  sourceType           String?   @default("git") // git | zip | template
 
   uptimeChecks    UptimeCheck[]
   customDomains   CustomDomain[]

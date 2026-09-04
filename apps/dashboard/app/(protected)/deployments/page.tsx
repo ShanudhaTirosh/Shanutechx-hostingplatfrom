@@ -20,6 +20,9 @@ import { IconLock, IconGlobe, IconGitBranch } from "@/components/Icons";
 import { DomainManagement } from "@/components/DomainManagement";
 import { ResourceScopeSelector } from "@/components/ResourceScopeSelector";
 
+import { useAppUser } from "@/lib/AppUserContext";
+import Link from "next/link";
+
 export const dynamic = "force-dynamic";
 
 const SERVICE_TYPES = [
@@ -71,8 +74,11 @@ export interface ConnectedGitAccount {
 }
 
 export default function DeploymentsPage() {
+  const { apiUser } = useAppUser();
+  const isStaff = apiUser?.role === "admin" || apiUser?.role === "dev";
   const [deployments, setDeployments] = useState<Deployment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAdminForm, setShowAdminForm] = useState(false);
   const { toast } = useToast();
 
   function load() {
@@ -90,18 +96,38 @@ export default function DeploymentsPage() {
   return (
     <div className="space-y-8 animate-fade-in">
       <PageHeader
-        title="Custom Application & Bot Deployments"
-        description="Deploy WhatsApp bots, Discord bots, Lavalink music servers, Next.js web apps, and custom scripts with full control over start commands and port exposure."
+        title="Application & Bot Deployments"
+        description="Manage your active Web Hosting, Bot Hosting, and Application Instances. Configure GitHub auto-deployments, ZIP source uploads, custom domains, and exposed ports."
+        action={
+          <div className="flex items-center gap-3">
+            <Link href="/services">
+              <Button size="sm" className="bg-brand-gradient">
+                + Purchase New Hosting Plan
+              </Button>
+            </Link>
+            {isStaff && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setShowAdminForm(!showAdminForm)}
+              >
+                {showAdminForm ? "Hide Infrastructure Panel" : "⚡ Admin Manual Provision"}
+              </Button>
+            )}
+          </div>
+        }
       />
 
       {error && <ErrorBanner message={error} />}
 
-      <NewDeploymentForm onDeployed={load} />
+      {isStaff && showAdminForm && <NewDeploymentForm onDeployed={load} />}
 
       <div>
-        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">
-          Your Active Deployments ({deployments?.length ?? 0})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Your Active Deployment Instances ({deployments?.length ?? 0})
+          </h2>
+        </div>
 
         {deployments === null && (
           <div className="space-y-4">
@@ -109,8 +135,25 @@ export default function DeploymentsPage() {
             <CardSkeleton />
           </div>
         )}
+
         {deployments?.length === 0 && (
-          <EmptyState message="No deployments active. Pick a repository from GitHub or enter a public Git URL above to deploy." />
+          <Card className="border border-dashed border-white/10 p-8 text-center bg-white/[0.01]">
+            <div className="h-12 w-12 rounded-2xl bg-accent-violet/10 text-accent-violet flex items-center justify-center mx-auto mb-4">
+              <IconGitBranch size={24} />
+            </div>
+            <h3 className="font-semibold text-base text-white mb-2">No Active Hosting Instances Found</h3>
+            <p className="text-xs text-text-muted max-w-md mx-auto mb-6">
+              Purchase Web Hosting, Discord Bot Hosting, WhatsApp Bot Hosting, or Application Hosting from the Services Storefront to unlock a dedicated deployment slot.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <Link href="/services">
+                <Button size="sm">Browse Services Catalog →</Button>
+              </Link>
+              <Link href="/catalog">
+                <Button size="sm" variant="secondary">Browse 1-Click App Store</Button>
+              </Link>
+            </div>
+          </Card>
         )}
 
         <div className="space-y-4">

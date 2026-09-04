@@ -414,6 +414,27 @@ export default function ServicesPage() {
                             )}
                           </div>
                         )}
+
+                        {/* App & Bot Hosting Specs */}
+                        {['node_app_hosting', 'python_app_hosting', 'discordbot_node', 'discordbot_python', 'whatsappbot_hosting', 'lavalink_hosting'].includes(product.category) && (
+                          <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono text-emerald-300 pt-1">
+                            <span className="inline-flex items-center gap-1">
+                              ⚡ {specs.cpuCores || 1} vCPU
+                            </span>
+                            <span className="text-white/20">•</span>
+                            <span className="inline-flex items-center gap-1 text-purple-300">
+                              🧠 {specs.ramMb || specs.memoryMb || 512}MB RAM
+                            </span>
+                            <span className="text-white/20">•</span>
+                            <span className="inline-flex items-center gap-1 text-cyan-300">
+                              💾 {specs.storageGb || 5}GB Storage
+                            </span>
+                            <span className="text-white/20">•</span>
+                            <span className="inline-flex items-center gap-1 text-amber-300">
+                              🚀 Git & ZIP Archive Upload Uploader
+                            </span>
+                          </div>
+                        )}
                       </div>
                       <Button
                         onClick={() => handleAddToCart(plan.id, `${product.name} — ${plan.name}`)}

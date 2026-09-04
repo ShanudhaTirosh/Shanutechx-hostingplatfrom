@@ -18,6 +18,7 @@ import {
 } from '@/components/ui';
 import { DomainManagement } from '@/components/DomainManagement';
 import { EnvVarsPanel } from '@/components/EnvVarsPanel';
+import { CodeDeploymentPanel } from '@/components/CodeDeploymentPanel';
 import { FileManagerPanel } from '@/components/FileManagerPanel';
 import { DeployWebhookPanel } from '@/components/DeployWebhookPanel';
 import { RoutingFirewallPanel } from '@/components/RoutingFirewallPanel';
@@ -548,8 +549,8 @@ export default function DeploymentDetailPage() {
       {/* TAB 5: STARTUP & ENV */}
       {activeTab === 'startup' && (
         <div className="space-y-6">
+          <CodeDeploymentPanel deployment={deployment} onChanged={loadDeployment} />
           <EnvVarsPanel deploymentId={deploymentId} isRunning={deployment?.status === 'running'} />
-
         </div>
       )}
 

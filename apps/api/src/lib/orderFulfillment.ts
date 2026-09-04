@@ -234,7 +234,70 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
       }
     }
 
-    // 4. AI Subscriptions
+    // 4. Application & Bot Hosting Deployment Instance Provisioning
+    const isAppHosting =
+      productCategory === 'web_hosting' ||
+      productCategory === 'node_app_hosting' ||
+      productCategory === 'python_app_hosting' ||
+      productCategory === 'discordbot_node' ||
+      productCategory === 'discordbot_python' ||
+      productCategory === 'whatsappbot_hosting' ||
+      productCategory === 'lavalink_hosting' ||
+      productCategory === 'app_catalog' ||
+      productName.includes('bot') ||
+      productName.includes('hosting') ||
+      productName.includes('app');
+
+    if (isAppHosting && !isSmtp && !isVps && !isLiveKit && !isManagedDb) {
+      const existingDep = await prisma.deployment.findFirst({
+        where: { orderItemId: item.id },
+      });
+
+      if (!existingDep) {
+        try {
+          const node = await selectNodeForDeployment({
+            requiredTag: 'node-hosting',
+            isAdminDeployment: false,
+          }).catch(() => prisma.node.findFirst({ where: { isActive: true } }));
+
+          if (node) {
+            const subPrefix = (item.plan?.name || 'app').toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 15);
+            const subdomain = `${subPrefix}-${crypto.randomBytes(3).toString('hex')}`;
+            const specs: any = item.plan?.specsJson || {};
+
+            let serviceType = 'web_hosting';
+            if (productCategory === 'discordbot_node') serviceType = 'discordbot_node';
+            else if (productCategory === 'discordbot_python') serviceType = 'discordbot_python';
+            else if (productCategory === 'whatsappbot_hosting') serviceType = 'whatsapp_baileys';
+            else if (productCategory === 'lavalink_hosting') serviceType = 'lavalink';
+            else if (productCategory === 'python_app_hosting') serviceType = 'python_hosting';
+            else if (productCategory === 'node_app_hosting') serviceType = 'node_hosting';
+
+            const dep = await prisma.deployment.create({
+              data: {
+                userId: order.userId,
+                orderItemId: item.id,
+                nodeId: node.id,
+                subdomain,
+                status: 'pending',
+                internalPort: 3000,
+                cpuLimit: specs.cpuCores ?? undefined,
+                memoryLimit: specs.memoryMB ?? specs.ramMB ?? undefined,
+                storageLimit: specs.storageGB ?? undefined,
+                exposureMode: serviceType.includes('bot') || serviceType === 'lavalink' ? 'no_ssl' : 'ssl_with_proxy',
+              },
+            });
+
+            fulfilledItems.push(`Hosting Instance (${subdomain}.app.${env.rootDomain})`);
+            logger.info({ orderId: order.id, deploymentId: dep.id, subdomain }, 'Auto-provisioned Deployment Slot');
+          }
+        } catch (err) {
+          logger.error({ orderId: order.id, err }, 'Failed to auto-provision Deployment slot');
+        }
+      }
+    }
+
+    // 5. AI Subscriptions
     const isAiSub = productCategory === 'ai_subscription' || /\bai\b/i.test(productName) || productName.includes('gemini') || productName.includes('gpt');
     if (isAiSub) {
       fulfilledItems.push(`AI Subscription (${item.plan?.name || 'AI Access'})`);
