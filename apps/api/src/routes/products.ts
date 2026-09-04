@@ -20,6 +20,15 @@ const CATEGORIES = [
   'web_hosting',
   'ai_subscription',
   'app_catalog',
+  'vps',
+  'database_hosting',
+  'smtp_hosting',
+  'node_app_hosting',
+  'python_app_hosting',
+  'discordbot_node',
+  'discordbot_python',
+  'whatsappbot_hosting',
+  'lavalink_hosting',
 ] as const;
 
 const BILLING_TYPES = ['one_time', 'monthly', 'quarterly', 'semiannual', 'yearly'] as const;
