@@ -10,21 +10,21 @@ import { env } from '../env';
 import { getVpsSshConfig } from './vpsSshClient';
 
 /**
- * Real, interactive SSH-from-the-browser for a customer's (or staff's) VPS.
- * Flow:
- *   1. Frontend calls POST /leaseweb/instances/:kind/:id/ssh-ticket (auth +
- *      ownership already checked there) and gets back a one-time ticket.
- *   2. Frontend opens `wss://.../ws/vps-ssh?ticket=...` — no auth headers
- *      needed on the WS handshake itself, since the ticket already proves
- *      the caller was authorized moments ago.
- *   3. This module looks up the ticket, fetches the VPS's IP + root/
- *      Administrator credentials from Leaseweb, opens a real SSH2 session,
- *      and pipes bytes between the browser's xterm.js instance and the
- *      remote shell until either side closes.
+ * Real, interactive browser-based SSH terminal gateway for customer & manual VPS provisions,
+ * as well as infrastructure host compute nodes.
  *
- * Tickets are single-use and expire in 30s — plenty of time for the
- * frontend to open the WebSocket immediately after minting one, but not
- * long enough to be replayable if it leaked into a log somewhere.
+ * Flow:
+ *   1. Frontend calls `POST /api/vps-provisions/:id/ssh-ticket` (or `POST /api/nodes/:id/ssh-ticket`)
+ *      where auth and RBAC ownership are validated.
+ *   2. The API issues a single-use, 30-second ticket stored in Redis / memory state.
+ *   3. Frontend opens WebSocket connection `wss://.../ws/vps-ssh?ticket=...`.
+ *   4. This module consumes the ticket, verifies account validity (`isBanned`), fetches the
+ *      `VpsProvision` (or NodeEngine host config) from Prisma DB, decrypts stored credentials
+ *      from platform vault via `getVpsSshConfig`, and opens a real `ssh2` session.
+ *   5. Pipes bidirectional data between browser `xterm.js` and remote PTY shell until closed.
+ *
+ * Tickets are single-use and expire in 30s — ensuring maximum security without exposing
+ * long-lived secrets in WebSockets handshake URLs.
  */
 
 import { storeState, consumeState } from './redis';
@@ -94,9 +94,8 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
         return fail('User account is invalid or banned.');
       }
 
-      // Cockpit-native node ticket: format is 'node:IP:sshKeyRef'
-      // These connect directly to the node using the stored SSH key,
-      // bypassing Leaseweb entirely.
+      // NodeEngine infrastructure node ticket: format is 'node:IP:sshKeyRef'
+      // Connects directly to the infrastructure host node using the vault SSH key.
       if (entry.vpsId.startsWith('node:')) {
         // Only admin or dev can access raw infrastructure node terminals
         if (user.role !== 'admin' && user.role !== 'dev') {
