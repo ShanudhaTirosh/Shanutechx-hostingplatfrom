@@ -41,46 +41,18 @@ export async function withDbFallback<T>(
 }
 
 /**
- * Default fallback contact info when database and firestore documents are empty
- */
-const DEFAULT_CONTACT_INFO = {
-  supportEmail: 'support@shanutechx.cloud',
-  contactEmail: 'sales@shanutechx.cloud',
-  contactPhone: '+1 (800) 589-STX1',
-  whatsappPhone: '+94 77 123 4567',
-  contactAddress: 'ShanuTechX Cloud HQ, Tech City, Sri Lanka',
-  supportHours: '24/7/365 Tier-3 Engineer Live Support',
-  discordUrl: 'https://discord.gg/shanutechx',
-  whatsappChannelUrl: 'https://wa.me/94771234567?text=Hello%20ShanuTechX%20Support',
-  telegramUrl: 'https://t.me/shanutechx',
-  githubUrl: 'https://github.com/shanutechx',
-  twitterUrl: 'https://twitter.com/shanutechx',
-  facebookUrl: 'https://facebook.com/shanutechx',
-  companyName: 'ShanuTechX Cloud',
-  heroTitle: 'Autonomous High-Performance Cloud Hosting',
-  heroSubtitle: 'Deploy web apps, Node.js and Python services, and Discord bots in minutes.',
-  announcementText: 'New VPS High-Performance Nodes Online in Ashburn & Frankfurt!',
-  announcementActive: true,
-  copyrightText: `© ${new Date().getFullYear()} ShanuTechX Cloud. All rights reserved.`,
-};
-
-/**
- * Reads Site Settings / Contact Info from Firestore `site_settings` collection
+ * Reads Site Settings / Contact Info directly from Firestore `site_settings` collection
  */
 export async function getContactInfoFromFirestore() {
   if (!firebaseFirestore) {
-    logger.warn('Firestore not initialized, returning default contact info');
-    return DEFAULT_CONTACT_INFO;
+    logger.warn('Firestore not initialized');
+    return {};
   }
 
   try {
     const doc = await firebaseFirestore.collection('site_settings').doc('contact_info').get();
     if (doc.exists) {
-      const data = doc.data() || {};
-      return {
-        ...DEFAULT_CONTACT_INFO,
-        ...data,
-      };
+      return doc.data() || {};
     }
 
     // Try reading cms_content page='home' / 'contact'
@@ -93,16 +65,13 @@ export async function getContactInfoFromFirestore() {
           content[item.key] = item.value;
         }
       });
-      return {
-        ...DEFAULT_CONTACT_INFO,
-        ...content,
-      };
+      return content;
     }
   } catch (err: any) {
     logger.error({ err: err.message }, 'Failed to read contact info from Firestore');
   }
 
-  return DEFAULT_CONTACT_INFO;
+  return {};
 }
 
 /**

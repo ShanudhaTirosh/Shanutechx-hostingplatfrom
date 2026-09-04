@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 import { logger } from './logger';
-import { syncProductsToFirebase } from './firebaseSync';
+import { syncProductsToFirebase, syncCmsToFirebase } from './firebaseSync';
 
 export async function ensureDefaultProductsSeeded(): Promise<void> {
   try {
@@ -241,7 +241,54 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
 
     logger.info(`Successfully seeded default products and plans! Created SMTP product ID: ${smtpProduct.id}`);
     void syncProductsToFirebase();
+    void ensureDefaultCmsSeeded();
   } catch (err: any) {
     logger.error({ err: err.message }, 'Failed to auto-seed default products');
+  }
+}
+
+export async function ensureDefaultCmsSeeded(): Promise<void> {
+  try {
+    const cmsCount = await prisma.contentBlock.count().catch(() => 0);
+    if (cmsCount > 0) {
+      void syncCmsToFirebase();
+      return;
+    }
+
+    logger.info('No CMS blocks found. Seeding default site settings and feeding to Firestore...');
+
+    const defaultBlocks = [
+      { page: 'contact', key: 'supportEmail', value: 'support@shanutechx.cloud' },
+      { page: 'contact', key: 'contactEmail', value: 'sales@shanutechx.cloud' },
+      { page: 'contact', key: 'contactPhone', value: '+1 (800) 589-STX1' },
+      { page: 'contact', key: 'whatsappPhone', value: '+94 77 123 4567' },
+      { page: 'contact', key: 'contactAddress', value: 'ShanuTechX Cloud HQ, Tech City, Sri Lanka' },
+      { page: 'contact', key: 'supportHours', value: '24/7/365 Tier-3 Engineer Live Support' },
+      { page: 'contact', key: 'discordUrl', value: 'https://discord.gg/shanutechx' },
+      { page: 'contact', key: 'whatsappChannelUrl', value: 'https://wa.me/94771234567?text=Hello%20ShanuTechX%20Support' },
+      { page: 'contact', key: 'telegramUrl', value: 'https://t.me/shanutechx' },
+      { page: 'contact', key: 'githubUrl', value: 'https://github.com/shanutechx' },
+      { page: 'contact', key: 'twitterUrl', value: 'https://twitter.com/shanutechx' },
+      { page: 'contact', key: 'facebookUrl', value: 'https://facebook.com/shanutechx' },
+      { page: 'home', key: 'companyName', value: 'ShanuTechX Cloud' },
+      { page: 'home', key: 'heroTitle', value: 'Autonomous High-Performance Cloud Hosting' },
+      { page: 'home', key: 'heroSubtitle', value: 'Deploy web apps, Node.js and Python services, and Discord bots in minutes.' },
+      { page: 'home', key: 'announcementText', value: 'New VPS High-Performance Nodes Online in Ashburn & Frankfurt!' },
+      { page: 'home', key: 'announcementActive', value: true },
+      { page: 'home', key: 'copyrightText', value: `© ${new Date().getFullYear()} ShanuTechX Cloud. All rights reserved.` },
+    ];
+
+    for (const b of defaultBlocks) {
+      await prisma.contentBlock.upsert({
+        where: { page_key: { page: b.page, key: b.key } },
+        create: { page: b.page, key: b.key, valueJson: b.value as any },
+        update: { valueJson: b.value as any },
+      });
+    }
+
+    logger.info('Successfully seeded default CMS blocks to database!');
+    await syncCmsToFirebase();
+  } catch (err: any) {
+    logger.error({ err: err.message }, 'Failed to seed default CMS blocks');
   }
 }

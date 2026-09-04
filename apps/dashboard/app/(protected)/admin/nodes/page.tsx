@@ -196,7 +196,7 @@ function Stat({ label, value, unit, max }: { label: string; value: number | null
 }
 
 function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
-  const [tab, setTab] = useState<'script' | 'ssh' | 'manual'>('script');
+  const [tab, setTab] = useState<'combined' | 'manual'>('combined');
   const [clusterSecret, setClusterSecret] = useState<string>('');
   const [nodeLabel, setNodeLabel] = useState<string>('node-singapore-1');
   const [roleTags, setRoleTags] = useState<string[]>(['web-hosting', 'node-hosting']);
@@ -232,7 +232,6 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
   }
 
   const tagsStr = roleTags.join(',');
-  const apiUrl = typeof window !== 'undefined' ? `${window.location.protocol}//api.${window.location.hostname.replace(/^(app|dev|admin)\./, '')}` : 'https://api.shanutechx.com';
   const installCmd = `curl -sSL https://api.shanutechx.com/api/nodes/install.sh | bash -s -- "https://api.shanutechx.com" "${clusterSecret}" "${nodeLabel}" "${tagsStr}"`;
 
   const [provisionLog, setProvisionLog] = useState<string[]>([]);
@@ -248,6 +247,10 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
 
   async function handleSshConnect(e: React.FormEvent) {
     e.preventDefault();
+    if (!sshIp) {
+      setSshError('Please enter the target VPS IP Address');
+      return;
+    }
     setSshBusy(true);
     setSshError(null);
     setProvisionLog([]);
@@ -288,13 +291,13 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
             if (event.type === 'step') {
               setProvisionLog((p) => [...p, event.message]);
             } else if (event.type === 'done') {
-              setProvisionLog((p) => [...p, '[SUCCESS] Node provisioned and registered successfully!']);
+              setProvisionLog((p) => [...p, '🎉 [SUCCESS] Node provisioned and registered successfully!']);
               setProvisionDone(true);
               toast('Node provisioned and connected via SSH successfully!', 'success');
               onCreated();
             } else if (event.type === 'error') {
               setSshError(event.error || 'Provisioning failed');
-              setProvisionLog((p) => [...p, `[ERROR] Error: ${event.error}`]);
+              setProvisionLog((p) => [...p, `❌ [ERROR] Error: ${event.error}`]);
             }
           } catch { /* skip malformed lines */ }
         }
@@ -333,7 +336,7 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
 
   function copyInstallCmd() {
     navigator.clipboard.writeText(installCmd);
-    toast('Command copied to clipboard!', 'success');
+    toast('1-Line Bash Script copied to clipboard!', 'success');
   }
 
   return (
@@ -344,7 +347,7 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
             <PlusIcon /> Add Compute Node to Cluster
           </h2>
           <p className="text-text-muted text-xs mt-0.5">
-            Choose an onboarding method below (Coolify 1-line script or direct SSH connection).
+            Connect your target VPS via SSH or copy the automated 1-line installation script below.
           </p>
         </div>
 
@@ -352,21 +355,12 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
         <div className="flex gap-1.5 bg-white/[0.04] p-1 rounded-xl border border-white/[0.06]">
           <button
             type="button"
-            onClick={() => setTab('script')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              tab === 'script' ? 'bg-accent-violet text-white shadow-glow-violet' : 'text-text-muted hover:text-text-primary'
+            onClick={() => setTab('combined')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              tab === 'combined' ? 'bg-accent-violet text-white shadow-glow-violet' : 'text-text-muted hover:text-text-primary'
             }`}
           >
-            <TerminalIcon /> 1-Line Bash Script
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('ssh')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              tab === 'ssh' ? 'bg-accent-violet text-white shadow-glow-violet' : 'text-text-muted hover:text-text-primary'
-            }`}
-          >
-            <KeyIcon /> Automated SSH Connection
+            <KeyIcon /> Automated SSH &amp; 1-Line Script
           </button>
           <button
             type="button"
@@ -383,7 +377,7 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
       {/* Role Tags Selector */}
       <div className="mb-6 p-4 rounded-xl bg-white/[0.02] border border-white/[0.04]">
         <label className="text-xs font-semibold text-text-muted uppercase tracking-wider block mb-2">
-          1. Configure Node Label &amp; Workload Capabilities
+          1. Node Label &amp; Workload Capability Tags
         </label>
         <div className="grid md:grid-cols-2 gap-4 mb-3">
           <Input
@@ -414,139 +408,150 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
         </div>
       </div>
 
-      {/* TAB 1: 1-LINE BASH SCRIPT GENERATOR */}
-      {tab === 'script' && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-xl bg-black/40 border border-white/10 font-mono text-xs text-emerald-400 overflow-x-auto relative group">
-            <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
-              <span className="text-text-faint font-sans text-[10px] uppercase tracking-wider font-semibold">Coolify One-Liner Onboarding Script</span>
-              <Button size="sm" onClick={copyInstallCmd}>Copy Command</Button>
-            </div>
-            <code className="break-all whitespace-pre-wrap select-all">{installCmd}</code>
-          </div>
+      {/* COMBINED TAB: AUTOMATED SSH & 1-LINE BASH SCRIPT */}
+      {tab === 'combined' && (
+        <div className="space-y-6">
+          {/* SSH Connection Details Form */}
+          <form onSubmit={handleSshConnect} className="space-y-4">
+            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] space-y-4">
+              <label className="text-xs font-semibold text-text-muted uppercase tracking-wider block">
+                2. Target VPS Credentials &amp; Connection Details
+              </label>
 
-          <div className="bg-white/[0.02] p-4 rounded-xl border border-white/[0.04] text-xs space-y-2 text-text-muted">
-            <p className="font-semibold text-text-primary flex items-center gap-1.5">
-              <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Quick Onboarding Guide:
-            </p>
-            <ol className="list-decimal list-inside space-y-1">
-              <li>SSH into any fresh Ubuntu / Debian / CentOS VPS as <code className="text-emerald-400">root</code>.</li>
-              <li>Paste and run the generated command above.</li>
-              <li>The script installs Docker, collects CPU/RAM/Disk hardware specs, and registers the server automatically!</li>
-            </ol>
-          </div>
+              {sshError && <ErrorBanner message={sshError} />}
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <Input
+                  required
+                  label="Target VPS IP Address"
+                  placeholder="e.g. 13.229.33.83"
+                  value={sshIp}
+                  onChange={(e) => setSshIp(e.target.value)}
+                />
+                <Input
+                  required
+                  label="SSH Port"
+                  placeholder="22"
+                  value={sshPort}
+                  onChange={(e) => setSshPort(e.target.value)}
+                />
+                <Input
+                  required
+                  label="SSH Username"
+                  placeholder="root or ubuntu"
+                  value={sshUser}
+                  onChange={(e) => setSshUser(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-4 items-center pt-1">
+                <label className="text-xs font-medium text-text-muted">Authentication Method:</label>
+                <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer font-medium">
+                  <input
+                    type="radio"
+                    name="authType"
+                    checked={authType === 'password'}
+                    onChange={() => setAuthType('password')}
+                    className="accent-violet-500"
+                  /> Password
+                </label>
+                <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer font-medium">
+                  <input
+                    type="radio"
+                    name="authType"
+                    checked={authType === 'key'}
+                    onChange={() => setAuthType('key')}
+                    className="accent-violet-500"
+                  /> SSH Private Key (PEM)
+                </label>
+              </div>
+
+              {authType === 'password' ? (
+                <Input
+                  required
+                  type="password"
+                  label="Root / User SSH Password"
+                  placeholder="Enter SSH password"
+                  value={sshPassword}
+                  onChange={(e) => setSshPassword(e.target.value)}
+                />
+              ) : (
+                <div>
+                  <label className="text-xs font-medium text-text-muted block mb-1">SSH Private Key (PEM format)</label>
+                  <textarea
+                    required
+                    rows={4}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl p-3 font-mono text-xs text-text-primary placeholder:text-text-faint focus:outline-none focus:border-accent-violet/50"
+                    placeholder="-----BEGIN RSA PRIVATE KEY-----"
+                    value={sshKey}
+                    onChange={(e) => setSshKey(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* 1-Line Script Preview & Manual Option */}
+            <div className="p-4 rounded-xl bg-black/40 border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-text-muted font-sans text-xs font-semibold flex items-center gap-1.5">
+                  <TerminalIcon /> 1-Line Onboarding Command Preview
+                </span>
+                <Button type="button" size="sm" variant="secondary" onClick={copyInstallCmd}>
+                  Copy 1-Line Script
+                </Button>
+              </div>
+              <pre className="p-3 rounded-lg bg-black/60 border border-white/5 font-mono text-xs text-emerald-400 overflow-x-auto whitespace-pre-wrap break-all select-all">
+                {installCmd}
+              </pre>
+              <p className="text-[11px] text-text-faint">
+                You can click the button below to connect via SSH and run this script automatically, or copy and execute it manually on your server command line.
+              </p>
+            </div>
+
+            {/* Submit Action */}
+            <div className="pt-2">
+              <Button type="submit" size="lg" loading={sshBusy} disabled={sshBusy || !sshIp} className="w-full justify-center">
+                {sshBusy ? (
+                  <span className="flex items-center gap-2">
+                    <Spinner /> Provisioning Server via SSH...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <KeyIcon /> Connect SSH &amp; Run 1-Line Script Automatically
+                  </span>
+                )}
+              </Button>
+            </div>
+
+            {/* Live Terminal Output Log */}
+            {provisionLog.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className={`h-2.5 w-2.5 rounded-full animate-pulse ${provisionDone ? 'bg-emerald-400' : sshError ? 'bg-red-400' : 'bg-amber-400'}`} />
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                    {provisionDone ? 'Provisioning Complete' : sshError ? 'Provisioning Failed' : 'Live Setup Progress Log...'}
+                  </p>
+                </div>
+                <pre
+                  ref={provisionLogRef}
+                  className="bg-black/80 border border-white/10 rounded-xl p-4 font-mono text-[11px] text-emerald-300 max-h-72 overflow-y-auto whitespace-pre-wrap leading-relaxed shadow-inner"
+                >
+                  {provisionLog.map((line, i) => (
+                    <span key={i} className={`block ${
+                      line.startsWith('[ERROR]') || line.startsWith('❌') ? 'text-red-400 font-semibold' :
+                      line.startsWith('[SUCCESS]') || line.startsWith('🎉') ? 'text-emerald-400 font-bold' :
+                      line.startsWith('[stderr]') ? 'text-amber-300' :
+                      'text-emerald-300'
+                    }`}>{line}</span>
+                  ))}
+                </pre>
+              </div>
+            )}
+          </form>
         </div>
       )}
 
-      {/* TAB 2: AUTOMATED SSH PROVISIONING */}
-      {tab === 'ssh' && (
-        <form onSubmit={handleSshConnect} className="space-y-4">
-          {sshError && <ErrorBanner message={sshError} />}
-
-          <div className="grid md:grid-cols-3 gap-4">
-            <Input
-              required
-              label="VPS IP Address"
-              placeholder="e.g. 13.229.33.83"
-              value={sshIp}
-              onChange={(e) => setSshIp(e.target.value)}
-            />
-            <Input
-              required
-              label="SSH Port"
-              placeholder="22"
-              value={sshPort}
-              onChange={(e) => setSshPort(e.target.value)}
-            />
-            <Input
-              required
-              label="SSH Username"
-              placeholder="root or ubuntu"
-              value={sshUser}
-              onChange={(e) => setSshUser(e.target.value)}
-            />
-          </div>
-
-          <div className="flex gap-4 items-center">
-            <label className="text-xs font-medium text-text-muted">Authentication Mode:</label>
-            <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
-              <input
-                type="radio"
-                name="authType"
-                checked={authType === 'password'}
-                onChange={() => setAuthType('password')}
-              /> Password
-            </label>
-            <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
-              <input
-                type="radio"
-                name="authType"
-                checked={authType === 'key'}
-                onChange={() => setAuthType('key')}
-              /> SSH Private Key
-            </label>
-          </div>
-
-          {authType === 'password' ? (
-            <Input
-              required
-              type="password"
-              label="Root / User Password"
-              placeholder="Enter SSH password"
-              value={sshPassword}
-              onChange={(e) => setSshPassword(e.target.value)}
-            />
-          ) : (
-            <div>
-              <label className="text-xs font-medium text-text-muted block mb-1">SSH Private Key (PEM format)</label>
-              <textarea
-                required
-                rows={4}
-                className="w-full bg-white/5 border border-white/10 rounded-xl p-3 font-mono text-xs text-text-primary placeholder:text-text-faint focus:outline-none focus:border-accent-violet/50"
-                placeholder="-----BEGIN RSA PRIVATE KEY-----"
-                value={sshKey}
-                onChange={(e) => setSshKey(e.target.value)}
-              />
-            </div>
-          )}
-
-          <div className="pt-2">
-            <Button type="submit" loading={sshBusy} disabled={sshBusy || !sshIp}>
-              {sshBusy ? 'Provisioning Node...' : 'Connect & Provision Node (6-Step Auto Setup)'}
-            </Button>
-          </div>
-
-          {/* Live Provisioning Log */}
-          {provisionLog.length > 0 && (
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <div className={`h-2 w-2 rounded-full animate-pulse ${provisionDone ? 'bg-emerald-400' : sshError ? 'bg-red-400' : 'bg-amber-400'}`} />
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-                  {provisionDone ? 'Provisioning Complete' : sshError ? 'Provisioning Failed' : 'Live Provisioning Log...'}
-                </p>
-              </div>
-              <pre
-                ref={provisionLogRef}
-                className="bg-black/60 border border-white/10 rounded-xl p-4 font-mono text-[11px] text-emerald-300 max-h-64 overflow-y-auto whitespace-pre-wrap"
-              >
-                {provisionLog.map((line, i) => (
-                  <span key={i} className={`block ${
-                    line.startsWith('[ERROR]') ? 'text-red-400' :
-                    line.startsWith('[SUCCESS]') ? 'text-emerald-400 font-bold' :
-                    line.startsWith('[stderr]') ? 'text-amber-300' :
-                    'text-emerald-300'
-                  }`}>{line}</span>
-                ))}
-              </pre>
-            </div>
-          )}
-        </form>
-      )}
-
-      {/* TAB 3: MANUAL FORM */}
+      {/* TAB 2: MANUAL FORM */}
       {tab === 'manual' && (
         <form onSubmit={handleManualSubmit} className="space-y-4">
           {manualError && <ErrorBanner message={manualError} />}
