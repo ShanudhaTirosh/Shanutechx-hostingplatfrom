@@ -18,9 +18,16 @@ const CATEGORIES = [
   'whatsappbot_hosting',
   'lavalink_hosting',
   'vps',
+  'vps_hosting',
   'ai_subscription',
   'smtp_hosting',
+  'email_hosting',
   'database_hosting',
+  'managed_database',
+  'app_container',
+  'media_livekit',
+  'cloud_storage',
+  'custom_service',
   'app_catalog',
 ] as const;
 
@@ -67,6 +74,8 @@ const productSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional().nullable(),
   iconUrl: z.string().url().optional().nullable(),
+  isPopular: z.boolean().optional().default(false),
+  badge: z.string().max(100).optional().nullable(),
   isActive: z.boolean().optional().default(true),
 });
 
@@ -135,6 +144,8 @@ const planSchema = z.object({
   price: z.number().int().nonnegative(),
   currency: z.enum(['LKR', 'USD']).optional().default('LKR'),
   billingType: z.enum(BILLING_TYPES),
+  isPopular: z.boolean().optional().default(false),
+  badge: z.string().max(100).optional().nullable(),
   specsJson: z.record(z.unknown()).optional().nullable(),
   isActive: z.boolean().optional().default(true),
 });

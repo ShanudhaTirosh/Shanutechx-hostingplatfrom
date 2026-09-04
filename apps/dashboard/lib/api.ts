@@ -1535,6 +1535,72 @@ export const api = {
       ),
   },
 
+  products: {
+    list: (category?: string) =>
+      apiFetch(`/api/products${category ? `?category=${category}` : ''}`).then((r) =>
+        asJson<{ products: Product[] }>(r)
+      ),
+    get: (id: string) => apiFetch(`/api/products/${id}`).then((r) => asJson<{ product: Product }>(r)),
+    createProduct: (data: {
+      category: string;
+      name: string;
+      description?: string | null;
+      iconUrl?: string | null;
+      isPopular?: boolean;
+      badge?: string | null;
+      isActive?: boolean;
+    }) =>
+      apiFetch('/api/products', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ product: Product }>(r)
+      ),
+    updateProduct: (id: string, data: Partial<{
+      category: string;
+      name: string;
+      description: string | null;
+      iconUrl: string | null;
+      isPopular: boolean;
+      badge: string | null;
+      isActive: boolean;
+    }>) =>
+      apiFetch(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ product: Product }>(r)
+      ),
+    deleteProduct: (id: string) =>
+      apiFetch(`/api/products/${id}`, { method: 'DELETE' }).then((r) =>
+        asJson<{ ok: boolean; message?: string }>(r)
+      ),
+    createPlan: (productId: string, data: {
+      name: string;
+      price: number;
+      currency?: 'LKR' | 'USD';
+      billingType: string;
+      isPopular?: boolean;
+      badge?: string | null;
+      specsJson?: Record<string, unknown> | null;
+      isActive?: boolean;
+    }) =>
+      apiFetch(`/api/products/${productId}/plans`, { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ plan: Plan }>(r)
+      ),
+    updatePlan: (id: string, data: Partial<{
+      name: string;
+      price: number;
+      currency: 'LKR' | 'USD';
+      billingType: string;
+      isPopular: boolean;
+      badge: string | null;
+      specsJson: Record<string, unknown> | null;
+      isActive: boolean;
+    }>) =>
+      apiFetch(`/api/plans/${id}`, { method: 'PUT', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ plan: Plan }>(r)
+      ),
+    deletePlan: (id: string) =>
+      apiFetch(`/api/plans/${id}`, { method: 'DELETE' }).then((r) =>
+        asJson<{ ok: boolean; plan: Plan }>(r)
+      ),
+  },
+
   vpsPlans: {
     list: () => apiFetch('/api/vps-plans').then((r) => asJson<{ plans: VpsPlan[] }>(r)),
     create: (data: {

@@ -10,29 +10,29 @@ import type { RootStackParamList } from '@/navigation/types';
 
 const ACTION_ICON: Record<string, string> = {
   // payments
-  'payment.manual_approve': '✅',
-  'payment.manual_reject': '❌',
+  'payment.manual_approve': '[OK]',
+  'payment.manual_reject': '[X]',
   // VPS
-  'vps.terminate': '🖥️',
-  'vps.reset_password': '🔑',
+  'vps.terminate': '[VPS]',
+  'vps.reset_password': '[KEY]',
   // containers / deployments
-  'container.stop': '⏹️',
-  'container.restart': '🔄',
-  'deployment.create': '🚀',
-  'deployment.stop': '⏹️',
-  'deployment.restart': '🔄',
-  'deployment.subdomain_update': '🔗',
-  'deployment.delete': '🗑️',
+  'container.stop': '[STOP]',
+  'container.restart': '[SYNC]',
+  'deployment.create': '[NEW]',
+  'deployment.stop': '[STOP]',
+  'deployment.restart': '[SYNC]',
+  'deployment.subdomain_update': '[LINK]',
+  'deployment.delete': '[DEL]',
   // catalog
-  'product.create': '🆕',
-  'plan.create': '🆕',
-  'product.delete': '🗑️',
+  'product.create': '[NEW]',
+  'plan.create': '[NEW]',
+  'product.delete': '[DEL]',
   // nodes
-  'node.create': '🖥',
-  'node.delete': '🗑️',
+  'node.create': '[NODE]',
+  'node.delete': '[DEL]',
   // users
-  'user.role_change': '👤',
-  'user.ban': '🚫',
+  'user.role_change': '[USER]',
+  'user.ban': '[BAN]',
 };
 
 function actionLabel(action: string): string {
@@ -89,7 +89,7 @@ export function NotificationsScreen() {
         }
         renderItem={({ item }) => (
           <GlassCard style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <Text style={{ fontSize: 20 }}>{ACTION_ICON[item.action] ?? '📋'}</Text>
+            <Text style={{ fontSize: 12, fontFamily: fontFamily.mono, color: colors.primary }}>{ACTION_ICON[item.action] ?? '[LOG]'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.action}>{actionLabel(item.action)}</Text>
               <Text style={styles.meta}>

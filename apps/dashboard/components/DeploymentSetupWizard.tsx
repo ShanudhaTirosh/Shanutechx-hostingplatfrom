@@ -20,6 +20,7 @@ import {
   Trash2,
   FileCode,
   Box,
+  Rocket,
 } from 'lucide-react';
 
 interface Props {
@@ -527,7 +528,7 @@ export function DeploymentSetupWizard({ deploymentId, initialDeployment, connect
               <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
             </Button>
             <Button size="sm" onClick={handleFinalDeploy} loading={deploying}>
-              {deploying ? 'Deploying Container...' : <span className="flex items-center gap-1.5"><Sparkles className="h-4 w-4" /> 🚀 Launch Deployment Instance</span>}
+              {deploying ? 'Deploying Container...' : <span className="flex items-center gap-1.5"><Rocket className="h-4 w-4" /> Launch Deployment Instance</span>}
             </Button>
           </div>
         </Card>

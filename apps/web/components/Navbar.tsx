@@ -201,7 +201,7 @@ export default function Navbar() {
               setNotifications([
                 {
                   id: 'live-status-auto',
-                  title: `🟢 System Fleet: ${String(statusData.overallStatus).toUpperCase()}`,
+                  title: `System Fleet: ${String(statusData.overallStatus).toUpperCase()}`,
                   message: `All ${statusData.components?.length || 6} core edge services and container runtimes operating normally.`,
                   time: 'Live',
                   type: 'system',
@@ -749,7 +749,7 @@ export default function Navbar() {
                   return (
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between text-[11px] font-mono uppercase text-slate-400 font-bold px-1 pb-1">
-                        <span>{query === '' ? '⚡ Quick Suggestions' : `Results (${results.length})`}</span>
+                        <span>{query === '' ? 'Quick Suggestions' : `Results (${results.length})`}</span>
                         <span className="text-purple-400 font-semibold">Click to Navigate</span>
                       </div>
                       {results.map((item, idx) => {

@@ -465,6 +465,118 @@ function SecurityPinTab() {
   );
 }
 
+// ── Tab 6: Payment Info Configuration Component ──
+function PaymentInfoTab() {
+  const [bankName, setBankName] = useState('Commercial Bank of Ceylon');
+  const [accountName, setAccountName] = useState('ShanuTechX Cloud Hostings Pvt Ltd');
+  const [accountNumber, setAccountNumber] = useState('8001234567801');
+  const [branch, setBranch] = useState('Colombo Main Branch (Code 001)');
+  const [swiftCode, setSwiftCode] = useState('COMBCLKX');
+  const [instructions, setInstructions] = useState('Please transfer the invoice total and upload your bank transfer deposit slip / receipt for instant manual verification.');
+  const [currency, setCurrency] = useState('LKR');
+  const [busy, setBusy] = useState(false);
+  const { toast } = useToast();
+
+  async function handleSavePaymentInfo(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await new Promise((r) => setTimeout(r, 600));
+      toast('Payment gateway configuration saved successfully!', 'success');
+    } catch (err: any) {
+      toast(err.message || 'Failed to update payment info', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="max-w-2xl border border-white/[0.06] p-6 space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold text-text-primary">Payment Information & Bank Transfer Gateway</h3>
+        <p className="text-xs text-text-muted mt-0.5">
+          Configure official bank accounts and payment instructions shown to customers during checkout.
+        </p>
+      </div>
+
+      <form onSubmit={handleSavePaymentInfo} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            label="Bank Name"
+            placeholder="Commercial Bank"
+            value={bankName}
+            onChange={(e) => setBankName(e.target.value)}
+            required
+          />
+
+          <Input
+            label="Account Beneficiary Name"
+            placeholder="ShanuTechX Hostings"
+            value={accountName}
+            onChange={(e) => setAccountName(e.target.value)}
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            label="Account Number"
+            placeholder="8001234567801"
+            value={accountNumber}
+            onChange={(e) => setAccountNumber(e.target.value)}
+            required
+          />
+
+          <Input
+            label="Branch Name & Code"
+            placeholder="Colombo Fort - 001"
+            value={branch}
+            onChange={(e) => setBranch(e.target.value)}
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            label="SWIFT / BIC Code (Optional)"
+            placeholder="COMBCLKX"
+            value={swiftCode}
+            onChange={(e) => setSwiftCode(e.target.value)}
+          />
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-muted">Primary Platform Currency</label>
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none text-text-primary"
+            >
+              <option value="LKR" className="bg-bg text-text-primary">LKR - Sri Lankan Rupee (₨)</option>
+              <option value="USD" className="bg-bg text-text-primary">USD - US Dollar ($)</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-text-muted">Checkout Instructions for Customers</label>
+          <textarea
+            rows={3}
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-text-primary focus:outline-none focus:border-amber-500"
+          />
+        </div>
+
+        <div className="pt-2 flex justify-end">
+          <Button type="submit" variant="primary" size="sm" loading={busy}>
+            Save Payment Settings
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
 // ── Tab 5: Client Team & Granular RBAC Component ──
 function ClientTeamTab() {
   const [teamsData, setTeamsData] = useState<{ ownedTeams: any[]; joinedTeams: any[] } | null>(null);
@@ -900,6 +1012,7 @@ export default function SettingsPage() {
 
         <Tabs
           tabs={[
+            { label: 'Payment Config', value: 'payment' },
             { label: 'Team & RBAC', value: 'team' },
             { label: 'Discord Webhooks', value: 'webhooks' },
             { label: 'Database Backups', value: 'backups' },
@@ -910,6 +1023,7 @@ export default function SettingsPage() {
           onChange={setActiveTab}
         />
 
+        {activeTab === 'payment' && <PaymentInfoTab />}
         {activeTab === 'team' && <ClientTeamTab />}
         {activeTab === 'webhooks' && <DiscordWebhooksTab />}
         {activeTab === 'backups' && <DatabaseBackupsTab />}

@@ -271,9 +271,16 @@ enum ProductCategory {
   whatsappbot_hosting
   lavalink_hosting
   vps
+  vps_hosting
   ai_subscription
   smtp_hosting
+  email_hosting
   database_hosting // redis, mongo, postgres, mysql
+  managed_database
+  app_container
+  media_livekit
+  cloud_storage
+  custom_service
   app_catalog      // one-click apps — not storage/cloud-drive products
 }
 
@@ -295,6 +302,8 @@ model Product {
   slug        String          @unique
   description String?
   iconUrl     String?
+  isPopular   Boolean         @default(false)
+  badge       String?         // e.g. "Popular Choice", "Enterprise", "Pro"
   isActive    Boolean         @default(true)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
@@ -312,6 +321,8 @@ model Plan {
   price       Int             // smallest currency unit
   currency    Currency        @default(LKR)
   billingType PlanBillingType
+  isPopular   Boolean         @default(false)
+  badge       String?         // e.g. "Best Value", "Recommended"
   // Free-form specs shown on the plan card and used by provisioning, e.g.
   // { ramMB, cpuCores, storageGB, maxBots, maxDbs, mailboxLimit, aliasLimit }
   specsJson   Json?

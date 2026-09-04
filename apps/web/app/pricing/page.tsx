@@ -316,8 +316,16 @@ export default function PricingPage() {
               return (
                 <div
                   key={product.id}
-                  className="bg-[#08091c]/90 border border-white/10 hover:border-purple-500/40 rounded-3xl p-7 space-y-6 flex flex-col justify-between transition-all shadow-xl backdrop-blur-md relative overflow-hidden group"
+                  className={`bg-[#08091c]/90 border rounded-3xl p-7 space-y-6 flex flex-col justify-between transition-all shadow-xl backdrop-blur-md relative overflow-hidden group ${
+                    product.isPopular ? 'border-purple-500/60 shadow-glow-violet' : 'border-white/10 hover:border-purple-500/40'
+                  }`}
                 >
+                  {product.isPopular && (
+                    <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-[10px] font-bold text-white shadow-md flex items-center gap-1">
+                      <Sparkles className="h-3.5 w-3.5" /> {product.badge || 'Popular Choice'}
+                    </div>
+                  )}
+
                   {/* Top Header */}
                   <div className="space-y-4">
                     <div className="flex items-start justify-between border-b border-white/10 pb-4 gap-3">
@@ -327,7 +335,7 @@ export default function PricingPage() {
                         </span>
                         <h3 className="font-extrabold text-xl text-white pt-2">{product.name}</h3>
                       </div>
-                      {product.plans.length > 0 && minPrice < 999999999 && (
+                      {product.plans && product.plans.length > 0 && minPrice < 999999999 && (
                         <div className="text-right shrink-0">
                           <span className="text-[10px] font-mono text-slate-400 block">Starting from</span>
                           <span className="text-sm font-extrabold text-teal-400 font-mono">
@@ -342,7 +350,7 @@ export default function PricingPage() {
                     )}
 
                     {/* Plans List */}
-                    {product.plans.length > 0 && (
+                    {product.plans && product.plans.length > 0 && (
                       <div className="space-y-2.5 pt-2">
                         <h4 className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-wider">
                           Available Plans &amp; Cycles
@@ -351,11 +359,20 @@ export default function PricingPage() {
                           {product.plans.map((plan) => (
                             <div
                               key={plan.id}
-                              className="flex justify-between items-center text-xs bg-white/5 rounded-xl px-3.5 py-2.5 border border-white/10 hover:border-purple-500/30 transition-all"
+                              className={`flex justify-between items-center text-xs rounded-xl px-3.5 py-2.5 border transition-all ${
+                                plan.isPopular
+                                  ? 'bg-purple-500/10 border-purple-500/40 text-white'
+                                  : 'bg-white/5 border-white/10 hover:border-purple-500/30'
+                              }`}
                             >
                               <div className="flex items-center gap-2 font-medium text-slate-200">
                                 <Check className="h-3.5 w-3.5 text-teal-400 shrink-0" />
-                                {plan.name}
+                                <span>{plan.name}</span>
+                                {plan.isPopular && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                    {plan.badge || 'Popular'}
+                                  </span>
+                                )}
                               </div>
                               <div className="text-right font-mono">
                                 <span className="text-teal-300 font-extrabold">{formatPrice(plan.price)}</span>
@@ -373,7 +390,7 @@ export default function PricingPage() {
                   {/* Order Button CTA */}
                   <div className="pt-4 border-t border-white/10">
                     <a
-                      href={`${dashboardUrl}/services`}
+                      href={`${dashboardUrl}/catalog`}
                       className="w-full py-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/40 text-purple-200 font-bold text-xs font-mono transition-all flex items-center justify-center gap-2 shadow-glow-violet"
                     >
                       Order {product.name} <ArrowRight className="h-4 w-4" />

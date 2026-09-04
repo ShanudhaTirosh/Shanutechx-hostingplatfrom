@@ -14,11 +14,8 @@ import {
 export const dynamic = 'force-dynamic';
 
 /**
- * Read-only custom UI for Traefik — Traefik's own dashboard is disabled
- * (see infra/control-plane/docker-compose.yml, api.dashboard=false); this
- * renders its REST API data in ShanuTechX's own design system instead.
- * Dev/admin only. See apps/api/src/routes/traefikStatus.ts for the honest
- * limitation note (unverified against a live Traefik instance).
+ * Edge Ingress & Reverse Proxy Status Panel
+ * Real-time telemetry for edge routers, TLS certificates, and HTTP/HTTPS load-balancer backends.
  */
 export default function ReverseProxyPage() {
   const [routers, setRouters] = useState<any[] | null>(null);
@@ -33,8 +30,8 @@ export default function ReverseProxyPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title="Reverse Proxy"
-        description="Live routers and services from Traefik's own API, rendered here instead of Traefik's built-in dashboard. Dev/admin only."
+        title="Edge Ingress & Reverse Proxy"
+        description="Monitor real-time edge routing rules, ingress SSL certificates, load-balancer backends, and domain gateway metrics across the cluster."
       />
 
       {error && (

@@ -103,6 +103,7 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
     defaultHref: '/admin',
     links: [
       { href: '/admin', label: 'Admin Dashboard', icon: 'overview' },
+      { href: '/admin/vps-plans', label: 'VPS Plans & Pricing', icon: 'vps' },
       { href: '/admin/vps', label: 'Global VPS Fleet', icon: 'vps' },
       { href: '/admin/review-queue', label: 'Payment Review', icon: 'review' },
       { href: '/admin/customers', label: 'Customers', icon: 'customers' },
@@ -113,8 +114,8 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
       { href: '/admin/cms', label: 'Site Content', icon: 'cms' },
       { href: '/admin/audit-log', label: 'Audit Log', icon: 'audit' },
       { href: '/admin/knowledgebase', label: 'Knowledge Base Mgr', icon: 'knowledgebase' },
+      { href: '/admin/catalog', label: 'Catalog Manager', icon: 'catalog' },
       { href: '/settings', label: 'Protected Settings', icon: 'settings' },
-      { href: '/catalog', label: 'App Catalog', icon: 'catalog' },
     ],
   },
   dev: {
@@ -126,17 +127,17 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
     defaultHref: '/dev',
     links: [
       { href: '/dev', label: 'Dev Dashboard', icon: 'infra' },
+      { href: '/dev/deploy', label: 'Deploy Hub', icon: 'deployments' },
+      { href: '/dev/projects', label: 'Projects & Managed DBs', icon: 'projects' },
       { href: '/dev/docs', label: 'Dev & API Docs', icon: 'knowledgebase' },
       { href: '/admin/nodes', label: 'Compute Nodes', icon: 'nodes' },
       { href: '/admin/vps', label: 'Global VPS Fleet', icon: 'vps' },
-      { href: '/admin/projects', label: 'Projects & Supabase Stack', icon: 'projects' },
       { href: '/dev/containers', label: 'Containers', icon: 'containers' },
       { href: '/dev/reverse-proxy', label: 'Reverse Proxy', icon: 'proxy' },
       { href: '/dev/monitoring', label: 'Monitoring', icon: 'monitoring' },
       { href: '/dev/logs', label: 'Logs', icon: 'logs' },
-      { href: '/admin/databases', label: 'Databases', icon: 'databases' },
-      { href: '/vps-plans', label: 'VPS Plans', icon: 'vps' },
-      { href: '/catalog', label: 'App Catalog', icon: 'catalog' },
+      { href: '/admin/vps-plans', label: 'VPS Plans & Pricing', icon: 'vps' },
+      { href: '/dev/catalog', label: 'Catalog Inspector', icon: 'catalog' },
       { href: '/admin/review-queue', label: 'Payment Review', icon: 'review' },
       { href: '/admin/customers', label: 'Customers', icon: 'customers' },
       { href: '/admin/staff', label: 'Staff Directory', icon: 'staff' },
@@ -187,6 +188,9 @@ function getSpaceFromPathname(pathname: string): SpaceKey {
     pathname.startsWith('/vps-plans')
   ) {
     return 'dev';
+  }
+  if (pathname.startsWith('/admin/catalog')) {
+    return 'admin';
   }
   if (pathname.startsWith('/support') || pathname.startsWith('/admin/tickets') || pathname.startsWith('/admin/chat')) {
     return 'support';

@@ -5,6 +5,8 @@ export interface Plan {
   price: number;
   currency: string;
   billingType: string;
+  isPopular?: boolean;
+  badge?: string | null;
   specsJson?: Record<string, any> | null;
   isActive: boolean;
 }
@@ -16,6 +18,8 @@ export interface Product {
   slug: string;
   description?: string | null;
   iconUrl?: string | null;
+  isPopular?: boolean;
+  badge?: string | null;
   isActive: boolean;
   plans?: Plan[];
 }

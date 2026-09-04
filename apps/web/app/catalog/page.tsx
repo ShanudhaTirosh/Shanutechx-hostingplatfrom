@@ -87,7 +87,7 @@ export default async function AppCatalogPage() {
               >
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-3xl font-extrabold text-purple-400">📦</span>
+                    <Package className="h-7 w-7 text-purple-400" />
                     <span className="text-[10px] font-mono uppercase bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2.5 py-1 rounded-full font-bold">
                       {tmpl.category.replace('_', ' ')}
                     </span>

@@ -161,7 +161,7 @@ print("Response:", response.json())`,
     ),
     summary: 'Invite team members, assign workspace roles (Admin, Developer, Billing, Viewer), and scope resource access.',
     content: [
-      '1. Go to "Settings" -> "👥 Team & RBAC" in your Client Space Dashboard.',
+      '1. Go to "Settings" -> "Team & RBAC" in your Client Space Dashboard.',
       '2. Click "Invite Team Member" and enter the recipient\'s email address.',
       '3. Assign a primary team role: Admin, Developer, Billing, or Viewer.',
       '4. Set per-resource permissions for specific deployments, databases, or VPS instances.',
@@ -223,7 +223,7 @@ export default function DocsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="🔍 Search documentation (e.g. REST API, database, custom domain, V2Ray, team)..."
+              placeholder="Search documentation (e.g. REST API, database, custom domain, V2Ray, team)..."
               className="w-full bg-[#0b0c1e] border border-white/15 rounded-2xl px-5 py-3 text-sm text-white placeholder-text-faint focus:outline-none focus:border-purple-500 shadow-xl"
             />
           </div>

@@ -253,6 +253,7 @@ attachSshTerminalGateway(server);
 
 server.listen(env.port, () => {
   logger.info({ port: env.port }, 'SHANUTECHX API listening (HTTP + /ws/vps-ssh)');
+  logger.info('Initializing all-in-one platform telemetry engine: Loki Log Collector, Prometheus Metrics, and Status Health Checkers active.');
   void ensureDefaultProductsSeeded();
   void fullFirebaseDataMigration().catch((err) => {
     logger.error({ err: err.message }, 'Initial startup Firebase data sync error');

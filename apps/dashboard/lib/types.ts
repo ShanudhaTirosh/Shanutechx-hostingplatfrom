@@ -40,9 +40,16 @@ export type ProductCategory =
   | 'whatsappbot_hosting'
   | 'lavalink_hosting'
   | 'vps'
+  | 'vps_hosting'
   | 'ai_subscription'
   | 'smtp_hosting'
+  | 'email_hosting'
   | 'database_hosting'
+  | 'managed_database'
+  | 'app_container'
+  | 'media_livekit'
+  | 'cloud_storage'
+  | 'custom_service'
   | 'app_catalog';
 
 export type PlanBillingType = 'one_time' | 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
@@ -54,6 +61,8 @@ export interface Plan {
   price: number; // smallest currency unit
   currency: 'LKR' | 'USD' | 'EUR';
   billingType: PlanBillingType;
+  isPopular?: boolean;
+  badge?: string | null;
   specsJson: Record<string, unknown> | null;
   isActive: boolean;
   product?: Product;
@@ -66,6 +75,8 @@ export interface Product {
   slug: string;
   description: string | null;
   iconUrl: string | null;
+  isPopular?: boolean;
+  badge?: string | null;
   isActive: boolean;
   plans: Plan[];
 }

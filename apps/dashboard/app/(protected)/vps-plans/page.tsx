@@ -1,3 +1,3 @@
-// Redirect: /vps-plans → /admin/services (Products & Plans)
-export { default } from '../admin/services/page';
+// VPS Plans & Pricing management (Accessible by Admin and Dev roles)
+export { default } from '../admin/vps-plans/page';
 export const dynamic = 'force-dynamic';
