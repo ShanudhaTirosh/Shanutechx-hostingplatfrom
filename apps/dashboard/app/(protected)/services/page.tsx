@@ -17,6 +17,18 @@ import {
   useToast,
   Badge,
 } from '@/components/ui';
+import {
+  Mail,
+  HardDrive,
+  Cpu,
+  Zap,
+  Globe,
+  Lock,
+  Layers,
+  ShoppingCart,
+  CheckCircle2,
+  GitBranch,
+} from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,18 +48,18 @@ const CATEGORY_LABEL: Record<ProductCategory, string> = {
 };
 
 const CATEGORY_COLOR: Record<ProductCategory, string> = {
-  web_hosting: 'bg-accent-violet/10 text-accent-violet-light',
-  node_app_hosting: 'bg-emerald-500/10 text-emerald-400',
-  python_app_hosting: 'bg-blue-500/10 text-blue-300',
-  discordbot_node: 'bg-purple-500/10 text-purple-300',
-  discordbot_python: 'bg-indigo-500/10 text-indigo-300',
-  whatsappbot_hosting: 'bg-green-500/10 text-green-400',
-  lavalink_hosting: 'bg-pink-500/10 text-pink-300',
-  vps: 'bg-orange-500/10 text-orange-300',
-  ai_subscription: 'bg-fuchsia-500/10 text-fuchsia-300',
-  smtp_hosting: 'bg-teal-500/10 text-teal-300',
-  database_hosting: 'bg-sky-500/10 text-sky-400',
-  app_catalog: 'bg-rose-500/10 text-rose-300',
+  web_hosting: 'bg-accent-violet/10 text-accent-violet-light border border-accent-violet/20',
+  node_app_hosting: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
+  python_app_hosting: 'bg-blue-500/10 text-blue-300 border border-blue-500/20',
+  discordbot_node: 'bg-purple-500/10 text-purple-300 border border-purple-500/20',
+  discordbot_python: 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20',
+  whatsappbot_hosting: 'bg-green-500/10 text-green-400 border border-green-500/20',
+  lavalink_hosting: 'bg-pink-500/10 text-pink-300 border border-pink-500/20',
+  vps: 'bg-orange-500/10 text-orange-300 border border-orange-500/20',
+  ai_subscription: 'bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-500/20',
+  smtp_hosting: 'bg-teal-500/10 text-teal-300 border border-teal-500/20',
+  database_hosting: 'bg-sky-500/10 text-sky-400 border border-sky-500/20',
+  app_catalog: 'bg-rose-500/10 text-rose-300 border border-rose-500/20',
 };
 
 const BILLING_LABEL: Record<string, string> = {
@@ -126,11 +138,23 @@ export default function ServicesPage() {
   const categoriesPresent = Array.from(new Set(products?.map((p) => p.category) ?? [])) as ProductCategory[];
   const filtered = filter === 'all' ? products : products?.filter((p) => p.category === filter);
 
+  // Flatten products and plans into individual card items
+  const planItems: Array<{ product: Product; plan: any }> = [];
+  if (filtered) {
+    for (const prod of filtered) {
+      if (prod.plans && prod.plans.length > 0) {
+        for (const p of prod.plans) {
+          planItems.push({ product: prod, plan: p });
+        }
+      }
+    }
+  }
+
   return (
     <div className="space-y-8 animate-fade-in">
       <PageHeader
-        title="Services & Hosting"
-        description="Browse everything you can buy — hosting, bots, VPS, AI subscriptions, databases, mail — and manage what's already active."
+        title="Services & Hosting Storefront"
+        description="Browse everything you can buy — web hosting, app runtimes, discord/whatsapp bots, VPS servers, mail hosting — and manage active instances."
       />
 
       {error && <ErrorBanner message={error} />}
@@ -212,12 +236,12 @@ export default function ServicesPage() {
         )}
       </div>
 
-      {/* Section 2: Storefront */}
+      {/* Section 2: Storefront Plan Cards Grid */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-sm font-semibold text-text-primary uppercase tracking-wider">
-              Available Products
+              Available Products & Hosting Plans
             </h2>
             <p className="text-xs text-text-muted">
               Pick a plan and add it to your cart. Payment is manual bank transfer — our team reviews every
@@ -231,226 +255,241 @@ export default function ServicesPage() {
           )}
         </div>
 
-        {products === null && (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Card key={i} className="flex flex-col border border-white/[0.06]">
-                <div className="flex items-center justify-between mb-4">
-                  <Skeleton className="h-10 w-10 rounded-xl" />
-                  <Skeleton className="h-5 w-24 rounded-full" />
-                </div>
-                <Skeleton className="h-5 w-32 mb-4" />
-                <div className="mt-auto pt-4 flex items-center justify-between">
-                  <Skeleton className="h-6 w-20" />
-                  <Skeleton className="h-8 w-24 rounded-full" />
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-
+        {/* Category Filter Pills */}
         {products && products.length > 0 && (
-          <div className="flex gap-2 flex-wrap mb-4">
+          <div className="flex gap-2 flex-wrap mb-6">
             <button
               onClick={() => setFilter('all')}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
                 filter === 'all'
                   ? 'bg-accent-violet text-white shadow-glow-violet'
                   : 'glass text-text-muted hover:text-text-primary hover:bg-white/[0.07]'
               }`}
             >
-              All Products
+              All Products ({products.reduce((sum, p) => sum + p.plans.length, 0)})
             </button>
-            {categoriesPresent.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setFilter(cat)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  filter === cat
-                    ? 'bg-accent-violet text-white shadow-glow-violet'
-                    : 'glass text-text-muted hover:text-text-primary hover:bg-white/[0.07]'
-                }`}
-              >
-                {CATEGORY_LABEL[cat]}
-              </button>
+            {categoriesPresent.map((cat) => {
+              const count = products.filter((p) => p.category === cat).reduce((sum, p) => sum + p.plans.length, 0);
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setFilter(cat)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    filter === cat
+                      ? 'bg-accent-violet text-white shadow-glow-violet'
+                      : 'glass text-text-muted hover:text-text-primary hover:bg-white/[0.07]'
+                  }`}
+                >
+                  {CATEGORY_LABEL[cat]} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Loading Skeletons */}
+        {products === null && (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i} className="flex flex-col border border-white/[0.06] p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-5 w-24 rounded-full" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-8 w-28" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                </div>
+                <Skeleton className="h-9 w-full rounded-xl mt-4" />
+              </Card>
             ))}
           </div>
         )}
 
-        {products && products.length === 0 && (
-          <EmptyState message="No products are published yet. Check back soon." />
+        {/* Empty State */}
+        {products && planItems.length === 0 && (
+          <EmptyState message="No products or plans available in this category." />
         )}
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered?.map((product) => (
-            <Card
-              key={product.id}
-              className="flex flex-col border border-white/[0.06] hover:border-white/10 transition-all group"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${CATEGORY_COLOR[product.category]}`}>
-                  {CATEGORY_LABEL[product.category]}
-                </span>
-              </div>
+        {/* Flat Grid of Individual Product Plan Cards */}
+        {products && planItems.length > 0 && (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {planItems.map(({ product, plan }) => {
+              const specs: any = plan.specsJson || {};
 
-              <h3 className="font-semibold text-text-primary mb-1 group-hover:text-white transition-colors">
-                {product.name}
-              </h3>
-              {product.description && (
-                <p className="text-xs text-text-muted mb-3 line-clamp-2">{product.description}</p>
-              )}
+              return (
+                <Card
+                  key={plan.id}
+                  className="flex flex-col justify-between border border-white/[0.08] hover:border-accent-violet/50 bg-black/40 backdrop-blur-xl p-6 rounded-2xl shadow-xl hover:shadow-2xl hover:shadow-accent-violet/10 transition-all duration-200 group relative overflow-hidden"
+                >
+                  <div className="space-y-4">
+                    {/* Top Category Badge & Billing Label */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ${CATEGORY_COLOR[product.category]}`}>
+                        {CATEGORY_LABEL[product.category]}
+                      </span>
+                      <span className="text-[10px] font-mono text-text-faint uppercase">
+                        {BILLING_LABEL[plan.billingType] ?? plan.billingType}
+                      </span>
+                    </div>
 
-              <div className="mt-auto pt-3 border-t border-white/[0.04] space-y-2">
-                {product.plans.length === 0 && (
-                  <p className="text-xs text-text-faint italic">No active plans yet.</p>
-                )}
-                {product.plans.map((plan) => {
-                  const specs: any = plan.specsJson || {};
-                  return (
-                    <div key={plan.id} className="p-3 bg-white/[0.02] border border-white/10 rounded-xl flex items-center justify-between gap-2">
-                      <div className="min-w-0 space-y-0.5">
-                        <p className="text-sm font-semibold text-text-primary truncate">{plan.name}</p>
-                        <p className="text-xs font-mono font-bold text-accent-cyan">
-                          {formatMoney(plan.price)} <span className="text-[10px] text-text-muted font-sans font-normal">/{BILLING_LABEL[plan.billingType] ?? plan.billingType}</span>
+                    {/* Product & Plan Header */}
+                    <div>
+                      <p className="text-[11px] font-medium text-text-muted truncate mb-0.5">{product.name}</p>
+                      <h3 className="font-bold text-white text-lg group-hover:text-accent-cyan transition-colors">
+                        {plan.name}
+                      </h3>
+                      {product.description && (
+                        <p className="text-xs text-text-muted mt-1.5 line-clamp-2 leading-relaxed">
+                          {product.description}
                         </p>
-                        
-                        {/* SMTP Specs */}
-                        {product.category === 'smtp_hosting' && (
-                          <div className="space-y-1 pt-1">
-                            <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono">
-                              <span className="inline-flex items-center gap-1 text-slate-200">
-                                <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                </svg>
-                                {specs.mailboxesCount === -1 ? '∞' : (specs.mailboxesCount || 1)} Mailbox{(specs.mailboxesCount || 1) !== 1 ? 'es' : ''}
-                              </span>
-                              <span className="text-white/20">•</span>
-                              <span className="inline-flex items-center gap-1 text-emerald-300">
-                                <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                                </svg>
-                                {specs.storageLimitGb === -1 ? '∞ Unlimited' : `${specs.storageLimitGb || 1}GB`} Storage
-                              </span>
-                              <span className="text-white/20">•</span>
-                              <span className="inline-flex items-center gap-1 text-purple-300">
-                                <svg className="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                </svg>
-                                {specs.forwardingRules === -1 ? '∞' : (specs.forwardingRules || 1)} Forwarding
-                              </span>
-                              <span className="text-white/20">•</span>
-                              <span className="inline-flex items-center gap-1 text-accent-cyan">
-                                <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                </svg>
-                                {specs.maxAliases === -1 || specs.emailAliases === -1 ? '∞' : (specs.maxAliases || specs.emailAliases || 2)} Aliases
-                              </span>
-                            </div>
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                              <svg className="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                              </svg>
+                      )}
+                    </div>
+
+                    {/* Price Tag */}
+                    <div className="py-2.5 border-y border-white/[0.06] flex items-baseline gap-1.5">
+                      <span className="text-2xl font-bold font-mono text-white tracking-tight">
+                        {formatMoney(plan.price)}
+                      </span>
+                      <span className="text-xs text-text-muted font-sans font-normal">
+                        /{BILLING_LABEL[plan.billingType] ?? plan.billingType}
+                      </span>
+                    </div>
+
+                    {/* Specs Section with Clean SVG Icons */}
+                    <div className="space-y-2 font-mono text-xs pt-1">
+                      {/* SMTP / Mail Hosting Specs */}
+                      {product.category === 'smtp_hosting' && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-slate-200">
+                            <Mail className="h-4 w-4 text-indigo-400 shrink-0" />
+                            <span>
+                              {specs.mailboxesCount === -1 ? 'Unlimited' : (specs.mailboxesCount || 1)} Mailbox{(specs.mailboxesCount || 1) !== 1 ? 'es' : ''}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-emerald-300">
+                            <HardDrive className="h-4 w-4 text-emerald-400 shrink-0" />
+                            <span>
+                              {specs.storageLimitGb === -1 ? 'Unlimited Storage' : `${specs.storageLimitGb || 1} GB Storage`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-purple-300">
+                            <Zap className="h-4 w-4 text-purple-400 shrink-0" />
+                            <span>
+                              {specs.forwardingRules === -1 ? 'Unlimited' : (specs.forwardingRules || 1)} Forwarding Rule{(specs.forwardingRules || 1) !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-cyan-300">
+                            <Globe className="h-4 w-4 text-cyan-400 shrink-0" />
+                            <span>
+                              {specs.maxAliases === -1 || specs.emailAliases === -1 ? 'Unlimited' : (specs.maxAliases || specs.emailAliases || 2)} Email Aliases
+                            </span>
+                          </div>
+                          <div className="pt-1">
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-300 font-mono bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                              <Lock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
                               Minimum 3-Month Commitment Required
                             </span>
                           </div>
-                        )}
+                        </div>
+                      )}
 
-                        {/* VPS Specs */}
-                        {product.category === 'vps' && (
-                          <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono text-sky-400 pt-1">
-                            <span className="inline-flex items-center gap-1">
-                              <svg className="w-3 h-3 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m14-6h2m-2 6h2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                              </svg>
-                              {specs.cpuCores || 2} vCPU
-                            </span>
-                            <span className="text-white/20">•</span>
-                            <span className="inline-flex items-center gap-1">
-                              <svg className="w-3 h-3 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                              </svg>
-                              {specs.ramGb || 4}GB RAM
-                            </span>
-                            <span className="text-white/20">•</span>
-                            <span className="inline-flex items-center gap-1">
-                              <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                              </svg>
-                              {specs.storageGb || 50}GB NVMe
+                      {/* VPS Specs */}
+                      {product.category === 'vps' && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-cyan-300">
+                            <Cpu className="h-4 w-4 text-cyan-400 shrink-0" />
+                            <span>{specs.cpuCores || 2} vCPU Cores</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-purple-300">
+                            <Layers className="h-4 w-4 text-purple-400 shrink-0" />
+                            <span>{specs.ramGb || 4} GB RAM</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-emerald-300">
+                            <HardDrive className="h-4 w-4 text-emerald-400 shrink-0" />
+                            <span>{specs.storageGb || 50} GB NVMe Storage</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-300">
+                            <Zap className="h-4 w-4 text-amber-400 shrink-0" />
+                            <span>{specs.bandwidth || 'Unmetered'} Bandwidth</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Web Hosting Specs */}
+                      {product.category === 'web_hosting' && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-purple-300">
+                            <HardDrive className="h-4 w-4 text-purple-400 shrink-0" />
+                            <span>{specs.storageGb || 5} GB NVMe SSD Storage</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-cyan-300">
+                            <Zap className="h-4 w-4 text-cyan-400 shrink-0" />
+                            <span>{specs.bandwidthGb ? `${specs.bandwidthGb} GB` : '100 GB'} Bandwidth</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-amber-300">
+                            <Globe className="h-4 w-4 text-amber-400 shrink-0" />
+                            <span>
+                              {specs.domainsCount === -1 ? 'Unlimited Domains' : `${specs.domainsCount || 1} Custom Domain${(specs.domainsCount || 1) !== 1 ? 's' : ''}`}
                             </span>
                           </div>
-                        )}
+                          {specs.gitAutoDeploy && (
+                            <div className="flex items-center gap-2 text-emerald-300 font-semibold">
+                              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                              <span>GitHub Auto-Deploy Included</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-                        {/* Web Hosting Specs */}
-                        {product.category === 'web_hosting' && (
-                          <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono text-purple-300 pt-1">
-                            <span className="inline-flex items-center gap-1">
-                              <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                              </svg>
-                              {specs.storageGb || 5}GB NVMe SSD
-                            </span>
-                            <span className="text-white/20">•</span>
-                            <span className="inline-flex items-center gap-1 text-cyan-300">
-                              <svg className="w-3 h-3 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                              </svg>
-                              {specs.bandwidthGb ? `${specs.bandwidthGb}GB` : '100GB'} Bandwidth
-                            </span>
-                            <span className="text-white/20">•</span>
-                            <span className="inline-flex items-center gap-1 text-amber-300">
-                              <svg className="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m-9 9a9 9 0 019-9" />
-                              </svg>
-                              {specs.domainsCount === -1 ? '∞ Domains' : `${specs.domainsCount || 1} Domain${(specs.domainsCount || 1) !== 1 ? 's' : ''}`}
-                            </span>
-                            {specs.gitAutoDeploy && (
-                              <>
-                                <span className="text-white/20">•</span>
-                                <span className="inline-flex items-center gap-1 text-emerald-300 font-bold">
-                                  ⚡ GitHub Auto-Deploy
-                                </span>
-                              </>
-                            )}
+                      {/* App & Bot Hosting Specs */}
+                      {['node_app_hosting', 'python_app_hosting', 'discordbot_node', 'discordbot_python', 'whatsappbot_hosting', 'lavalink_hosting'].includes(product.category) && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-emerald-300">
+                            <Cpu className="h-4 w-4 text-emerald-400 shrink-0" />
+                            <span>{specs.cpuCores || 1} vCPU Dedicated</span>
                           </div>
-                        )}
-
-                        {/* App & Bot Hosting Specs */}
-                        {['node_app_hosting', 'python_app_hosting', 'discordbot_node', 'discordbot_python', 'whatsappbot_hosting', 'lavalink_hosting'].includes(product.category) && (
-                          <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono text-emerald-300 pt-1">
-                            <span className="inline-flex items-center gap-1">
-                              ⚡ {specs.cpuCores || 1} vCPU
-                            </span>
-                            <span className="text-white/20">•</span>
-                            <span className="inline-flex items-center gap-1 text-purple-300">
-                              🧠 {specs.ramMb || specs.memoryMb || 512}MB RAM
-                            </span>
-                            <span className="text-white/20">•</span>
-                            <span className="inline-flex items-center gap-1 text-cyan-300">
-                              💾 {specs.storageGb || 5}GB Storage
-                            </span>
-                            <span className="text-white/20">•</span>
-                            <span className="inline-flex items-center gap-1 text-amber-300">
-                              🚀 Git & ZIP Archive Upload Uploader
-                            </span>
+                          <div className="flex items-center gap-2 text-purple-300">
+                            <Layers className="h-4 w-4 text-purple-400 shrink-0" />
+                            <span>{specs.ramMb || specs.memoryMb || 512} MB RAM</span>
                           </div>
-                        )}
-                      </div>
-                      <Button
-                        onClick={() => handleAddToCart(plan.id, `${product.name} — ${plan.name}`)}
-                        loading={addingPlanId === plan.id}
-                        size="sm"
-                        className="shrink-0"
-                      >
-                        {addingPlanId === plan.id ? 'Adding...' : 'Add to Cart'}
-                      </Button>
+                          <div className="flex items-center gap-2 text-cyan-300">
+                            <HardDrive className="h-4 w-4 text-cyan-400 shrink-0" />
+                            <span>{specs.storageGb || 5} GB NVMe Storage</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-amber-300">
+                            <GitBranch className="h-4 w-4 text-amber-400 shrink-0" />
+                            <span>Git Webhook & ZIP Archive Deployment</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            </Card>
-          ))}
-        </div>
+                  </div>
+
+                  {/* Action Footer */}
+                  <div className="pt-5 mt-5 border-t border-white/[0.06]">
+                    <Button
+                      onClick={() => handleAddToCart(plan.id, `${product.name} — ${plan.name}`)}
+                      loading={addingPlanId === plan.id}
+                      size="sm"
+                      className="w-full flex items-center justify-center gap-2 font-semibold shadow-lg"
+                    >
+                      {addingPlanId === plan.id ? (
+                        'Adding to Cart...'
+                      ) : (
+                        <>
+                          <ShoppingCart className="h-4 w-4" /> Add to Cart
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
