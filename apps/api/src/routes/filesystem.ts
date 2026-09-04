@@ -230,6 +230,14 @@ filesystemRouter.post('/fs/:deploymentId/git-commit-push', async (req: AuthedReq
   }
 
   if (!matchedProvider || !matchedAccountId) {
+    const synced = await pushWorkspaceToShadowRepo(req.params.deploymentId, commitMessage);
+    if (synced) {
+      return res.json({
+        ok: true,
+        provider: 'shadow-backup',
+        message: 'Committed and pushed to platform shadow backup repository',
+      });
+    }
     return res.status(400).json({
       error: 'No connected Git account found. Connect your GitHub or GitLab account in the Deployments page first.',
     });

@@ -418,7 +418,22 @@ export const api = {
         await asJson<{ ok: boolean; deployment: any; message: string }>(res);
       }
     },
-    redeploy: async (id: string, onEvent: (event: BuildEvent) => void): Promise<void> => {
+    updateConfig: (id: string, data: Partial<{
+      repoUrl: string;
+      branch: string;
+      frameworkPreset: string;
+      startCommand: string;
+      internalPort: number;
+      exposureMode: 'ssl_with_proxy' | 'raw_tcp' | 'internal_only';
+      subdomain: string;
+      envVars: Record<string, string>;
+    }>) =>
+      apiFetch(`/api/deployments/${id}/config`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }).then((r) => asJson<{ ok: boolean; deployment: any }>(r)),
+
+    redeploy: async (id: string, onEvent?: (event: BuildEvent) => void): Promise<void> => {
       const res = await apiFetch(`/api/deployments/${id}/redeploy`, { method: 'POST', body: JSON.stringify({}) });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}: ${res.statusText}` }));
@@ -437,7 +452,7 @@ export const api = {
         const lines = buffered.split('\n');
         buffered = lines.pop() ?? '';
         for (const line of lines) {
-          if (line.trim()) onEvent(JSON.parse(line));
+          if (line.trim() && onEvent) onEvent(JSON.parse(line));
         }
       }
     },

@@ -550,15 +550,13 @@ export function FileManagerPanel({ deploymentId, repoUrl, connectedAccounts = []
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {connectedAccounts.length > 0 && (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => { setGitCommitMsg(`Update ${activeTab.name}`); setShowGitPushModal(true); }}
-                    >
-                      <GitCommit className="h-3.5 w-3.5 mr-1" /> Push to Git
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => { setGitCommitMsg(`Update ${activeTab.name}`); setShowGitPushModal(true); }}
+                  >
+                    <GitCommit className="h-3.5 w-3.5 mr-1" /> Push to Git
+                  </Button>
                   <Button size="sm" onClick={handleSaveFile} loading={savingFile} disabled={!activeTab.isDirty}>
                     {savingFile ? 'Saving...' : <span className="flex items-center gap-1.5"><Save className="h-3.5 w-3.5" /> Save (Ctrl+S)</span>}
                   </Button>
@@ -672,7 +670,7 @@ export function FileManagerPanel({ deploymentId, repoUrl, connectedAccounts = []
           <div className="bg-bg border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4">
             <h3 className="font-semibold text-sm text-white">Push to GitHub / GitLab</h3>
             <p className="text-xs text-text-muted">
-              Save the current file and push it as a commit to the connected Git repository.
+              Save the current file and push it as a commit to your connected Git repository or platform shadow backup repository.
             </p>
             <form onSubmit={handleGitPush} className="space-y-4">
               {connectedAccounts.length > 1 && (

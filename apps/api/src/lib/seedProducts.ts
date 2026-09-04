@@ -4,14 +4,7 @@ import { syncProductsToFirebase, syncCmsToFirebase } from './firebaseSync';
 
 export async function ensureDefaultProductsSeeded(): Promise<void> {
   try {
-    const existingCount = await prisma.product.count().catch(() => 0);
-    if (existingCount > 0) {
-      // Sync existing products to Firebase on boot
-      void syncProductsToFirebase();
-      return;
-    }
-
-    logger.info('No products found in catalog. Seeding default platform products and plans...');
+    logger.info('Checking product catalog and seeding any missing platform products & plans...');
 
     // 1. SMTP Mail Hosting Product & Plans (5 Configurable Tiers)
     let smtpProduct = await prisma.product.findFirst({ where: { category: 'smtp_hosting' } });
@@ -136,74 +129,80 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     }
 
     // 2. High-Performance VPS Hosting
-    await prisma.product.create({
-      data: {
-        category: 'vps',
-        name: 'High-Performance Cloud VPS',
-        slug: 'high-performance-vps',
-        description: 'Dedicated virtual private servers with NVMe SSDs, 1Gbps unmetered bandwidth, and root SSH control.',
-        isActive: true,
-        plans: {
-          create: [
-            {
-              name: 'VPS Micro',
-              price: 250000, // LKR 2,500.00
-              currency: 'LKR',
-              billingType: 'monthly',
-              specsJson: { cpuCores: 1, ramGB: 2, storageGB: 30, bandwidth: 'Unmetered 1Gbps' },
-              isActive: true,
-            },
-            {
-              name: 'VPS Standard',
-              price: 500000, // LKR 5,000.00
-              currency: 'LKR',
-              billingType: 'monthly',
-              specsJson: { cpuCores: 2, ramGB: 4, storageGB: 80, bandwidth: 'Unmetered 1Gbps' },
-              isActive: true,
-            },
-            {
-              name: 'VPS Pro',
-              price: 950000, // LKR 9,500.00
-              currency: 'LKR',
-              billingType: 'monthly',
-              specsJson: { cpuCores: 4, ramGB: 8, storageGB: 160, bandwidth: 'Unmetered 1Gbps' },
-              isActive: true,
-            },
-          ],
+    let vpsProduct = await prisma.product.findFirst({ where: { category: 'vps' } });
+    if (!vpsProduct) {
+      await prisma.product.create({
+        data: {
+          category: 'vps',
+          name: 'High-Performance Cloud VPS',
+          slug: 'high-performance-vps',
+          description: 'Dedicated virtual private servers with NVMe SSDs, 1Gbps unmetered bandwidth, and root SSH control.',
+          isActive: true,
+          plans: {
+            create: [
+              {
+                name: 'VPS Micro',
+                price: 250000, // LKR 2,500.00
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: { cpuCores: 1, ramGB: 2, storageGB: 30, bandwidth: 'Unmetered 1Gbps' },
+                isActive: true,
+              },
+              {
+                name: 'VPS Standard',
+                price: 500000, // LKR 5,000.00
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: { cpuCores: 2, ramGB: 4, storageGB: 80, bandwidth: 'Unmetered 1Gbps' },
+                isActive: true,
+              },
+              {
+                name: 'VPS Pro',
+                price: 950000, // LKR 9,500.00
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: { cpuCores: 4, ramGB: 8, storageGB: 160, bandwidth: 'Unmetered 1Gbps' },
+                isActive: true,
+              },
+            ],
+          },
         },
-      },
-    });
+      });
+    }
 
     // 3. Node.js & Web Application Hosting
-    await prisma.product.create({
-      data: {
-        category: 'node_app_hosting',
-        name: 'Node.js & Next.js App Hosting',
-        slug: 'nodejs-app-hosting',
-        description: 'Nixpacks-powered container hosting with automatic SSL, custom domain routing, and environment secrets.',
-        isActive: true,
-        plans: {
-          create: [
-            {
-              name: 'Developer Node Plan',
-              price: 120000, // LKR 1,200.00
-              currency: 'LKR',
-              billingType: 'monthly',
-              specsJson: { memoryMB: 512, cpuCores: 0.5, customDomain: true },
-              isActive: true,
-            },
-            {
-              name: 'Business Node Plan',
-              price: 280000, // LKR 2,800.00
-              currency: 'LKR',
-              billingType: 'monthly',
-              specsJson: { memoryMB: 2048, cpuCores: 1.5, customDomain: true },
-              isActive: true,
-            },
-          ],
+    let nodeProduct = await prisma.product.findFirst({ where: { category: 'node_app_hosting' } });
+    if (!nodeProduct) {
+      await prisma.product.create({
+        data: {
+          category: 'node_app_hosting',
+          name: 'Node.js & Next.js App Hosting',
+          slug: 'nodejs-app-hosting',
+          description: 'Nixpacks-powered container hosting with automatic SSL, custom domain routing, and environment secrets.',
+          isActive: true,
+          plans: {
+            create: [
+              {
+                name: 'Developer Node Plan',
+                price: 120000, // LKR 1,200.00
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: { memoryMB: 512, cpuCores: 0.5, customDomain: true },
+                isActive: true,
+              },
+              {
+                name: 'Business Node Plan',
+                price: 280000, // LKR 2,800.00
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: { memoryMB: 2048, cpuCores: 1.5, customDomain: true },
+                isActive: true,
+              },
+            ],
+          },
         },
-      },
-    });
+      });
+    }
 
     // 4. Static & Dynamic Web Hosting (GitHub Auto-Deploy & Free Auto-SSL)
     let webHostingProduct = await prisma.product.findFirst({ where: { category: 'web_hosting' } });

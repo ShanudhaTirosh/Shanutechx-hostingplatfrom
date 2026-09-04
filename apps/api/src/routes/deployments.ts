@@ -416,6 +416,50 @@ deploymentsRouter.get('/deployments/:id', async (req: AuthedRequest, res) => {
   });
 });
 
+const updateConfigSchema = z.object({
+  repoUrl: z.string().optional(),
+  branch: z.string().optional(),
+  frameworkPreset: z.string().optional(),
+  startCommand: z.string().optional(),
+  internalPort: z.number().int().positive().optional(),
+  exposureMode: z.enum(['ssl_with_proxy', 'raw_tcp', 'internal_only']).optional(),
+  subdomain: z.string().optional(),
+  envVars: z.record(z.string()).optional(),
+});
+
+deploymentsRouter.patch('/deployments/:id/config', async (req: AuthedRequest, res) => {
+  const deployment = await loadOwnedDeployment(req, req.params.id);
+  if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
+
+  const parsed = updateConfigSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues });
+  }
+
+  const { repoUrl, branch, frameworkPreset, startCommand, internalPort, exposureMode, subdomain, envVars } = parsed.data;
+
+  let envVarsEncrypted = deployment.envVarsEncrypted;
+  if (envVars) {
+    envVarsEncrypted = encryptSecret(JSON.stringify(envVars), env.secretsEncryptionKey);
+  }
+
+  const updated = await prisma.deployment.update({
+    where: { id: deployment.id },
+    data: {
+      repoUrl: repoUrl !== undefined ? repoUrl : deployment.repoUrl,
+      branch: branch !== undefined ? branch : deployment.branch,
+      frameworkPreset: frameworkPreset !== undefined ? frameworkPreset : deployment.frameworkPreset,
+      startCommand: startCommand !== undefined ? startCommand : deployment.startCommand,
+      internalPort: internalPort !== undefined ? internalPort : deployment.internalPort,
+      exposureMode: exposureMode !== undefined ? exposureMode : deployment.exposureMode,
+      subdomain: subdomain !== undefined ? subdomain : deployment.subdomain,
+      envVarsEncrypted,
+    },
+  });
+
+  res.json({ ok: true, deployment: updated });
+});
+
 deploymentsRouter.post('/deployments/:id/stop', async (req: AuthedRequest, res) => {
   const deployment = await loadOwnedDeployment(req, req.params.id);
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });

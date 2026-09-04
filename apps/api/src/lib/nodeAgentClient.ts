@@ -13,6 +13,26 @@ function agentHeaders(extra: Record<string, string> = {}) {
   return { 'x-agent-secret': env.nodeAgentSecret, ...extra };
 }
 
+export async function callNodeAgent(
+  node: Node,
+  path: string,
+  method: string = 'GET',
+  body?: any
+): Promise<any> {
+  const url = agentUrl(node, path);
+  const headers = agentHeaders({ 'Content-Type': 'application/json' });
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => '');
+    throw new Error(`callNodeAgent failed (${res.status}): ${errorText}`);
+  }
+  return res.json().catch(() => ({ ok: true }));
+}
+
 export interface BuildAndRunParams {
   deploymentId: string;
   repoUrl: string;

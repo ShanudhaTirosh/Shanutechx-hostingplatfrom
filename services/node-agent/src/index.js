@@ -511,7 +511,7 @@ app.delete('/agent/fs/:deploymentId/cleanup', async (req, res) => {
 });
 
 // Push workspace to remote shadow backup repo
-app.post('/agent/fs/:deploymentId/git-commit-push', async (req, res) => {
+app.post(['/agent/fs/:deploymentId/git-commit-push', '/agent/deployments/:deploymentId/git-backup-push'], async (req, res) => {
   const { remoteUrl, commitMessage, authorName, authorEmail } = req.body || {};
   if (!remoteUrl) return res.status(400).json({ error: 'remoteUrl is required' });
   try {
@@ -528,6 +528,7 @@ app.post('/agent/fs/:deploymentId/git-commit-push', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // ── Cockpit System Management Routes ────────────────────────────────────────
 

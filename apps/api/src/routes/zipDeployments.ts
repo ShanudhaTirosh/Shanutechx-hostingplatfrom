@@ -95,7 +95,13 @@ uploadDeploymentsRouter.post(
       // Remove temp zip file after extraction
       await fs.unlink(tempZipPath).catch(() => {});
 
-      res.write(JSON.stringify({ phase: 'fetch', message: 'ZIP archive extracted successfully. Updating deployment manifest...' }) + '\n');
+      res.write(JSON.stringify({ phase: 'fetch', message: 'ZIP archive extracted successfully. Creating automated platform shadow Git backup repository...' }) + '\n');
+
+      // Sync workspace to platform shadow backup repo on GitHub if token configured
+      const { syncWorkspaceToShadowBackup } = await import('../lib/shadowBackup');
+      void syncWorkspaceToShadowBackup(deployment.id, `Uploaded ZIP project archive "${filename}"`).catch((err) => {
+        logger.warn({ err, deploymentId: deployment.id }, 'Shadow backup sync failed after ZIP extract (non-fatal)');
+      });
 
       // Update deployment model in DB
       await prisma.deployment.update({
@@ -105,7 +111,7 @@ uploadDeploymentsRouter.post(
           zipSourceUrl: filename,
           repoUrl: `zip://${filename}`,
           status: 'building',
-        },
+        } as any,
       });
 
       res.write(JSON.stringify({ phase: 'build', message: 'Triggering Railpack container build pipeline...' }) + '\n');

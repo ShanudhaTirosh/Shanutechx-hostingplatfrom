@@ -22,6 +22,7 @@ import { CodeDeploymentPanel } from '@/components/CodeDeploymentPanel';
 import { FileManagerPanel } from '@/components/FileManagerPanel';
 import { DeployWebhookPanel } from '@/components/DeployWebhookPanel';
 import { RoutingFirewallPanel } from '@/components/RoutingFirewallPanel';
+import { DeploymentSetupWizard } from '@/components/DeploymentSetupWizard';
 import { useAppUser } from '@/lib/AppUserContext';
 
 export const dynamic = 'force-dynamic';
@@ -255,6 +256,20 @@ export default function DeploymentDetailPage() {
       <div className="space-y-6">
         <CardSkeleton />
       </div>
+    );
+  }
+
+  if (deployment.status === 'pending' || (!deployment.containerId && (!deployment.repoUrl || deployment.repoUrl.startsWith('pending://')))) {
+    return (
+      <DeploymentSetupWizard
+        deploymentId={deploymentId}
+        initialDeployment={deployment}
+        connectedAccounts={connectedAccounts}
+        onComplete={() => {
+          loadDeployment();
+          loadLogs();
+        }}
+      />
     );
   }
 
