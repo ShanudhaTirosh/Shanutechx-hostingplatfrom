@@ -863,6 +863,13 @@ export const api = {
 
   vps: {
     list: () => apiFetch('/api/vps-provisions').then((r) => asJson<{ provisions: VpsProvision[]; notice?: string }>(r)),
+    listAllAdmin: () =>
+      apiFetch('/api/vps-provisions/admin/all').then((r) =>
+        asJson<{
+          provisions: Array<VpsProvision & { user?: { id: string; email: string; displayName?: string | null; role: string } }>;
+          notice?: string;
+        }>(r)
+      ),
     get: (id: string) => apiFetch(`/api/vps-provisions/${id}`).then((r) => asJson<{ provision: VpsProvision; notice?: string }>(r)),
     revealPassword: (id: string) =>
       apiFetch(`/api/vps-provisions/${id}/reveal-password`).then((r) =>
@@ -872,9 +879,9 @@ export const api = {
       apiFetch(`/api/vps-provisions/${id}/ssh-ticket`, { method: 'POST' }).then(
         (r) => asJson<{ ticket: string; expiresInMs: number; notice?: string }>(r)
       ),
-    power: (id: string, action: 'reboot' | 'stop' | 'start' | 'status') =>
+    power: (id: string, action: 'reboot' | 'start' | 'status') =>
       apiFetch(`/api/vps-provisions/${id}/power`, { method: 'POST', body: JSON.stringify({ action }) }).then(
-        (r) => asJson<{ ok: boolean; action: string; message?: string; status?: string; uptime?: string }>(r)
+        (r) => asJson<{ ok: boolean; action: string; message?: string; status?: string; uptime?: string; notice?: string }>(r)
       ),
     stats: (id: string) =>
       apiFetch(`/api/vps-provisions/${id}/stats`).then((r) =>

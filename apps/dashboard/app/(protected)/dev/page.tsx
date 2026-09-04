@@ -70,19 +70,19 @@ const INFRA_PANELS = [
   },
   {
     href: '/admin/nodes',
-    label: 'Compute Nodes',
-    description: 'Register and monitor bare-metal and VPS compute nodes running cloud workloads.',
+    label: 'Compute Host Nodes',
+    description: 'Register and monitor bare-metal and VPS host nodes, CPU & bandwidth quotas.',
     icon: <ServerIcon />,
     color: 'bg-accent-violet/10 text-accent-violet-light',
     countKey: 'nodes',
   },
   {
-    href: '/admin/leaseweb',
-    label: 'Leaseweb VPS',
-    description: 'Create, power cycle, and manage Leaseweb dedicated/VPS instances via the Leaseweb API.',
+    href: '/admin/vps',
+    label: 'Global Admin VPS Fleet',
+    description: 'Manage all customer & system VPS provisions, pre-delivery SSH/SFTP testing, and credentials.',
     icon: <CloudIcon />,
     color: 'bg-teal-500/10 text-teal-300',
-    countKey: 'leaseweb',
+    countKey: 'vpsFleet',
   },
   {
     href: '/admin/databases',
@@ -134,6 +134,12 @@ const ADMIN_PANELS = [
     badgeKey: 'customers',
   },
   {
+    href: '/admin/vps',
+    label: 'Global VPS Fleet',
+    description: 'Overview of all active customer VPS instances, connectivity testing, and access credentials.',
+    icon: <CloudIcon />,
+  },
+  {
     href: '/admin/services',
     label: 'Products & Plans',
     description: 'Manage services, pricing tiers, plans, and subscription packages.',
@@ -164,9 +170,9 @@ const ADMIN_PANELS = [
     icon: <ShieldIcon />,
   },
   {
-    href: '/admin/tickets',
-    label: 'Support Tickets & Chat',
-    description: 'Manage support tickets and engage in live customer chat.',
+    href: '/support',
+    label: 'Support Portal & Chat',
+    description: 'Triage customer support tickets, manage support queue, and initiate live chat.',
     icon: <CloudIcon />,
     badgeKey: 'tickets',
   },
@@ -174,7 +180,7 @@ const ADMIN_PANELS = [
 
 export default function DevLandingPage() {
   const [activeTab, setActiveTab] = useState<'infra' | 'admin'>('infra');
-  const [health, setHealth] = useState<any>(null);
+  const [vpsFleetCount, setVpsFleetCount] = useState<number | null>(null);
   const [nodeCount, setNodeCount] = useState<number | null>(null);
   const [dbCount, setDbCount] = useState<number | null>(null);
   const [pendingPayments, setPendingPayments] = useState<number>(0);
@@ -184,16 +190,16 @@ export default function DevLandingPage() {
 
   useEffect(() => {
     Promise.allSettled([
-      api.leaseweb.health(),
+      api.vps.listAllAdmin(),
       api.nodes.list(),
       api.managedDatabases.list(),
       api.payments.reviewQueue(),
       api.admin.customers(1),
       api.tickets.list(),
     ]).then((results) => {
-      const [healthResult, nodesResult, dbsResult, payResult, custResult, tickResult] = results;
+      const [vpsResult, nodesResult, dbsResult, payResult, custResult, tickResult] = results;
       
-      setHealth(healthResult.status === 'fulfilled' ? healthResult.value : null);
+      setVpsFleetCount(vpsResult.status === 'fulfilled' ? vpsResult.value.provisions.length : 0);
       setNodeCount(nodesResult.status === 'fulfilled' ? nodesResult.value.nodes.length : 0);
       setDbCount(dbsResult.status === 'fulfilled' ? dbsResult.value.databases.length : 0);
       setPendingPayments(payResult.status === 'fulfilled' ? payResult.value.payments.length : 0);
@@ -208,7 +214,7 @@ export default function DevLandingPage() {
     nodes: nodeCount === null ? '…' : `${nodeCount}`,
     supabase: 'Manage Stack',
     secrets: 'Open Vault',
-    leaseweb: health === null ? '…' : (health?.apiKeyConfigured ? 'Connected' : 'Not configured'),
+    vpsFleet: vpsFleetCount === null ? '…' : `${vpsFleetCount} instances`,
     databases: dbCount === null ? '…' : `${dbCount}`,
     settings: 'Protected',
     containers: 'Inspect',
@@ -247,8 +253,8 @@ export default function DevLandingPage() {
           color="violet"
         />
         <StatCard
-          label="Leaseweb API"
-          value={loading ? '…' : (health?.apiKeyConfigured ? 'Online' : 'Offline')}
+          label="Global VPS Fleet"
+          value={loading ? '…' : (vpsFleetCount ?? 0)}
           icon={<CloudIcon />}
           color="teal"
         />
@@ -271,25 +277,6 @@ export default function DevLandingPage() {
       {/* INFRA TAB CONTENT */}
       {activeTab === 'infra' && (
         <div className="space-y-6 animate-fade-in">
-          {health && (
-            <Card className="border border-white/[0.06]">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-xl bg-teal-500/10 text-teal-300 flex items-center justify-center">
-                    <CloudIcon />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm text-text-primary">Leaseweb API Health</p>
-                    <p className="text-text-muted text-xs mt-0.5">
-                      {health.apiKeyConfigured ? 'API key is configured and reachable.' : 'API key is not configured — manage in Protected Settings.'}
-                    </p>
-                  </div>
-                </div>
-                <Badge status={health.apiKeyConfigured && health.lastCallSucceeded !== false ? 'running' : 'failed'} />
-              </div>
-            </Card>
-          )}
-
           <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Infrastructure Surface Area</h2>
           <div className="grid md:grid-cols-4 gap-4">
             {INFRA_PANELS.map((panel) => (

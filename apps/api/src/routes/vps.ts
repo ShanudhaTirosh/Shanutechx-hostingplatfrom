@@ -135,6 +135,27 @@ vpsRouter.post('/vps-provisions', requireAdminOrDev, async (req: AuthedRequest, 
 });
 
 /**
+ * GET /api/vps-provisions/admin/all
+ * List all VPS provisions across all platform customers with user metadata (admin/dev only).
+ */
+vpsRouter.get('/vps-provisions/admin/all', requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+  const provisions = await prisma.vpsProvision.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          role: true,
+        },
+      },
+    },
+  });
+  res.json({ provisions: provisions.map(omitCredentialRef), notice: CREDENTIAL_SYNC_NOTICE });
+});
+
+/**
  * GET /api/vps-provisions
  * List VPS provisions for current user (or all assigned for admin/dev).
  */
@@ -210,11 +231,11 @@ vpsRouter.post('/vps-provisions/:id/ssh-ticket', async (req: AuthedRequest, res:
   res.json({ ticket, expiresInMs: 30_000, notice: CREDENTIAL_SYNC_NOTICE });
 });
 
-const powerSchema = z.object({ action: z.enum(['reboot', 'stop', 'start', 'status']) });
+const powerSchema = z.object({ action: z.enum(['reboot', 'start', 'status']) });
 
 /**
  * POST /api/vps-provisions/:id/power
- * SSH-based power management actions (reboot, shutdown, status checks).
+ * SSH-based power management actions (reboot, status checks).
  */
 vpsRouter.post('/vps-provisions/:id/power', async (req: AuthedRequest, res: Response) => {
   const parsed = powerSchema.safeParse(req.body);
@@ -240,20 +261,6 @@ vpsRouter.post('/vps-provisions/:id/power', async (req: AuthedRequest, res: Resp
         },
       });
       return res.json({ ok: true, action: 'reboot', message: result.message });
-    }
-
-    if (action === 'stop') {
-      // Shutdown host
-      void execVpsSsh(provision, 'sudo shutdown -h now || shutdown -h now || sudo poweroff || poweroff').catch(() => {});
-      await prisma.auditLog.create({
-        data: {
-          adminId: req.user!.id,
-          action: 'vps.ssh_shutdown',
-          target: provision.id,
-          actorRole: req.user!.role === 'customer' ? 'customer' : null,
-        },
-      });
-      return res.json({ ok: true, action: 'stop', message: 'Shutdown signal sent to VPS over SSH.' });
     }
 
     if (action === 'start' || action === 'status') {

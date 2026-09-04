@@ -103,10 +103,11 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
     defaultHref: '/admin',
     links: [
       { href: '/admin', label: 'Admin Dashboard', icon: 'overview' },
+      { href: '/admin/vps', label: 'Global VPS Fleet', icon: 'vps' },
       { href: '/admin/review-queue', label: 'Payment Review', icon: 'review' },
       { href: '/admin/customers', label: 'Customers', icon: 'customers' },
       { href: '/admin/services', label: 'Products & Plans', icon: 'services' },
-      { href: '/admin/email', label: 'Business Email & SMTP Host', icon: 'smtp' },
+      { href: '/admin/email', label: 'Business Email & Host', icon: 'smtp' },
       { href: '/admin/staff', label: 'Staff Directory', icon: 'staff' },
       { href: '/admin/analytics', label: 'Analytics', icon: 'analytics' },
       { href: '/admin/cms', label: 'Site Content', icon: 'cms' },
@@ -125,8 +126,9 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
     defaultHref: '/dev',
     links: [
       { href: '/dev', label: 'Dev Dashboard', icon: 'infra' },
+      { href: '/admin/nodes', label: 'Compute Nodes', icon: 'nodes' },
+      { href: '/admin/vps', label: 'Global VPS Fleet', icon: 'vps' },
       { href: '/admin/projects', label: 'Projects & Supabase Stack', icon: 'projects' },
-      { href: '/admin/nodes', label: 'Nodes Engine', icon: 'nodes' },
       { href: '/dev/containers', label: 'Containers', icon: 'containers' },
       { href: '/dev/reverse-proxy', label: 'Reverse Proxy', icon: 'proxy' },
       { href: '/dev/monitoring', label: 'Monitoring', icon: 'monitoring' },
@@ -149,8 +151,9 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
     badge: 'Support',
     badgeBg: 'bg-cyan-500/10 border-cyan-500/20',
     badgeText: 'text-cyan-300',
-    defaultHref: '/admin/tickets',
+    defaultHref: '/support',
     links: [
+      { href: '/support', label: 'Support Operations', icon: 'overview' },
       { href: '/admin/tickets', label: 'Ticket Queue', icon: 'tickets' },
       { href: '/admin/chat', label: 'Live Support Chat', icon: 'chat' },
       { href: '/knowledgebase', label: 'Knowledge Base', icon: 'knowledgebase' },
@@ -168,6 +171,7 @@ function isPathInSpace(pathname: string, spaceKey: SpaceKey): boolean {
       (linkPath !== '/dashboard' &&
         linkPath !== '/admin' &&
         linkPath !== '/dev' &&
+        linkPath !== '/support' &&
         pathname.startsWith(linkPath))
     );
   });
@@ -183,7 +187,7 @@ function getSpaceFromPathname(pathname: string): SpaceKey {
   ) {
     return 'dev';
   }
-  if (pathname.startsWith('/admin/tickets') || pathname.startsWith('/admin/chat')) {
+  if (pathname.startsWith('/support') || pathname.startsWith('/admin/tickets') || pathname.startsWith('/admin/chat')) {
     return 'support';
   }
   if (pathname.startsWith('/admin') || pathname.startsWith('/settings')) {

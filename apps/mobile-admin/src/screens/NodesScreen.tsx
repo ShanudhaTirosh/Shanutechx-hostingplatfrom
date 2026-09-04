@@ -69,8 +69,8 @@ function NodeCard({
       <View style={styles.footerMeta}>
         <Text style={styles.metaText}>{node.deploymentCount} deployment{node.deploymentCount !== 1 ? 's' : ''}</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pressable onPress={() => onOpenNodeEngine(node)} style={styles.cockpitBtn}>
-            <Text style={styles.cockpitBtnText}>Node Engine</Text>
+          <Pressable onPress={() => onOpenNodeEngine(node)} style={styles.nodeEngineBtn}>
+            <Text style={styles.nodeEngineBtnText}>Node Engine</Text>
           </Pressable>
           <Pressable onPress={() => onToggleActive(node)} style={styles.actionBtn}>
             <Text style={styles.actionBtnText}>{node.status === 'online' ? 'Pause' : 'Activate'}</Text>
@@ -294,8 +294,8 @@ const styles = StyleSheet.create({
   metaText: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted },
   actionBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(207,188,255,0.15)', borderWidth: 1, borderColor: 'rgba(207,188,255,0.25)' },
   actionBtnText: { fontFamily: fontFamily.bodyMedium, fontSize: 11, color: colors.primary },
-  cockpitBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(6,182,212,0.15)', borderWidth: 1, borderColor: 'rgba(6,182,212,0.3)' },
-  cockpitBtnText: { fontFamily: fontFamily.bodyMedium, fontSize: 11, color: colors.cyan },
+  nodeEngineBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(6,182,212,0.15)', borderWidth: 1, borderColor: 'rgba(6,182,212,0.3)' },
+  nodeEngineBtnText: { fontFamily: fontFamily.bodyMedium, fontSize: 11, color: colors.cyan },
   muted: { fontFamily: fontFamily.body, color: colors.muted, fontSize: 13 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 20 },
   modalCard: { backgroundColor: colors.bgScreen2, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.glassBorder, padding: 20 },

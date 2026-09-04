@@ -107,7 +107,7 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
     }
   }, [showContainers]);
 
-  async function handlePowerAction(action: 'start' | 'stop' | 'reboot') {
+  async function handlePowerAction(action: 'start' | 'reboot') {
     setBusyAction(action);
     try {
       await api.vps.power(p.id, action);
@@ -306,16 +306,6 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
               className="flex items-center gap-1.5"
             >
               <IconRestart size={14} /> Restart
-            </Button>
-
-            <Button
-              size="sm"
-              variant="danger"
-              loading={busyAction === 'stop'}
-              onClick={() => handlePowerAction('stop')}
-              className="flex items-center gap-1.5"
-            >
-              <IconStop size={14} /> Stop / Shutdown
             </Button>
           </div>
 

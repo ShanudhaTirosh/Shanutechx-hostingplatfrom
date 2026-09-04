@@ -327,7 +327,7 @@ function sshExec(
  * POST /api/nodes/connect
  *
  * Connects to a remote server via SSH (password or private key), installs all
- * Cockpit management prerequisites (from COCKPIT_MANAGEMENT_GUIDE.md), deploys
+ * System Node management prerequisites, deploys
  * the node agent, and registers the node in the database.
  *
  * Returns the final node record. For live step-by-step progress, use the
