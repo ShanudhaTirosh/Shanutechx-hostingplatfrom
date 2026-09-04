@@ -4,7 +4,7 @@ import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import GradientMeshOrb from '../../components/GradientMeshOrb';
 import { fetchProducts } from '../../lib/api';
-import { Database, RefreshCw, Lock, Zap, ArrowRight, CheckCircle2, Package } from 'lucide-react';
+import { Database, RefreshCw, Lock, Zap, ArrowRight, CheckCircle2, Package, Server } from 'lucide-react';
 
 export const metadata = {
   title: 'Managed Database Hosting | PostgreSQL, MySQL, Redis & MongoDB | SHANUTECHX Cloud',
