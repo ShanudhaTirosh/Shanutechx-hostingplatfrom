@@ -16,7 +16,7 @@ interface Props {
  * manual-handoff fields (panelUrl/username/credentialRef) still shown by
  * the VPS page for any non-Leaseweb provider.
  */
-import { CockpitDashboardPanel } from './CockpitDashboardPanel';
+import { NodeEngineControlPanel } from './NodeEngineControlPanel';
 
 export default function LeasewebInstancePanel({ kind, id }: Props) {
   const [instance, setInstance] = useState<any>(null);
@@ -26,7 +26,7 @@ export default function LeasewebInstancePanel({ kind, id }: Props) {
   const [creds, setCreds] = useState<{ username: string; password: string } | null>(null);
   const [snapshots, setSnapshots] = useState<any[] | null>(null);
   const [snapshotName, setSnapshotName] = useState('');
-  const [showCockpit, setShowCockpit] = useState(false);
+  const [showNodeEngine, setShowNodeEngine] = useState(false);
 
   function load() {
     api.leaseweb
@@ -120,8 +120,8 @@ export default function LeasewebInstancePanel({ kind, id }: Props) {
         <Button variant="ghost" onClick={handleConsole}>
           Open console
         </Button>
-        <Button variant="primary" onClick={() => setShowCockpit(!showCockpit)}>
-          {showCockpit ? 'Hide Cockpit Dashboard' : <span className="flex items-center gap-1.5"><Server className="h-3.5 w-3.5" /> Cockpit Management</span>}
+        <Button variant="primary" onClick={() => setShowNodeEngine(!showNodeEngine)}>
+          {showNodeEngine ? 'Hide Node Engine Panel' : <span className="flex items-center gap-1.5"><Server className="h-3.5 w-3.5" /> Host Node Engine</span>}
         </Button>
       </div>
 
@@ -138,9 +138,9 @@ export default function LeasewebInstancePanel({ kind, id }: Props) {
         )}
       </div>
 
-      {showCockpit && (
+      {showNodeEngine && (
         <div className="pt-4 border-t border-white/10">
-          <CockpitDashboardPanel nodeId={id} ipAddress={instance.ips?.[0]?.ip} />
+          <NodeEngineControlPanel nodeId={id} ipAddress={instance.ips?.[0]?.ip} />
         </div>
       )}
 
