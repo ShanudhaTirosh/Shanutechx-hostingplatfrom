@@ -31,7 +31,7 @@ import {
   IconShield,
 } from '@/components/Icons';
 import { VpsFileManager } from '@/components/VpsFileManager';
-import { CockpitDashboardPanel } from '@/components/CockpitDashboardPanel';
+import { NodeEngineControlPanel } from '@/components/NodeEngineControlPanel';
 import { VpsFirewallManager } from '@/components/VpsFirewallManager';
 
 export const dynamic = 'force-dynamic';
@@ -474,10 +474,10 @@ export default function VpsPage() {
                 </div>
               )}
 
-              {/* Cockpit Drawer for Leaseweb */}
+              {/* Node Engine Control Drawer */}
               {isCockpitOpen && (
                 <div className="pt-4 border-t border-white/10">
-                  <CockpitDashboardPanel nodeId={p.id} ipAddress={displayIp} />
+                  <NodeEngineControlPanel nodeId={p.id} />
                 </div>
               )}
             </Card>
