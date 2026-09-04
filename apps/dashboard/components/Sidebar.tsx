@@ -101,7 +101,7 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
     badge: 'Admin',
     badgeBg: 'bg-amber-500/10 border-amber-500/20',
     badgeText: 'text-amber-400',
-    defaultHref: '/admin/review-queue',
+    defaultHref: '/admin',
     links: [
       { href: '/admin', label: 'Admin Dashboard', icon: 'overview' },
       { href: '/admin/review-queue', label: 'Payment Review', icon: 'review' },

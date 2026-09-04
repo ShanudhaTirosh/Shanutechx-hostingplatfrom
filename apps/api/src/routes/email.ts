@@ -144,9 +144,9 @@ const adminProvisionSchema = z.object({
 });
 
 emailRouter.post('/admin/email/provision', async (req: AuthedRequest, res) => {
-  if (req.user!.role !== 'dev') {
+  if (req.user!.role !== 'dev' && req.user!.role !== 'admin') {
     return res.status(403).json({
-      error: 'Access denied: Only dev administrators can manually provision new email user accounts. Admins can only manage or be assigned access to existing mailboxes.',
+      error: 'Access denied: Only dev or admin administrators can manually provision new email user accounts.',
     });
   }
 
