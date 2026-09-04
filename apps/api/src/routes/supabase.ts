@@ -27,13 +27,17 @@ export interface ClientProject {
   anonKey: string;
   serviceKey: string;
   smtpConfigured: boolean;
+  studioPort?: number;
+  apiPort?: number;
+  dbPort?: number;
+  storageLimitMb?: number;
+  extensions?: string[];
+  authSettingsJson?: any;
+  poolerSettingsJson?: any;
   createdAt: string;
 }
 
-function serializeProject(p: {
-  id: string; name: string; clientEmail: string; dbName: string; region: string;
-  status: string; anonKey: string; serviceKey: string; smtpConfigured: boolean; createdAt: Date;
-}): ClientProject {
+function serializeProject(p: any): ClientProject {
   return {
     id: p.id,
     name: p.name,
@@ -41,13 +45,17 @@ function serializeProject(p: {
     dbName: p.dbName,
     region: p.region,
     status: p.status as ClientProject['status'],
-    // The seeded default project ships with blank keys (see migration
-    // 20260819000800) -- fill them from env lazily on read rather than
-    // baking a stale copy into the row.
     anonKey: p.anonKey || SUPABASE_ANON_KEY,
     serviceKey: p.serviceKey || SUPABASE_SERVICE_ROLE_KEY,
     smtpConfigured: p.smtpConfigured,
-    createdAt: p.createdAt.toISOString(),
+    studioPort: p.studioPort ?? 8000,
+    apiPort: p.apiPort ?? 8001,
+    dbPort: p.dbPort ?? 5432,
+    storageLimitMb: p.storageLimitMb ?? 5120,
+    extensions: p.extensions ?? ['uuid-ossp', 'pgcrypto', 'pgvector'],
+    authSettingsJson: p.authSettingsJson ?? { emailEnabled: true, githubEnabled: true, googleEnabled: false },
+    poolerSettingsJson: p.poolerSettingsJson ?? { mode: 'transaction', poolSize: 20, port: 6543 },
+    createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
   };
 }
 
@@ -190,6 +198,42 @@ supabaseRouter.delete('/supabase/projects/:id', requireAuth, requireAdminOrDev, 
   }
   await prisma.supabaseClientProject.delete({ where: { id } });
   res.json({ ok: true, deletedId: id });
+});
+
+supabaseRouter.patch('/supabase/projects/:id/config', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+  const { id } = req.params;
+  const {
+    dbPassword,
+    jwtSecret,
+    studioPort,
+    apiPort,
+    dbPort,
+    authSettingsJson,
+    poolerSettingsJson,
+    storageLimitMb,
+    extensions,
+  } = req.body;
+
+  const existing = await prisma.supabaseClientProject.findUnique({ where: { id } });
+  if (!existing) return res.status(404).json({ error: 'Project not found' });
+
+  const dataToUpdate: any = {};
+  if (dbPassword) dataToUpdate.dbPasswordEnc = encryptSecret(dbPassword, env.secretsEncryptionKey);
+  if (jwtSecret) dataToUpdate.jwtSecretEnc = encryptSecret(jwtSecret, env.secretsEncryptionKey);
+  if (studioPort) dataToUpdate.studioPort = Number(studioPort);
+  if (apiPort) dataToUpdate.apiPort = Number(apiPort);
+  if (dbPort) dataToUpdate.dbPort = Number(dbPort);
+  if (authSettingsJson !== undefined) dataToUpdate.authSettingsJson = authSettingsJson;
+  if (poolerSettingsJson !== undefined) dataToUpdate.poolerSettingsJson = poolerSettingsJson;
+  if (storageLimitMb) dataToUpdate.storageLimitMb = Number(storageLimitMb);
+  if (Array.isArray(extensions)) dataToUpdate.extensions = extensions;
+
+  const updated = await prisma.supabaseClientProject.update({
+    where: { id },
+    data: dataToUpdate,
+  });
+
+  res.json({ ok: true, project: serializeProject(updated) });
 });
 
 // 3. SMTP Config & Connection Verification

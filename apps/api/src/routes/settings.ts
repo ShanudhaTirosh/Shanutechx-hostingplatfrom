@@ -113,7 +113,6 @@ settingsRouter.get('/configs', requireAdminOrDev, async (req: AuthedRequest, res
       prisma.backupRun.findMany({ orderBy: { createdAt: 'desc' }, take: 10 }).catch(() => []),
     ]);
 
-    const leasewebConfigured = !!(process.env.LEASEWEB_API_KEY || process.env.LEASEWEB_CUSTOMER_ID);
     const smtpConfigured = !!(process.env.SMTP_HOST || process.env.SMTP_USER || process.env.POSTAL_API_KEY);
     const r2Configured = !!(process.env.R2_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || process.env.S3_BUCKET);
     const discordConfigured = webhookCount > 0 || !!process.env.DISCORD_WEBHOOK_URL || !!process.env.DISCORD_BOT_TOKEN;
@@ -128,9 +127,6 @@ settingsRouter.get('/configs', requireAdminOrDev, async (req: AuthedRequest, res
           configured: r2Configured,
           lastBackup: backupHistory[0] || null,
           totalRuns: backupHistory.length,
-        },
-        leasewebApi: {
-          configured: leasewebConfigured,
         },
         smtpServer: {
           configured: smtpConfigured,

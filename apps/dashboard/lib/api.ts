@@ -27,6 +27,9 @@ import {
   SqlResult,
   CatalogTemplate,
   VpsPlan,
+  ManagedDatabase,
+  ManagedDatabaseUser,
+  SupabaseClientProject,
 } from './types';
 
 async function asJson<T>(res: Response): Promise<T> {
@@ -1046,33 +1049,6 @@ export const api = {
       apiFetch(`/api/deployments/${id}/uptime`).then((r) => asJson<{ checks: any[]; uptimePct: number | null }>(r)),
   },
 
-  managedDatabases: {
-    list: () => apiFetch('/api/managed-databases').then((r) => asJson<{ databases: any[] }>(r)),
-    create: (userId: string, type: 'postgres' | 'mysql' | 'redis' | 'mongodb') =>
-      apiFetch('/api/managed-databases', { method: 'POST', body: JSON.stringify({ userId, type }) }).then((r) =>
-        asJson<{ database: any }>(r)
-      ),
-    revealPassword: (id: string) =>
-      apiFetch(`/api/managed-databases/${id}/reveal-password`).then((r) => asJson<{ password: string }>(r)),
-    action: (id: string, action: 'start' | 'stop' | 'restart') =>
-      apiFetch(`/api/managed-databases/${id}/action`, { method: 'POST', body: JSON.stringify({ action }) }).then((r) =>
-        asJson<{ ok: boolean; database: any }>(r)
-      ),
-    connection: (id: string) =>
-      apiFetch(`/api/managed-databases/${id}/connection`).then((r) =>
-        asJson<{
-          type: string;
-          host: string;
-          port: number;
-          username: string;
-          password: string;
-          databaseName: string;
-          connectionString: string;
-        }>(r)
-      ),
-    delete: (id: string) =>
-      apiFetch(`/api/managed-databases/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean; deletedId: string }>(r)),
-  },
 
   teams: {
     list: () => apiFetch('/api/teams').then((r) => asJson<{ ownedTeams: any[]; joinedTeams: any[] }>(r)),
@@ -1525,7 +1501,31 @@ export const api = {
       apiFetch('/api/products', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<{ product: Product }>(r)
       ),
+    create: (data: {
+      category: string;
+      name: string;
+      description?: string | null;
+      iconUrl?: string | null;
+      isPopular?: boolean;
+      badge?: string | null;
+      isActive?: boolean;
+    }) =>
+      apiFetch('/api/products', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ product: Product }>(r)
+      ),
     updateProduct: (id: string, data: Partial<{
+      category: string;
+      name: string;
+      description: string | null;
+      iconUrl: string | null;
+      isPopular: boolean;
+      badge: string | null;
+      isActive: boolean;
+    }>) =>
+      apiFetch(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ product: Product }>(r)
+      ),
+    update: (id: string, data: Partial<{
       category: string;
       name: string;
       description: string | null;
@@ -1539,7 +1539,11 @@ export const api = {
       ),
     deleteProduct: (id: string) =>
       apiFetch(`/api/products/${id}`, { method: 'DELETE' }).then((r) =>
-        asJson<{ ok: boolean; message?: string }>(r)
+        asJson<{ ok: boolean; message?: string; deactivated?: boolean }>(r)
+      ),
+    delete: (id: string) =>
+      apiFetch(`/api/products/${id}`, { method: 'DELETE' }).then((r) =>
+        asJson<{ ok: boolean; message?: string; deactivated?: boolean }>(r)
       ),
     createPlan: (productId: string, data: {
       name: string;
@@ -1630,11 +1634,117 @@ export const api = {
           configs: {
             discordWebhooks: { configured: boolean; count: number };
             backups: { configured: boolean; lastBackup: any; totalRuns: number };
-            leasewebApi: { configured: boolean };
             smtpServer: { configured: boolean };
             r2Storage: { configured: boolean };
           };
         }>(r)
       ),
+  },
+
+  managedDatabases: {
+    list: () => apiFetch('/api/managed-databases').then((r) => asJson<{ databases: ManagedDatabase[] }>(r)),
+    create: (data: {
+      userId?: string;
+      type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+      dbName?: string;
+      masterUsername?: string;
+      masterPassword?: string;
+      allowedIps?: string[];
+      maxConnections?: number;
+      dbVersion?: string;
+    }) =>
+      apiFetch('/api/managed-databases', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ database: ManagedDatabase & { masterUsername?: string; masterPassword?: string } }>(r)
+      ),
+    revealPassword: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}/reveal-password`).then((r) => asJson<{ password: string }>(r)),
+    getConnection: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}/connection`).then((r) =>
+        asJson<{
+          type: string;
+          host: string;
+          port: number;
+          username: string;
+          password: string;
+          databaseName: string;
+          connectionString: string;
+        }>(r)
+      ),
+    action: (id: string, action: 'start' | 'stop' | 'restart') =>
+      apiFetch(`/api/managed-databases/${id}/action`, { method: 'POST', body: JSON.stringify({ action }) }).then((r) =>
+        asJson<{ ok: boolean; database: ManagedDatabase }>(r)
+      ),
+    delete: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}`, { method: 'DELETE' }).then((r) =>
+        asJson<{ ok: boolean; deletedId: string }>(r)
+      ),
+    listUsers: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}/users`).then((r) => asJson<{ users: ManagedDatabaseUser[] }>(r)),
+    createUser: (id: string, data: { username: string; password?: string; role?: 'admin' | 'read_write' | 'read_only' }) =>
+      apiFetch(`/api/managed-databases/${id}/users`, { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ user: ManagedDatabaseUser & { password?: string } }>(r)
+      ),
+    deleteUser: (id: string, username: string) =>
+      apiFetch(`/api/managed-databases/${id}/users/${username}`, { method: 'DELETE' }).then((r) =>
+        asJson<{ ok: boolean; deletedUsername: string }>(r)
+      ),
+    updateUser: (id: string, username: string, data: { password?: string; role?: 'admin' | 'read_write' | 'read_only' }) =>
+      apiFetch(`/api/managed-databases/${id}/users/${username}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ user: ManagedDatabaseUser & { password?: string } }>(r)
+      ),
+    updateConfig: (id: string, data: { dbName?: string; allowedIps?: string[]; maxConnections?: number; dbVersion?: string }) =>
+      apiFetch(`/api/managed-databases/${id}/config`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ database: ManagedDatabase }>(r)
+      ),
+    backup: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}/backups`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; backupKey: string }>(r)
+      ),
+    restore: (id: string, backupKey: string) =>
+      apiFetch(`/api/managed-databases/${id}/restore`, { method: 'POST', body: JSON.stringify({ backupKey }) }).then((r) =>
+        asJson<{ ok: boolean; message: string }>(r)
+      ),
+  },
+
+  devSupabase: {
+    health: () =>
+      apiFetch('/api/supabase/health').then((r) =>
+        asJson<{ status: string; services: Record<string, string>; urls: Record<string, string> }>(r)
+      ),
+    listProjects: () =>
+      apiFetch('/api/supabase/projects').then((r) => asJson<{ projects: SupabaseClientProject[]; total: number }>(r)),
+    createProject: (data: { name: string; clientEmail: string; region?: string }) =>
+      apiFetch('/api/supabase/projects', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ project: SupabaseClientProject }>(r)
+      ),
+    deleteProject: (id: string) =>
+      apiFetch(`/api/supabase/projects/${id}`, { method: 'DELETE' }).then((r) =>
+        asJson<{ ok: boolean; deletedId: string }>(r)
+      ),
+    updateProjectConfig: (id: string, data: Record<string, any>) =>
+      apiFetch(`/api/supabase/projects/${id}/config`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ ok: boolean; project: SupabaseClientProject }>(r)
+      ),
+    getSchemas: () => apiFetch('/api/supabase/db/schemas').then((r) => asJson<{ schemas: any[] }>(r)),
+    getTables: () => apiFetch('/api/supabase/db/tables').then((r) => asJson<{ tables: any[] }>(r)),
+    executeQuery: (sql: string) =>
+      apiFetch('/api/supabase/db/query', { method: 'POST', body: JSON.stringify({ sql }) }).then((r) => asJson<any>(r)),
+    getBuckets: () => apiFetch('/api/supabase/storage/buckets').then((r) => asJson<{ buckets: any[] }>(r)),
+    createBucket: (data: { id: string; name: string; isPublic?: boolean }) =>
+      apiFetch('/api/supabase/storage/buckets', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<any>(r)
+      ),
+    getAuthUsers: () => apiFetch('/api/supabase/auth/users').then((r) => asJson<{ users: any[]; total: number }>(r)),
+    createAuthUser: (data: { email: string; password: string; user_metadata?: any }) =>
+      apiFetch('/api/supabase/auth/users', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<any>(r)
+      ),
+    deleteAuthUser: (id: string) =>
+      apiFetch(`/api/supabase/auth/users/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    getAdvisors: () =>
+      apiFetch('/api/supabase/advisors').then((r) => asJson<{ security: any[]; performance: any[] }>(r)),
+    getObservability: () => apiFetch('/api/supabase/observability').then((r) => asJson<{ metrics: any }>(r)),
+    getLogs: (service?: string) =>
+      apiFetch(`/api/supabase/logs${service ? `?service=${service}` : ''}`).then((r) => asJson<{ logs: any[] }>(r)),
   },
 };

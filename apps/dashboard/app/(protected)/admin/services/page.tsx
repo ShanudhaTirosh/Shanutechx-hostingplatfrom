@@ -821,7 +821,7 @@ export default function AdminProductsPage() {
                 </div>
               </div>
               <div>
-                <label className="text-[11px] text-text-muted block mb-1">Leaseweb Cost Price (LKR, for margin tracking)</label>
+                <label className="text-[11px] text-text-muted block mb-1">Upstream Infrastructure Cost Price (LKR, for margin tracking)</label>
                 <input
                   type="number"
                   step="0.01"

@@ -26,8 +26,7 @@ type NotificationEvent =
   | 'new_order'
   | 'new_ticket'
   | 'deployment_failed'
-  | 'vps_assigned'
-  | 'new_ai_subscription_request';
+  | 'vps_assigned';
 
 const EVENTS: { value: NotificationEvent; label: string; description: string }[] = [
   { value: 'new_payment_submitted', label: 'New payment submitted', description: 'A customer uploaded a payment proof — needs manual review.' },
@@ -37,7 +36,6 @@ const EVENTS: { value: NotificationEvent; label: string; description: string }[]
   { value: 'new_ticket', label: 'New ticket', description: 'A support ticket was opened.' },
   { value: 'deployment_failed', label: 'Deployment failed', description: 'A customer or dev deployment failed to build/start.' },
   { value: 'vps_assigned', label: 'VPS assigned / terminated', description: 'A VPS was assigned to a customer, or terminated.' },
-  { value: 'new_ai_subscription_request', label: 'New AI subscription request', description: 'A customer opened an AI subscription activation ticket.' },
 ];
 
 interface WebhookConfig {
@@ -327,12 +325,6 @@ function ApiConfigsTab() {
   if (loading) return <Spinner label="Checking system API integrations..." />;
 
   const INTEGRATIONS = [
-    {
-      name: 'Leaseweb VPS API',
-      status: configs?.leasewebApi?.configured ? 'Configured' : 'Not Configured',
-      color: configs?.leasewebApi?.configured ? 'emerald' : 'white',
-      hint: 'Required for provisioning and power-cycling Leaseweb VPS instances.',
-    },
     {
       name: 'Global SMTP / Mail Server',
       status: configs?.smtpServer?.configured ? 'Configured' : 'Not Configured',

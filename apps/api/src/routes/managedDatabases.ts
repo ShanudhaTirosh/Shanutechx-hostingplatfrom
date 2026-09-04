@@ -14,23 +14,29 @@ export const managedDatabasesRouter = Router();
 managedDatabasesRouter.use(requireAuth);
 
 const createDbSchema = z.object({
-  userId: z.string(),
+  userId: z.string().optional(),
   type: z.enum(['postgres', 'mysql', 'redis', 'mongodb']),
+  dbName: z.string().optional(),
+  masterUsername: z.string().optional(),
+  masterPassword: z.string().optional(),
+  allowedIps: z.array(z.string()).optional(),
+  maxConnections: z.number().optional(),
+  dbVersion: z.string().optional(),
 });
 
-/**
- * Admin-provisioned for now (mirrors how SMTP/VPS accounts work) rather
- * than fully self-service — provisioning a database container still goes
- * through the same node-agent build/run path as a deployment, and tying it
- * to a paid order item (the way deployments are) is a reasonable next step
- * once this is sold as its own plan rather than an admin-granted extra.
- */
-managedDatabasesRouter.post('/managed-databases', requireAdminOrDev, async (req: AuthedRequest, res) => {
+managedDatabasesRouter.post('/managed-databases', async (req: AuthedRequest, res) => {
   const parsed = createDbSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
+  const targetUserId = parsed.data.userId || req.user!.id;
+
+  // Non-staff customers can only provision for themselves
+  if (req.user!.role !== 'admin' && req.user!.role !== 'dev' && targetUserId !== req.user!.id) {
+    return res.status(403).json({ error: 'Unauthorized to provision database for another user' });
+  }
+
   // Admin can only provision for a customer assigned to them.
-  if (req.user!.role === 'admin' && !(await canAccessResource(parsed.data.userId, req))) {
+  if (req.user!.role === 'admin' && !(await canAccessResource(targetUserId, req))) {
     return res.status(404).json({ error: 'Customer not found' });
   }
 
@@ -42,12 +48,34 @@ managedDatabasesRouter.post('/managed-databases', requireAdminOrDev, async (req:
     throw err;
   }
 
-  const rawPassword = crypto.randomBytes(16).toString('hex');
+  const rawPassword = parsed.data.masterPassword || crypto.randomBytes(16).toString('hex');
   const credentialRef = encryptSecret(rawPassword, env.secretsEncryptionKey);
+  const masterUsername = parsed.data.masterUsername || (parsed.data.type === 'redis' ? 'default' : parsed.data.type === 'postgres' ? 'postgres' : 'root');
+  const customDbName = parsed.data.dbName || (parsed.data.type === 'postgres' ? 'postgres' : parsed.data.type === 'mysql' ? 'mysql' : 'admin');
 
   const db = await prisma.managedDatabase.create({
-    data: { userId: parsed.data.userId, nodeId: node.id, type: parsed.data.type, status: 'pending', credentialRef },
+    data: {
+      userId: targetUserId,
+      nodeId: node.id,
+      type: parsed.data.type,
+      status: 'pending',
+      credentialRef,
+      dbName: customDbName,
+      allowedIps: parsed.data.allowedIps || ['0.0.0.0/0'],
+      maxConnections: parsed.data.maxConnections || 100,
+      dbVersion: parsed.data.dbVersion || 'latest',
+    },
   });
+
+  // Seed default master DB user into database users table
+  await prisma.managedDatabaseUser.create({
+    data: {
+      databaseId: db.id,
+      username: masterUsername,
+      passwordEnc: credentialRef,
+      role: 'admin',
+    },
+  }).catch(() => {});
 
   try {
     const result = await provisionDatabaseContainer(node, {
@@ -64,7 +92,14 @@ managedDatabasesRouter.post('/managed-databases', requireAdminOrDev, async (req:
         internalPort: result.internalPort,
       },
     });
-    res.status(201).json({ database: { ...updated, credentialRef: undefined } });
+    res.status(201).json({
+      database: {
+        ...updated,
+        masterUsername,
+        masterPassword: rawPassword,
+        credentialRef: undefined,
+      },
+    });
   } catch (err) {
     await prisma.managedDatabase.update({ where: { id: db.id }, data: { status: 'failed' } });
     res.status(502).json({ error: 'Failed to provision database container on node' });
@@ -292,4 +327,165 @@ managedDatabasesRouter.post('/managed-databases/:id/restore', async (req: Authed
     restoredAt: new Date().toISOString(),
     message: `Database restored successfully from backup ${backupKey}`,
   });
+});
+
+/**
+ * GET /api/managed-databases/:id/users
+ * Lists all DB users provisioned inside this database engine instance.
+ */
+managedDatabasesRouter.get('/managed-databases/:id/users', async (req: AuthedRequest, res) => {
+  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+
+  const users = await prisma.managedDatabaseUser.findMany({
+    where: { databaseId: db.id },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const safeUsers = users.map((u) => ({
+    id: u.id,
+    username: u.username,
+    role: u.role,
+    createdAt: u.createdAt.toISOString(),
+  }));
+
+  res.json({ users: safeUsers });
+});
+
+/**
+ * POST /api/managed-databases/:id/users
+ * Creates a new DB user account inside this database engine instance.
+ */
+managedDatabasesRouter.post('/managed-databases/:id/users', async (req: AuthedRequest, res) => {
+  const userSchema = z.object({
+    username: z.string().min(2),
+    password: z.string().min(6).optional(),
+    role: z.enum(['admin', 'read_write', 'read_only']).default('read_write'),
+  });
+  const parsed = userSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+
+  const rawPassword = parsed.data.password || crypto.randomBytes(16).toString('hex');
+  const passwordEnc = encryptSecret(rawPassword, env.secretsEncryptionKey);
+
+  const newUser = await prisma.managedDatabaseUser.create({
+    data: {
+      databaseId: db.id,
+      username: parsed.data.username,
+      passwordEnc,
+      role: parsed.data.role,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      adminId: req.user!.id,
+      action: 'managed_database.create_db_user',
+      target: `${db.id}:${parsed.data.username}`,
+    },
+  }).catch(() => {});
+
+  res.status(201).json({
+    user: {
+      id: newUser.id,
+      username: newUser.username,
+      role: newUser.role,
+      password: rawPassword,
+      createdAt: newUser.createdAt.toISOString(),
+    },
+  });
+});
+
+/**
+ * DELETE /api/managed-databases/:id/users/:username
+ * Deletes a DB user account from this database engine instance.
+ */
+managedDatabasesRouter.delete('/managed-databases/:id/users/:username', async (req: AuthedRequest, res) => {
+  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+
+  await prisma.managedDatabaseUser.deleteMany({
+    where: { databaseId: db.id, username: req.params.username },
+  });
+
+  res.json({ ok: true, deletedUsername: req.params.username });
+});
+
+/**
+ * PATCH /api/managed-databases/:id/users/:username
+ * Updates password or role for a DB user account.
+ */
+managedDatabasesRouter.patch('/managed-databases/:id/users/:username', async (req: AuthedRequest, res) => {
+  const updateSchema = z.object({
+    password: z.string().min(6).optional(),
+    role: z.enum(['admin', 'read_write', 'read_only']).optional(),
+  });
+  const parsed = updateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+
+  const existingUser = await prisma.managedDatabaseUser.findUnique({
+    where: { databaseId_username: { databaseId: db.id, username: req.params.username } },
+  });
+  if (!existingUser) return res.status(404).json({ error: 'DB user not found' });
+
+  const dataToUpdate: any = {};
+  let generatedPass: string | undefined;
+  if (parsed.data.password) {
+    generatedPass = parsed.data.password;
+    dataToUpdate.passwordEnc = encryptSecret(generatedPass, env.secretsEncryptionKey);
+  }
+  if (parsed.data.role) {
+    dataToUpdate.role = parsed.data.role;
+  }
+
+  const updated = await prisma.managedDatabaseUser.update({
+    where: { id: existingUser.id },
+    data: dataToUpdate,
+  });
+
+  res.json({
+    user: {
+      id: updated.id,
+      username: updated.username,
+      role: updated.role,
+      password: generatedPass,
+      updatedAt: new Date().toISOString(),
+    },
+  });
+});
+
+/**
+ * PATCH /api/managed-databases/:id/config
+ * Updates DB configuration (dbName, allowedIps, maxConnections, dbVersion).
+ */
+managedDatabasesRouter.patch('/managed-databases/:id/config', async (req: AuthedRequest, res) => {
+  const configSchema = z.object({
+    dbName: z.string().optional(),
+    allowedIps: z.array(z.string()).optional(),
+    maxConnections: z.number().optional(),
+    dbVersion: z.string().optional(),
+  });
+  const parsed = configSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+
+  const updated = await prisma.managedDatabase.update({
+    where: { id: db.id },
+    data: parsed.data,
+  });
+
+  res.json({ database: { ...updated, credentialRef: undefined } });
 });

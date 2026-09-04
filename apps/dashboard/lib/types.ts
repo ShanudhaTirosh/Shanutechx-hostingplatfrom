@@ -511,3 +511,47 @@ export interface KbArticle {
   updatedAt: string;
 }
 
+export interface ManagedDatabaseUser {
+  id: string;
+  username: string;
+  role: 'admin' | 'read_write' | 'read_only';
+  createdAt: string;
+}
+
+export interface ManagedDatabase {
+  id: string;
+  userId: string;
+  nodeId: string;
+  type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+  status: 'pending' | 'running' | 'stopped' | 'failed' | 'terminated';
+  containerId?: string | null;
+  internalHost?: string | null;
+  internalPort?: number | null;
+  dbName?: string | null;
+  allowedIps?: string[];
+  maxConnections?: number | null;
+  dbVersion?: string | null;
+  user?: ApiUser;
+  createdAt: string;
+}
+
+export interface SupabaseClientProject {
+  id: string;
+  name: string;
+  clientEmail: string;
+  dbName: string;
+  region: string;
+  status: 'ACTIVE' | 'PROVISIONING' | 'SUSPENDED';
+  anonKey: string;
+  serviceKey: string;
+  smtpConfigured: boolean;
+  studioPort?: number;
+  apiPort?: number;
+  dbPort?: number;
+  storageLimitMb?: number;
+  extensions?: string[];
+  authSettingsJson?: any;
+  poolerSettingsJson?: any;
+  createdAt: string;
+}
+

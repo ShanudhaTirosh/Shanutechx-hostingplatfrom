@@ -129,7 +129,6 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
       { href: '/dev', label: 'Dev Dashboard', icon: 'infra' },
       { href: '/dev/deploy', label: 'Deploy Hub', icon: 'deployments' },
       { href: '/dev/projects', label: 'Projects & Managed DBs', icon: 'projects' },
-      { href: '/dev/docs', label: 'Dev & API Docs', icon: 'knowledgebase' },
       { href: '/admin/nodes', label: 'Compute Nodes', icon: 'nodes' },
       { href: '/admin/vps', label: 'Global VPS Fleet', icon: 'vps' },
       { href: '/dev/containers', label: 'Containers', icon: 'containers' },
@@ -145,6 +144,7 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
       { href: '/admin/cms', label: 'Site Content', icon: 'cms' },
       { href: '/admin/audit-log', label: 'Audit Log', icon: 'audit' },
       { href: '/settings', label: 'Protected Settings', icon: 'settings' },
+      { href: '/dev/docs', label: 'Dev & API Docs', icon: 'knowledgebase' },
     ],
   },
   support: {
@@ -412,8 +412,27 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         })}
       </nav>
 
+      {/* Dev & API Docs Bottom Pinned Link */}
+      <div className="mt-2 pt-2 border-t border-white/[0.06] px-1">
+        <Link
+          href="/dev/docs"
+          onClick={() => onNavigate?.()}
+          className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all border ${
+            pathname === '/dev/docs'
+              ? 'bg-purple-500/20 text-purple-200 border-purple-500/40 shadow-glow-violet'
+              : 'bg-white/[0.03] text-purple-300 border-purple-500/20 hover:bg-purple-500/10 hover:border-purple-500/30'
+          }`}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-400 shrink-0">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+          </svg>
+          <span className="truncate">Dev &amp; API Docs</span>
+        </Link>
+      </div>
+
       {/* User Profile Footer */}
-      <div className="mt-4 pt-4 border-t border-white/[0.06] px-3">
+      <div className="mt-2 pt-3 border-t border-white/[0.06] px-3">
         {apiUser && (
           <div className="flex items-center gap-2.5 mb-3">
             <div className="h-8 w-8 rounded-full bg-brand-gradient flex items-center justify-center text-white text-xs font-semibold shrink-0 shadow-glow-teal">

@@ -969,16 +969,25 @@ model SecretAuditEntry {
 
 // Supabase client projects and configuration.
 model SupabaseClientProject {
-  id             String   @id @default(cuid())
-  name           String
-  clientEmail    String
-  dbName         String
-  region         String   @default("ap-southeast-1 (Local)")
-  status         String   @default("ACTIVE") // 'ACTIVE' | 'PROVISIONING' | 'SUSPENDED'
-  anonKey        String
-  serviceKey     String
-  smtpConfigured Boolean  @default(true)
-  createdAt      DateTime @default(now())
+  id                 String   @id @default(cuid())
+  name               String
+  clientEmail        String
+  dbName             String
+  region             String   @default("ap-southeast-1 (Local)")
+  status             String   @default("ACTIVE") // 'ACTIVE' | 'PROVISIONING' | 'SUSPENDED'
+  anonKey            String
+  serviceKey         String
+  smtpConfigured     Boolean  @default(true)
+  dbPasswordEnc      String?
+  jwtSecretEnc       String?
+  studioPort         Int?     @default(8000)
+  apiPort            Int?     @default(8001)
+  dbPort             Int?     @default(5432)
+  authSettingsJson   Json?
+  poolerSettingsJson Json?
+  storageLimitMb     Int?     @default(5120)
+  extensions         String[] @default(["uuid-ossp", "pgcrypto", "pgvector"])
+  createdAt          DateTime @default(now())
 }
 
 // Singleton row (id "global") for GoTrue/Supabase-Auth outbound email
@@ -1166,20 +1175,38 @@ model WebhookDelivery {
 // runs its own container with no HTTP-facing route, just an internal
 // connection string handed back to the customer.
 model ManagedDatabase {
-  id            String                @id @default(cuid())
-  userId        String
-  user          User                  @relation(fields: [userId], references: [id])
-  orderItemId   String?               @unique
-  orderItem     OrderItem?            @relation(fields: [orderItemId], references: [id])
-  nodeId        String
-  node          Node                  @relation(fields: [nodeId], references: [id])
-  type          ManagedDatabaseType
-  status        ManagedDatabaseStatus @default(pending)
-  containerId   String?
-  internalHost  String? // container name, reachable only on the node's internal Docker network
-  internalPort  Int?
-  credentialRef String? // encrypted password — see lib/secretsVault.ts
-  createdAt     DateTime              @default(now())
+  id             String                @id @default(cuid())
+  userId         String
+  user           User                  @relation(fields: [userId], references: [id])
+  orderItemId    String?               @unique
+  orderItem      OrderItem?            @relation(fields: [orderItemId], references: [id])
+  nodeId         String
+  node           Node                  @relation(fields: [nodeId], references: [id])
+  type           ManagedDatabaseType
+  status         ManagedDatabaseStatus @default(pending)
+  containerId    String?
+  internalHost   String? // container name, reachable only on the node's internal Docker network
+  internalPort   Int?
+  credentialRef  String? // encrypted master password — see lib/secretsVault.ts
+  dbName         String?               @default("main_db")
+  allowedIps     String[]              @default(["0.0.0.0/0"])
+  maxConnections Int?                  @default(100)
+  dbVersion      String?               @default("latest")
+  createdAt      DateTime              @default(now())
+
+  dbUsers ManagedDatabaseUser[]
+}
+
+model ManagedDatabaseUser {
+  id          String          @id @default(cuid())
+  databaseId  String
+  database    ManagedDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+  username    String
+  passwordEnc String // AES-256-GCM encrypted password
+  role        String          @default("read_write") // admin | read_write | read_only
+  createdAt   DateTime        @default(now())
+
+  @@unique([databaseId, username])
 }
 
 // Logs every Leaseweb API call this platform makes (minus secrets — never
