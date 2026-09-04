@@ -83,9 +83,8 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
     links: [
       { href: '/dashboard', label: 'Overview', icon: 'overview' },
       { href: '/services', label: 'Services', icon: 'services' },
-      { href: '/cart', label: 'Cart', icon: 'cart' },
-      { href: '/orders', label: 'Orders & Invoices', icon: 'orders' },
-      { href: '/billing', label: 'Subscriptions', icon: 'billing' },
+      { href: '/cart', label: 'Shopping Cart', icon: 'cart' },
+      { href: '/orders', label: 'Subscriptions & Invoices', icon: 'billing' },
       { href: '/deployments', label: 'Deployments', icon: 'deployments' },
       { href: '/email', label: 'Business Email & Webmail', icon: 'smtp' },
       { href: '/vps', label: 'VPS', icon: 'vps' },

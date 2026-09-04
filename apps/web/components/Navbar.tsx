@@ -821,22 +821,40 @@ export default function Navbar() {
                   </button>
                 </div>
 
-                <div className="text-center py-12 space-y-3">
-                  <ShoppingCart className="h-12 w-12 text-slate-600 mx-auto" />
-                  <p className="text-sm font-semibold text-slate-300">Your cart is currently empty</p>
-                  <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                    Select a Cloud VPS or 1-Click App catalog product to add to your order.
+                <div className="text-center py-10 space-y-3">
+                  <div className="h-14 w-14 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mx-auto">
+                    <ShoppingCart className="h-7 w-7" />
+                  </div>
+                  <p className="text-sm font-bold text-white">Your Cart & Subscriptions</p>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+                    Select a Cloud VPS, Bot Hosting, or 1-Click App catalog product to add to your cart or view active subscriptions.
                   </p>
                 </div>
               </div>
 
-              <Link
-                href="/pricing"
-                onClick={() => setCartOpen(false)}
-                className="w-full py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs text-center shadow-glow-violet transition-all"
-              >
-                Browse Plans &amp; Pricing →
-              </Link>
+              <div className="space-y-2.5">
+                <a
+                  href={`${dashboardUrl}/cart`}
+                  onClick={() => setCartOpen(false)}
+                  className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs text-center shadow-glow-violet transition-all flex items-center justify-center gap-2"
+                >
+                  <ShoppingCart className="h-4 w-4" /> View Cart &amp; Checkout →
+                </a>
+                <a
+                  href={`${dashboardUrl}/orders?tab=subscriptions`}
+                  onClick={() => setCartOpen(false)}
+                  className="w-full py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white font-bold text-xs text-center border border-white/10 transition-all block"
+                >
+                  My Subscriptions &amp; Invoices
+                </a>
+                <Link
+                  href="/pricing"
+                  onClick={() => setCartOpen(false)}
+                  className="w-full py-2.5 rounded-2xl bg-transparent hover:bg-white/5 text-slate-400 hover:text-slate-200 font-bold text-xs text-center transition-all block"
+                >
+                  Browse Plans &amp; Pricing Catalog
+                </Link>
+              </div>
             </motion.div>
           </div>
         )}
