@@ -18,25 +18,25 @@ const DB_ENGINES = [
     name: 'PostgreSQL 16',
     desc: 'Advanced relational database with JSONB support, pgvector indexing, and full ACID compliance.',
     badge: 'Popular SQL',
-    icon: '🐘',
+    icon: Database,
   },
   {
     name: 'MySQL 8',
     desc: 'High-throughput relational database optimized for web applications, WordPress, and ecommerce.',
     badge: 'Web Standard',
-    icon: '🐬',
+    icon: Server,
   },
   {
     name: 'Redis 7',
     desc: 'In-memory data structure store for high-speed caching, session management, and pub/sub queues.',
     badge: 'In-Memory Cache',
-    icon: '🔴',
+    icon: Zap,
   },
   {
     name: 'MongoDB 6',
     desc: 'Flexible document-oriented NoSQL database for unstructured data and scalable microservices.',
     badge: 'NoSQL Document',
-    icon: '🍃',
+    icon: Package,
   },
 ];
 
@@ -105,7 +105,7 @@ export default async function ManagedDatabasesPage() {
           {DB_ENGINES.map((db, idx) => (
             <div key={idx} className="bg-[#080918] border border-white/10 rounded-3xl p-6 space-y-3 hover:border-teal-500/40 transition-all">
               <div className="flex items-center justify-between">
-                <span className="text-3xl">{db.icon}</span>
+                <db.icon className="h-7 w-7 text-teal-400" />
                 <span className="text-[10px] font-mono uppercase bg-teal-500/10 text-teal-300 border border-teal-500/20 px-2 py-0.5 rounded-md">
                   {db.badge}
                 </span>

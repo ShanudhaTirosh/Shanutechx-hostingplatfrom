@@ -184,7 +184,11 @@ export default function AdminCmsPage() {
         <form onSubmit={handleSave} className="space-y-4 animate-fade-in">
           <Card className="border border-white/[0.06] space-y-4">
             <h2 className="font-semibold text-sm text-text-primary flex items-center gap-2">
-              <span className="h-6 w-6 rounded-lg bg-teal-500/15 text-teal-300 font-bold text-xs flex items-center justify-center">📞</span>
+              <span className="h-6 w-6 rounded-lg bg-teal-500/15 text-teal-300 flex items-center justify-center">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+              </span>
               Contact Numbers & Support Inboxes
             </h2>
 
@@ -416,8 +420,11 @@ export default function AdminCmsPage() {
             <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
               Contact Form Inquiries ({submissions?.length || 0})
             </h2>
-            <Button variant="secondary" size="sm" onClick={loadCmsData}>
-              🔄 Refresh Messages
+            <Button variant="secondary" size="sm" onClick={loadCmsData} className="flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh Messages
             </Button>
           </div>
 

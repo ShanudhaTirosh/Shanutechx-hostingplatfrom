@@ -193,8 +193,16 @@ export default function AdminCustomersPage() {
               </Td>
               <Td className="text-xs text-text-muted">
                 <span className="font-semibold text-text-primary">{cust.orderCount}</span> orders
-                {cust.phoneNumber && ' · 📱 WhatsApp'}
-                {cust.discordUserId && ' · 💬 Discord'}
+                {cust.phoneNumber && (
+                  <span className="inline-flex items-center gap-1 text-emerald-400 font-medium ml-1">
+                    · WhatsApp
+                  </span>
+                )}
+                {cust.discordUserId && (
+                  <span className="inline-flex items-center gap-1 text-indigo-400 font-medium ml-1">
+                    · Discord
+                  </span>
+                )}
               </Td>
               <Td className="font-bold text-accent-teal-bright text-sm">
                 {formatMoney(cust.totalSpent)}
@@ -229,7 +237,10 @@ export default function AdminCustomersPage() {
           <div className="w-full max-w-md rounded-2xl border border-rose-500/30 bg-background-card p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2 text-rose-400 font-semibold text-sm">
-                <span>⚠️ Suspend / Ban Customer Account</span>
+                <svg className="w-4 h-4 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>Suspend / Ban Customer Account</span>
               </div>
               <button
                 onClick={() => setBanModalUser(null)}

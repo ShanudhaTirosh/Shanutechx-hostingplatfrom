@@ -260,15 +260,142 @@ export async function syncCatalogToFirebase() {
 }
 
 /**
+ * Syncs CMS Content Blocks (Site Settings) into Firestore
+ */
+export async function syncCmsToFirebase() {
+  try {
+    const blocks = await prisma.contentBlock.findMany({
+      where: { page: { in: ['home', 'contact', 'settings'] } },
+    });
+
+    const content: Record<string, unknown> = {};
+    for (const block of blocks) {
+      content[block.key] = block.valueJson;
+    }
+
+    if (firebaseFirestore) {
+      await firebaseFirestore.collection('site_settings').doc('contact_info').set(content, { merge: true });
+
+      const batch = firebaseFirestore.batch();
+      for (const block of blocks) {
+        const docRef = firebaseFirestore.collection('cms_content').doc(`${block.page}_${block.key}`);
+        batch.set(
+          docRef,
+          {
+            page: block.page,
+            key: block.key,
+            value: block.valueJson,
+            updatedAt: block.updatedAt.toISOString(),
+          },
+          { merge: true }
+        );
+      }
+      await batch.commit();
+      logger.info({ count: blocks.length }, 'Synced CMS content blocks to Firebase Firestore');
+    }
+
+    if (firebaseDb) {
+      await firebaseDb.ref('settings/cms').set({
+        ...content,
+        updatedAt: Date.now(),
+      });
+    }
+
+    return { success: true, count: blocks.length };
+  } catch (err: any) {
+    logger.error({ err: err.message }, 'Failed to sync CMS content to Firebase');
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Syncs Knowledge Base Categories & Articles into Firestore
+ */
+export async function syncKnowledgeBaseToFirebase() {
+  try {
+    const [categories, articles] = await Promise.all([
+      prisma.kbCategory.findMany(),
+      prisma.kbArticle.findMany({ include: { category: true } }),
+    ]);
+
+    if (firebaseFirestore) {
+      const catBatch = firebaseFirestore.batch();
+      for (const cat of categories) {
+        const docRef = firebaseFirestore.collection('kb_categories').doc(cat.id);
+        catBatch.set(
+          docRef,
+          {
+            id: cat.id,
+            name: cat.name,
+            slug: cat.slug,
+            description: cat.description || '',
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      }
+      await catBatch.commit();
+
+      const artBatch = firebaseFirestore.batch();
+      for (const art of articles) {
+        const docRef = firebaseFirestore.collection('knowledge_base').doc(art.id);
+        artBatch.set(
+          docRef,
+          {
+            id: art.id,
+            slug: art.slug,
+            title: art.title,
+            category: art.category.slug,
+            summary: art.summary,
+            content: art.content,
+            published: art.published,
+            views: art.views,
+            helpfulCount: art.helpfulCount,
+            updatedAt: art.updatedAt.toISOString(),
+          },
+          { merge: true }
+        );
+      }
+      await artBatch.commit();
+      logger.info({ count: articles.length }, 'Synced KB articles to Firebase Firestore');
+    }
+
+    if (firebaseDb) {
+      const kbRef = firebaseDb.ref('knowledge_base/articles');
+      const data: Record<string, any> = {};
+      for (const art of articles) {
+        data[art.id] = {
+          id: art.id,
+          slug: art.slug,
+          title: art.title,
+          category: art.category.slug,
+          summary: art.summary,
+          published: art.published,
+          updatedAt: Date.now(),
+        };
+      }
+      await kbRef.set(data);
+    }
+
+    return { success: true, count: articles.length };
+  } catch (err: any) {
+    logger.error({ err: err.message }, 'Failed to sync Knowledge Base to Firebase');
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Triggers full data migration/sync from PostgreSQL to Firebase Firestore & Realtime DB
  */
 export async function fullFirebaseDataMigration() {
   logger.info('Starting full data migration to Firebase Firestore & Realtime Database...');
-  const [productsResult, ordersResult, settingsResult, catalogResult] = await Promise.all([
+  const [productsResult, ordersResult, settingsResult, catalogResult, cmsResult, kbResult] = await Promise.all([
     syncProductsToFirebase(),
     syncOrdersToFirebase(),
     syncPanelSettingsToFirebase(),
     syncCatalogToFirebase(),
+    syncCmsToFirebase(),
+    syncKnowledgeBaseToFirebase(),
   ]);
 
   // Sync all users to Firestore
@@ -284,6 +411,8 @@ export async function fullFirebaseDataMigration() {
     orders: ordersResult,
     settings: settingsResult,
     catalog: catalogResult,
+    cms: cmsResult,
+    knowledgebase: kbResult,
     syncedUsersCount: userSuccessCount,
     timestamp: new Date().toISOString(),
   };

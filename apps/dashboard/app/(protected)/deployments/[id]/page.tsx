@@ -14,6 +14,7 @@ import {
   useToast,
   PageHeader,
   ConfirmDialog,
+  EmptyState,
 } from '@/components/ui';
 import { DomainManagement } from '@/components/DomainManagement';
 import { EnvVarsPanel } from '@/components/EnvVarsPanel';
@@ -298,27 +299,97 @@ export default function DeploymentDetailPage() {
           ) : (
             <>
               <Button size="sm" variant="secondary" onClick={() => setShowRestartConfirm(true)} loading={restarting}>
-                ↺ Restart
+                <svg className="w-3.5 h-3.5 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Restart
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setShowStopConfirm(true)} loading={stopping}>
-                ■ Stop
+                <svg className="w-3.5 h-3.5 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor" />
+                </svg>
+                Stop
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setShowKillConfirm(true)} loading={killing} className="text-red-400 hover:bg-red-500/10">
-                ⚡ Kill
+                <svg className="w-3.5 h-3.5 inline mr-1 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Kill
               </Button>
             </>
           )}
         </div>
       </div>
 
-      {/* FeatherPanel Navigation Tabs */}
+      {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-white/10 overflow-x-auto pb-2">
-        <TabButton id="console" active={activeTab} onClick={setActiveTab} icon="💻" label="Console" />
-        <TabButton id="files" active={activeTab} onClick={setActiveTab} icon="📂" label="Files & IDE" />
-        <TabButton id="databases" active={activeTab} onClick={setActiveTab} icon="🗄️" label="Databases" />
-        <TabButton id="network" active={activeTab} onClick={setActiveTab} icon="🌐" label="Network & Subdomains" />
-        <TabButton id="startup" active={activeTab} onClick={setActiveTab} icon="⚙️" label="Startup & Env" />
-        <TabButton id="activity" active={activeTab} onClick={setActiveTab} icon="⚡" label="Activity & Webhooks" />
+        <TabButton
+          id="console"
+          active={activeTab}
+          onClick={setActiveTab}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          }
+          label="Console"
+        />
+        <TabButton
+          id="files"
+          active={activeTab}
+          onClick={setActiveTab}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+          }
+          label="Files & IDE"
+        />
+        <TabButton
+          id="databases"
+          active={activeTab}
+          onClick={setActiveTab}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+            </svg>
+          }
+          label="Databases"
+        />
+        <TabButton
+          id="network"
+          active={activeTab}
+          onClick={setActiveTab}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+            </svg>
+          }
+          label="Network & Subdomains"
+        />
+        <TabButton
+          id="startup"
+          active={activeTab}
+          onClick={setActiveTab}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          }
+          label="Startup & Env"
+        />
+        <TabButton
+          id="activity"
+          active={activeTab}
+          onClick={setActiveTab}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          }
+          label="Activity & Webhooks"
+        />
       </div>
 
       {/* TAB 1: CONSOLE & METRICS */}
@@ -400,11 +471,10 @@ export default function DeploymentDetailPage() {
         <div className="space-y-6">
           <Card title="Managed Database Connections" description="Provisioned databases and cluster credentials linked to this deployment environment.">
             {databases.length === 0 ? (
-              <div className="text-center py-12 space-y-3">
-                <p className="text-3xl">🗄️</p>
-                <p className="text-xs text-text-muted">No databases attached yet. Provision a PostgreSQL, Redis, or MongoDB instance from the App Catalog.</p>
-                <Button size="sm" onClick={() => router.push('/catalog')}>Browse Catalog</Button>
-              </div>
+              <EmptyState
+                message="No databases attached yet. Provision a PostgreSQL, Redis, or MongoDB instance from the App Catalog."
+                action={{ label: 'Browse Catalog', onClick: () => router.push('/catalog') }}
+              />
             ) : (
               <div className="space-y-4">
                 {databases.map((db) => (
@@ -521,7 +591,7 @@ export default function DeploymentDetailPage() {
   );
 }
 
-function TabButton({ id, active, onClick, icon, label }: { id: TabType; active: TabType; onClick: (t: TabType) => void; icon: string; label: string }) {
+function TabButton({ id, active, onClick, icon, label }: { id: TabType; active: TabType; onClick: (t: TabType) => void; icon: React.ReactNode; label: string }) {
   const isSelected = active === id;
   return (
     <button

@@ -3,56 +3,79 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdmin, AuthedRequest } from '../middleware/auth';
 
-import { syncPanelSettingsToFirebase } from '../lib/firebaseSync';
+import { syncPanelSettingsToFirebase, syncCmsToFirebase } from '../lib/firebaseSync';
+import { withDbFallback, getContactInfoFromFirestore, getCmsPageFromFirestore } from '../lib/firestoreService';
 
 export const cmsRouter = Router();
 
 /**
  * Public — returns structured contact info & platform settings with sensible defaults.
+ * Fails over to Firebase Firestore automatically if PostgreSQL is offline.
  */
 cmsRouter.get('/cms/contact-info', async (_req, res) => {
-  const blocks = await prisma.contentBlock.findMany({
-    where: { page: { in: ['home', 'contact', 'settings'] } },
-  });
+  const result = await withDbFallback(
+    async () => {
+      const blocks = await prisma.contentBlock.findMany({
+        where: { page: { in: ['home', 'contact', 'settings'] } },
+      });
 
-  const content: Record<string, unknown> = {};
-  for (const block of blocks) {
-    content[block.key] = block.valueJson;
-  }
+      const content: Record<string, unknown> = {};
+      for (const block of blocks) {
+        content[block.key] = block.valueJson;
+      }
 
-  res.json({
-    supportEmail: content.supportEmail ?? 'support@shanutechx.cloud',
-    contactEmail: content.contactEmail ?? 'sales@shanutechx.cloud',
-    contactPhone: content.contactPhone ?? '+1 (800) 589-STX1',
-    whatsappPhone: content.whatsappPhone ?? '+94 77 123 4567',
-    contactAddress: content.contactAddress ?? 'ShanuTechX Cloud HQ, Tech City, Sri Lanka',
-    supportHours: content.supportHours ?? '24/7/365 Tier-3 Engineer Live Support',
-    discordUrl: content.discordUrl ?? 'https://discord.gg/shanutechx',
-    whatsappChannelUrl: content.whatsappChannelUrl ?? 'https://wa.me/94771234567?text=Hello%20ShanuTechX%20Support',
-    telegramUrl: content.telegramUrl ?? 'https://t.me/shanutechx',
-    githubUrl: content.githubUrl ?? 'https://github.com/shanutechx',
-    twitterUrl: content.twitterUrl ?? 'https://twitter.com/shanutechx',
-    facebookUrl: content.facebookUrl ?? 'https://facebook.com/shanutechx',
-    companyName: content.companyName ?? 'ShanuTechX Cloud',
-    heroTitle: content.heroTitle ?? 'Autonomous High-Performance Cloud Hosting',
-    heroSubtitle: content.heroSubtitle ?? 'Deploy web apps, Node.js and Python services, and Discord bots in minutes.',
-    announcementText: content.announcementText ?? '🚀 New VPS High-Performance Nodes Online in Ashburn & Frankfurt!',
-    announcementActive: content.announcementActive ?? true,
-    copyrightText: content.copyrightText ?? `© ${new Date().getFullYear()} ShanuTechX Cloud. All rights reserved.`,
-  });
+      return {
+        supportEmail: content.supportEmail ?? 'support@shanutechx.cloud',
+        contactEmail: content.contactEmail ?? 'sales@shanutechx.cloud',
+        contactPhone: content.contactPhone ?? '+1 (800) 589-STX1',
+        whatsappPhone: content.whatsappPhone ?? '+94 77 123 4567',
+        contactAddress: content.contactAddress ?? 'ShanuTechX Cloud HQ, Tech City, Sri Lanka',
+        supportHours: content.supportHours ?? '24/7/365 Tier-3 Engineer Live Support',
+        discordUrl: content.discordUrl ?? 'https://discord.gg/shanutechx',
+        whatsappChannelUrl: content.whatsappChannelUrl ?? 'https://wa.me/94771234567?text=Hello%20ShanuTechX%20Support',
+        telegramUrl: content.telegramUrl ?? 'https://t.me/shanutechx',
+        githubUrl: content.githubUrl ?? 'https://github.com/shanutechx',
+        twitterUrl: content.twitterUrl ?? 'https://twitter.com/shanutechx',
+        facebookUrl: content.facebookUrl ?? 'https://facebook.com/shanutechx',
+        companyName: content.companyName ?? 'ShanuTechX Cloud',
+        heroTitle: content.heroTitle ?? 'Autonomous High-Performance Cloud Hosting',
+        heroSubtitle: content.heroSubtitle ?? 'Deploy web apps, Node.js and Python services, and Discord bots in minutes.',
+        announcementText: content.announcementText ?? '🚀 New VPS High-Performance Nodes Online in Ashburn & Frankfurt!',
+        announcementActive: content.announcementActive ?? true,
+        copyrightText: content.copyrightText ?? `© ${new Date().getFullYear()} ShanuTechX Cloud. All rights reserved.`,
+      };
+    },
+    async () => {
+      return await getContactInfoFromFirestore();
+    }
+  );
+
+  res.json(result);
 });
 
 /**
  * Public — the marketing site fetches this at request time with no auth.
  * Returns a flat { [key]: value } map for the page.
+ * Fails over to Firebase Firestore if PostgreSQL is offline.
  */
 cmsRouter.get('/cms/:page', async (req, res) => {
-  const blocks = await prisma.contentBlock.findMany({ where: { page: req.params.page } });
-  const content: Record<string, unknown> = {};
-  for (const block of blocks) {
-    content[block.key] = block.valueJson;
-  }
-  res.json({ page: req.params.page, content });
+  const page = req.params.page;
+
+  const result = await withDbFallback(
+    async () => {
+      const blocks = await prisma.contentBlock.findMany({ where: { page } });
+      const content: Record<string, unknown> = {};
+      for (const block of blocks) {
+        content[block.key] = block.valueJson;
+      }
+      return { page, content };
+    },
+    async () => {
+      return await getCmsPageFromFirestore(page);
+    }
+  );
+
+  res.json(result);
 });
 
 const upsertSchema = z.object({
@@ -82,6 +105,7 @@ cmsRouter.put('/cms/:page', requireAuth, requireAdmin, async (req: AuthedRequest
 
   // Sync updated CMS settings to Firebase Firestore & Realtime DB
   void syncPanelSettingsToFirebase().catch(() => null);
+  void syncCmsToFirebase().catch(() => null);
 
   const blocks = await prisma.contentBlock.findMany({ where: { page } });
   const content: Record<string, unknown> = {};

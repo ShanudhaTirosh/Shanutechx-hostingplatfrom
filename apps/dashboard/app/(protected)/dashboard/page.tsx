@@ -123,7 +123,7 @@ export default function DashboardPage() {
         <div className="absolute inset-0 bg-brand-gradient opacity-[0.04] -z-10" />
         <div className="absolute -right-16 -top-16 w-48 h-48 rounded-full bg-accent-violet/10 blur-3xl" />
         <h1 className="text-2xl font-bold text-text-primary">
-          Welcome back, {user?.displayName ?? apiUser?.email?.split('@')[0]} 👋
+          Welcome back, {user?.displayName ?? apiUser?.email?.split('@')[0]}
         </h1>
         <p className="text-text-muted text-sm mt-1">
           Everything is running smoothly. Your services are active and monitored in real time.

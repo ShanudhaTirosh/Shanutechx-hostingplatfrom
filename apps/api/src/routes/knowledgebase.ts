@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireAdmin, AuthedRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
+import { syncKnowledgeBaseToFirebase } from '../lib/firebaseSync';
+import { withDbFallback, getKbArticlesFromFirestore, getKbArticleByIdFromFirestore } from '../lib/firestoreService';
 
 /**
  * Knowledge Base API endpoints.
@@ -17,48 +19,72 @@ function serializeArticle(a: { category: { slug: string } } & Record<string, any
 }
 
 // GET /api/knowledgebase - Authenticated: List categories & articles
+// Automatically fails over to Firebase Firestore if PostgreSQL is offline
 knowledgebaseRouter.get('/', requireAuth, async (req: Request, res: Response) => {
   const { category, q } = req.query;
+  const categoryStr = typeof category === 'string' ? category : undefined;
+  const searchStr = typeof q === 'string' ? q : undefined;
 
-  const where: any = { published: true };
-  if (category && typeof category === 'string' && category !== 'all') {
-    where.category = { slug: category };
-  }
-  if (q && typeof q === 'string' && q.trim()) {
-    where.OR = [
-      { title: { contains: q, mode: 'insensitive' } },
-      { summary: { contains: q, mode: 'insensitive' } },
-      { content: { contains: q, mode: 'insensitive' } },
-    ];
-  }
+  const result = await withDbFallback(
+    async () => {
+      const where: any = { published: true };
+      if (categoryStr && categoryStr !== 'all') {
+        where.category = { slug: categoryStr };
+      }
+      if (searchStr && searchStr.trim()) {
+        where.OR = [
+          { title: { contains: searchStr, mode: 'insensitive' } },
+          { summary: { contains: searchStr, mode: 'insensitive' } },
+          { content: { contains: searchStr, mode: 'insensitive' } },
+        ];
+      }
 
-  const [categories, articles] = await Promise.all([
-    prisma.kbCategory.findMany({ orderBy: { name: 'asc' } }),
-    prisma.kbArticle.findMany({ where, include: { category: true }, orderBy: { updatedAt: 'desc' } }),
-  ]);
+      const [categories, articles] = await Promise.all([
+        prisma.kbCategory.findMany({ orderBy: { name: 'asc' } }),
+        prisma.kbArticle.findMany({ where, include: { category: true }, orderBy: { updatedAt: 'desc' } }),
+      ]);
 
-  res.json({
-    categories,
-    articles: articles.map(serializeArticle),
-    total: articles.length,
-  });
+      return {
+        categories,
+        articles: articles.map(serializeArticle),
+        total: articles.length,
+      };
+    },
+    async () => {
+      return await getKbArticlesFromFirestore(categoryStr, searchStr);
+    }
+  );
+
+  res.json(result);
 });
 
 // GET /api/knowledgebase/articles/:id - Read single article & increment view count
+// Automatically fails over to Firebase Firestore if PostgreSQL is offline
 knowledgebaseRouter.get('/articles/:id', requireAuth, async (req: Request, res: Response) => {
-  const article = await prisma.kbArticle.findFirst({
-    where: { OR: [{ id: req.params.id }, { slug: req.params.id }] },
-    include: { category: true },
-  });
+  const idOrSlug = req.params.id;
+
+  const article = await withDbFallback(
+    async () => {
+      const found = await prisma.kbArticle.findFirst({
+        where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
+        include: { category: true },
+      });
+      if (!found) return null;
+
+      const updated = await prisma.kbArticle.update({
+        where: { id: found.id },
+        data: { views: { increment: 1 } },
+        include: { category: true },
+      });
+      return serializeArticle(updated);
+    },
+    async () => {
+      return await getKbArticleByIdFromFirestore(idOrSlug);
+    }
+  );
+
   if (!article) return res.status(404).json({ error: 'Article not found' });
-
-  const updated = await prisma.kbArticle.update({
-    where: { id: article.id },
-    data: { views: { increment: 1 } },
-    include: { category: true },
-  });
-
-  res.json({ article: serializeArticle(updated) });
+  res.json({ article });
 });
 
 // POST /api/knowledgebase/articles/:id/helpful - Vote article as helpful
@@ -121,6 +147,8 @@ knowledgebaseRouter.post('/articles', requireAuth, requireAdmin, async (req: Aut
     data: { adminId: req.user!.id, action: 'kb.article.create', target: newArticle.id },
   });
 
+  void syncKnowledgeBaseToFirebase().catch(() => null);
+
   res.status(201).json({ article: serializeArticle(newArticle) });
 });
 
@@ -152,6 +180,8 @@ knowledgebaseRouter.put('/articles/:id', requireAuth, requireAdmin, async (req: 
     data: { adminId: req.user!.id, action: 'kb.article.update', target: updated.id },
   });
 
+  void syncKnowledgeBaseToFirebase().catch(() => null);
+
   res.json({ article: serializeArticle(updated) });
 });
 
@@ -165,6 +195,8 @@ knowledgebaseRouter.delete('/articles/:id', requireAuth, requireAdmin, async (re
   await prisma.auditLog.create({
     data: { adminId: req.user!.id, action: 'kb.article.delete', target: req.params.id },
   });
+
+  void syncKnowledgeBaseToFirebase().catch(() => null);
 
   res.json({ success: true });
 });

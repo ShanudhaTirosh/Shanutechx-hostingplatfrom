@@ -4,7 +4,7 @@ import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import GradientMeshOrb from '../../components/GradientMeshOrb';
 import { fetchProducts } from '../../lib/api';
-import { Code2, ArrowRight, CheckCircle2, Package } from 'lucide-react';
+import { Code2, ArrowRight, CheckCircle2, Package, Terminal, Cpu, Zap, Container, Sparkles, FolderArchive } from 'lucide-react';
 
 export const metadata = {
   title: 'Web App & Repository Hosting | SHANUTECHX Cloud',
@@ -14,12 +14,12 @@ export const metadata = {
 export const revalidate = 0; // Dynamic DB fetching
 
 const STACKS = [
-  { name: 'Node.js', desc: 'Express, Next.js, Remix, NestJS', icon: '🟢' },
-  { name: 'Python', desc: 'Django, FastAPI, Flask', icon: '🐍' },
-  { name: 'Go & Rust', desc: 'Compiled High-Speed Binaries', icon: '⚡' },
-  { name: 'Docker / Compose', desc: 'Custom Dockerfile & Multi-container', icon: '🐳' },
-  { name: 'Static Frontend', desc: 'React, Vue, HTML5, Tailwind', icon: '✨' },
-  { name: 'ZIP Package', desc: 'Direct Drag & Drop Source Upload', icon: '📦' },
+  { name: 'Node.js', desc: 'Express, Next.js, Remix, NestJS', icon: Terminal },
+  { name: 'Python', desc: 'Django, FastAPI, Flask', icon: Cpu },
+  { name: 'Go & Rust', desc: 'Compiled High-Speed Binaries', icon: Zap },
+  { name: 'Docker / Compose', desc: 'Custom Dockerfile & Multi-container', icon: Container },
+  { name: 'Static Frontend', desc: 'React, Vue, HTML5, Tailwind', icon: Sparkles },
+  { name: 'ZIP Package', desc: 'Direct Drag & Drop Source Upload', icon: FolderArchive },
 ];
 
 export default async function AppHostingPage() {
@@ -90,7 +90,7 @@ export default async function AppHostingPage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {STACKS.map((stack, idx) => (
             <div key={idx} className="bg-[#080918] border border-white/10 rounded-3xl p-6 flex items-start gap-4 hover:border-indigo-500/40 transition-all">
-              <span className="text-3xl">{stack.icon}</span>
+              <stack.icon className="h-6 w-6 text-indigo-400 shrink-0 mt-0.5" />
               <div>
                 <h3 className="font-extrabold text-base text-white">{stack.name}</h3>
                 <p className="text-xs text-text-muted mt-1">{stack.desc}</p>

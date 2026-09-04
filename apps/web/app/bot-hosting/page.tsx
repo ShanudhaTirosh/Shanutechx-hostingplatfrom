@@ -4,7 +4,7 @@ import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import GradientMeshOrb from '../../components/GradientMeshOrb';
 import { fetchProducts } from '../../lib/api';
-import { Bot, ShieldCheck, Activity, Terminal, ArrowRight, CheckCircle2, RefreshCw, Package } from 'lucide-react';
+import { Bot, ShieldCheck, Activity, Terminal, ArrowRight, CheckCircle2, RefreshCw, Package, MessageSquare, Send } from 'lucide-react';
 
 export const metadata = {
   title: '24/7 Bot Hosting | Discord, Telegram & WhatsApp Bots | SHANUTECHX Cloud',
@@ -17,17 +17,17 @@ const BOT_TYPES = [
   {
     title: 'Discord.js & Python Bots',
     desc: 'Support for Discord.js v14, Eris, discord.py, Nextcord, and Lavalink audio streaming nodes.',
-    icon: '🤖',
+    icon: Bot,
   },
   {
     title: 'WhatsApp Gateways (Baileys)',
     desc: 'Keep your Baileys QR session state persistent across container restarts with persistent volumes.',
-    icon: '💬',
+    icon: MessageSquare,
   },
   {
     title: 'Telegram & Custom Bot Daemons',
     desc: 'Telebot, python-telegram-bot, GramJS, and custom webhook handlers running with continuous monitoring.',
-    icon: '✈️',
+    icon: Send,
   },
 ];
 
@@ -95,7 +95,7 @@ export default async function BotHostingPage() {
         <div className="grid md:grid-cols-3 gap-8">
           {BOT_TYPES.map((type, idx) => (
             <div key={idx} className="bg-[#080918] border border-white/10 rounded-3xl p-8 space-y-4 hover:border-pink-500/40 transition-all">
-              <span className="text-4xl">{type.icon}</span>
+              <type.icon className="h-8 w-8 text-pink-400" />
               <h3 className="font-extrabold text-lg text-white">{type.title}</h3>
               <p className="text-xs text-text-muted leading-relaxed">{type.desc}</p>
             </div>

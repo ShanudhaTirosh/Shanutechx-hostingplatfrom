@@ -646,7 +646,21 @@ export default function RedesignedMailboxStudioPage() {
                 <div className="flex items-center gap-3">
                   <span className="font-extrabold text-sm text-slate-900 font-mono">{dom.domain}</span>
                   <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${dom.status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {dom.status === 'verified' ? '✓ Verified' : '⏳ Pending DNS Check'}
+                    {dom.status === 'verified' ? (
+                      <span className="flex items-center gap-1">
+                        <svg className="w-3 h-3 inline text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Verified
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1">
+                        <svg className="w-3 h-3 inline text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Pending DNS Check
+                      </span>
+                    )}
                   </span>
                 </div>
                 <button
@@ -784,9 +798,12 @@ export default function RedesignedMailboxStudioPage() {
                           setComposeFrom(fullAlias);
                           setShowComposeModal(true);
                         }}
-                        className="text-indigo-600 font-bold hover:underline"
+                        className="text-indigo-600 font-bold hover:underline flex items-center gap-1"
                       >
-                        ✉️ Compose as Alias
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        Compose as Alias
                       </button>
                       <button
                         onClick={() => copyToClipboard(fullAlias, 'Alias Address')}
@@ -887,8 +904,11 @@ export default function RedesignedMailboxStudioPage() {
                 <h3 className="font-bold text-sm text-slate-900 uppercase tracking-wider">Available Email Hosting Plans</h3>
                 <p className="text-xs text-slate-500">Configure prices in Dev Dashboard. All plans require a minimum 3-month purchase commitment.</p>
               </div>
-              <span className="text-[10px] font-bold uppercase bg-amber-100 text-amber-800 px-3 py-1 rounded-full border border-amber-200">
-                🔒 3-Month Minimum Commitment
+              <span className="text-[10px] font-bold uppercase bg-amber-100 text-amber-800 px-3 py-1 rounded-full border border-amber-200 flex items-center gap-1">
+                <svg className="w-3 h-3 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                3-Month Minimum Commitment
               </span>
             </div>
 
@@ -969,7 +989,12 @@ export default function RedesignedMailboxStudioPage() {
           </div>
 
           <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 text-xs text-amber-900 space-y-1">
-            <p className="font-bold">🛡️ Delegation Rules:</p>
+            <p className="font-bold flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-amber-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              Delegation Rules:
+            </p>
             <p>- Delegated admins can read emails, send emails, and manage settings on behalf of assigned clients.</p>
             <p>- Non-dev admins cannot create new email accounts within client spaces (only provision/assign existing ones).</p>
           </div>
@@ -1053,7 +1078,10 @@ export default function RedesignedMailboxStudioPage() {
                   }}
                   className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1"
                 >
-                  📎 Attach File
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
+                  Attach File
                 </button>
                 {attachments.length > 0 && <span className="text-[11px] text-slate-500 font-mono">{attachments.length} file(s) attached</span>}
               </div>

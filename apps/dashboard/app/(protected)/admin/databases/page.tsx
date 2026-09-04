@@ -347,9 +347,12 @@ export default function AdminDatabasesPage() {
                               toast(e.message, 'error');
                             }
                           }}
-                          className="px-2 py-0.5 text-[11px] font-semibold text-emerald-400 hover:bg-emerald-500/20 rounded transition-colors"
+                          className="px-2 py-0.5 text-[11px] font-semibold text-emerald-400 hover:bg-emerald-500/20 rounded transition-colors flex items-center gap-1"
                         >
-                          ▶ Start
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                          </svg>
+                          Start
                         </button>
                       ) : (
                         <button
@@ -362,9 +365,12 @@ export default function AdminDatabasesPage() {
                               toast(e.message, 'error');
                             }
                           }}
-                          className="px-2 py-0.5 text-[11px] font-semibold text-amber-400 hover:bg-amber-500/20 rounded transition-colors"
+                          className="px-2 py-0.5 text-[11px] font-semibold text-amber-400 hover:bg-amber-500/20 rounded transition-colors flex items-center gap-1"
                         >
-                          ⏹ Stop
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <rect x="6" y="6" width="12" height="12" rx="1" />
+                          </svg>
+                          Stop
                         </button>
                       )}
 
@@ -378,9 +384,12 @@ export default function AdminDatabasesPage() {
                             toast(e.message, 'error');
                           }
                         }}
-                        className="px-2 py-0.5 text-[11px] font-semibold text-accent-violet-light hover:bg-accent-violet/20 rounded transition-colors"
+                        className="px-2 py-0.5 text-[11px] font-semibold text-accent-violet-light hover:bg-accent-violet/20 rounded transition-colors flex items-center gap-1"
                       >
-                        🔄 Restart
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Restart
                       </button>
                     </div>
 
@@ -394,9 +403,12 @@ export default function AdminDatabasesPage() {
                           toast(e.message, 'error');
                         }
                       }}
-                      className="text-xs text-accent-cyan hover:underline font-mono"
+                      className="text-xs text-accent-cyan hover:underline font-mono flex items-center gap-1"
                     >
-                      🔗 Copy DSN
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                      Copy DSN
                     </button>
 
                     <button
@@ -409,9 +421,12 @@ export default function AdminDatabasesPage() {
                           toast(e.message, 'error');
                         }
                       }}
-                      className="text-xs text-accent-violet-light hover:underline font-mono"
+                      className="text-xs text-accent-violet-light hover:underline font-mono flex items-center gap-1"
                     >
-                      🔑 Password
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                      </svg>
+                      Password
                     </button>
 
                     <button
@@ -425,9 +440,12 @@ export default function AdminDatabasesPage() {
                           toast(e.message, 'error');
                         }
                       }}
-                      className="text-xs text-red-400 hover:underline"
+                      className="text-xs text-red-400 hover:underline flex items-center gap-1"
                     >
-                      🗑️ Delete
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete
                     </button>
                   </div>
                 </div>

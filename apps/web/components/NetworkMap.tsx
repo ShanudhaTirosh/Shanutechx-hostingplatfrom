@@ -197,7 +197,7 @@ function NetworkMap() {
                   : 'bg-white/[0.03] border-white/[0.08] text-slate-400 hover:text-white hover:border-white/20'
               }`}
             >
-              {region === 'All' ? '🌐 All Regions' : region}
+              {region}
             </button>
           ))}
 
@@ -207,7 +207,7 @@ function NetworkMap() {
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold font-mono hover:border-emerald-400 transition-all flex items-center gap-2 shadow-[0_0_15px_rgba(52,211,153,0.2)]"
           >
             <RefreshCw size={13} className={isTesting ? 'animate-spin' : ''} />
-            {isTesting ? 'Testing Latencies...' : '⚡ Test Latencies'}
+            {isTesting ? 'Testing Latencies...' : 'Test Latencies'}
           </button>
         </div>
       </div>
