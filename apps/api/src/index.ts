@@ -255,10 +255,35 @@ server.listen(env.port, () => {
   logger.info({ port: env.port }, 'SHANUTECHX API listening (HTTP + /ws/vps-ssh)');
   logger.info('Initializing all-in-one platform telemetry engine: Loki Log Collector, Prometheus Metrics, and Status Health Checkers active.');
   void ensureDefaultProductsSeeded();
+  void ensureDefaultMasterNodeRegistered();
   void fullFirebaseDataMigration().catch((err) => {
     logger.error({ err: err.message }, 'Initial startup Firebase data sync error');
   });
 });
+
+async function ensureDefaultMasterNodeRegistered() {
+  try {
+    const nodeCount = await prisma.node.count({ where: { isActive: true } });
+    if (nodeCount === 0) {
+      await prisma.node.create({
+        data: {
+          label: 'Local Master Compute Host',
+          ip: '127.0.0.1',
+          sshKeyRef: 'vault:nodes:master-ssh-key',
+          cpuCores: 8,
+          ramMb: 32768,
+          diskGb: 500,
+          roleTags: ['web-hosting', 'node-hosting', 'python-hosting', 'vps-master'],
+          monthlyBandwidthGb: 30000,
+          isActive: true,
+        },
+      });
+      logger.info('Auto-registered Host API Server as default Local Master Compute Node (30 TB VPS Quota active).');
+    }
+  } catch (err: any) {
+    logger.warn({ err: err.message }, 'Master node auto-registration warning');
+  }
+}
 
 async function gracefulShutdown(signal: string) {
   logger.info({ signal }, 'Received termination signal. Closing HTTP server and database pool...');

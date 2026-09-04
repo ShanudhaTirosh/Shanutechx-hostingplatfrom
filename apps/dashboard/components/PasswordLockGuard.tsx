@@ -25,6 +25,17 @@ export default function PasswordLockGuard({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Fetch current authed user role
+    api.me()
+      .then((res) => {
+        const role = res.user.role;
+        if (role === 'dev') {
+          // Dev user has unprompted full access
+          setUnlocked(true);
+        }
+      })
+      .catch(() => {});
+
     // Check if session is currently unlocked
     const storedUnlockTime = sessionStorage.getItem(UNLOCK_STORAGE_KEY);
     if (storedUnlockTime) {

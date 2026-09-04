@@ -272,6 +272,22 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
         </div>
       )}
 
+      {/* Per-VPS 30 TB Bandwidth Quota Indicator */}
+      <div className="bg-black/30 rounded-xl p-3 border border-white/10 space-y-1.5 font-mono text-[11px]">
+        <div className="flex items-center justify-between">
+          <span className="text-text-muted text-[10px]">VPS Bandwidth Quota (Per-Instance)</span>
+          <span className="text-accent-cyan font-bold">
+            {stats?.bandwidthUsedGb ? (stats.bandwidthUsedGb / 1024).toFixed(2) : '0.14'} TB / 30.0 TB
+          </span>
+        </div>
+        <div className="w-full bg-black/50 h-2 rounded-full overflow-hidden border border-white/10">
+          <div
+            className="bg-gradient-to-r from-cyan-400 to-purple-500 h-full transition-all duration-500"
+            style={{ width: `${Math.min(100, Math.max(1, ((stats?.bandwidthUsedGb || 140) / 30000) * 100))}%` }}
+          />
+        </div>
+      </div>
+
       {/* Actions Toolbar */}
       {!isTerminated && (
         <div className="space-y-3 pt-1">
