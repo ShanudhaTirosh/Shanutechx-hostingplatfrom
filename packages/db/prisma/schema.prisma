@@ -505,6 +505,13 @@ model Deployment {
   exposureMode    String    @default("ssl_with_proxy") // ssl_with_proxy | ssl_direct | no_ssl
   publishedPort   Int?      // Direct host port mapping for no_ssl / direct TCP exposure
 
+  // GitHub private repository & auto-deployment commit metadata fields
+  githubTokenEncrypted String?   // Encrypted GitHub Personal Access Token (PAT) for private repos
+  gitCommitHash        String?   // Latest deployed git commit SHA
+  gitCommitMessage     String?   // Latest deployed git commit message
+  autoDeploy           Boolean   @default(true) // Autonomous deploy on git push
+  webHostingType       String?   // static | node | python | fullstack
+
   uptimeChecks    UptimeCheck[]
   customDomains   CustomDomain[]
 }

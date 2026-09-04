@@ -205,7 +205,70 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
       },
     });
 
-    // 4. Ensure Primary Compute Node exists with all tags for local & deployment hosting
+    // 4. Static & Dynamic Web Hosting (GitHub Auto-Deploy & Free Auto-SSL)
+    let webHostingProduct = await prisma.product.findFirst({ where: { category: 'web_hosting' } });
+    if (!webHostingProduct) {
+      webHostingProduct = await prisma.product.create({
+        data: {
+          category: 'web_hosting',
+          name: 'Static & Dynamic Web Hosting',
+          slug: 'web-hosting',
+          description: 'High-speed cloud web hosting with GitHub auto-deployment (Public & Private repos), free SSL certificates, custom domains, and automatic commit detection.',
+          isActive: true,
+          plans: {
+            create: [
+              {
+                name: 'Starter Web Hosting (1GB)',
+                price: 85000, // LKR 850.00 / mo
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: {
+                  storageGB: 1,
+                  bandwidthGB: 100,
+                  customDomain: true,
+                  autoSsl: true,
+                  gitAutoDeploy: true,
+                  features: ['1 GB High-Speed NVMe', '100 GB Bandwidth', 'GitHub Public & Private Deploy', 'Automatic Git Push Deployment', 'Free Auto SSL'],
+                },
+                isActive: true,
+              },
+              {
+                name: 'Pro Web Hosting (5GB)',
+                price: 195000, // LKR 1,950.00 / mo
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: {
+                  storageGB: 5,
+                  bandwidthGB: 500,
+                  customDomain: true,
+                  autoSsl: true,
+                  gitAutoDeploy: true,
+                  features: ['5 GB High-Speed NVMe', '500 GB Bandwidth', 'Multiple Custom Domains', 'GitHub Public & Private Deploy', 'Automatic Git Push Deployment', 'Free Auto SSL'],
+                },
+                isActive: true,
+              },
+              {
+                name: 'Enterprise Web Hosting (20GB)',
+                price: 450000, // LKR 4,500.00 / mo
+                currency: 'LKR',
+                billingType: 'monthly',
+                specsJson: {
+                  storageGB: 20,
+                  bandwidthGB: 2000,
+                  customDomain: true,
+                  autoSsl: true,
+                  gitAutoDeploy: true,
+                  features: ['20 GB High-Speed NVMe', '2 TB Bandwidth', 'Unlimited Custom Domains', 'GitHub Public & Private Deploy', 'Automatic Git Push Deployment', 'Dedicated Priority Node Isolation'],
+                },
+                isActive: true,
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    // 5. Ensure Primary Compute Node exists with all tags for local & deployment hosting
     const nodeCount = await prisma.node.count().catch(() => 0);
     if (nodeCount === 0) {
       await prisma.node.create({

@@ -147,6 +147,8 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
   >([]);
   const [loadingRepos, setLoadingRepos] = useState(false);
 
+  const [gitToken, setGitToken] = useState("");
+  const [autoDeploy, setAutoDeploy] = useState(true);
   const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("main");
   const [customGitUrl, setCustomGitUrl] = useState("");
@@ -304,6 +306,8 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
             gitProvider !== "custom"
               ? selectedAccountId || undefined
               : undefined,
+          gitToken: gitToken.trim() || undefined,
+          autoDeploy,
           preferredName,
           customSubdomain: customSubdomain.trim() || undefined,
           internalPort: Number(internalPort),
@@ -321,6 +325,7 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
       );
       setRepoUrl("");
       setPreferredName("");
+      setGitToken("");
       setCustomSubdomain(generateRandomSubdomain());
       toast("Deployment created & live!", "success");
       onDeployed();
@@ -562,6 +567,39 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
           />
         </div>
 
+        <div className="grid md:grid-cols-2 gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+          <Input
+            type="password"
+            label="GitHub Access Token (PAT) — Optional"
+            placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+            value={gitToken}
+            onChange={(e) => setGitToken(e.target.value)}
+            hint="Required for private Git repositories if account OAuth is not connected. Encrypted securely."
+          />
+          <div className="flex flex-col justify-center gap-1.5">
+            <label className="text-xs font-medium text-text-muted">
+              Continuous Integration &amp; Auto-Deployment
+            </label>
+            <label className="flex items-center gap-3 p-2.5 rounded-xl bg-black/40 border border-white/10 cursor-pointer hover:border-white/20 transition-all">
+              <input
+                type="checkbox"
+                checked={autoDeploy}
+                onChange={(e) => setAutoDeploy(e.target.checked)}
+                className="h-4 w-4 rounded border-white/20 bg-black/60 text-accent-teal focus:ring-0 focus:ring-offset-0"
+              />
+              <div>
+                <span className="text-xs font-semibold text-white block flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  ⚡ Auto-Deploy on Push
+                </span>
+                <span className="text-[11px] text-text-muted block">
+                  Rebuild container automatically when new commits hit branch &apos;{branch || "main"}&apos;
+                </span>
+              </div>
+            </label>
+          </div>
+        </div>
+
         <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-4">
           <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
             Advanced Bot &amp; Container Settings
@@ -745,6 +783,18 @@ function DeploymentRow({
             {deployment.customDomain && (
               <span className="text-[10px] rounded-full px-2 py-0.5 bg-accent-teal/10 text-accent-teal-bright font-medium">
                 {deployment.customDomain}
+              </span>
+            )}
+            {deployment.gitCommitHash && (
+              <span className="text-[10px] rounded-full px-2.5 py-0.5 bg-purple-500/15 text-purple-300 border border-purple-500/30 font-mono flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
+                Git: {deployment.gitCommitHash} {deployment.gitCommitMessage ? `(${deployment.gitCommitMessage})` : ''}
+              </span>
+            )}
+            {deployment.autoDeploy !== undefined && (
+              <span className={`text-[10px] rounded-full px-2.5 py-0.5 font-medium flex items-center gap-1 ${deployment.autoDeploy ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-white/5 text-text-muted border border-white/10'}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${deployment.autoDeploy ? 'bg-emerald-400 animate-pulse' : 'bg-text-muted'}`} />
+                {deployment.autoDeploy ? '⚡ Auto-Deploy Active' : 'Manual Deploy'}
               </span>
             )}
             {deployment.exposureMode && (

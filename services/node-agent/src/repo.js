@@ -49,6 +49,9 @@ async function prepareWorkspace(deploymentId, repoUrl, branch = 'main', remoteBa
   }
 
   if (fs.existsSync(path.join(dir, '.git'))) {
+    if (repoUrl && !repoUrl.startsWith('zip://') && !repoUrl.startsWith('upload://')) {
+      await run('git', ['remote', 'set-url', 'origin', repoUrl], { cwd: dir }).catch(() => {});
+    }
     await run('git', ['fetch', '--depth', '1', 'origin', branch], { cwd: dir }).catch(() => {});
     await run('git', ['reset', '--hard', `origin/${branch}`], { cwd: dir }).catch(() => {});
   } else if (repoUrl && !repoUrl.startsWith('zip://') && !repoUrl.startsWith('upload://')) {

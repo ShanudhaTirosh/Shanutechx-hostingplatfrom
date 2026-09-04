@@ -380,6 +380,40 @@ export default function ServicesPage() {
                             </span>
                           </div>
                         )}
+
+                        {/* Web Hosting Specs */}
+                        {product.category === 'web_hosting' && (
+                          <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono text-purple-300 pt-1">
+                            <span className="inline-flex items-center gap-1">
+                              <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                              </svg>
+                              {specs.storageGb || 5}GB NVMe SSD
+                            </span>
+                            <span className="text-white/20">•</span>
+                            <span className="inline-flex items-center gap-1 text-cyan-300">
+                              <svg className="w-3 h-3 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              </svg>
+                              {specs.bandwidthGb ? `${specs.bandwidthGb}GB` : '100GB'} Bandwidth
+                            </span>
+                            <span className="text-white/20">•</span>
+                            <span className="inline-flex items-center gap-1 text-amber-300">
+                              <svg className="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m-9 9a9 9 0 019-9" />
+                              </svg>
+                              {specs.domainsCount === -1 ? '∞ Domains' : `${specs.domainsCount || 1} Domain${(specs.domainsCount || 1) !== 1 ? 's' : ''}`}
+                            </span>
+                            {specs.gitAutoDeploy && (
+                              <>
+                                <span className="text-white/20">•</span>
+                                <span className="inline-flex items-center gap-1 text-emerald-300 font-bold">
+                                  ⚡ GitHub Auto-Deploy
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <Button
                         onClick={() => handleAddToCart(plan.id, `${product.name} — ${plan.name}`)}

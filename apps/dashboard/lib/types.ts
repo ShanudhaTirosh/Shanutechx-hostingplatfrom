@@ -121,6 +121,7 @@ export interface CustomDomain {
 export interface Deployment {
   id: string;
   repoUrl: string | null;
+  branch?: string | null;
   subdomain: string | null;
   status: DeploymentStatus;
   containerId: string | null;
@@ -134,6 +135,10 @@ export interface Deployment {
   frameworkPreset?: string | null;
   exposureMode?: string | null;
   publishedPort?: number | null;
+  gitCommitHash?: string | null;
+  gitCommitMessage?: string | null;
+  autoDeploy?: boolean;
+  hasGitToken?: boolean;
 }
 
 export interface Node {

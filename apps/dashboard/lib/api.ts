@@ -467,6 +467,7 @@ export const api = {
         gitProvider?: 'github' | 'gitlab' | 'custom';
         gitAccountId?: string;
         gitToken?: string;
+        autoDeploy?: boolean;
         startCommand?: string;
         entryFile?: string;
         exposureMode?: string;
@@ -498,6 +499,11 @@ export const api = {
         }
       }
     },
+    updateGitSettings: (id: string, data: { gitToken?: string; autoDeploy?: boolean }) =>
+      apiFetch(`/api/deployments/${id}/git-settings`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }).then((r) => asJson<{ deployment: Deployment }>(r)),
   },
 
   domains: {

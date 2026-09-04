@@ -397,6 +397,7 @@ deploymentsRouter.get('/deployments/:id', async (req: AuthedRequest, res) => {
       userId: deployment.userId,
       nodeId: deployment.nodeId,
       repoUrl: redactRepoUrl(deployment.repoUrl),
+      branch: deployment.branch,
       subdomain: deployment.subdomain,
       internalPort: deployment.internalPort,
       status: deployment.status,
@@ -405,6 +406,10 @@ deploymentsRouter.get('/deployments/:id', async (req: AuthedRequest, res) => {
       storageLimit: deployment.storageLimit,
       createdAt: deployment.createdAt,
       lastDeployAt: deployment.lastDeployAt,
+      gitCommitHash: deployment.gitCommitHash,
+      gitCommitMessage: deployment.gitCommitMessage,
+      autoDeploy: deployment.autoDeploy,
+      hasGitToken: Boolean(deployment.githubTokenEncrypted),
     },
     envVars,
     resourceUsage,
@@ -1087,4 +1092,43 @@ deploymentsRouter.patch('/deployments/:id/env', async (req: AuthedRequest, res) 
       message: 'Environment variables updated. Changes will apply on next deployment start.',
     });
   }
+});
+
+const updateGitSettingsSchema = z.object({
+  branch: z.string().regex(/^[a-zA-Z0-9_\-\/\.]+$/, 'Invalid branch name').max(100).optional(),
+  gitToken: z.string().optional(),
+  autoDeploy: z.boolean().optional(),
+});
+
+/**
+ * PATCH /api/deployments/:id/git-settings
+ * Updates Git repository configuration: tracked branch, private access token, and auto-deploy on push toggle.
+ */
+deploymentsRouter.patch('/deployments/:id/git-settings', async (req: AuthedRequest, res) => {
+  const deployment = await loadOwnedDeployment(req, req.params.id);
+  if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
+
+  const parsed = updateGitSettingsSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const dataToUpdate: Record<string, any> = {};
+  if (parsed.data.branch !== undefined) dataToUpdate.branch = parsed.data.branch;
+  if (parsed.data.autoDeploy !== undefined) dataToUpdate.autoDeploy = parsed.data.autoDeploy;
+  if (parsed.data.gitToken !== undefined) {
+    dataToUpdate.githubTokenEncrypted = parsed.data.gitToken
+      ? encryptSecret(parsed.data.gitToken, env.secretsEncryptionKey)
+      : null;
+  }
+
+  const updated = await prisma.deployment.update({
+    where: { id: deployment.id },
+    data: dataToUpdate,
+  });
+
+  res.json({
+    ok: true,
+    branch: updated.branch,
+    autoDeploy: updated.autoDeploy,
+    hasGitToken: Boolean(updated.githubTokenEncrypted),
+  });
 });

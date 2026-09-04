@@ -130,6 +130,11 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
     return res.status(401).json({ error: 'Invalid webhook signature' });
   }
 
+  if (deployment.autoDeploy === false) {
+    logger.info({ deploymentId: deployment.id }, 'Auto-deploy disabled for this deployment');
+    return res.status(200).json({ accepted: false, reason: 'Auto-deploy on push is disabled for this deployment' });
+  }
+
   // Only redeploy on a push to the branch this deployment actually tracks
   // (or any branch if none is recorded) — a push to an unrelated branch in
   // the same repo shouldn't trigger a rebuild.
@@ -141,10 +146,29 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
     return res.status(200).json({ accepted: false, reason: `Ignored push to branch '${pushedBranch}'; deployment tracks '${deployment.branch}'` });
   }
 
+  // Extract commit details from payload
+  const headCommit = req.body?.head_commit || (Array.isArray(req.body?.commits) ? req.body.commits[0] : null);
+  const commitHash = headCommit?.id ? String(headCommit.id).slice(0, 7) : undefined;
+  const commitMessage = headCommit?.message ? String(headCommit.message).split('\n')[0].slice(0, 255) : undefined;
+
   // Ack immediately — GitHub/GitLab expect a fast 2xx and will retry/flag
   // the webhook as failing if the build (which can take a while) blocks
   // the response.
-  res.status(202).json({ accepted: true, branch: pushedBranch ?? '(default)' });
+  res.status(202).json({ accepted: true, branch: pushedBranch ?? '(default)', commitHash });
+
+  // Resolve private git repo token if present
+  let effectiveRepoUrl = deployment.repoUrl!;
+  if (deployment.githubTokenEncrypted) {
+    try {
+      const { decryptSecret } = await import('../lib/secretsVault');
+      const { env } = await import('../env');
+      const decryptedToken = decryptSecret(deployment.githubTokenEncrypted, env.secretsEncryptionKey);
+      const urlObj = new URL(deployment.repoUrl!);
+      effectiveRepoUrl = `https://x-access-token:${decryptedToken}@${urlObj.hostname}${urlObj.pathname}`;
+    } catch (tokenErr) {
+      logger.warn({ deploymentId: deployment.id, err: tokenErr }, 'Failed to decrypt github token for webhook deployment');
+    }
+  }
 
   // Fire the actual rebuild in the background.
   void (async () => {
@@ -154,7 +178,7 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
         deployment.node,
         {
           deploymentId: deployment.id,
-          repoUrl: deployment.repoUrl!,
+          repoUrl: effectiveRepoUrl,
           branch: pushedBranch,
           subdomain: deployment.subdomain ?? undefined,
           internalPort: deployment.internalPort!,
@@ -167,6 +191,7 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
         void notifyDiscordChannel('deployment_failed', {
           Deployment: deployment.id,
           Branch: pushedBranch ?? '(default)',
+          Commit: commitHash ?? 'N/A',
           Error: result.message,
         });
         return;
@@ -174,7 +199,13 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
 
       await prisma.deployment.update({
         where: { id: deployment.id },
-        data: { status: 'running', containerId: result.containerId, lastDeployAt: new Date() },
+        data: {
+          status: 'running',
+          containerId: result.containerId,
+          lastDeployAt: new Date(),
+          ...(commitHash ? { gitCommitHash: commitHash } : {}),
+          ...(commitMessage ? { gitCommitMessage: commitMessage } : {}),
+        },
       });
     } catch (err: any) {
       logger.error({ err, deploymentId: deployment.id }, 'Webhook-triggered redeploy failed');
