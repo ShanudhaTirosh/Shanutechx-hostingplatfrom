@@ -40,7 +40,7 @@ cmsRouter.get('/cms/contact-info', async (_req, res) => {
         companyName: content.companyName ?? 'ShanuTechX Cloud',
         heroTitle: content.heroTitle ?? 'Autonomous High-Performance Cloud Hosting',
         heroSubtitle: content.heroSubtitle ?? 'Deploy web apps, Node.js and Python services, and Discord bots in minutes.',
-        announcementText: content.announcementText ?? '🚀 New VPS High-Performance Nodes Online in Ashburn & Frankfurt!',
+        announcementText: content.announcementText ?? 'New VPS High-Performance Nodes Online in Ashburn & Frankfurt!',
         announcementActive: content.announcementActive ?? true,
         copyrightText: content.copyrightText ?? `© ${new Date().getFullYear()} ShanuTechX Cloud. All rights reserved.`,
       };

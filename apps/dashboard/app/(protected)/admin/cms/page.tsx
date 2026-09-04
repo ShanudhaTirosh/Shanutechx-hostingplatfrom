@@ -262,7 +262,11 @@ export default function AdminCmsPage() {
         <form onSubmit={handleSave} className="space-y-4 animate-fade-in">
           <Card className="border border-white/[0.06] space-y-4">
             <h2 className="font-semibold text-sm text-text-primary flex items-center gap-2">
-              <span className="h-6 w-6 rounded-lg bg-indigo-500/15 text-indigo-300 font-bold text-xs flex items-center justify-center">💬</span>
+              <span className="h-6 w-6 rounded-lg bg-indigo-500/15 text-indigo-300 flex items-center justify-center">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </span>
               Community &amp; Social Platform Links
             </h2>
 
@@ -334,7 +338,11 @@ export default function AdminCmsPage() {
         <form onSubmit={handleSave} className="space-y-4 animate-fade-in">
           <Card className="border border-white/[0.06] space-y-4">
             <h2 className="font-semibold text-sm text-text-primary flex items-center gap-2">
-              <span className="h-6 w-6 rounded-lg bg-violet-500/15 text-violet-300 font-bold text-xs flex items-center justify-center">✨</span>
+              <span className="h-6 w-6 rounded-lg bg-violet-500/15 text-violet-300 flex items-center justify-center">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+              </span>
               Branding &amp; Hero Content
             </h2>
 
@@ -366,7 +374,11 @@ export default function AdminCmsPage() {
 
           <Card className="border border-white/[0.06] space-y-4">
             <h2 className="font-semibold text-sm text-text-primary flex items-center gap-2">
-              <span className="h-6 w-6 rounded-lg bg-amber-500/15 text-amber-300 font-bold text-xs flex items-center justify-center">📢</span>
+              <span className="h-6 w-6 rounded-lg bg-amber-500/15 text-amber-300 flex items-center justify-center">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                </svg>
+              </span>
               Top Announcement Bar
             </h2>
 
@@ -375,7 +387,7 @@ export default function AdminCmsPage() {
               type="text"
               value={announcementText}
               onChange={(e) => setAnnouncementText(e.target.value)}
-              placeholder="🚀 New VPS High-Performance Nodes Online in Ashburn & Frankfurt!"
+              placeholder="New VPS High-Performance Nodes Online in Ashburn & Frankfurt!"
             />
 
             <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">

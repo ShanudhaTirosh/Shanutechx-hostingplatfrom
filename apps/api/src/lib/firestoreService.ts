@@ -59,7 +59,7 @@ const DEFAULT_CONTACT_INFO = {
   companyName: 'ShanuTechX Cloud',
   heroTitle: 'Autonomous High-Performance Cloud Hosting',
   heroSubtitle: 'Deploy web apps, Node.js and Python services, and Discord bots in minutes.',
-  announcementText: '🚀 New VPS High-Performance Nodes Online in Ashburn & Frankfurt!',
+  announcementText: 'New VPS High-Performance Nodes Online in Ashburn & Frankfurt!',
   announcementActive: true,
   copyrightText: `© ${new Date().getFullYear()} ShanuTechX Cloud. All rights reserved.`,
 };
