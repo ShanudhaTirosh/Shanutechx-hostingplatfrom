@@ -125,7 +125,8 @@ export async function deployService(params: DeployParams) {
 
   try {
     if (subdomain) {
-      await createSubdomainRecord(subdomain, node.ip);
+      const isProxied = deployment.exposureMode === 'ssl_with_proxy';
+      await createSubdomainRecord(subdomain, node.ip, isProxied);
     }
 
     const result = await buildAndRun(

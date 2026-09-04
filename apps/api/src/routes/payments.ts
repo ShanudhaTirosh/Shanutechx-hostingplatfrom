@@ -86,24 +86,33 @@ paymentsRouter.post(
   }
 );
 
-/** Admin queue of payments awaiting human review. */
+/** Admin queue & history of payments with status filtering. */
 paymentsRouter.get('/payments/review-queue', requireAdmin, async (req: AuthedRequest, res) => {
   const { take, skip } = parsePagination(req.query);
   const visibility = await paymentReviewVisibilityWhere(req);
-  const where = { status: 'manual_review' as const, ...visibility };
+  
+  const statusParam = typeof req.query.status === 'string' ? req.query.status.trim() : 'manual_review';
+  const validStatuses = ['pending', 'manual_review', 'manually_approved', 'auto_approved', 'rejected'];
+  const statusWhere = statusParam === 'all'
+    ? {}
+    : validStatuses.includes(statusParam)
+      ? { status: statusParam as any }
+      : { status: 'manual_review' as const };
+
+  const where = { ...statusWhere, ...visibility };
 
   const [payments, total] = await Promise.all([
     prisma.payment.findMany({
       where,
-      include: { order: { include: { user: true } } },
-      orderBy: { createdAt: 'asc' },
+      include: { order: { include: { user: true } }, reviewedBy: true },
+      orderBy: { createdAt: 'desc' },
       take,
       skip,
     }),
     prisma.payment.count({ where }),
   ]);
 
-  res.json({ payments, total, take, skip });
+  res.json({ payments, total, take, skip, statusFilter: statusParam });
 });
 
 const reviewSchema = z

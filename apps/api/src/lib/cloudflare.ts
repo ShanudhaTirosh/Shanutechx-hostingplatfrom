@@ -20,7 +20,7 @@ function headers() {
  * through Cloudflare's proxy in "Full" mode), so SSL works at any subdomain
  * depth without needing Cloudflare's paid wildcard cert product.
  */
-export async function createSubdomainRecord(subdomain: string, nodeIp: string) {
+export async function createSubdomainRecord(subdomain: string, nodeIp: string, proxied: boolean = true) {
   const res = await fetch(`${CF_API_BASE}/zones/${env.cloudflareZoneId}/dns_records`, {
     method: 'POST',
     headers: headers(),
@@ -28,8 +28,8 @@ export async function createSubdomainRecord(subdomain: string, nodeIp: string) {
       type: 'A',
       name: `${subdomain}.${env.rootDomain}`,
       content: nodeIp,
-      proxied: true,
-      ttl: 1, // automatic, only meaningful when proxied=false but harmless here
+      proxied,
+      ttl: 1, // automatic when proxied=true, 300 when proxied=false
     }),
   });
 
