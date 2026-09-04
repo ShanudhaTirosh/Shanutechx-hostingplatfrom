@@ -170,11 +170,16 @@ adminRouter.patch('/admin/staff/:userId/role', async (req: AuthedRequest, res) =
   const target = await prisma.user.findUnique({ where: { id: req.params.userId } });
   if (!target) return res.status(404).json({ error: 'User not found' });
 
-  // Protect the dev role: only the dev user can assign or change the dev user role.
-  // Regular admins are blocked.
-  if ((target.role === 'dev' || parsed.data.role === 'dev') && req.user!.role !== 'dev') {
+  // Protect the dev role: no one can demote a dev user account.
+  if (target.role === 'dev' && parsed.data.role !== 'dev') {
     return res.status(403).json({
-      error: 'Only the platform dev account can assign or change the dev user role.',
+      error: 'Developer accounts cannot be demoted to a lower role.',
+    });
+  }
+
+  if (parsed.data.role === 'dev' && req.user!.role !== 'dev') {
+    return res.status(403).json({
+      error: 'Only the platform dev account can assign the dev user role.',
     });
   }
 

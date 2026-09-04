@@ -87,7 +87,7 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
       { href: '/orders', label: 'Orders & Invoices', icon: 'orders' },
       { href: '/billing', label: 'Subscriptions', icon: 'billing' },
       { href: '/deployments', label: 'Deployments', icon: 'deployments' },
-      { href: '/email', label: 'Shared SMTP & Webmail', icon: 'smtp' },
+      { href: '/email', label: 'Business Email & Webmail', icon: 'smtp' },
       { href: '/vps', label: 'VPS', icon: 'vps' },
       { href: '/tickets', label: 'Support', icon: 'tickets' },
       { href: '/knowledgebase', label: 'Knowledge Base', icon: 'knowledgebase' },
@@ -107,7 +107,7 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
       { href: '/admin/review-queue', label: 'Payment Review', icon: 'review' },
       { href: '/admin/customers', label: 'Customers', icon: 'customers' },
       { href: '/admin/services', label: 'Products & Plans', icon: 'services' },
-      { href: '/admin/email', label: 'Shared SMTP Manager', icon: 'smtp' },
+      { href: '/admin/email', label: 'Business Email & SMTP Host', icon: 'smtp' },
       { href: '/admin/staff', label: 'Staff Directory', icon: 'staff' },
       { href: '/admin/analytics', label: 'Analytics', icon: 'analytics' },
       { href: '/admin/cms', label: 'Site Content', icon: 'cms' },
@@ -366,31 +366,40 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <div className="min-w-0 flex-1">
               <p className="text-xs text-text-primary font-medium truncate">{apiUser.email}</p>
               <div className="flex items-center gap-1 mt-0.5">
-                <select
-                  value={apiUser.role}
-                  onChange={async (e) => {
-                    const newRole = e.target.value as any;
-                    try {
-                      await switchRole(newRole);
-                    } catch {}
-                  }}
-                  className="text-[10px] capitalize font-semibold tracking-wide bg-white/5 border border-white/10 rounded px-1.5 py-0.5 cursor-pointer focus:outline-none focus:border-accent-teal"
-                  style={{
-                    color:
-                      apiUser.role === 'admin'
-                        ? '#f59e0b'
-                        : apiUser.role === 'dev'
-                        ? '#a855f7'
-                        : apiUser.role === 'support'
-                        ? '#06b6d4'
-                        : '#10b981',
-                  }}
-                >
-                  <option value="dev" className="bg-[#0a0a14] text-violet-400">Dev Account</option>
-                  <option value="admin" className="bg-[#0a0a14] text-amber-400">Admin Account</option>
-                  <option value="support" className="bg-[#0a0a14] text-cyan-400">Support Account</option>
-                  <option value="customer" className="bg-[#0a0a14] text-emerald-400">Customer Account</option>
-                </select>
+                {apiUser.role === 'dev' ? (
+                  <span
+                    className="text-[10px] font-semibold uppercase tracking-wider bg-accent-violet/20 text-accent-violet-light border border-accent-violet/30 rounded px-2 py-0.5 inline-flex items-center gap-1"
+                    title="Developer accounts cannot be demoted"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    Dev Account (Protected)
+                  </span>
+                ) : (
+                  <select
+                    value={apiUser.role}
+                    onChange={async (e) => {
+                      const newRole = e.target.value as any;
+                      try {
+                        await switchRole(newRole);
+                      } catch {}
+                    }}
+                    className="text-[10px] capitalize font-semibold tracking-wide bg-white/5 border border-white/10 rounded px-1.5 py-0.5 cursor-pointer focus:outline-none focus:border-accent-teal"
+                    style={{
+                      color:
+                        apiUser.role === 'admin'
+                          ? '#f59e0b'
+                          : apiUser.role === 'support'
+                          ? '#06b6d4'
+                          : '#10b981',
+                    }}
+                  >
+                    <option value="admin" className="bg-[#0a0a14] text-amber-400">Admin Account</option>
+                    <option value="support" className="bg-[#0a0a14] text-cyan-400">Support Account</option>
+                    <option value="customer" className="bg-[#0a0a14] text-emerald-400">Customer Account</option>
+                  </select>
+                )}
               </div>
             </div>
           </div>

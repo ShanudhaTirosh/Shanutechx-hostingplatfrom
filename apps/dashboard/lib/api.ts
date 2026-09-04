@@ -181,6 +181,13 @@ export const api = {
       apiFetch(`/api/cms/${page}`, { method: 'PUT', body: JSON.stringify({ blocks }) }).then((r) =>
         asJson<{ page: string; content: Record<string, any> }>(r)
       ),
+    getContactInfo: () => apiFetch('/api/cms/contact-info').then((r) => asJson<Record<string, any>>(r)),
+    getSubmissions: () => apiFetch('/api/admin/cms/submissions').then((r) => asJson<{ submissions: any[] }>(r)),
+    deleteSubmission: (key: string) => apiFetch(`/api/admin/cms/submissions/${key}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+  },
+
+  analytics: {
+    get: (range: string = '30d') => apiFetch(`/api/admin/analytics?range=${range}`).then((r) => asJson<any>(r)),
   },
 
   services: {
@@ -976,10 +983,6 @@ export const api = {
       ),
     deploymentUptime: (id: string) =>
       apiFetch(`/api/deployments/${id}/uptime`).then((r) => asJson<{ checks: any[]; uptimePct: number | null }>(r)),
-  },
-
-  analytics: {
-    get: () => apiFetch('/api/admin/analytics').then((r) => asJson<Record<string, any>>(r)),
   },
 
   managedDatabases: {

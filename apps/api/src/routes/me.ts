@@ -76,6 +76,10 @@ meRouter.patch('/me/role', requireAuth, async (req: AuthedRequest, res) => {
   const parsed = updateRoleSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
+  if (req.user!.role === 'dev' && parsed.data.role !== 'dev') {
+    return res.status(403).json({ error: 'Developer accounts cannot be demoted.' });
+  }
+
   const updatedUser = await prisma.user.update({
     where: { id: req.user!.id },
     data: { role: parsed.data.role },

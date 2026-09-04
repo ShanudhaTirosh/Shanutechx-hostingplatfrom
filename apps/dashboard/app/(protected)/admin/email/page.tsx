@@ -117,13 +117,13 @@ export default function AdminEmailPage() {
     }
   }
 
-  if (loading) return <Spinner label="Loading Admin Shared SMTP Manager..." />;
+  if (loading) return <Spinner label="Loading Business Email & SMTP Host Manager..." />;
 
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title="Admin Shared SMTP & Email Service Manager"
-        description="Monitor mail relay nodes, provision customer email accounts, configure custom resource quotas, and assign limits."
+        title="Business Email & SMTP Host Manager"
+        description="Monitor mail relay nodes, provision corporate mail accounts, configure custom resource quotas, and assign limits."
         action={
           <Button size="sm" onClick={() => setShowProvisionModal(true)}>
             + Provision Mail Account

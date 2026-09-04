@@ -110,18 +110,22 @@ export function Input({ label, error, hint, className = '', id, ...props }: Inpu
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
+  hint?: string;
 }
-export function Textarea({ label, error, className = '', ...props }: TextareaProps) {
+export function Textarea({ label, error, hint, className = '', id, ...props }: TextareaProps) {
+  const textareaId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
   return (
     <div className="flex flex-col gap-1.5">
-      {label && <label className="text-xs font-medium text-text-muted">{label}</label>}
+      {label && <label htmlFor={textareaId} className="text-xs font-medium text-text-muted">{label}</label>}
       <textarea
+        id={textareaId}
         className={`w-full bg-white/5 border rounded-xl px-4 py-2.5 text-sm placeholder:text-text-faint focus:outline-none transition-colors resize-none ${
           error ? 'border-red-500/40 focus:border-red-500/60' : 'border-white/10 focus:border-accent-violet/50 focus:bg-white/[0.07]'
         } ${className}`}
         {...props}
       />
       {error && <p className="text-xs text-red-400">{error}</p>}
+      {hint && !error && <p className="text-xs text-text-muted">{hint}</p>}
     </div>
   );
 }

@@ -113,31 +113,37 @@ function StaffRow({ member, onChanged, isDevUser }: { member: StaffMember; onCha
         {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
       </Td>
       <Td className="text-right">
-        <div className="inline-flex items-center gap-2">
-          {member.role !== 'admin' && (
-            <Button variant="secondary" size="sm" disabled={busy} onClick={() => handleChange('admin')}>
-              Make Admin
+        {member.role === 'dev' ? (
+          <span className="text-xs text-accent-violet-light font-mono italic bg-accent-violet/10 px-2.5 py-1 rounded-full border border-accent-violet/20">
+            Developer Account (Protected)
+          </span>
+        ) : (
+          <div className="inline-flex items-center gap-2">
+            {member.role !== 'admin' && (
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => handleChange('admin')}>
+                Make Admin
+              </Button>
+            )}
+            {member.role !== 'support' && member.role === 'admin' && (
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => handleChange('support')}>
+                Demote to Support
+              </Button>
+            )}
+            {member.role !== 'support' && member.role !== 'admin' && (
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => handleChange('support')}>
+                Make Support
+              </Button>
+            )}
+            {isDevUser && member.role !== 'dev' && (
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => handleChange('dev')}>
+                Make Dev
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" disabled={busy} className="hover:text-red-400" onClick={() => handleChange('customer')}>
+              Revoke Access
             </Button>
-          )}
-          {member.role !== 'support' && member.role === 'admin' && (
-            <Button variant="secondary" size="sm" disabled={busy} onClick={() => handleChange('support')}>
-              Demote to Support
-            </Button>
-          )}
-          {member.role !== 'support' && member.role !== 'admin' && (
-            <Button variant="secondary" size="sm" disabled={busy} onClick={() => handleChange('support')}>
-              Make Support
-            </Button>
-          )}
-          {isDevUser && member.role !== 'dev' && (
-            <Button variant="secondary" size="sm" disabled={busy} onClick={() => handleChange('dev')}>
-              Make Dev
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" disabled={busy} className="hover:text-red-400" onClick={() => handleChange('customer')}>
-            Revoke Access
-          </Button>
-        </div>
+          </div>
+        )}
       </Td>
     </Tr>
   );

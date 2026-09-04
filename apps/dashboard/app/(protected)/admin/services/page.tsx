@@ -545,7 +545,7 @@ export default function AdminProductsPage() {
 
           <Input
             label="Product Name"
-            placeholder="e.g. Enterprise Shared SMTP & Mail Hosting"
+            placeholder="e.g. Enterprise Business Email & SMTP Hosting"
             value={pName}
             onChange={(e) => setPName(e.target.value)}
             required
