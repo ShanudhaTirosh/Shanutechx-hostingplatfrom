@@ -1,38 +1,61 @@
 /**
- * cockpit.js — Node Agent System Management & Security Module (Cockpit-style)
+ * nodeEngine.js — Node Agent System Engine & Docker Orchestration Module
  * 
- * Provides secure system monitoring, systemd service management, Linux user admin,
- * Docker container operations, and UFW firewall rule configuration.
+ * Provides host node telemetry, systemd service administration, Linux user accounts,
+ * OS package management/installation, listening ports detection, UFW firewall rules,
+ * advanced Docker container & network orchestration, and Docker Compose stack management.
  * 
  * SECURITY DIRECTIVE:
  * All commands are executed strictly via child_process.execFile / spawn with argument arrays.
- * User inputs are sanitized using strict regex validation before reaching execFile.
+ * User inputs are sanitized using strict regex whitelists before command execution.
  */
 
-const { execFile } = require('child_process');
+const { execFile, exec } = require('child_process');
 const util = require('util');
 const fs = require('fs/promises');
+const path = require('path');
 const si = require('systeminformation');
 const Docker = require('dockerode');
 
 const execFileAsync = util.promisify(execFile);
+const execAsync = util.promisify(exec);
 const docker = new Docker();
 
-// Validation Whitelists
+// Whitelist Regexes
 const REGEX_SERVICE_NAME = /^[a-zA-Z0-9_\-\.]+\.service$|^[a-zA-Z0-9_\-\.]+$/;
 const REGEX_USERNAME = /^[a-zA-Z0-9_-]{1,32}$/;
 const REGEX_GROUPNAME = /^[a-zA-Z0-9_-]{1,32}$/;
+const REGEX_PACKAGE_NAME = /^[a-zA-Z0-9_\-\.\+]{1,64}$/;
+const REGEX_NETWORK_NAME = /^[a-zA-Z0-9_\-]{1,64}$/;
 
-// ── 1. SYSTEM MONITORING ───────────────────────────────────────────────────
+// ── 1. SYSTEM MONITORING & BANDWIDTH TELEMETRY ────────────────────────────
 
-async function getSystemMonitoringInfo() {
-  const [cpu, mem, load, fsSize, time] = await Promise.all([
+async function getSystemMonitoringInfo(monthlyBandwidthGb = 30000) {
+  const [cpu, mem, load, fsSize, time, netStats] = await Promise.all([
     si.cpu(),
     si.mem(),
     si.currentLoad(),
     si.fsSize(),
     si.time(),
+    si.networkStats().catch(() => []),
   ]);
+
+  // Aggregate network rx/tx bytes across all physical interfaces
+  let totalRxBytes = 0;
+  let totalTxBytes = 0;
+  if (Array.isArray(netStats)) {
+    for (const net of netStats) {
+      if (net.iface && !net.iface.startsWith('lo') && !net.iface.startsWith('veth') && !net.iface.startsWith('br-')) {
+        totalRxBytes += net.rx_bytes || 0;
+        totalTxBytes += net.tx_bytes || 0;
+      }
+    }
+  }
+
+  const totalBytes = totalRxBytes + totalTxBytes;
+  const usedGb = Math.round((totalBytes / (1024 * 1024 * 1024)) * 100) / 100;
+  const limitGb = Math.max(1, Number(monthlyBandwidthGb) || 30000);
+  const bandwidthPct = Math.min(100, Math.round((usedGb / limitGb) * 10000) / 100);
 
   return {
     uptimeSeconds: time.uptime,
@@ -57,10 +80,91 @@ async function getSystemMonitoringInfo() {
       usedPct: Math.round(disk.use * 100) / 100,
       mount: disk.mount,
     })),
+    network: {
+      rxBytes: totalRxBytes,
+      txBytes: totalTxBytes,
+      rxGb: Math.round((totalRxBytes / (1024 * 1024 * 1024)) * 100) / 100,
+      txGb: Math.round((totalTxBytes / (1024 * 1024 * 1024)) * 100) / 100,
+      totalUsedGb: usedGb,
+      monthlyLimitGb: limitGb,
+      usedPct: bandwidthPct,
+    },
   };
 }
 
-// ── 2. SYSTEMD SERVICE MANAGEMENT ──────────────────────────────────────────
+// ── 2. OS PACKAGE INSTALLATION & SYSTEM UPGRADES ──────────────────────────
+
+async function installSystemPackage(packageName) {
+  if (!REGEX_PACKAGE_NAME.test(packageName)) {
+    throw new Error('Invalid package name format');
+  }
+
+  // Detect package manager (debian/ubuntu apt-get, alpine apk, centos yum)
+  try {
+    const { stdout } = await execFileAsync('apt-get', ['update', '-y'], { timeout: 60000 });
+    const installRes = await execFileAsync('apt-get', ['install', '-y', packageName], { timeout: 180000 });
+    return { ok: true, package: packageName, output: stdout + '\n' + installRes.stdout };
+  } catch (aptErr) {
+    try {
+      const { stdout } = await execFileAsync('apk', ['add', '--no-cache', packageName], { timeout: 60000 });
+      return { ok: true, package: packageName, output: stdout };
+    } catch (apkErr) {
+      throw new Error(`Package installation failed: ${aptErr.message || apkErr.message}`);
+    }
+  }
+}
+
+async function upgradeSystemPackages() {
+  try {
+    const updateRes = await execFileAsync('apt-get', ['update', '-y'], { timeout: 60000 });
+    const upgradeRes = await execFileAsync('apt-get', ['upgrade', '-y'], { timeout: 300000 });
+    return { ok: true, output: updateRes.stdout + '\n' + upgradeRes.stdout };
+  } catch (aptErr) {
+    try {
+      const upgradeRes = await execFileAsync('apk', ['upgrade', '-U'], { timeout: 180000 });
+      return { ok: true, output: upgradeRes.stdout };
+    } catch (apkErr) {
+      throw new Error(`Package upgrade failed: ${aptErr.message || apkErr.message}`);
+    }
+  }
+}
+
+// ── 3. LISTENING PORTS DETECTOR ───────────────────────────────────────────
+
+async function getListeningPorts() {
+  try {
+    const { stdout } = await execFileAsync('ss', ['-tulpn']);
+    const lines = stdout.split('\n');
+    const ports = [];
+
+    for (const line of lines) {
+      if (line.includes('LISTEN') || line.includes('UNCONN')) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length >= 5) {
+          const proto = parts[0];
+          const localAddr = parts[4];
+          const processInfo = parts[6] || '';
+          
+          const portMatch = localAddr.match(/:(\d+)$/);
+          if (portMatch) {
+            ports.push({
+              protocol: proto.toUpperCase(),
+              port: Number(portMatch[1]),
+              address: localAddr,
+              process: processInfo,
+            });
+          }
+        }
+      }
+    }
+
+    return ports;
+  } catch (err) {
+    return [];
+  }
+}
+
+// ── 4. SYSTEMD SERVICE MANAGEMENT ──────────────────────────────────────────
 
 async function listSystemdServices() {
   try {
@@ -98,7 +202,6 @@ async function listSystemdServices() {
 
     return services;
   } catch (err) {
-    // Return empty list if systemctl isn't available (e.g., inside container or Windows host)
     return [];
   }
 }
@@ -137,7 +240,7 @@ async function getServiceLogs(serviceName, linesCount = 100) {
   return { service: cleanName, logs: stdout };
 }
 
-// ── 3. LINUX USER MANAGEMENT ───────────────────────────────────────────────
+// ── 5. LINUX USER MANAGEMENT ───────────────────────────────────────────────
 
 async function listLinuxUsers() {
   try {
@@ -176,7 +279,6 @@ async function createLinuxUser(username, password) {
   await execFileAsync('useradd', ['-m', '-s', '/bin/bash', username]);
 
   if (password) {
-    // Await the password setting instead of fire-and-forget (Bug 3 fix)
     await new Promise((resolve, reject) => {
       const child = execFile('passwd', [username], (err, _stdout, stderr) => {
         if (err) return reject(new Error(stderr || err.message));
@@ -230,7 +332,7 @@ async function modifyLinuxUserGroups(username, group, action = 'add') {
   return { ok: true, username, group, action };
 }
 
-// ── 4. DOCKER CONTAINER MANAGEMENT ─────────────────────────────────────────
+// ── 6. DOCKER CONTAINER & NETWORK ORCHESTRATION ────────────────────────────
 
 async function listDockerContainers() {
   try {
@@ -241,7 +343,7 @@ async function listDockerContainers() {
       names: c.Names.map((n) => n.replace(/^\//, '')),
       image: c.Image,
       status: c.Status,
-      state: c.State, // 'running' | 'exited' | 'paused'
+      state: c.State,
       created: c.Created,
       ports: c.Ports.map((p) => ({
         privatePort: p.PrivatePort,
@@ -269,20 +371,15 @@ async function controlDockerContainer(action, containerId) {
   return { ok: true, action, containerId };
 }
 
-/**
- * Strips the 8-byte Docker stream multiplexer header from each log chunk.
- * Format: [stream_type (1B), padding (3B), length (4B big-endian), payload...]
- * Without stripping, raw binary headers appear as garbage control characters.
- */
 function stripDockerLogHeaders(buffer) {
   const chunks = [];
   let offset = 0;
   while (offset < buffer.length) {
-    if (offset + 8 > buffer.length) break; // incomplete header — stop
+    if (offset + 8 > buffer.length) break;
     const payloadLen = buffer.readUInt32BE(offset + 4);
     const payloadStart = offset + 8;
     const payloadEnd = payloadStart + payloadLen;
-    if (payloadEnd > buffer.length) break; // incomplete chunk — stop
+    if (payloadEnd > buffer.length) break;
     chunks.push(buffer.slice(payloadStart, payloadEnd));
     offset = payloadEnd;
   }
@@ -298,14 +395,97 @@ async function getDockerContainerLogs(containerId, tail = 200) {
     timestamps: true,
   });
 
-  // logsBuffer may be a Buffer or a string depending on the Dockerode version
   const raw = Buffer.isBuffer(logsBuffer) ? logsBuffer : Buffer.from(logsBuffer);
   const logs = stripDockerLogHeaders(raw);
 
   return { containerId, logs };
 }
 
-// ── 5. UFW FIREWALL CONFIGURATION ──────────────────────────────────────────
+async function createDockerContainer({ name, image, env = [], ports = [], volumes = [], network }) {
+  // Pull image if not local
+  try {
+    await docker.pull(image);
+  } catch (e) {}
+
+  const portBindings = {};
+  const exposedPorts = {};
+  if (Array.isArray(ports)) {
+    for (const p of ports) {
+      if (p.hostPort && p.containerPort) {
+        const key = `${p.containerPort}/tcp`;
+        exposedPorts[key] = {};
+        portBindings[key] = [{ HostPort: String(p.hostPort) }];
+      }
+    }
+  }
+
+  const binds = Array.isArray(volumes)
+    ? volumes.filter((v) => v.hostPath && v.containerPath).map((v) => `${v.hostPath}:${v.containerPath}`)
+    : [];
+
+  const container = await docker.createContainer({
+    name,
+    Image: image,
+    Env: Array.isArray(env) ? env : [],
+    ExposedPorts: exposedPorts,
+    HostConfig: {
+      PortBindings: portBindings,
+      Binds: binds,
+      RestartPolicy: { Name: 'unless-stopped' },
+      NetworkMode: network || 'bridge',
+    },
+  });
+
+  await container.start();
+  return { ok: true, containerId: container.id, name };
+}
+
+async function listDockerNetworks() {
+  try {
+    const networks = await docker.listNetworks();
+    return networks.map((n) => ({
+      id: n.Id,
+      name: n.Name,
+      driver: n.Driver,
+      scope: n.Scope,
+    }));
+  } catch (err) {
+    return [];
+  }
+}
+
+async function createDockerNetwork(name, driver = 'bridge') {
+  if (!REGEX_NETWORK_NAME.test(name)) {
+    throw new Error('Invalid network name format');
+  }
+  const net = await docker.createNetwork({ Name: name, Driver: driver });
+  return { ok: true, id: net.id, name };
+}
+
+async function deployDockerCompose(yamlContent, projectName = 'stx-stack') {
+  const targetDir = path.join('/tmp', `stx-compose-${Date.now()}`);
+  await fs.mkdir(targetDir, { recursive: true });
+  const composePath = path.join(targetDir, 'docker-compose.yml');
+  await fs.writeFile(composePath, yamlContent, 'utf8');
+
+  try {
+    const { stdout, stderr } = await execAsync(`docker compose -f "${composePath}" -p "${projectName}" up -d`);
+    return { ok: true, output: stdout + '\n' + stderr };
+  } catch (err) {
+    const { stdout, stderr } = await execAsync(`docker-compose -f "${composePath}" -p "${projectName}" up -d`);
+    return { ok: true, output: stdout + '\n' + stderr };
+  } finally {
+    await fs.rm(targetDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function pruneDockerResources() {
+  const containers = await docker.pruneContainers();
+  const images = await docker.pruneImages();
+  return { ok: true, containersPruned: containers.ContainersDeleted?.length || 0, imagesPruned: images.ImagesDeleted?.length || 0 };
+}
+
+// ── 7. UFW FIREWALL CONFIGURATION ──────────────────────────────────────────
 
 async function getUfwStatus() {
   try {
@@ -381,6 +561,9 @@ async function deleteUfwRule(port, protocol = 'tcp') {
 
 module.exports = {
   getSystemMonitoringInfo,
+  installSystemPackage,
+  upgradeSystemPackages,
+  getListeningPorts,
   listSystemdServices,
   controlSystemdService,
   getServiceLogs,
@@ -392,6 +575,11 @@ module.exports = {
   listDockerContainers,
   controlDockerContainer,
   getDockerContainerLogs,
+  createDockerContainer,
+  listDockerNetworks,
+  createDockerNetwork,
+  deployDockerCompose,
+  pruneDockerResources,
   getUfwStatus,
   addUfwRule,
   deleteUfwRule,

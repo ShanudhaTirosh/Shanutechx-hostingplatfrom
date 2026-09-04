@@ -37,11 +37,11 @@ function UsageBar({ pct, color }: { pct: number | null; color: string }) {
 function NodeCard({
   node,
   onToggleActive,
-  onOpenCockpit,
+  onOpenNodeEngine,
 }: {
   node: Node;
   onToggleActive: (node: Node) => void;
-  onOpenCockpit: (node: Node) => void;
+  onOpenNodeEngine: (node: Node) => void;
 }) {
   const s = statusStyle(node.status);
   return (
@@ -69,8 +69,8 @@ function NodeCard({
       <View style={styles.footerMeta}>
         <Text style={styles.metaText}>{node.deploymentCount} deployment{node.deploymentCount !== 1 ? 's' : ''}</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pressable onPress={() => onOpenCockpit(node)} style={styles.cockpitBtn}>
-            <Text style={styles.cockpitBtnText}>Cockpit</Text>
+          <Pressable onPress={() => onOpenNodeEngine(node)} style={styles.cockpitBtn}>
+            <Text style={styles.cockpitBtnText}>Node Engine</Text>
           </Pressable>
           <Pressable onPress={() => onToggleActive(node)} style={styles.actionBtn}>
             <Text style={styles.actionBtnText}>{node.status === 'online' ? 'Pause' : 'Activate'}</Text>
@@ -109,10 +109,10 @@ export function NodesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cockpit Modal
-  const [cockpitNode, setCockpitNode] = useState<Node | null>(null);
-  const [cockpitData, setCockpitData] = useState<any>(null);
-  const [cockpitLoading, setCockpitLoading] = useState(false);
+  // Node Engine Modal
+  const [engineNode, setEngineNode] = useState<Node | null>(null);
+  const [engineData, setEngineData] = useState<any>(null);
+  const [engineLoading, setEngineLoading] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -132,17 +132,17 @@ export function NodesScreen() {
     setRefreshing(false);
   }
 
-  async function handleOpenCockpit(node: Node) {
-    setCockpitNode(node);
-    setCockpitLoading(true);
-    setCockpitData(null);
+  async function handleOpenNodeEngine(node: Node) {
+    setEngineNode(node);
+    setEngineLoading(true);
+    setEngineData(null);
     try {
-      const res = await api.nodes.cockpitMonitoring(node.id);
-      setCockpitData(res);
+      const res = await api.nodes.engineMonitoring(node.id);
+      setEngineData(res);
     } catch (err: any) {
-      setCockpitData({ error: err.message || 'Cockpit telemetry unavailable' });
+      setEngineData({ error: err.message || 'Node Engine telemetry unavailable' });
     } finally {
-      setCockpitLoading(false);
+      setEngineLoading(false);
     }
   }
 
@@ -205,33 +205,33 @@ export function NodesScreen() {
           key={node.id}
           node={node}
           onToggleActive={handleToggleActive}
-          onOpenCockpit={handleOpenCockpit}
+          onOpenNodeEngine={handleOpenNodeEngine}
         />
       ))}
 
-      {/* Cockpit Modal */}
-      <Modal visible={!!cockpitNode} transparent animationType="slide" onRequestClose={() => setCockpitNode(null)}>
+      {/* Node Engine Modal */}
+      <Modal visible={!!engineNode} transparent animationType="slide" onRequestClose={() => setEngineNode(null)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <Text style={styles.modalTitle}>Cockpit Telemetry</Text>
-              <Pressable onPress={() => setCockpitNode(null)}>
+              <Text style={styles.modalTitle}>Node Engine Telemetry</Text>
+              <Pressable onPress={() => setEngineNode(null)}>
                 <Text style={{ color: colors.muted, fontSize: 16 }}>X</Text>
               </Pressable>
             </View>
-            <Text style={styles.modalSubtitle}>{cockpitNode?.label} ({cockpitNode?.ip})</Text>
+            <Text style={styles.modalSubtitle}>{engineNode?.label} ({engineNode?.ip})</Text>
 
-            {cockpitLoading ? (
+            {engineLoading ? (
               <ActivityIndicator color={colors.primary} style={{ marginVertical: 30 }} />
-            ) : cockpitData?.error ? (
-              <Text style={{ color: colors.error, fontFamily: fontFamily.body, marginVertical: 14 }}>{cockpitData.error}</Text>
+            ) : engineData?.error ? (
+              <Text style={{ color: colors.error, fontFamily: fontFamily.body, marginVertical: 14 }}>{engineData.error}</Text>
             ) : (
               <ScrollView style={{ maxHeight: 300, marginVertical: 10 }}>
-                <Text style={styles.telemetryJson}>{JSON.stringify(cockpitData, null, 2)}</Text>
+                <Text style={styles.telemetryJson}>{JSON.stringify(engineData, null, 2)}</Text>
               </ScrollView>
             )}
 
-            <Button label="Close" variant="glass" size="sm" onPress={() => setCockpitNode(null)} style={{ marginTop: 12 }} />
+            <Button label="Close" variant="glass" size="sm" onPress={() => setEngineNode(null)} style={{ marginTop: 12 }} />
           </View>
         </View>
       </Modal>

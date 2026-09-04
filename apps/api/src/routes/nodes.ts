@@ -265,6 +265,7 @@ const createNodeSchema = z.object({
   ramMb: z.number().int().positive(),
   diskGb: z.number().int().positive(),
   roleTags: z.array(z.string()).min(1),
+  monthlyBandwidthGb: z.number().int().positive().default(30000),
 });
 
 nodesRouter.post('/nodes', async (req: AuthedRequest, res: Response) => {
@@ -300,6 +301,7 @@ const connectSSHSchema = z.object({
   privateKey: z.string().optional(),
   label: z.string().min(1),
   roleTags: z.array(z.string()).default(['web-hosting', 'node-hosting']),
+  monthlyBandwidthGb: z.number().int().positive().default(30000),
 });
 
 /**
@@ -446,7 +448,7 @@ nodesRouter.post('/nodes/connect', async (req: AuthedRequest, res: Response) => 
 
     const serviceContent = [
       '[Unit]',
-      'Description=ShanuTechX Node Agent & Cockpit Management Service',
+      'Description=ShanuTechX Node Agent & Host Node Engine Service',
       'After=network.target docker.service',
       'Requires=docker.service',
       '',
@@ -624,7 +626,7 @@ nodesRouter.post('/nodes/connect/stream', async (req: AuthedRequest, res: Respon
       'chmod 0600 /etc/shanutechx-agent.env',
       'chown shanutechx-agent:shanutechx-agent /etc/shanutechx-agent.env',
     ].join(' && '), log);
-    const svcContent = `[Unit]\nDescription=ShanuTechX Node Agent & Cockpit Management Service\nAfter=network.target docker.service\nRequires=docker.service\n\n[Service]\nType=simple\nUser=shanutechx-agent\nGroup=shanutechx-agent\nWorkingDirectory=/opt/shanutechx/services/node-agent\nEnvironmentFile=/etc/shanutechx-agent.env\nEnvironment=NODE_ENV=production\nEnvironment=AGENT_PORT=5000\nEnvironment=API_URL=${apiUrl}\nEnvironment=AGENT_WORKSPACES_DIR=/var/lib/shanutechx/workspaces\nExecStart=/usr/bin/node src/index.js\nRestart=always\nRestartSec=5\nLimitNOFILE=65536\n\n[Install]\nWantedBy=multi-user.target`.replace(/'/g, "'\\''" );
+    const svcContent = `[Unit]\nDescription=ShanuTechX Node Agent & Host Node Engine Service\nAfter=network.target docker.service\nRequires=docker.service\n\n[Service]\nType=simple\nUser=shanutechx-agent\nGroup=shanutechx-agent\nWorkingDirectory=/opt/shanutechx/services/node-agent\nEnvironmentFile=/etc/shanutechx-agent.env\nEnvironment=NODE_ENV=production\nEnvironment=AGENT_PORT=5000\nEnvironment=API_URL=${apiUrl}\nEnvironment=AGENT_WORKSPACES_DIR=/var/lib/shanutechx/workspaces\nExecStart=/usr/bin/node src/index.js\nRestart=always\nRestartSec=5\nLimitNOFILE=65536\n\n[Install]\nWantedBy=multi-user.target`.replace(/'/g, "'\\''" );
     await sshExec(ssh, `printf '%s' '${svcContent}' > /etc/systemd/system/shanutechx-node-agent.service && systemctl daemon-reload && systemctl enable --now shanutechx-node-agent 2>&1 || true`, log);
 
     log('🎉 All 6 setup steps completed successfully!');

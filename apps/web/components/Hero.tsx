@@ -21,7 +21,7 @@ const BADGES = [
   { icon: Code, label: 'Python 3.12' },
   { icon: Bot, label: 'Discord & WA Bots' },
   { icon: Globe, label: 'Webmail & Web Apps' },
-  { icon: Monitor, label: 'VPS Cockpit' },
+  { icon: Monitor, label: 'VPS Node Engine' },
 ];
 
 const STATS = [

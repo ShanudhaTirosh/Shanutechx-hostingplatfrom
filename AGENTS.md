@@ -12,7 +12,7 @@ ShanuTechX is an autonomous enterprise cloud-hosting platform and container orch
   - [`web/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web) — Next.js 14 App Router public storefront and marketing portal.
   - [`mobile-admin/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/mobile-admin) — Standalone Expo / React Native Android & iOS admin app (excluded from root npm workspaces via `!apps/mobile-admin`).
 - **`services/`**
-  - [`node-agent/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent) — Plain JavaScript (`.js`) Docker management & telemetry agent running per VPS host node. Core modules: [`filesystem.js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent/src/filesystem.js), [`cockpit.js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent/src/cockpit.js).
+  - [`node-agent/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent) — Plain JavaScript (`.js`) Docker management & telemetry agent running per VPS host node. Core modules: [`filesystem.js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent/src/filesystem.js), [`nodeEngine.js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent/src/nodeEngine.js).
   - [`discord-bot/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/discord-bot) — Discord.js bot daemon for notification webhooks, support ticketing, and payment review alerts.
   - [`whatsapp-bot/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/whatsapp-bot) — Baileys WhatsApp messaging gateway for customer notifications.
 - **`packages/`**

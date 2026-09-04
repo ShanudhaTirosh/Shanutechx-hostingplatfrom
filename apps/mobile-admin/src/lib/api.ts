@@ -278,8 +278,8 @@ export const api = {
       apiFetch(`/api/nodes/${id}`).then((r) => asJson<{ node: Node }>(r)),
     toggleActive: (id: string, isActive: boolean) =>
       apiFetch(`/api/nodes/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }).then((r) => asJson<{ node: Node }>(r)),
-    cockpitMonitoring: (nodeId: string) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/monitoring`).then((r) => asJson<any>(r)),
+    engineMonitoring: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/monitoring`).then((r) => asJson<any>(r)),
   },
 
   databases: {

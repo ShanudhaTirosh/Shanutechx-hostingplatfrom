@@ -218,6 +218,7 @@ model Node {
   diskGb     Int
   roleTags   String[] // e.g. ["web-hosting", "node-hosting", "python-hosting"]
   isActive   Boolean  @default(true)
+  monthlyBandwidthGb Int @default(30000)
   createdAt  DateTime @default(now())
 
   // Live utilization, updated by the node stats collector

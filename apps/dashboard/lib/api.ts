@@ -1176,61 +1176,93 @@ export const api = {
       ),
   },
 
-  cockpit: {
+  nodeEngine: {
     monitoring: (nodeId: string) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/monitoring`).then((r) => asJson<any>(r)),
+      apiFetch(`/api/nodes/${nodeId}/engine/monitoring`).then((r) => asJson<any>(r)),
+    installPackage: (nodeId: string, packageName: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/packages/install`, {
+        method: 'POST',
+        body: JSON.stringify({ packageName }),
+      }).then((r) => asJson<{ ok: boolean; package: string; output: string }>(r)),
+    upgradePackages: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/packages/upgrade`, {
+        method: 'POST',
+      }).then((r) => asJson<{ ok: boolean; output: string }>(r)),
+    listeningPorts: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/ports`).then((r) => asJson<{ ports: Array<{ protocol: string; port: number; address: string; process: string }> }>(r)),
     services: (nodeId: string) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/services`).then((r) => asJson<{ services: any[] }>(r)),
+      apiFetch(`/api/nodes/${nodeId}/engine/services`).then((r) => asJson<{ services: any[] }>(r)),
     serviceAction: (nodeId: string, serviceName: string, action: string) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/services/action`, {
+      apiFetch(`/api/nodes/${nodeId}/engine/services/action`, {
         method: 'POST',
         body: JSON.stringify({ serviceName, action }),
       }).then((r) => asJson<any>(r)),
     serviceLogs: (nodeId: string, serviceName: string, lines = 100) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/services/logs?serviceName=${encodeURIComponent(serviceName)}&lines=${lines}`).then(
+      apiFetch(`/api/nodes/${nodeId}/engine/services/logs?serviceName=${encodeURIComponent(serviceName)}&lines=${lines}`).then(
         (r) => asJson<{ service: string; logs: string }>(r)
       ),
     users: (nodeId: string) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/users`).then((r) => asJson<{ users: any[] }>(r)),
+      apiFetch(`/api/nodes/${nodeId}/engine/users`).then((r) => asJson<{ users: any[] }>(r)),
     createUser: (nodeId: string, data: { username: string; password?: string }) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/users`, {
+      apiFetch(`/api/nodes/${nodeId}/engine/users`, {
         method: 'POST',
         body: JSON.stringify(data),
       }).then((r) => asJson<any>(r)),
     deleteUser: (nodeId: string, username: string) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/users/${encodeURIComponent(username)}`, { method: 'DELETE' }).then(
+      apiFetch(`/api/nodes/${nodeId}/engine/users/${encodeURIComponent(username)}`, { method: 'DELETE' }).then(
         (r) => asJson<any>(r)
       ),
     setUserPassword: (nodeId: string, username: string, password: string) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/users/${encodeURIComponent(username)}/password`, {
+      apiFetch(`/api/nodes/${nodeId}/engine/users/${encodeURIComponent(username)}/password`, {
         method: 'POST',
         body: JSON.stringify({ password }),
       }).then((r) => asJson<any>(r)),
     containers: (nodeId: string) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/docker/containers`).then((r) => asJson<{ containers: any[] }>(r)),
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/containers`).then((r) => asJson<{ containers: any[] }>(r)),
+    createContainer: (nodeId: string, config: { name: string; image: string; env?: string[]; ports?: Array<{ hostPort: number; containerPort: number }>; volumes?: Array<{ hostPath: string; containerPath: string }>; network?: string }) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/containers`, {
+        method: 'POST',
+        body: JSON.stringify(config),
+      }).then((r) => asJson<{ ok: boolean; containerId: string; name: string }>(r)),
     containerAction: (nodeId: string, containerId: string, action: string) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/docker/containers/${encodeURIComponent(containerId)}/action`, {
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/containers/${encodeURIComponent(containerId)}/action`, {
         method: 'POST',
         body: JSON.stringify({ action }),
       }).then((r) => asJson<any>(r)),
     containerLogs: (nodeId: string, containerId: string, tail = 200) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/docker/containers/${encodeURIComponent(containerId)}/logs?tail=${tail}`).then(
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/containers/${encodeURIComponent(containerId)}/logs?tail=${tail}`).then(
         (r) => asJson<{ containerId: string; logs: string }>(r)
       ),
+    networks: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/networks`).then((r) => asJson<{ networks: any[] }>(r)),
+    createNetwork: (nodeId: string, name: string, driver = 'bridge') =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/networks`, {
+        method: 'POST',
+        body: JSON.stringify({ name, driver }),
+      }).then((r) => asJson<{ ok: boolean; id: string; name: string }>(r)),
+    deployCompose: (nodeId: string, yamlContent: string, projectName = 'stx-stack') =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/compose`, {
+        method: 'POST',
+        body: JSON.stringify({ yamlContent, projectName }),
+      }).then((r) => asJson<{ ok: boolean; output: string }>(r)),
+    pruneDocker: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/prune`, {
+        method: 'POST',
+      }).then((r) => asJson<{ ok: boolean; containersPruned: number; imagesPruned: number }>(r)),
     firewallStatus: (nodeId: string) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/firewall`).then((r) => asJson<any>(r)),
+      apiFetch(`/api/nodes/${nodeId}/engine/firewall`).then((r) => asJson<any>(r)),
     addFirewallRule: (nodeId: string, rule: { port: number; protocol: string; action: string }) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/firewall/rules`, {
+      apiFetch(`/api/nodes/${nodeId}/engine/firewall/rules`, {
         method: 'POST',
         body: JSON.stringify(rule),
       }).then((r) => asJson<any>(r)),
     deleteFirewallRule: (nodeId: string, port: string, protocol: string) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/firewall/rules?port=${encodeURIComponent(port)}&protocol=${encodeURIComponent(protocol)}`, {
+      apiFetch(`/api/nodes/${nodeId}/engine/firewall/rules?port=${encodeURIComponent(port)}&protocol=${encodeURIComponent(protocol)}`, {
         method: 'DELETE',
       }).then((r) => asJson<any>(r)),
-    /** Mint a short-lived SSH ticket for the cockpit terminal (non-Leaseweb nodes) */
+    /** Mint a short-lived SSH ticket for the Node Engine terminal */
     sshTicket: (nodeId: string) =>
-      apiFetch(`/api/nodes/${nodeId}/cockpit/ssh-ticket`, { method: 'POST' }).then(
+      apiFetch(`/api/nodes/${nodeId}/engine/ssh-ticket`, { method: 'POST' }).then(
         (r) => asJson<{ ticket: string; expiresInMs: number; ip: string; sshKeyRef: string }>(r)
       ),
   },

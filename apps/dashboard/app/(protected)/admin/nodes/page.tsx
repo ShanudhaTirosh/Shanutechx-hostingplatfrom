@@ -13,7 +13,7 @@ import {
   Input,
   useToast,
 } from '@/components/ui';
-import { CockpitDashboardPanel } from '@/components/CockpitDashboardPanel';
+import { NodeEngineControlPanel } from '@/components/NodeEngineControlPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -105,7 +105,7 @@ export default function NodesPage() {
 
 function NodeCard({ node }: { node: Node }) {
   const stale = !node.lastSeenAt || Date.now() - new Date(node.lastSeenAt).getTime() > 5 * 60 * 1000;
-  const [showCockpit, setShowCockpit] = useState(false);
+  const [showNodeEngine, setShowNodeEngine] = useState(false);
 
   return (
     <Card className="border border-white/[0.06] hover:border-white/12 transition-all flex flex-col justify-between space-y-4">
@@ -145,19 +145,19 @@ function NodeCard({ node }: { node: Node }) {
       </div>
 
       <div className="pt-2 border-t border-white/[0.04] flex justify-between items-center">
-        <Button size="sm" variant={showCockpit ? 'secondary' : 'primary'} onClick={() => setShowCockpit(!showCockpit)}>
+        <Button size="sm" variant={showNodeEngine ? 'secondary' : 'primary'} onClick={() => setShowNodeEngine(!showNodeEngine)}>
           <span className="flex items-center gap-1.5">
             <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
-            {showCockpit ? 'Hide Cockpit' : 'Open Cockpit Dashboard'}
+            {showNodeEngine ? 'Hide Node Control Panel' : 'Open Host Node Control Panel'}
           </span>
         </Button>
       </div>
 
-      {showCockpit && (
+      {showNodeEngine && (
         <div className="pt-4 border-t border-white/10">
-          <CockpitDashboardPanel nodeId={node.id} nodeLabel={node.label} ipAddress={node.ip} />
+          <NodeEngineControlPanel nodeId={node.id} nodeLabel={node.label} ipAddress={node.ip} />
         </div>
       )}
 
