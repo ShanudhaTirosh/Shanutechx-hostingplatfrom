@@ -10,6 +10,7 @@ import {
   PageHeader,
   Spinner,
   ErrorBanner,
+  EmptyState,
   Table,
   Tr,
   Td,
@@ -251,15 +252,10 @@ export default function AdminDashboardPage() {
         {loading ? (
           <Spinner label="Loading review queue..." />
         ) : pendingPaymentsList.length === 0 ? (
-          <Card className="flex flex-col items-center justify-center py-8 border border-white/[0.06] text-center">
-            <p className="text-text-muted text-xs mb-1 flex items-center gap-1.5 font-medium">
-              <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-              </svg>
-              No pending payment proofs awaiting review.
-            </p>
-            <p className="text-text-faint text-[11px]">All submitted bank slips have been processed.</p>
-          </Card>
+          <EmptyState
+            title="Queue is Clear"
+            message="No pending payment proofs awaiting manual review. All submitted bank slips have been processed."
+          />
         ) : (
           <Table headers={['Order ID', 'Amount', 'Submitted At', 'Status', 'Action']}>
             {pendingPaymentsList.map((p) => (

@@ -254,23 +254,36 @@ export function TableSkeleton({ rows = 3 }: { rows?: number }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// EmptyState
+// EmptyState Box Container
 // ─────────────────────────────────────────────────────────────
 export function EmptyState({
+  title,
   message,
   icon,
   action,
+  className,
 }: {
+  title?: string;
   message: string;
   icon?: ReactNode;
   action?: { label: string; onClick: () => void };
+  className?: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-      {icon && <div className="text-text-faint mb-1">{icon}</div>}
-      <p className="text-text-muted text-sm">{message}</p>
+    <div className={`flex flex-col items-center justify-center p-8 sm:p-12 border border-white/[0.08] rounded-2xl bg-surface-secondary/40 text-center space-y-3 shadow-sm ${className || ''}`}>
+      <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-text-muted shadow-inner mb-1">
+        {icon || (
+          <svg className="w-6 h-6 text-text-muted/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+          </svg>
+        )}
+      </div>
+      {title && <h3 className="text-sm font-semibold text-text-primary">{title}</h3>}
+      <p className="text-xs text-text-muted max-w-md font-sans leading-relaxed">{message}</p>
       {action && (
-        <Button variant="secondary" size="sm" onClick={action.onClick}>{action.label}</Button>
+        <Button variant="secondary" size="sm" onClick={action.onClick} className="mt-2">
+          {action.label}
+        </Button>
       )}
     </div>
   );

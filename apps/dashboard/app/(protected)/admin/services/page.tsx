@@ -403,15 +403,11 @@ export default function AdminProductsPage() {
                   </div>
 
                   {product.plans.length === 0 && (
-                    <div className="p-4 border border-dashed border-white/10 rounded-xl text-center">
-                      <p className="text-xs text-text-muted">No pricing plans added for this product yet.</p>
-                      <button
-                        onClick={() => openCreatePlan(product.id, product.category)}
-                        className="text-xs text-accent-cyan hover:underline mt-1 block font-semibold mx-auto"
-                      >
-                        + Add Pricing Plan Now
-                      </button>
-                    </div>
+                    <EmptyState
+                      message="No pricing plans added for this product yet."
+                      action={{ label: '+ Add Pricing Plan Now', onClick: () => openCreatePlan(product.id, product.category) }}
+                      className="py-6 sm:py-8"
+                    />
                   )}
 
                   <div className="grid gap-3">

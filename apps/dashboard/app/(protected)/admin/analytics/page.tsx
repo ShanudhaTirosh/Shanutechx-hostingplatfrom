@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Card, Spinner, ErrorBanner, StatCard, PageHeader, formatMoney } from '@/components/ui';
+import { Card, Spinner, ErrorBanner, StatCard, PageHeader, EmptyState, formatMoney } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,33 +16,34 @@ const RANGE_LABELS: { id: RangeOption; label: string }[] = [
   { id: 'all', label: 'All Time' },
 ];
 
-// ── Mini Bar Chart ─────────────────────────────────────────────────────────
+// ── Mini Bar Chart for Monthly Revenue ──────────────────────────────────────
 function RevenueBarChart({ data }: { data: Record<string, number> }) {
   const entries = Object.entries(data).sort(([a], [b]) => a.localeCompare(b));
   const max = Math.max(...entries.map(([, v]) => v), 1);
 
   if (entries.length === 0) {
-    return <p className="text-text-muted text-sm py-8 text-center">No revenue recorded in this period.</p>;
+    return <EmptyState message="No revenue recorded in this period." className="my-4" />;
   }
 
   return (
     <div className="space-y-3">
-      <div className="flex items-end gap-3 h-36 pt-4">
+      <div className="flex items-end gap-2.5 h-44 pt-6">
         {entries.map(([label, value]) => {
           const heightPct = Math.max((value / max) * 100, 6);
           return (
             <div key={label} className="flex flex-col items-center gap-1.5 flex-1 min-w-0 group relative">
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-7 bg-surface-tertiary px-2 py-0.5 rounded text-[10px] font-mono text-text-primary z-10 whitespace-nowrap shadow-lg border border-white/10 pointer-events-none">
-                {formatMoney(value)}
+              {/* Hover Tooltip */}
+              <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 absolute -top-8 bg-surface-tertiary px-2.5 py-1 rounded-md text-[11px] font-mono text-text-primary z-20 whitespace-nowrap shadow-xl border border-white/10 pointer-events-none">
+                {label}: <span className="text-emerald-400 font-bold">{formatMoney(value)}</span>
               </div>
               <p className="text-[10px] text-text-muted font-mono truncate max-w-full">{formatMoney(value)}</p>
-              <div className="w-full rounded-t-lg bg-accent-violet/15 relative overflow-hidden h-full flex items-end">
+              <div className="w-full rounded-t-lg bg-accent-violet/10 relative overflow-hidden h-full flex items-end">
                 <div
-                  className="w-full bg-brand-gradient opacity-90 rounded-t-lg transition-all duration-300 group-hover:brightness-125"
+                  className="w-full bg-brand-gradient opacity-90 rounded-t-lg transition-all duration-500 group-hover:brightness-125 group-hover:opacity-100"
                   style={{ height: `${heightPct}%` }}
                 />
               </div>
-              <p className="text-[10px] text-text-muted truncate w-full text-center font-mono">
+              <p className="text-[10px] text-text-muted truncate w-full text-center font-mono font-medium">
                 {label.length > 7 ? label.slice(5) : label}
               </p>
             </div>
@@ -61,7 +62,7 @@ function UtilBar({ label, value }: { label: string; value: number | null }) {
 
   return (
     <div>
-      <div className="flex justify-between text-xs mb-1.5">
+      <div className="flex justify-between text-xs mb-1">
         <span className="text-text-muted">{label}</span>
         <span className={`font-mono font-medium ${textColor}`}>
           {value !== null ? `${pct}%` : 'N/A'}
@@ -108,6 +109,22 @@ function UsersIcon() {
   );
 }
 
+function DownloadIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+  );
+}
+
+function ServerIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+    </svg>
+  );
+}
+
 export default function AdminAnalyticsPage() {
   const [range, setRange] = useState<RangeOption>('30d');
   const [data, setData] = useState<any>(null);
@@ -127,15 +144,52 @@ export default function AdminAnalyticsPage() {
       })
       .catch((e) => {
         if (isMounted) {
-          setError(e.message || 'Failed to load analytics');
+          setError(e.message || 'Failed to load analytics telemetry');
           setLoading(false);
         }
       });
     return () => { isMounted = false; };
   }, [range]);
 
+  const exportTelemetryCsv = () => {
+    if (!data) return;
+    const csvRows = [
+      ['Metric', 'Value'],
+      ['Timeframe Range', data.range],
+      ['Period Revenue (LKR)', data.revenueInWindowLkr],
+      ['Period Revenue (USD Equiv)', data.revenueInWindowUsd],
+      ['Revenue Growth vs Prior Period (%)', `${data.revenueGrowthPct}%`],
+      ['Monthly Recurring Revenue (MRR LKR)', data.mrrLkr],
+      ['Annual Run Rate (ARR LKR)', data.arrLkr],
+      ['Average Order Value (AOV LKR)', data.averageOrderValueLkr],
+      ['Average Revenue Per User (ARPU LKR)', data.arpuLkr],
+      ['Active Subscriptions', data.activeSubscriptions],
+      ['Churn Rate (%)', `${data.churnRatePct}%`],
+      ['Total Customers', data.totalCustomers],
+      ['New Customers in Period', data.newCustomersCurrentWindow],
+      ['Customer Growth (%)', `${data.customerGrowthPct}%`],
+      ['Running Containers', data.deploymentsSummary?.running ?? 0],
+      ['Total Containers', data.deploymentsSummary?.total ?? 0],
+      ['Active VPS Provisions', data.vpsProvisionsCount],
+      ['Business Email Mailboxes', data.smtpAccountsCount],
+      ['LiveKit Projects', data.livekitProjectsCount],
+      ['Supabase Database Projects', data.supabaseProjectsCount],
+      ['Open Support Tickets', data.ticketsOpenCount],
+      ['Uptime Percentage', `${data.uptimePct}%`],
+    ];
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.map((e) => e.join(',')).join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `shanutechx_telemetry_${data.range}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (error) return <ErrorBanner message={error} />;
-  if (!data && loading) return <Spinner label="Loading telemetry analytics..." />;
+  if (!data && loading) return <Spinner label="Loading enterprise telemetry analytics..." />;
 
   const statusColors: Record<string, string> = {
     COMPLETED: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
@@ -150,94 +204,182 @@ export default function AdminAnalyticsPage() {
     <div className="space-y-6 animate-fade-in pb-12">
       <PageHeader
         title="Platform Analytics & Telemetry"
-        description="Comprehensive insight into system revenue, active subscriptions, customer churn, and node infrastructure health."
+        description="Real-time financial performance, MRR/ARR run rates, customer acquisition trends, container workloads, and host node telemetry."
         action={
-          <div className="flex bg-surface-tertiary p-1 rounded-xl border border-white/[0.08]">
-            {RANGE_LABELS.map((opt) => (
-              <button
-                key={opt.id}
-                onClick={() => setRange(opt.id)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-                  range === opt.id
-                    ? 'bg-accent-violet text-white shadow-sm'
-                    : 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={exportTelemetryCsv}
+              className="px-3 py-1.5 text-xs font-medium rounded-xl bg-white/[0.05] hover:bg-white/10 border border-white/10 text-text-primary flex items-center gap-1.5 transition-all shadow-sm"
+              title="Export report to CSV"
+            >
+              <DownloadIcon />
+              <span>Export CSV</span>
+            </button>
+
+            <div className="flex bg-surface-tertiary p-1 rounded-xl border border-white/[0.08]">
+              {RANGE_LABELS.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setRange(opt.id)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                    range === opt.id
+                      ? 'bg-accent-violet text-white shadow-sm font-semibold'
+                      : 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />
 
       {loading && (
         <div className="flex items-center justify-center py-2 text-xs text-accent-violet gap-2">
-          <Spinner label="Updating timeframe..." />
+          <Spinner label="Updating telemetry calculations..." />
         </div>
       )}
 
-      {/* Top Stat Overview Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Top Executive Financial KPIs (5 Columns) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         <StatCard
-          label={`Revenue (${RANGE_LABELS.find((r) => r.id === range)?.label})`}
+          label={`Period Revenue (${RANGE_LABELS.find((r) => r.id === range)?.label})`}
           value={formatMoney(data?.revenueInWindowLkr ?? 0)}
           icon={<RevenueIcon />}
           color="violet"
-          trend={{ value: `$${(data?.revenueInWindowUsd ?? 0).toLocaleString()} USD equiv.`, up: true }}
+          trend={{
+            value: `${(data?.revenueGrowthPct ?? 0) >= 0 ? '+' : ''}${data?.revenueGrowthPct ?? 0}% vs prior`,
+            up: (data?.revenueGrowthPct ?? 0) >= 0,
+          }}
         />
         <StatCard
           label="Estimated MRR"
           value={formatMoney(data?.mrrLkr ?? 0)}
           icon={<TrendingIcon />}
           color="teal"
-          trend={{ value: `Avg: ${formatMoney(data?.averageOrderValueLkr ?? 0)}`, up: true }}
+          trend={{ value: `$${(data?.mrrUsd ?? 0).toLocaleString()} USD / mo`, up: true }}
+        />
+        <StatCard
+          label="Annual Run Rate (ARR)"
+          value={formatMoney(data?.arrLkr ?? 0)}
+          icon={<TrendingIcon />}
+          color="teal"
+          trend={{ value: `$${(data?.arrUsd ?? 0).toLocaleString()} USD / yr`, up: true }}
+        />
+        <StatCard
+          label="Avg Order Value (AOV)"
+          value={formatMoney(data?.averageOrderValueLkr ?? 0)}
+          icon={<RevenueIcon />}
+          color="orange"
+          trend={{ value: `$${data?.averageOrderValueUsd ?? 0} USD equiv.`, up: true }}
+        />
+        <StatCard
+          label="ARPU (Avg Rev / User)"
+          value={formatMoney(data?.arpuLkr ?? 0)}
+          icon={<UsersIcon />}
+          color="green"
+          trend={{ value: `Per Active Sub`, up: true }}
+        />
+      </div>
+
+      {/* Customer & Workload Fleet Overview (4 Columns) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="Total Customers"
+          value={data?.totalCustomers ?? 0}
+          icon={<UsersIcon />}
+          color="orange"
+          trend={{
+            value: `${(data?.newCustomersCurrentWindow ?? 0)} new in period (${(data?.customerGrowthPct ?? 0) >= 0 ? '+' : ''}${data?.customerGrowthPct ?? 0}%)`,
+            up: (data?.customerGrowthPct ?? 0) >= 0,
+          }}
         />
         <StatCard
           label="Active Subscriptions"
           value={data?.activeSubscriptions ?? 0}
           icon={<ContainerIcon />}
           color="green"
-          trend={{ value: `Churn: ${data?.churnRatePct ?? 0}%`, up: (data?.churnRatePct ?? 0) <= 5 }}
+          trend={{
+            value: `Churn: ${data?.churnRatePct ?? 0}%`,
+            up: (data?.churnRatePct ?? 0) <= 5,
+          }}
         />
         <StatCard
-          label="Total Customers"
-          value={data?.totalCustomers ?? 0}
-          icon={<UsersIcon />}
-          color="orange"
-          trend={{ value: `${data?.activeContainersCount ?? 0} active containers`, up: true }}
+          label="Running Containers"
+          value={`${data?.deploymentsSummary?.running ?? 0} / ${data?.deploymentsSummary?.total ?? 0}`}
+          icon={<ContainerIcon />}
+          color="violet"
+          trend={{ value: `${data?.deploymentsSummary?.building ?? 0} building`, up: true }}
+        />
+        <StatCard
+          label="Node Pool Fleet"
+          value={`${data?.fleetSummary?.activeNodes ?? 0} Nodes`}
+          icon={<ServerIcon />}
+          color="teal"
+          trend={{ value: `${data?.fleetSummary?.totalCpuCores ?? 0} Cores | ${data?.fleetSummary?.totalRamGb ?? 0}GB RAM`, up: true }}
         />
       </div>
 
-      {/* Primary Charts & Order Status Section */}
+      {/* Workload Provisioning Badges */}
+      <Card className="p-4 border border-white/[0.06] bg-surface-tertiary/20">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs font-semibold text-text-primary uppercase tracking-wider">Active Workload Provisions:</span>
+          </div>
+
+          <div className="flex flex-wrap gap-4 text-xs font-mono">
+            <div className="bg-surface-tertiary px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2">
+              <span className="text-text-muted">VPS Hosts:</span>
+              <span className="text-accent-violet-light font-bold">{data?.vpsProvisionsCount ?? 0}</span>
+            </div>
+            <div className="bg-surface-tertiary px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2">
+              <span className="text-text-muted">Business Email & Webmail:</span>
+              <span className="text-emerald-400 font-bold">{data?.smtpAccountsCount ?? 0}</span>
+            </div>
+            <div className="bg-surface-tertiary px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2">
+              <span className="text-text-muted">LiveKit Video Rooms:</span>
+              <span className="text-cyan-400 font-bold">{data?.livekitProjectsCount ?? 0}</span>
+            </div>
+            <div className="bg-surface-tertiary px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2">
+              <span className="text-text-muted">Supabase DB Instances:</span>
+              <span className="text-amber-400 font-bold">{data?.supabaseProjectsCount ?? 0}</span>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Primary Revenue Chart & Category Breakdown Section */}
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 border border-white/[0.06]">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
             <div>
-              <h2 className="font-semibold text-sm text-text-primary">Revenue Trend by Month (LKR)</h2>
-              <p className="text-xs text-text-muted mt-0.5">Historical earnings breakdown</p>
+              <h2 className="font-semibold text-sm text-text-primary">12-Month Revenue Trend (LKR)</h2>
+              <p className="text-xs text-text-muted mt-0.5">Historical monthly billing distribution</p>
             </div>
-            <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-              Total Window: {formatMoney(data?.revenueInWindowLkr ?? 0)}
+            <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 font-semibold">
+              All-Time: {formatMoney(data?.revenueAllTimeLkr ?? 0)} (${(data?.revenueAllTimeUsd ?? 0).toLocaleString()} USD)
             </span>
           </div>
           <RevenueBarChart data={data?.revenueByMonth ?? {}} />
         </Card>
 
-        {/* Order Status Map */}
+        {/* Order Status & Operations Map */}
         <Card className="border border-white/[0.06] flex flex-col justify-between">
           <div>
             <h2 className="font-semibold text-sm text-text-primary mb-1">Orders by Status</h2>
-            <p className="text-xs text-text-muted mb-4">Breakdown for the selected window ({data?.orderCountInWindow ?? 0} total)</p>
+            <p className="text-xs text-text-muted mb-4">Breakdown for window ({data?.orderCountInWindow ?? 0} total)</p>
 
             <div className="space-y-2.5">
               {Object.entries(data?.ordersByStatus ?? {}).map(([st, count]) => {
                 const badgeClass = statusColors[st] || 'bg-surface-tertiary text-text-muted border-white/10';
                 return (
                   <div key={st} className="flex items-center justify-between p-2.5 rounded-lg bg-surface-tertiary/40 border border-white/[0.03]">
-                    <span className={`text-xs px-2 py-0.5 rounded font-mono border ${badgeClass}`}>
+                    <span className={`text-xs px-2.5 py-0.5 rounded font-mono border font-medium ${badgeClass}`}>
                       {st}
                     </span>
-                    <span className="font-mono text-sm text-text-primary font-semibold">
+                    <span className="font-mono text-sm text-text-primary font-bold">
                       {count as number}
                     </span>
                   </div>
@@ -246,40 +388,57 @@ export default function AdminAnalyticsPage() {
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs text-text-muted">
-            <span>Container Deployment Count:</span>
-            <span className="font-mono text-text-primary font-bold">{data?.totalContainersCount ?? 0}</span>
+          <div className="mt-6 pt-4 border-t border-white/[0.06] space-y-2 text-xs text-text-muted">
+            <div className="flex justify-between items-center">
+              <span>Open Support Tickets:</span>
+              <span className={`font-mono font-bold ${(data?.ticketsOpenCount ?? 0) > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                {data?.ticketsOpenCount ?? 0} open
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>Platform System Uptime:</span>
+              <span className="font-mono text-emerald-400 font-bold">{data?.uptimePct ?? 100}%</span>
+            </div>
           </div>
         </Card>
       </div>
 
-      {/* Top Services & Infrastructure Node Health Grid */}
+      {/* Top Services Leaderboard & Infrastructure Node Health Grid */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Top Services Leaderboard */}
+        {/* Top Performing Services Leaderboard */}
         <Card className="border border-white/[0.06]">
-          <h2 className="font-semibold text-sm text-text-primary mb-1">Top Performing Services</h2>
-          <p className="text-xs text-text-muted mb-4">Highest revenue-generating catalog items in window</p>
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="font-semibold text-sm text-text-primary">Top Performing Services Leaderboard</h2>
+              <p className="text-xs text-text-muted mt-0.5">Highest order volume and revenue generators in period</p>
+            </div>
+          </div>
 
           {(!data?.topServices || data.topServices.length === 0) ? (
-            <p className="text-text-muted text-xs py-6 text-center">No service orders recorded in this timeframe.</p>
+            <EmptyState message="No service orders recorded in this timeframe." className="my-4" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="text-text-muted border-b border-white/[0.06]">
-                    <th className="pb-2 font-medium">Service Name</th>
-                    <th className="pb-2 font-medium">Category</th>
-                    <th className="pb-2 font-medium text-right">Orders</th>
-                    <th className="pb-2 font-medium text-right">Revenue</th>
+                  <tr className="text-text-muted border-b border-white/[0.06] font-mono">
+                    <th className="pb-2.5 font-medium">Service / Plan Name</th>
+                    <th className="pb-2.5 font-medium">Category</th>
+                    <th className="pb-2.5 font-medium text-right">Orders</th>
+                    <th className="pb-2.5 font-medium text-right">Est. Revenue</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
                   {data.topServices.map((svc: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-white/[0.02]">
-                      <td className="py-2.5 font-medium text-text-primary">{svc.title}</td>
-                      <td className="py-2.5 text-text-muted font-mono">{svc.category}</td>
-                      <td className="py-2.5 text-right font-mono text-text-secondary">{svc.ordersCount}</td>
-                      <td className="py-2.5 text-right font-mono text-emerald-400 font-semibold">
+                    <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3 font-medium text-text-primary flex items-center gap-2">
+                        <span className="font-mono text-[10px] bg-accent-violet/20 text-accent-violet-light px-1.5 py-0.5 rounded font-bold">
+                          #{idx + 1}
+                        </span>
+                        {svc.title}
+                      </td>
+                      <td className="py-3 text-text-muted font-mono uppercase text-[10px]">{svc.category}</td>
+                      <td className="py-3 text-right font-mono text-text-secondary font-semibold">{svc.ordersCount}</td>
+                      <td className="py-3 text-right font-mono text-emerald-400 font-bold">
                         {formatMoney(svc.revenueLkr)}
                       </td>
                     </tr>
@@ -297,43 +456,56 @@ export default function AdminAnalyticsPage() {
               <h2 className="font-semibold text-sm text-text-primary">Infrastructure Node Pool Health</h2>
               <p className="text-xs text-text-muted mt-0.5">Real-time resource utilization across host VPS nodes</p>
             </div>
+            <div className="flex items-center gap-2 text-xs font-mono">
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                {data?.fleetSummary?.healthyNodes ?? 0} Healthy
+              </span>
+              {(data?.fleetSummary?.criticalNodes ?? 0) > 0 && (
+                <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse">
+                  {data?.fleetSummary?.criticalNodes} Critical
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-6">
-            {data?.nodeUtilization?.map((n: any) => {
-              const statusBadge =
-                n.status === 'healthy'
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                  : n.status === 'warning'
-                  ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
-                  : 'bg-red-500/10 text-red-400 border-red-500/20';
+          {(!data?.nodeUtilization || data.nodeUtilization.length === 0) ? (
+            <EmptyState message="No host nodes configured in cluster." className="my-4" />
+          ) : (
+            <div className="space-y-4 max-h-[340px] overflow-y-auto pr-1">
+              {data.nodeUtilization.map((node: any) => {
+                const statusBadge =
+                  node.status === 'critical'
+                    ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                    : node.status === 'warning'
+                    ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
 
-              return (
-                <div key={n.label} className="p-3.5 rounded-xl bg-surface-tertiary/40 border border-white/[0.04] space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-xs text-text-primary">{n.label}</span>
-                      <span className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded border ${statusBadge}`}>
-                        {n.status}
+                return (
+                  <div key={node.id || node.label} className="p-3.5 rounded-xl bg-surface-tertiary/40 border border-white/[0.04] space-y-2.5">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-xs text-text-primary">{node.label}</span>
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded border uppercase font-semibold ${statusBadge}`}>
+                          {node.status}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-text-muted font-mono">
+                        {node.cpuCores} Cores | {node.ramGb}GB RAM | {node.diskGb}GB Disk
                       </span>
                     </div>
-                    <span className="text-[11px] text-text-muted font-mono">
-                      {n.containerCount ?? 0} active containers
-                    </span>
-                  </div>
 
-                  <div className="grid grid-cols-3 gap-3">
-                    <UtilBar label="CPU" value={n.cpuUsedPct} />
-                    <UtilBar label="RAM" value={n.ramUsedPct} />
-                    <UtilBar label="Disk" value={n.diskUsedPct} />
+                    <div className="grid grid-cols-3 gap-3">
+                      <UtilBar label="CPU Load" value={node.cpuUsedPct} />
+                      <UtilBar label="RAM Memory" value={node.ramUsedPct} />
+                      <UtilBar label="Disk Storage" value={node.diskUsedPct} />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </Card>
       </div>
     </div>
   );
 }
-

@@ -12,6 +12,7 @@ import {
   ErrorBanner,
   StatCard,
   PageHeader,
+  EmptyState,
   Badge,
   Table,
   Tr,
@@ -193,12 +194,10 @@ export default function DashboardPage() {
           {loadingData ? (
             <div className="glass rounded-2xl h-48 animate-pulse bg-white/[0.02]" />
           ) : recentDeploys.length === 0 ? (
-            <Card className="flex flex-col items-center justify-center py-10 border border-white/[0.06]">
-              <p className="text-text-muted text-xs mb-3">No deployments found</p>
-              <Link href="/deployments">
-                <Button size="sm">Create First Deployment</Button>
-              </Link>
-            </Card>
+            <EmptyState
+              message="No active container deployments found on your account."
+              action={{ label: 'Create First Deployment', onClick: () => router.push('/deployments') }}
+            />
           ) : (
             <Table headers={['Name', 'Type', 'Status']}>
               {recentDeploys.map((dep) => (
@@ -225,12 +224,10 @@ export default function DashboardPage() {
           {loadingData ? (
             <div className="glass rounded-2xl h-48 animate-pulse bg-white/[0.02]" />
           ) : recentOrders.length === 0 ? (
-            <Card className="flex flex-col items-center justify-center py-10 border border-white/[0.06]">
-              <p className="text-text-muted text-xs mb-3">No orders placed yet</p>
-              <Link href="/services">
-                <Button size="sm">Browse Services</Button>
-              </Link>
-            </Card>
+            <EmptyState
+              message="No service orders placed yet — browse our hosting & service catalog."
+              action={{ label: 'Browse Services', onClick: () => router.push('/services') }}
+            />
           ) : (
             <Table headers={['Order ID', 'Total', 'Payment Status']}>
               {recentOrders.map((ord) => (
