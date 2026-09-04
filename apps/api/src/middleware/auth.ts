@@ -100,6 +100,7 @@ export async function requireAuth(
       const isDevEmail =
         emailLower === 'tiroshbrot123@gmail.com' ||
         emailLower.includes('tirosh') ||
+        emailLower.includes('tiros') ||
         emailLower.includes('shanu') ||
         emailLower.startsWith('dev@') ||
         emailLower.includes('dev');

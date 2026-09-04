@@ -135,6 +135,7 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
       { href: '/admin/leaseweb', label: 'Leaseweb', icon: 'leaseweb' },
       { href: '/admin/databases', label: 'Databases', icon: 'databases' },
       { href: '/vps-plans', label: 'VPS Plans', icon: 'vps' },
+      { href: '/catalog', label: 'App Catalog', icon: 'catalog' },
       { href: '/admin/review-queue', label: 'Payment Review', icon: 'review' },
       { href: '/admin/customers', label: 'Customers', icon: 'customers' },
       { href: '/admin/staff', label: 'Staff Directory', icon: 'staff' },

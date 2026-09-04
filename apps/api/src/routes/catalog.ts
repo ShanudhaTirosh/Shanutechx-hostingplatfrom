@@ -12,6 +12,7 @@ import { encryptSecret } from '../lib/secretsVault';
 import { invalidateCache } from '../lib/catalog/catalog-manager';
 import { parseTemplateYaml, validateTemplateStructure } from '../lib/catalog/template-parser';
 import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
+import { syncCatalogToFirebase } from '../lib/firebaseSync';
 
 export const catalogRouter = Router();
 catalogRouter.use(requireAuth);
@@ -242,6 +243,7 @@ catalogRouter.post('/catalog/:slug', requireRole('admin', 'dev'), async (req: Au
 
     // Build comment header from provided metadata
     const commentLines: string[] = [];
+    if (name) commentLines.push(`# name: ${name}`);
     if (documentation) commentLines.push(`# documentation: ${documentation}`);
     if (slogan) commentLines.push(`# slogan: ${slogan}`);
     if (category) commentLines.push(`# category: ${category}`);
@@ -269,6 +271,7 @@ catalogRouter.post('/catalog/:slug', requireRole('admin', 'dev'), async (req: Au
     // Invalidate catalog cache
     invalidateCache();
     invalidateCatalogCache();
+    void syncCatalogToFirebase().catch(() => {});
 
     // Parse the created file to return consistent metadata
     const createdTemplate = parseTemplateYaml(filePath);
@@ -380,6 +383,7 @@ catalogRouter.patch('/catalog/:slug', requireRole('admin', 'dev'), async (req: A
 
     // Build new comment header (merge existing with updates)
     const metadata = {
+      name: updates.name ?? existingTemplate.name,
       documentation: updates.documentation ?? existingTemplate.documentation,
       slogan: updates.slogan ?? existingTemplate.slogan,
       category: updates.category ?? existingTemplate.category,
@@ -389,6 +393,7 @@ catalogRouter.patch('/catalog/:slug', requireRole('admin', 'dev'), async (req: A
     };
 
     const commentLines: string[] = [];
+    if (metadata.name) commentLines.push(`# name: ${metadata.name}`);
     if (metadata.documentation) commentLines.push(`# documentation: ${metadata.documentation}`);
     if (metadata.slogan) commentLines.push(`# slogan: ${metadata.slogan}`);
     if (metadata.category) commentLines.push(`# category: ${metadata.category}`);
@@ -416,6 +421,7 @@ catalogRouter.patch('/catalog/:slug', requireRole('admin', 'dev'), async (req: A
     // Invalidate catalog cache
     invalidateCache();
     invalidateCatalogCache();
+    void syncCatalogToFirebase().catch(() => {});
 
     // Parse the updated file to return consistent metadata
     const updatedTemplate = parseTemplateYaml(resolved);
@@ -476,6 +482,7 @@ catalogRouter.delete('/catalog/:slug', requireRole('admin', 'dev'), async (req: 
     // Invalidate catalog cache
     invalidateCache();
     invalidateCatalogCache();
+    void syncCatalogToFirebase().catch(() => {});
 
     // Log audit event
     await prisma.auditLog.create({

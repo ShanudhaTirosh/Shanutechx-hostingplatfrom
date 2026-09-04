@@ -30,6 +30,71 @@ function catColor(cat: string) {
   return CAT_COLOR[cat.toLowerCase()] ?? CAT_COLOR.other;
 }
 
+// ── Template Logo component with multi-tier fallbacks ────────────────────────
+function TemplateLogo({ logo, name, slug, color }: { logo?: string; name: string; slug: string; color: string }) {
+  const initials = (name || slug)
+    .split(/[\s-]+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+
+  const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  const candidates: string[] = [];
+  if (logo) {
+    if (logo.startsWith('http://') || logo.startsWith('https://') || logo.startsWith('data:')) {
+      candidates.push(logo);
+    } else if (logo.startsWith('/')) {
+      candidates.push(logo);
+    } else {
+      candidates.push(`https://raw.githubusercontent.com/coollabsio/coolify/main/public/uploads/${logo}`);
+    }
+  }
+
+  if (cleanSlug) {
+    candidates.push(`https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/${cleanSlug}.png`);
+    candidates.push(`https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/${cleanSlug}.svg`);
+    candidates.push(`https://cdn.simpleicons.org/${cleanSlug}`);
+  }
+
+  const [candidateIndex, setCandidateIndex] = useState(0);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setCandidateIndex(0);
+    setHasError(false);
+  }, [logo, slug]);
+
+  const currentSrc = candidates[candidateIndex];
+
+  const handleError = () => {
+    if (candidateIndex + 1 < candidates.length) {
+      setCandidateIndex((prev) => prev + 1);
+    } else {
+      setHasError(true);
+    }
+  };
+
+  return (
+    <div
+      className="flex items-center justify-center w-11 h-11 rounded-xl text-white text-sm font-bold shrink-0 shadow-lg overflow-hidden"
+      style={{ background: `linear-gradient(135deg, ${color}cc, ${color}55)`, border: `1px solid ${color}44` }}
+    >
+      {!hasError && currentSrc ? (
+        <img
+          src={currentSrc}
+          alt={name || slug}
+          className="w-7 h-7 object-contain"
+          onError={handleError}
+        />
+      ) : (
+        <span>{initials}</span>
+      )}
+    </div>
+  );
+}
+
 export default function TemplateEditorPage() {
   const { apiUser } = useAppUser();
   const params = useParams();
@@ -403,16 +468,19 @@ export default function TemplateEditorPage() {
 
               {/* Logo */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-text-muted">Logo Path</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-text-muted">Logo Path & Live Preview</label>
+                  <TemplateLogo logo={logo} name={name} slug={slug} color={accentColor} />
+                </div>
                 <input
                   type="text"
                   value={logo}
                   onChange={(e) => setLogo(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-sm text-text-primary focus:outline-none focus:border-white/25 placeholder:text-text-faint"
-                  placeholder="svgs/wordpress.png"
+                  placeholder="svgs/wordpress.png or https://..."
                 />
                 <p className="text-xs text-text-faint">
-                  Relative path from Coolify public uploads directory
+                  URL, relative path, or filename (auto-resolves CDN & icons)
                 </p>
               </div>
 
