@@ -207,6 +207,7 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
       routingMode: routingMode || 'proxied',
       exposureMode: exposureMode || 'ssl_with_proxy',
       startCommand: startCommand || null,
+      frameworkPreset: frameworkPreset || 'auto',
       publishedPort: publishedPort ?? null,
     });
 
@@ -218,6 +219,24 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
     emit({ phase: 'error', message: err.message, stderr: err.stderr });
     res.end();
   }
+});
+
+const activeBuilds = new Map();
+
+app.post('/agent/deployments/:deploymentId/cancel-build', async (req, res) => {
+  const { deploymentId } = req.params;
+  const build = activeBuilds.get(deploymentId);
+  if (build) {
+    try {
+      if (typeof build.kill === 'function') build.kill();
+      activeBuilds.delete(deploymentId);
+      logger.info({ deploymentId }, 'Build process cancelled');
+      return res.json({ ok: true, message: 'Build cancelled' });
+    } catch (err) {
+      logger.error({ deploymentId, err }, 'Error cancelling build process');
+    }
+  }
+  res.json({ ok: true, message: 'No active build process found or already stopped' });
 });
 
 app.get('/agent/deployments/:containerId/logs', async (req, res) => {

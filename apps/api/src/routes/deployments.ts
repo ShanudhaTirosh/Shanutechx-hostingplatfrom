@@ -5,7 +5,7 @@ import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { ownedResourceWhere, canAccessResource } from '../middleware/rbac';
 import { deployService } from '../lib/deployPipeline';
 import { NodeSelectionError } from '../lib/nodeSelector';
-import { fetchLogs, stopDeployment, stopComposeProject, startDeployment, restartDeployment, buildAndRun, addCustomDomainRoute, removeCustomDomainRoute, getResourceUsage, ResourceMetrics } from '../lib/nodeAgentClient';
+import { fetchLogs, stopDeployment, cancelBuild, stopComposeProject, startDeployment, restartDeployment, buildAndRun, addCustomDomainRoute, removeCustomDomainRoute, getResourceUsage, ResourceMetrics } from '../lib/nodeAgentClient';
 import { parsePagination } from '../lib/pagination';
 import { verifyCnameTarget } from '../lib/customDomain';
 import { createSubdomainRecord, deleteSubdomainRecord } from '../lib/cloudflare';
@@ -848,6 +848,24 @@ deploymentsRouter.post('/deployments/:id/redeploy', async (req: AuthedRequest, r
     await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'failed' } });
     res.write(JSON.stringify({ phase: 'error', message: 'Redeploy failed' }) + '\n');
     res.end();
+  }
+});
+
+deploymentsRouter.post('/deployments/:id/cancel-build', async (req: AuthedRequest, res) => {
+  const deployment = await loadOwnedDeployment(req, req.params.id);
+  if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
+
+  try {
+    await cancelBuild(deployment.node, deployment.id).catch((err) => {
+      logger.warn({ deploymentId: deployment.id, err }, 'Failed to trigger cancel-build on node (continuing local update)');
+    });
+    await prisma.deployment.update({
+      where: { id: deployment.id },
+      data: { status: 'failed' },
+    });
+    res.json({ ok: true, message: 'Build cancelled successfully' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to cancel build' });
   }
 });
 

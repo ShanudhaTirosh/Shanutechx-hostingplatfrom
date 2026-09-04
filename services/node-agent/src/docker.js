@@ -25,6 +25,7 @@ async function runContainer({
   routingMode = 'proxied',
   exposureMode = 'ssl_with_proxy',
   startCommand = null,
+  frameworkPreset = 'auto',
   publishedPort = null,
 }) {
   const containerName = `deploy-${deploymentId}`;
@@ -36,16 +37,20 @@ async function runContainer({
   const networks = [];
   const portBindings = {};
 
+  const isBotProcess = ['nodejs_bot', 'python_bot', 'whatsapp_baileys'].includes(frameworkPreset);
+
   // Resolve effective exposure mode ('no_ssl', 'ssl_direct', 'ssl_with_proxy')
   const effectiveMode = exposureMode || (routingMode === 'direct' ? 'no_ssl' : 'ssl_with_proxy');
 
-  if (effectiveMode === 'no_ssl' || routingMode === 'direct') {
-    // Raw Host Port Mapping — bypass Traefik proxy for direct TCP/UDP (e.g. Lavalink on port 2333)
-    const hostPort = String(publishedPort || internalPort);
-    portBindings[`${internalPort}/tcp`] = [{ HostPort: hostPort }];
-    portBindings[`${internalPort}/udp`] = [{ HostPort: hostPort }];
-  } else {
-    // Proxied Routing via Traefik
+  if (effectiveMode === 'no_ssl' || routingMode === 'direct' || (isBotProcess && publishedPort)) {
+    // Raw Host Port Mapping — bypass Traefik proxy for direct TCP/UDP (e.g. Lavalink or bot on direct port)
+    if (publishedPort || internalPort) {
+      const hostPort = String(publishedPort || internalPort);
+      portBindings[`${internalPort}/tcp`] = [{ HostPort: hostPort }];
+      portBindings[`${internalPort}/udp`] = [{ HostPort: hostPort }];
+    }
+  } else if (!isBotProcess || subdomain) {
+    // Proxied Routing via Traefik (web services or bots with an HTTP management interface)
     const activeSubdomain = subdomain || `app-${deploymentId.slice(0, 8)}`;
     const routerName = `deploy-${deploymentId}`;
     const targetPort = internalPort && Number(internalPort) > 0 ? Number(internalPort) : 3000;

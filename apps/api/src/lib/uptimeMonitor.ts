@@ -127,7 +127,12 @@ export async function checkDnsResolution(hostname: string, expectedIp?: string):
  */
 export async function runUptimeChecks(): Promise<{ checked: number; up: number; down: number }> {
   const deployments = await prisma.deployment.findMany({
-    where: { status: 'running', isPreview: false, subdomain: { not: null } },
+    where: {
+      status: 'running',
+      isPreview: false,
+      frameworkPreset: { notIn: ['nodejs_bot', 'python_bot', 'whatsapp_baileys'] },
+      subdomain: { not: null },
+    },
     include: { user: true },
   });
 
