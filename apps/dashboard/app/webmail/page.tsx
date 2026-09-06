@@ -2,6 +2,23 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  Sun,
+  Moon,
+  Settings,
+  Mail,
+  Calendar,
+  User,
+  CheckSquare,
+  Pencil,
+  Inbox,
+  Star,
+  Send,
+  FileText,
+  Archive,
+  Trash2,
+  X,
+} from 'lucide-react';
 
 // =====================================================================
 // TYPES & INTERFACES
@@ -815,7 +832,7 @@ export default function WebmailPage() {
                 className="p-2.5 rounded-full text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
                 title="Toggle Light/Dark Theme"
               >
-                {theme === 'dark' ? '☀️' : '🌙'}
+                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
 
               <button
@@ -823,7 +840,7 @@ export default function WebmailPage() {
                 className="p-2.5 rounded-full text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
                 title="Settings Hub"
               >
-                ⚙️
+                <Settings className="w-4 h-4" />
               </button>
 
               {/* User Dropdown */}
@@ -881,7 +898,7 @@ export default function WebmailPage() {
                 }`}
                 title="Mail"
               >
-                ✉️
+                <Mail className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setActiveModule('calendar')}
@@ -890,7 +907,7 @@ export default function WebmailPage() {
                 }`}
                 title="Calendar"
               >
-                📅
+                <Calendar className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setActiveModule('contacts')}
@@ -899,7 +916,7 @@ export default function WebmailPage() {
                 }`}
                 title="Contacts"
               >
-                👤
+                <User className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setActiveModule('tasks')}
@@ -908,7 +925,7 @@ export default function WebmailPage() {
                 }`}
                 title="Tasks"
               >
-                ☑️
+                <CheckSquare className="w-5 h-5" />
               </button>
             </nav>
 
@@ -925,19 +942,19 @@ export default function WebmailPage() {
                         sidebarCollapsed ? 'px-0' : ''
                       }`}
                     >
-                      <span>✏️</span>
+                      <Pencil className="w-4 h-4" />
                       {!sidebarCollapsed && <span>Compose</span>}
                     </button>
 
                     {/* Folders List */}
                     <nav className="space-y-1">
                       {[
-                        { id: 'inbox', label: 'Inbox', icon: '📥' },
-                        { id: 'starred', label: 'Starred', icon: '⭐' },
-                        { id: 'sent', label: 'Sent Mail', icon: '📤' },
-                        { id: 'drafts', label: 'Drafts', icon: '📝' },
-                        { id: 'archive', label: 'Archive', icon: '📦' },
-                        { id: 'trash', label: 'Trash', icon: '🗑️' },
+                        { id: 'inbox', label: 'Inbox', Icon: Inbox },
+                        { id: 'starred', label: 'Starred', Icon: Star },
+                        { id: 'sent', label: 'Sent Mail', Icon: Send },
+                        { id: 'drafts', label: 'Drafts', Icon: FileText },
+                        { id: 'archive', label: 'Archive', Icon: Archive },
+                        { id: 'trash', label: 'Trash', Icon: Trash2 },
                       ].map((f) => (
                         <button
                           key={f.id}
@@ -949,7 +966,7 @@ export default function WebmailPage() {
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <span>{f.icon}</span>
+                            <f.Icon className="w-4 h-4" />
                             {!sidebarCollapsed && <span>{f.label}</span>}
                           </div>
                         </button>

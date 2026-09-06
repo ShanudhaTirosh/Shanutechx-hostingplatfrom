@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { KbArticle, KbCategory } from '@/lib/types';
 import { Card, Button, Spinner, PageHeader, useToast, Badge } from '@/components/ui';
+import { Check, Copy, Eye, ThumbsUp, X } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,11 @@ function CodeBlock({ code }: { code: string }) {
           onClick={copyToClipboard}
           className="text-accent-teal hover:text-white transition-colors font-semibold flex items-center gap-1"
         >
-          {copied ? '✓ Copied' : '📋 Copy'}
+          {copied ? (
+            <span className="flex items-center gap-1"><Check className="w-3 h-3 text-emerald-400" /> Copied</span>
+          ) : (
+            <span className="flex items-center gap-1"><Copy className="w-3 h-3" /> Copy</span>
+          )}
         </button>
       </div>
       <pre className="p-3 text-emerald-300 overflow-x-auto whitespace-pre-wrap">{code}</pre>
@@ -199,8 +204,8 @@ export default function CustomerKnowledgeBasePage() {
                   {article.summary}
                 </p>
                 <div className="flex items-center justify-between text-[10px] text-text-muted font-mono pt-2 border-t border-white/5">
-                  <span>👁 {article.views} views</span>
-                  <span className="text-emerald-400">👍 {article.helpfulCount} helpful</span>
+                  <span className="flex items-center gap-1"><Eye className="w-3 h-3 text-slate-400" /> {article.views} views</span>
+                  <span className="text-emerald-400 flex items-center gap-1"><ThumbsUp className="w-3 h-3 text-emerald-400" /> {article.helpfulCount} helpful</span>
                 </div>
               </div>
             ))}
@@ -224,9 +229,9 @@ export default function CustomerKnowledgeBasePage() {
               <button
                 type="button"
                 onClick={() => setSelectedArticle(null)}
-                className="text-text-muted hover:text-white text-lg p-1"
+                className="text-text-muted hover:text-white p-1"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
@@ -245,7 +250,11 @@ export default function CustomerKnowledgeBasePage() {
                 variant={votedHelpful[selectedArticle.id] ? 'secondary' : 'primary'}
                 onClick={() => handleVoteHelpful(selectedArticle.id)}
               >
-                {votedHelpful[selectedArticle.id] ? '✓ Marked Helpful' : `Was this helpful? (${selectedArticle.helpfulCount})`}
+                {votedHelpful[selectedArticle.id] ? (
+                  <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /> Marked Helpful</span>
+                ) : (
+                  `Was this helpful? (${selectedArticle.helpfulCount})`
+                )}
               </Button>
             </div>
           </div>

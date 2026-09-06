@@ -21,6 +21,7 @@ import {
   IconAlert,
   IconPlus,
 } from '@/components/Icons';
+import { Search, Headphones } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -127,7 +128,7 @@ export default function SupportPortalPage() {
       {/* Customer Quick Lookup Card */}
       <Card className="bg-white/5 border border-white/10 p-4 space-y-3">
         <h3 className="text-sm font-bold text-white flex items-center gap-2">
-          🔍 Customer Account Quick Lookup
+          <Search className="w-4 h-4 text-accent-teal" /> Customer Account Quick Lookup
         </h3>
         <div className="flex gap-2">
           <input
@@ -276,7 +277,7 @@ export default function SupportPortalPage() {
           </Card>
         ) : (
           <Card className="border border-dashed border-white/10 p-8 flex flex-col items-center justify-center text-center text-text-muted space-y-2">
-            <span className="text-2xl">🎧</span>
+            <Headphones className="w-8 h-8 text-slate-400 stroke-1" />
             <p className="text-xs">Select any ticket from the queue on the left to review details and send a staff response.</p>
           </Card>
         )}

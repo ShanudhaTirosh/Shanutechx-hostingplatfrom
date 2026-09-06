@@ -12,7 +12,7 @@ import {
 } from 'firebase/auth';
 import { firebaseAuth, googleProvider, githubProvider } from '@/lib/firebaseClient';
 import { Mail, Lock, User, ArrowRight, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
+import { API_BASE } from '@/lib/useAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -187,8 +187,9 @@ export default function LoginPage() {
         
         // Register in API to trigger database record & welcome email
         try {
-          await apiFetch('/api/auth/register', {
+          await fetch(`${API_BASE}/api/auth/register`, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               email: email.trim(),
               password,
@@ -220,8 +221,9 @@ export default function LoginPage() {
 
         // Also trigger backend password reset notification
         try {
-          await apiFetch('/api/auth/forgot-password', {
+          await fetch(`${API_BASE}/api/auth/forgot-password`, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: email.trim() }),
           });
         } catch {

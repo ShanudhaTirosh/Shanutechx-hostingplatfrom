@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
 import { supabaseAdmin, ClientSupabaseProject } from '@/lib/supabaseAdmin';
@@ -47,7 +48,7 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
         setName('');
         setClientEmail('');
         setShowModal(false);
-        setProjects((prev) => [...prev, res.project]);
+        setProjects((prev: ClientSupabaseProject[]) => [...prev, res.project]);
         onSelectProject(res.project);
       })
       .catch((err) => alert(err.message))
@@ -59,7 +60,7 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
       <div className="flex items-center gap-3">
         <div className="h-8 w-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
           </svg>
         </div>
         <div>
@@ -76,12 +77,12 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
             <select
               value={activeProject?.id || ''}
               onChange={(e) => {
-                const found = projects.find((p) => p.id === e.target.value);
+                const found = projects.find((p: ClientSupabaseProject) => p.id === e.target.value);
                 if (found) onSelectProject(found);
               }}
               className="bg-transparent text-sm font-bold text-text-primary focus:outline-none cursor-pointer"
             >
-              {projects.map((p) => (
+              {projects.map((p: ClientSupabaseProject) => (
                 <option key={p.id} value={p.id} className="bg-[#0f111a] text-text-primary">
                   {p.name} ({p.clientEmail})
                 </option>

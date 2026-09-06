@@ -63,7 +63,7 @@ const FEATURES = [
     icon: <ShieldCheck className="h-5 w-5 text-amber-400" />,
     title: 'Instant Provisioning & Vault',
     desc: 'Automated container creation, live WebSockets SSH terminal, AES-256-GCM secrets vault, and instant credential delivery upon payment approval.',
-    href: '/dashboard',
+    href: `${process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001'}/dashboard`,
   },
 ];
 

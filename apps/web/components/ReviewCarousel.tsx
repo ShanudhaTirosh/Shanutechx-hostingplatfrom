@@ -24,6 +24,7 @@ interface PurchasedItem {
 }
 
 export default function ReviewCarousel() {
+  const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [isPaused, setIsPaused] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -207,7 +208,7 @@ export default function ReviewCarousel() {
         return;
       }
 
-      setSubmitSuccess('✨ Thank you! Your verified product review has been published.');
+      setSubmitSuccess('Thank you! Your verified product review has been published.');
       if (data.review) {
         setReviews((prev) => [data.review, ...prev]);
       }
@@ -371,7 +372,7 @@ export default function ReviewCarousel() {
                     </p>
                   </div>
                   <Link
-                    href="http://localhost:3001/login"
+                    href={`${dashboardUrl}/login`}
                     target="_blank"
                     className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-glow-violet transition-all"
                   >

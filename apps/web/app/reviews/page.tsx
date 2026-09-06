@@ -27,6 +27,7 @@ interface PurchasedItem {
 }
 
 export default function ReviewsPage() {
+  const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -426,7 +427,7 @@ export default function ReviewsPage() {
                     </p>
                   </div>
                   <Link
-                    href="http://localhost:3001/login"
+                    href={`${dashboardUrl}/login`}
                     target="_blank"
                     className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-glow-violet transition-all"
                   >

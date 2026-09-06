@@ -624,7 +624,7 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
     try {
       const { payment } = await api.orders.uploadProof(order.id, file, idempotencyKey);
       if (payment.status === 'auto_approved') {
-        toast('Payment confirmed automatically ✓', 'success');
+        toast('Payment confirmed automatically', 'success');
       } else if (payment.status === 'manual_review') {
         toast('Submitted for review — support staff will verify shortly.', 'info');
       } else {
@@ -733,8 +733,11 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
 
           {order.status === 'paid' && (
             order.total === 0 ? (
-              <span className="text-xs font-medium text-emerald-400/90 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
-                ✓ Free Order (No Invoice Required)
+              <span className="text-xs font-medium text-emerald-400/90 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 inline-flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+                Free Order (No Invoice Required)
               </span>
             ) : (
               <>

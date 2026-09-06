@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Lock, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
+import { API_BASE } from '@/lib/useAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,8 +57,9 @@ export default function ResetPasswordPage() {
     setBusy(true);
 
     try {
-      const res = await apiFetch('/api/auth/reset-password', {
+      const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, newPassword }),
       });
 

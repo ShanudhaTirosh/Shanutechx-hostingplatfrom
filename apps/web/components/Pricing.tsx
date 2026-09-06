@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Globe, Zap, Code, Bot, MessageSquare, Music, Monitor, Brain, Mail, Database, Package } from 'lucide-react';
+import { Globe, Zap, Code, Bot, MessageSquare, Music, Monitor, Brain, Mail, Database, Package, ShoppingCart } from 'lucide-react';
 
 import { useCart } from '../context/CartContext';
 import GradientMeshOrb from './GradientMeshOrb';
@@ -194,7 +194,9 @@ export default function Pricing() {
                         : 'glass text-text-primary hover:bg-white/[0.08]'
                     }`}
                   >
-                    Add to Cart 🛒
+                    <span className="flex items-center justify-center gap-2">
+                      Add to Cart <ShoppingCart className="w-4 h-4" />
+                    </span>
                   </button>
 
                   {product.description && (
