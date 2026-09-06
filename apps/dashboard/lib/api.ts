@@ -604,7 +604,12 @@ export const api = {
       apiFetch(`/api/nodes/${nodeId}/ports/expose`, { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ exposure: any }>(r)),
     deletePortExposure: (nodeId: string, exposureId: string) =>
       apiFetch(`/api/nodes/${nodeId}/ports/exposures/${exposureId}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    triggerFailover: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/failover`, { method: 'POST' }).then((r) => asJson<{ success: boolean; message: string; result: any }>(r)),
+    getFailoverStatus: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/failover-status`).then((r) => asJson<{ logs: any[] }>(r)),
   },
+
 
 
   payments: {

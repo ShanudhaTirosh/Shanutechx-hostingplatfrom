@@ -106,6 +106,24 @@ export default function NodesPage() {
 function NodeCard({ node }: { node: Node }) {
   const stale = !node.lastSeenAt || Date.now() - new Date(node.lastSeenAt).getTime() > 5 * 60 * 1000;
   const [showNodeEngine, setShowNodeEngine] = useState(false);
+  const [failoverBusy, setFailoverBusy] = useState(false);
+  const { toast } = useToast();
+
+  async function handleFailover() {
+    if (!confirm(`Are you sure you want to evacuate node "${node.label}"? All containers and databases will be migrated to healthy target nodes in real-time.`)) {
+      return;
+    }
+
+    setFailoverBusy(true);
+    try {
+      const res = await api.nodes.triggerFailover(node.id);
+      toast(res.message || 'Node evacuation & failover completed!', 'success');
+    } catch (err: any) {
+      toast(err.message || 'Node failover failed', 'error');
+    } finally {
+      setFailoverBusy(false);
+    }
+  }
 
   return (
     <Card className="border border-white/[0.06] hover:border-white/12 transition-all flex flex-col justify-between space-y-4">
@@ -144,13 +162,22 @@ function NodeCard({ node }: { node: Node }) {
         </div>
       </div>
 
-      <div className="pt-2 border-t border-white/[0.04] flex justify-between items-center">
+      <div className="pt-2 border-t border-white/[0.04] flex flex-wrap gap-2 justify-between items-center">
         <Button size="sm" variant={showNodeEngine ? 'secondary' : 'primary'} onClick={() => setShowNodeEngine(!showNodeEngine)}>
           <span className="flex items-center gap-1.5">
             <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
-            {showNodeEngine ? 'Hide Node Control Panel' : 'Open Host Node Control Panel'}
+            {showNodeEngine ? 'Hide Control Panel' : 'Host Control Panel'}
+          </span>
+        </Button>
+
+        <Button size="sm" variant="secondary" loading={failoverBusy} onClick={handleFailover} className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10">
+          <span className="flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Evacuate &amp; Failover
           </span>
         </Button>
       </div>
@@ -172,6 +199,7 @@ function NodeCard({ node }: { node: Node }) {
     </Card>
   );
 }
+
 
 function Stat({ label, value, unit, max }: { label: string; value: number | null; unit: string; max: number }) {
   const pct = value !== null && max > 0 ? Math.min(100, (value / max) * 100) : 0;

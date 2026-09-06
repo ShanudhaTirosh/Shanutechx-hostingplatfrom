@@ -66,6 +66,7 @@ sslRenewalQueue.on('error', (err) => {
 export interface BillingSweepJob {}
 export interface UptimeSweepJob {}
 export interface WorkspaceCleanupJob {}
+export interface NodeFailoverSweepJob {}
 
 export const billingSweepQueue = new Queue<BillingSweepJob>('billing-sweep', {
   connection: redisConnectionOptions,
@@ -97,6 +98,16 @@ export const workspaceCleanupQueue = new Queue<WorkspaceCleanupJob>('workspace-c
   },
 });
 
+export const nodeFailoverQueue = new Queue<NodeFailoverSweepJob>('node-failover', {
+  connection: redisConnectionOptions,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 30000 },
+    removeOnComplete: { age: 60 * 60 * 24 * 3 },
+    removeOnFail: { age: 60 * 60 * 24 * 7 },
+  },
+});
+
 billingSweepQueue.on('error', () => {
   isRedisConnected = false;
 });
@@ -106,6 +117,10 @@ uptimeSweepQueue.on('error', () => {
 workspaceCleanupQueue.on('error', () => {
   isRedisConnected = false;
 });
+nodeFailoverQueue.on('error', () => {
+  isRedisConnected = false;
+});
+
 
 // Safely attach event listeners without unhandled promise rejections
 (async () => {

@@ -9,8 +9,10 @@ import { encryptSecret } from '../lib/secretsVault';
 import { verifySharedSecret } from '../lib/gateAuth';
 import { logger } from '../lib/logger';
 import { createSubdomainRecord, deleteSubdomainRecord } from '../lib/cloudflare';
+import { evacuateNodeWorkloads } from '../lib/failoverEngine';
 
 export const nodesRouter = Router();
+
 
 const CLUSTER_SECRET = env.nodeAgentSecret;
 
@@ -779,7 +781,57 @@ nodesRouter.patch('/nodes/:id', async (req: AuthedRequest, res: Response) => {
   res.json({ node });
 });
 
+/**
+ * POST /api/nodes/:id/failover
+ * Manually trigger instant evacuation and workload failover for a node.
+ * Evacuates deployments, managed databases, LiveKit keys, and exposed ports across remaining cluster nodes.
+ */
+nodesRouter.post('/nodes/:id/failover', async (req: AuthedRequest, res: Response) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.id } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+
+  try {
+    const result = await evacuateNodeWorkloads(node.id);
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'node.manual_failover',
+        target: node.id,
+        metadata: JSON.parse(JSON.stringify(result)),
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `Node evacuation & failover completed for ${node.label}`,
+      result,
+    });
+  } catch (err: any) {
+    logger.error({ err, nodeId: node.id }, 'Manual node failover failed');
+    res.status(500).json({ error: err.message || 'Node failover failed' });
+  }
+});
+
+/**
+ * GET /api/nodes/:id/failover-status
+ * Fetch recent failover audit logs for a compute node.
+ */
+nodesRouter.get('/nodes/:id/failover-status', async (req: AuthedRequest, res: Response) => {
+  const logs = await prisma.auditLog.findMany({
+    where: {
+      target: req.params.id,
+      action: { in: ['node.auto_failover', 'node.manual_failover'] },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+  });
+
+  res.json({ logs });
+});
+
 // ── BUG-10 FIX: Sanitize provisioning logs to remove cluster secret values ──
+
 function sanitizeLogs(logs: string[]): string[] {
   return logs.map(line => line.replaceAll(CLUSTER_SECRET, '[REDACTED]'));
 }

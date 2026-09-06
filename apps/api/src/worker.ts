@@ -10,13 +10,17 @@ import {
   uptimeSweepQueue,
   WorkspaceCleanupJob,
   workspaceCleanupQueue,
+  NodeFailoverSweepJob,
+  nodeFailoverQueue,
 } from './lib/queue';
 import { executeSSLRenewalJob } from './jobs/ssl-renewal';
 import { runBillingChecks } from './lib/billing';
 import { runUptimeChecks } from './lib/uptimeMonitor';
 import { executeWorkspaceCleanupJob } from './jobs/workspace-cleanup';
 import { checkMetricAlerts } from './lib/alerts';
+import { checkNodeHealthAndFailover } from './lib/nodeMonitor';
 import { logger } from './lib/logger';
+
 
 // SSL Certificate Renewal Worker
 const sslRenewalWorker = new Worker<SSLRenewalJob>(
@@ -161,3 +165,41 @@ uptimeSweepWorker.on('failed', (job, err) => {
     });
   }
 })();
+
+// Node health watchdog & automated failover sweep worker.
+const nodeFailoverWorker = new Worker<NodeFailoverSweepJob>(
+  'node-failover',
+  async (job) => {
+    const res = await checkNodeHealthAndFailover();
+    if (res.failedOver > 0) {
+      logger.info({ jobId: job.id, ...res }, 'Node health watchdog completed failover evacuation');
+    }
+  },
+  { connection: redisConnectionOptions, concurrency: 1 }
+);
+
+nodeFailoverWorker.on('failed', (job, err) => {
+  logger.error({ jobId: job?.id, err }, 'Node failover watchdog job failed');
+});
+
+(async () => {
+  try {
+    await nodeFailoverQueue.add(
+      'node-failover-watchdog-recurring',
+      {},
+      {
+        repeat: { every: 60 * 1000 }, // Every 60 seconds
+        jobId: 'node-failover-recurring',
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
+      }
+    );
+    logger.info({ msg: 'Node failover watchdog scheduled successfully', interval: '1 minute' });
+  } catch (error) {
+    logger.error({
+      msg: 'Failed to schedule node failover watchdog job',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+})();
+

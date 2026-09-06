@@ -31,4 +31,13 @@ export class NodesResource extends BaseClient {
     const res = await fetch(`${this.apiUrl}/api/nodes/install.sh`);
     return res.text();
   }
+
+  async triggerFailover(id: string): Promise<{ success: boolean; message: string; result: any }> {
+    return this.httpPost<{ success: boolean; message: string; result: any }>(`/api/nodes/${id}/failover`, {});
+  }
+
+  async getFailoverStatus(id: string): Promise<{ logs: any[] }> {
+    return this.httpGet<{ logs: any[] }>(`/api/nodes/${id}/failover-status`);
+  }
 }
+

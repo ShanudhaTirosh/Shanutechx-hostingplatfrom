@@ -1,6 +1,8 @@
 import { prisma } from './prisma';
+import { evacuateNodeWorkloads } from './failoverEngine';
 
 export class NodeSelectionError extends Error {}
+
 
 interface SelectNodeOptions {
   /** e.g. "web-hosting", "python-hosting", "discordbot-node", "livekit" */
@@ -98,42 +100,13 @@ export async function selectNodeForDeployment(opts: SelectNodeOptions) {
  * Automatic Node Failover & Container Migration Routine.
  * Evaluates node health and re-assigns active deployments to healthy nodes in the cluster.
  * Triggered when a node goes offline/unhealthy or is deactivated.
- * Migrates all deployments from the dead node to healthy nodes in the cluster.
+ * Migrates all deployments and workloads from the dead node to healthy nodes in the cluster.
  */
 export async function failoverDeadNode(failedNodeId: string): Promise<{ migrated: number; failed: number }> {
-  const failedNode = await prisma.node.findUnique({ where: { id: failedNodeId } });
-  if (!failedNode) {
-    throw new NodeSelectionError(`Node "${failedNodeId}" not found`);
-  }
-
-  // Mark node inactive
-  await prisma.node.update({
-    where: { id: failedNodeId },
-    data: { isActive: false },
-  });
-
-  const deployments = await prisma.deployment.findMany({
-    where: { nodeId: failedNodeId },
-  });
-
-  let migrated = 0;
-  let failed = 0;
-
-  for (const dep of deployments) {
-    try {
-      const requiredTag = dep.runtime?.includes('python') ? 'python-hosting' : 'web-hosting';
-      const targetNode = await selectNodeForDeployment({ requiredTag });
-
-      await prisma.deployment.update({
-        where: { id: dep.id },
-        data: { nodeId: targetNode.id, status: 'pending' },
-      });
-
-      migrated++;
-    } catch {
-      failed++;
-    }
-  }
-
-  return { migrated, failed };
+  const result = await evacuateNodeWorkloads(failedNodeId);
+  return {
+    migrated: result.deploymentsMigrated + result.databasesMigrated,
+    failed: result.deploymentsFailed + result.databasesFailed,
+  };
 }
+
