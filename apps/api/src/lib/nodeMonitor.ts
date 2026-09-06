@@ -43,13 +43,14 @@ export async function checkNodeHealthAndFailover(): Promise<{ audited: number; f
         logger.error({ nodeId: node.id, label: node.label }, 'Node is OFFLINE and unreachable. Executing automated failover evacuation.');
 
         // Send alert to admin discord/notifications
-        void notifyDiscordChannel(
-          'deployment_status_changed',
-          `🚨 **COMPUTE NODE OFFLINE ALERT**\n` +
-          `Node **${node.label}** (${node.ip}) went offline!\n` +
-          `Last heartbeat: ${node.lastSeenAt ? node.lastSeenAt.toISOString() : 'Never'}.\n` +
-          `*Autonomous failover & container evacuation triggered.*`
-        ).catch(() => {});
+        void notifyDiscordChannel('deployment_failed', {
+          alert: 'COMPUTE NODE OFFLINE ALERT',
+          nodeLabel: node.label,
+          nodeIp: node.ip,
+          lastSeenAt: node.lastSeenAt ? node.lastSeenAt.toISOString() : 'Never',
+          action: 'Autonomous failover & container evacuation triggered',
+        }).catch(() => {});
+
 
 
         try {

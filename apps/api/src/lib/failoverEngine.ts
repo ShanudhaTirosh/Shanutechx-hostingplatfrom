@@ -277,13 +277,18 @@ export async function evacuateNodeWorkloads(failedNodeId: string): Promise<Failo
   }
 
   // Log audit trail for node failover
-  await prisma.auditLog.create({
-    data: {
-      action: 'node.auto_failover',
-      target: failedNodeId,
-      metadata: JSON.parse(JSON.stringify(result)),
-    },
-  }).catch(() => {});
+  const adminUser = await prisma.user.findFirst({ where: { role: { in: ['admin', 'dev'] } } });
+  if (adminUser) {
+    await prisma.auditLog.create({
+      data: {
+        adminId: adminUser.id,
+        action: 'node.auto_failover',
+        target: `${failedNodeId}: ${JSON.stringify(result)}`,
+        actorRole: 'system',
+      },
+    }).catch(() => {});
+  }
+
 
   logger.info(
     {

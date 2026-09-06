@@ -797,10 +797,11 @@ nodesRouter.post('/nodes/:id/failover', async (req: AuthedRequest, res: Response
       data: {
         adminId: req.user!.id,
         action: 'node.manual_failover',
-        target: node.id,
-        metadata: JSON.parse(JSON.stringify(result)),
+        target: `${node.id}: ${JSON.stringify(result)}`,
+        actorRole: req.user!.role,
       },
     });
+
 
     res.json({
       success: true,
