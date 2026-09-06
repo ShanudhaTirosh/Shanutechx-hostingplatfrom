@@ -4,15 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { Node, ManagedDatabase } from '../lib/types';
 import {
-  ServerIcon,
-  CpuChipIcon,
-  CircleStackIcon,
-  ArrowPathIcon,
-  XMarkIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  BoltIcon,
-} from '@heroicons/react/24/outline';
+  Server,
+  Cpu,
+  Database,
+  RefreshCw,
+  X,
+  CheckCircle,
+  AlertTriangle,
+  Zap,
+} from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -105,7 +105,7 @@ export default function DatabaseMigrationScaleModal({ isOpen, onClose, database,
         <div className="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-900/50">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-              <CircleStackIcon className="w-6 h-6" />
+              <Database className="w-6 h-6" />
             </div>
             <div>
               <h3 className="text-lg font-semibold text-slate-100">
@@ -120,7 +120,7 @@ export default function DatabaseMigrationScaleModal({ isOpen, onClose, database,
             onClick={onClose}
             className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
           >
-            <XMarkIcon className="w-5 h-5" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -134,7 +134,7 @@ export default function DatabaseMigrationScaleModal({ isOpen, onClose, database,
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <CpuChipIcon className="w-4 h-4" />
+            <Cpu className="w-4 h-4" />
             Dynamic Scaling & Tuning
           </button>
           <button
@@ -145,7 +145,7 @@ export default function DatabaseMigrationScaleModal({ isOpen, onClose, database,
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <ServerIcon className="w-4 h-4" />
+            <Server className="w-4 h-4" />
             Live Compute Migration
           </button>
         </div>
@@ -154,14 +154,14 @@ export default function DatabaseMigrationScaleModal({ isOpen, onClose, database,
         <div className="p-6 space-y-5">
           {error && (
             <div className="flex items-center gap-3 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
-              <ExclamationTriangleIcon className="w-5 h-5 shrink-0" />
+              <AlertTriangle className="w-5 h-5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           {successMsg && (
             <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
-              <CheckCircleIcon className="w-5 h-5 shrink-0" />
+              <CheckCircle className="w-5 h-5 shrink-0" />
               <span>{successMsg}</span>
             </div>
           )}
@@ -172,7 +172,7 @@ export default function DatabaseMigrationScaleModal({ isOpen, onClose, database,
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                    <BoltIcon className="w-4 h-4 text-amber-400" /> CPU Allocation Limit
+                    <Zap className="w-4 h-4 text-amber-400" /> CPU Allocation Limit
                   </label>
                   <span className="text-xs font-mono text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/50">
                     {cpuLimit} {cpuLimit === 1 ? 'Core' : 'Cores'}
@@ -198,7 +198,7 @@ export default function DatabaseMigrationScaleModal({ isOpen, onClose, database,
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                    <CpuChipIcon className="w-4 h-4 text-cyan-400" /> RAM Memory Allocation
+                    <Cpu className="w-4 h-4 text-cyan-400" /> RAM Memory Allocation
                   </label>
                   <span className="text-xs font-mono text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/50">
                     {memoryMb >= 1024 ? `${(memoryMb / 1024).toFixed(1)} GB` : `${memoryMb} MB`}
@@ -224,7 +224,7 @@ export default function DatabaseMigrationScaleModal({ isOpen, onClose, database,
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                    <CircleStackIcon className="w-4 h-4 text-emerald-400" /> Max Concurrent Connections
+                    <Database className="w-4 h-4 text-emerald-400" /> Max Concurrent Connections
                   </label>
                   <span className="text-xs font-mono text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/50">
                     {maxConnections} Conns
@@ -298,7 +298,7 @@ export default function DatabaseMigrationScaleModal({ isOpen, onClose, database,
             disabled={loading}
             className="px-5 py-2 text-sm font-semibold text-slate-950 bg-cyan-400 hover:bg-cyan-300 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/20 disabled:opacity-50"
           >
-            {loading && <ArrowPathIcon className="w-4 h-4 animate-spin" />}
+            {loading && <RefreshCw className="w-4 h-4 animate-spin" />}
             {activeTab === 'scale' ? 'Apply Resource Limits' : 'Start Live Migration'}
           </button>
         </div>
