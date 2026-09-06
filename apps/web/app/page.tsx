@@ -5,6 +5,7 @@ import BentoGrid from '@/components/BentoGrid';
 import FeaturesGrid from '@/components/FeaturesGrid';
 import Pricing from '@/components/Pricing';
 import ReviewCarousel from '@/components/ReviewCarousel';
+import CtaBanner from '@/components/CtaBanner';
 import StxFooter from '@/components/StxFooter';
 
 export default async function HomePage() {
@@ -16,6 +17,7 @@ export default async function HomePage() {
       <BentoGrid />
       <FeaturesGrid />
       <Pricing />
+      <CtaBanner />
       <ReviewCarousel />
       <StxFooter />
     </main>

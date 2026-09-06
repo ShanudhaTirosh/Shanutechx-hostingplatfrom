@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Globe, Zap, Code, Bot, MessageSquare, Music, Monitor, Brain, Mail, Database, Package } from 'lucide-react';
 
+import { useCart } from '../context/CartContext';
 import GradientMeshOrb from './GradientMeshOrb';
 import Reveal from './motion/Reveal';
 import TiltCard from './motion/TiltCard';
@@ -51,8 +52,8 @@ interface Product { id: string; name: string; category: string; description: str
 
 export default function Pricing() {
   const [products, setProducts] = useState<Product[] | null>(null);
-  const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
-  const loginUrl = `${dashboardUrl}/login`;
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const { addItem } = useCart();
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
@@ -70,7 +71,7 @@ export default function Pricing() {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 opacity-65 sm:opacity-80 pointer-events-none">
         <GradientMeshOrb size={600} glowColor="rgba(45,212,191,0.55)" />
       </div>
-      <Reveal className="text-center mb-12">
+      <Reveal className="text-center mb-10">
         <span className="glass inline-block rounded-full px-4 py-1 text-xs text-text-muted mb-4">
           Products &amp; Pricing
         </span>
@@ -78,8 +79,35 @@ export default function Pricing() {
           Host anything, <span className="text-gradient">pay per product</span>
         </h2>
         <p className="text-text-muted mt-3 max-w-2xl mx-auto">
-          No complex packages. Pay only for the specific resources you need. Fully managed under our auto-scaling edge network and secure SSL routing.
+          No complex packages. Pay only for the specific resources you need. Fully managed under our auto-scaling edge network.
         </p>
+
+        {/* Monthly / Yearly Billing Toggle */}
+        <div className="mt-8 inline-flex items-center gap-2 p-1.5 rounded-full bg-slate-900/80 border border-white/10 backdrop-blur-md">
+          <button
+            onClick={() => setBillingCycle('monthly')}
+            className={`px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              billingCycle === 'monthly'
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Monthly Billing
+          </button>
+          <button
+            onClick={() => setBillingCycle('yearly')}
+            className={`px-5 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              billingCycle === 'yearly'
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span>Annual Billing</span>
+            <span className="px-2 py-0.5 text-[10px] font-black rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              SAVE 30%
+            </span>
+          </button>
+        </div>
       </Reveal>
 
       {/* Skeleton loader while fetching */}
@@ -100,7 +128,8 @@ export default function Pricing() {
       {products !== null && displayed.length > 0 && (
         <div className="grid md:grid-cols-3 gap-6">
           {displayed.map((product, idx) => {
-            const cheapest = product.plans.reduce((min, p) => (p.price < min.price ? p : min), product.plans[0]);
+            const rawCheapest = product.plans.reduce((min, p) => (p.price < min.price ? p : min), product.plans[0]);
+            const finalPrice = billingCycle === 'yearly' ? Math.round(rawCheapest.price * 0.7) : rawCheapest.price;
             const recommended = idx === 1;
             return (
               <Reveal key={product.id} index={idx}>
@@ -114,7 +143,7 @@ export default function Pricing() {
                 >
                   {recommended && (
                     <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-xs font-semibold text-white bg-brand-gradient shadow-glow-violet">
-                      Most Popular
+                      Recommended For Your Business
                     </span>
                   )}
 
@@ -137,27 +166,36 @@ export default function Pricing() {
                   <div className="mb-6">
                     <div className="flex items-end gap-1">
                       <span className="text-3xl font-bold text-text-primary">
-                        {formatPrice(cheapest.price)}
+                        {formatPrice(finalPrice)}
                       </span>
                       <span className="text-text-muted text-xs mb-1.5">
-                        {BILLING_LABEL[cheapest.billingType] ?? cheapest.billingType}
+                        {billingCycle === 'yearly' ? '/month (billed yearly)' : BILLING_LABEL[rawCheapest.billingType] ?? rawCheapest.billingType}
                       </span>
                     </div>
                     {product.plans.length > 1 && (
-                      <p className="text-text-faint text-[11px] mt-0.5">+ {product.plans.length - 1} more plan{product.plans.length > 2 ? 's' : ''}</p>
+                      <p className="text-text-faint text-[11px] mt-0.5">+ {product.plans.length - 1} more plan tier{product.plans.length > 2 ? 's' : ''}</p>
                     )}
                   </div>
 
-                  <a
-                    href={loginUrl}
-                    className={`rounded-full px-4 py-2.5 text-sm font-semibold text-center transition-all hover:opacity-90 ${
+                  <button
+                    onClick={() =>
+                      addItem({
+                        id: rawCheapest.id,
+                        name: `${product.name} — ${rawCheapest.name}`,
+                        category: product.category,
+                        price: finalPrice,
+                        currency: 'LKR',
+                        billingType: billingCycle,
+                      })
+                    }
+                    className={`rounded-full px-4 py-2.5 text-sm font-semibold text-center transition-all cursor-pointer ${
                       recommended
-                        ? 'bg-brand-gradient text-white shadow-glow-violet'
+                        ? 'bg-brand-gradient text-white shadow-glow-violet hover:opacity-90'
                         : 'glass text-text-primary hover:bg-white/[0.08]'
                     }`}
                   >
-                    Order Now →
-                  </a>
+                    Add to Cart 🛒
+                  </button>
 
                   {product.description && (
                     <ul className="mt-6 space-y-2.5 text-xs text-text-muted flex-1 border-t border-white/[0.05] pt-5">

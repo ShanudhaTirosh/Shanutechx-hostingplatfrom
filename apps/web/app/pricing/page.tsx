@@ -27,6 +27,8 @@ interface Plan {
   name: string;
   price: number; // in cents or smallest currency unit
   billingType: string;
+  isPopular?: boolean;
+  badge?: string;
 }
 
 interface Product {
@@ -35,6 +37,8 @@ interface Product {
   category: string;
   description: string | null;
   plans: Plan[];
+  isPopular?: boolean;
+  badge?: string;
 }
 
 const BILLING_LABEL: Record<string, string> = {

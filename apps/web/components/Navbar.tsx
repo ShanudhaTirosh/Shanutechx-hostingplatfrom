@@ -469,11 +469,16 @@ export default function Navbar() {
 
           {/* 🛒 Cart Drawer Icon Button */}
           <button
-            onClick={() => setCartOpen((v) => !v)}
+            onClick={() => setCartOpen(!cartOpen)}
             className="relative p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-all focus:outline-none"
             title="Shopping Cart"
           >
-              {totalCount}
+            <ShoppingCart className="h-4 w-4" />
+            {totalCount > 0 && (
+              <span className="absolute top-1 right-1 bg-purple-500 text-white font-mono font-bold text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-[0_0_8px_rgba(168,85,247,0.8)]">
+                {totalCount}
+              </span>
+            )}
           </button>
 
           {/* 🔔 Notification Bell with Click Outside Handler */}
