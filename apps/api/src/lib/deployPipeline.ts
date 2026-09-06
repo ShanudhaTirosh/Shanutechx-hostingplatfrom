@@ -89,7 +89,9 @@ export async function deployService(params: DeployParams) {
     explicitNodeId,
   });
 
-  const isPublic = PUBLIC_SERVICE_TYPES.has(serviceType) || (exposureMode && exposureMode !== 'no_ssl');
+  const isPublic = exposureMode
+    ? exposureMode !== 'internal_only'
+    : PUBLIC_SERVICE_TYPES.has(serviceType);
   const subdomain = isPublic ? await generateSubdomain(preferredName, params.customSubdomain) : undefined;
 
   // Encrypt environment variables if provided (Requirements 12.10-12.11)

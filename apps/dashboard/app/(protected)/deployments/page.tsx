@@ -50,17 +50,24 @@ const SERVICE_TYPES = [
 
 const EXPOSURE_MODES = [
   {
+    value: "internal_only",
+    label: "🔒 No Open Ports (Internal Only — Recommended for Bots, Background Workers & Private DBs)",
+  },
+  {
     value: "ssl_with_proxy",
-    label: "SSL with Proxy ( Automatic Let's Encrypt TLS)",
+    label: "🌐 Subdomain Reverse Proxy SSL (443/80 — Recommended for Web Apps & Webhooks)",
   },
   {
     value: "ssl_direct",
-    label: "SSL Direct (Container Direct TLS Termination)",
+    label: "🔒 Domain + Port with SSL (Container Direct TLS)",
   },
   {
     value: "no_ssl",
-    label:
-      "No SSL / Direct Host Port (Direct TCP/UDP — Required for Lavalink audio, game servers, raw sockets)",
+    label: "HTTP / Port without SSL (Direct Port Access)",
+  },
+  {
+    value: "raw_tcp",
+    label: "⚡ Raw Host:Port TCP Direct (Game Servers, Lavalink Audio, Direct Sockets)",
   },
 ];
 
@@ -843,16 +850,22 @@ function DeploymentRow({
             {deployment.exposureMode && (
               <span
                 className={`text-[10px] rounded-full px-2 py-0.5 font-medium ${
-                  deployment.exposureMode === "no_ssl"
-                    ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                    : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                  deployment.exposureMode === "internal_only"
+                    ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                    : deployment.exposureMode === "no_ssl" || deployment.exposureMode === "raw_tcp"
+                      ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                      : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                 }`}
               >
-                {deployment.exposureMode === "no_ssl"
-                  ? "Direct TCP (No SSL)"
-                  : deployment.exposureMode === "ssl_direct"
-                    ? "SSL Direct"
-                    : "SSL Proxy"}
+                {deployment.exposureMode === "internal_only"
+                  ? "🔒 Internal Only (No Ports)"
+                  : deployment.exposureMode === "raw_tcp"
+                    ? "Raw TCP Direct"
+                    : deployment.exposureMode === "no_ssl"
+                      ? "Direct TCP (No SSL)"
+                      : deployment.exposureMode === "ssl_direct"
+                        ? "SSL Direct"
+                        : "SSL Proxy"}
               </span>
             )}
           </div>

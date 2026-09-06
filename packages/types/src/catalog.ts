@@ -31,6 +31,9 @@ export interface CatalogTemplate {
   minMemoryMb?: number;
   minCpuCores?: number;
   tags: string[];
+  requiresExposedPort?: boolean;
+  defaultInternalPort?: number;
+  recommendedExposureMode?: 'internal_only' | 'ssl_with_proxy' | 'ssl_direct' | 'no_ssl' | 'raw_tcp';
 }
 
 export interface CatalogDeployInput {

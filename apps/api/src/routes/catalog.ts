@@ -31,6 +31,9 @@ interface TemplateMeta {
   tags: string[];
   logo: string;
   port: number | null;
+  requiresExposedPort: boolean;
+  defaultInternalPort: number | null;
+  recommendedExposureMode: 'internal_only' | 'ssl_with_proxy' | 'ssl_direct' | 'no_ssl' | 'raw_tcp';
 }
 
 // In-memory cache for template catalog
@@ -47,6 +50,10 @@ function parseMeta(content: string, filename: string): TemplateMeta {
     if (!line.startsWith('#') && line.trim()) break;
   }
   const slug = path.basename(filename, path.extname(filename));
+  const reqPort = meta.requiresExposedPort ? meta.requiresExposedPort.toLowerCase() === 'true' : false;
+  const parsedPort = meta.defaultInternalPort ? parseInt(meta.defaultInternalPort, 10) : (meta.port ? parseInt(meta.port, 10) : null);
+  const recMode = (meta.recommendedExposureMode as any) || (reqPort ? 'ssl_with_proxy' : 'internal_only');
+
   return {
     slug,
     filename,
@@ -56,7 +63,10 @@ function parseMeta(content: string, filename: string): TemplateMeta {
     category: meta.category ?? 'other',
     tags: meta.tags ? meta.tags.split(',').map((t) => t.trim()) : [],
     logo: meta.logo ?? '',
-    port: meta.port ? parseInt(meta.port, 10) : null,
+    port: parsedPort,
+    requiresExposedPort: reqPort,
+    defaultInternalPort: parsedPort,
+    recommendedExposureMode: recMode,
   };
 }
 

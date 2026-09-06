@@ -71,7 +71,7 @@ const createDeploymentSchema = z.object({
   startCommand: z.string().max(500).optional(),
   entryFile: z.string().max(255).optional(),
   frameworkPreset: z.enum(['auto', 'nextjs', 'react_vite', 'nodejs_bot', 'whatsapp_baileys', 'python_bot', 'lavalink_java', 'static_html', 'custom']).optional(),
-  exposureMode: z.enum(['ssl_with_proxy', 'ssl_direct', 'no_ssl']).optional(),
+  exposureMode: z.enum(['ssl_with_proxy', 'ssl_direct', 'no_ssl', 'internal_only', 'raw_tcp']).optional(),
   publishedPort: z.number().int().min(1).max(65535).optional(),
   teamId: z.string().nullable().optional(),
 }).refine((data) => data.templateId || (data.repoUrl && data.internalPort), {

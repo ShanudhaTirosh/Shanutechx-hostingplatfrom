@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { api } from '@/lib/api';
 import { Button, Spinner, Modal, useToast } from '@/components/ui';
+import BulkEnvImportModal from '@/components/BulkEnvImportModal';
 
 interface Props {
   deploymentId: string;
@@ -344,30 +345,26 @@ export function EnvVarsPanel({ deploymentId, isRunning }: Props) {
       </div>
 
       {/* Bulk Paste Modal */}
-      {showBulkPasteModal && (
-        <Modal open={true} onClose={() => setShowBulkPasteModal(false)} title="Bulk Paste .env File Content" width="max-w-2xl">
-          <div className="space-y-4">
-            <p className="text-xs text-text-muted">
-              Paste raw <code className="text-indigo-400 font-mono">KEY=VALUE</code> lines below. Existing keys will be updated with new values.
-            </p>
-            <textarea
-              rows={10}
-              value={bulkText}
-              onChange={(e) => setBulkText(e.target.value)}
-              placeholder={`PORT=3000\nDATABASE_URL=postgresql://user:pass@host:5432/db\nAPI_KEY="sk_live_sample"`}
-              className="w-full bg-black/60 border border-white/10 rounded-xl p-3 text-xs font-mono text-emerald-400 focus:outline-none focus:border-accent-violet placeholder:text-text-faint"
-            />
-            <div className="flex justify-end gap-3 pt-2">
-              <Button size="sm" variant="ghost" onClick={() => setShowBulkPasteModal(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleApplyBulkPaste}>
-                Apply Variables
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      <BulkEnvImportModal
+        isOpen={showBulkPasteModal}
+        onClose={() => setShowBulkPasteModal(false)}
+        onImport={(parsedEnv) => {
+          setRows((prev) => {
+            const existingKeys = new Set(prev.map((r) => r.key));
+            const updated = [...prev];
+            for (const [key, value] of Object.entries(parsedEnv)) {
+              if (existingKeys.has(key)) {
+                const idx = updated.findIndex((r) => r.key === key);
+                if (idx >= 0) updated[idx] = { ...updated[idx], value };
+              } else {
+                updated.push({ key, value, masked: true });
+              }
+            }
+            return updated;
+          });
+          toast(`Imported ${Object.keys(parsedEnv).length} variables!`, 'success');
+        }}
+      />
 
       {/* Rebuild/Restart Live Log */}
       {showLog && log.length > 0 && (
