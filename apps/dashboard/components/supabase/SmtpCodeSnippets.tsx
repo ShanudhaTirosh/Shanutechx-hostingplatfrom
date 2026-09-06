@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Check, Copy } from 'lucide-react';
 import { SupabaseSmtpConfig } from '@/lib/supabaseAdmin';
+
 
 interface SmtpCodeSnippetsProps {
   smtp: SupabaseSmtpConfig;
@@ -106,10 +108,12 @@ echo 'Message sent!';
 
         <button
           onClick={handleCopy}
-          className="px-3 py-1 rounded-lg bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet-light border border-accent-violet/30 text-xs font-semibold transition-all"
+          className="px-3 py-1 rounded-lg bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet-light border border-accent-violet/30 text-xs font-semibold transition-all flex items-center gap-1.5"
         >
-          {copied ? 'Copied ✓' : 'Copy Code Snippet'}
+          {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+          <span>{copied ? 'Copied' : 'Copy Code Snippet'}</span>
         </button>
+
       </div>
 
       <pre className="w-full h-44 rounded-lg bg-black/60 border border-white/[0.08] p-3 font-mono text-[11px] text-teal-300 overflow-y-auto">

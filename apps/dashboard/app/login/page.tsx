@@ -6,8 +6,13 @@ import { useRouter } from 'next/navigation';
 import {
   signInWithPopup,
   GithubAuthProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { firebaseAuth, googleProvider, githubProvider } from '@/lib/firebaseClient';
+import { Mail, Lock, User, ArrowRight, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,8 +53,13 @@ function GithubIcon() {
 
 export default function LoginPage() {
   const router = useRouter();
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [busyProvider, setBusyProvider] = useState<'google' | 'github' | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [busyProvider, setBusyProvider] = useState<'google' | 'github' | 'email' | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -60,7 +70,7 @@ export default function LoginPage() {
     return (
       <main className="min-h-screen flex items-center justify-center px-4 bg-[#070818]">
         <div className="w-full max-w-sm">
-          <div className="bg-white/5 rounded-3xl p-8 h-[380px] animate-pulse" />
+          <div className="bg-white/5 rounded-3xl p-8 h-[420px] animate-pulse" />
         </div>
       </main>
     );
@@ -70,16 +80,20 @@ export default function LoginPage() {
     if (msg.includes('popup-closed-by-user')) return 'Sign-in window closed before completing authentication.';
     if (msg.includes('account-exists-with-different-credential'))
       return 'An account already exists with the same email using a different provider.';
+    if (msg.includes('user-not-found') || msg.includes('wrong-password') || msg.includes('invalid-credential'))
+      return 'Invalid email address or password.';
+    if (msg.includes('email-already-in-use')) return 'An account with this email address already exists.';
+    if (msg.includes('weak-password')) return 'Password should be at least 6 characters long.';
     return msg;
   }
 
   async function handleGoogle() {
     setError(null);
+    setSuccess(null);
     setBusyProvider('google');
     try {
       const result = await signInWithPopup(firebaseAuth, googleProvider);
       if (result.user) {
-        // Cache provider session info
         localStorage.setItem(
           'stx_auth_user',
           JSON.stringify({
@@ -101,11 +115,10 @@ export default function LoginPage() {
 
   async function handleGithub() {
     setError(null);
+    setSuccess(null);
     setBusyProvider('github');
     try {
       const result = await signInWithPopup(firebaseAuth, githubProvider);
-
-      // Extract GitHub access token directly so user doesn't need to connect repositories separately!
       const credential = GithubAuthProvider.credentialFromResult(result);
       const token = credential?.accessToken;
 
@@ -134,8 +147,98 @@ export default function LoginPage() {
     }
   }
 
+  async function handleEmailSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    if (!email.trim()) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    setBusyProvider('email');
+
+    try {
+      if (authMode === 'signin') {
+        if (!password) {
+          setError('Please enter your password');
+          setBusyProvider(null);
+          return;
+        }
+        const userCred = await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
+        localStorage.setItem(
+          'stx_auth_user',
+          JSON.stringify({
+            uid: userCred.user.uid,
+            name: userCred.user.displayName || userCred.user.email?.split('@')[0],
+            email: userCred.user.email,
+            provider: 'password',
+          })
+        );
+        router.push('/dashboard');
+      } else if (authMode === 'signup') {
+        if (!password || password.length < 6) {
+          setError('Password must be at least 6 characters long');
+          setBusyProvider(null);
+          return;
+        }
+        const userCred = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
+        
+        // Register in API to trigger database record & welcome email
+        try {
+          await apiFetch('/api/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({
+              email: email.trim(),
+              password,
+              name: name.trim() || email.trim().split('@')[0],
+              firebaseUid: userCred.user.uid,
+            }),
+          });
+        } catch {
+          // Sync fallback
+        }
+
+        localStorage.setItem(
+          'stx_auth_user',
+          JSON.stringify({
+            uid: userCred.user.uid,
+            name: name.trim() || userCred.user.email?.split('@')[0],
+            email: userCred.user.email,
+            provider: 'password',
+          })
+        );
+        router.push('/dashboard');
+      } else if (authMode === 'forgot') {
+        // Send Firebase Password Reset
+        try {
+          await sendPasswordResetEmail(firebaseAuth, email.trim());
+        } catch {
+          // Fallback through backend API
+        }
+
+        // Also trigger backend password reset notification
+        try {
+          await apiFetch('/api/auth/forgot-password', {
+            method: 'POST',
+            body: JSON.stringify({ email: email.trim() }),
+          });
+        } catch {
+          // Fallback
+        }
+
+        setSuccess('Password reset link sent! Check your email inbox for instructions.');
+      }
+    } catch (err: any) {
+      setError(friendly(err.message ?? 'Authentication failed'));
+    } finally {
+      setBusyProvider(null);
+    }
+  }
+
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden bg-[#060719] font-sans selection:bg-purple-500 selection:text-white">
+    <main className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden bg-[#060719] font-sans selection:bg-purple-500 selection:text-white py-12">
       {/* Background Ambient Orbs & Grids */}
       <div className="absolute inset-0 -z-10 pointer-events-none">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] rounded-full bg-purple-600/15 blur-[120px]" />
@@ -158,59 +261,174 @@ export default function LoginPage() {
         </div>
 
         {/* Login Card */}
-        <div className="bg-[#090b22]/90 backdrop-blur-2xl border border-white/15 rounded-3xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.15)] space-y-6">
-          <div className="text-center space-y-1.5">
-            <h1 className="text-2xl font-black text-white tracking-tight">Sign In / Sign Up</h1>
+        <div className="bg-[#090b22]/90 backdrop-blur-2xl border border-white/15 rounded-3xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.15)] space-y-5">
+          {/* Mode Switcher Tabs */}
+          <div className="grid grid-cols-3 gap-1 bg-white/5 p-1 rounded-2xl border border-white/10 text-center text-xs font-bold">
+            <button
+              onClick={() => { setAuthMode('signin'); setError(null); setSuccess(null); }}
+              className={`py-2 rounded-xl transition-all ${authMode === 'signin' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => { setAuthMode('signup'); setError(null); setSuccess(null); }}
+              className={`py-2 rounded-xl transition-all ${authMode === 'signup' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              Sign Up
+            </button>
+            <button
+              onClick={() => { setAuthMode('forgot'); setError(null); setSuccess(null); }}
+              className={`py-2 rounded-xl transition-all ${authMode === 'forgot' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              Reset
+            </button>
+          </div>
+
+          <div className="text-center space-y-1">
+            <h1 className="text-xl font-black text-white tracking-tight">
+              {authMode === 'signin' && 'Welcome Back'}
+              {authMode === 'signup' && 'Create Cloud Account'}
+              {authMode === 'forgot' && 'Reset Your Password'}
+            </h1>
             <p className="text-xs text-slate-400 font-sans">
-              Choose your OAuth identity provider to access control panel
+              {authMode === 'signin' && 'Sign in to access your servers and deployments'}
+              {authMode === 'signup' && 'Deploy applications, VPS nodes & managed databases'}
+              {authMode === 'forgot' && 'Enter your email to receive a password reset link'}
             </p>
           </div>
 
           {/* Error Banner */}
           {error && (
-            <div className="flex items-start gap-2.5 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-300">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="shrink-0 mt-0.5">
-                <path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm-1-7v2h2v-2h-2zm0-8v6h2V7h-2z" />
-              </svg>
+            <div className="flex items-start gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Social Provider Buttons ONLY */}
-          <div className="space-y-3.5 pt-2">
+          {/* Success Banner */}
+          {success && (
+            <div className="flex items-start gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300">
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{success}</span>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleEmailSubmit} className="space-y-3.5">
+            {authMode === 'signup' && (
+              <div className="relative">
+                <User className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Full Name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all"
+                  required
+                />
+              </div>
+            )}
+
+            <div className="relative">
+              <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+              <input
+                type="email"
+                placeholder="Email Address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all"
+                required
+              />
+            </div>
+
+            {authMode !== 'forgot' && (
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all"
+                  required
+                />
+              </div>
+            )}
+
+            {authMode === 'signin' && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('forgot'); setError(null); setSuccess(null); }}
+                  className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={busyProvider !== null}
+              className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-all shadow-lg hover:scale-[1.02] disabled:opacity-50"
+            >
+              {busyProvider === 'email' ? (
+                <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              ) : (
+                <>
+                  <span>
+                    {authMode === 'signin' && 'Sign In with Email'}
+                    {authMode === 'signup' && 'Create Account'}
+                    {authMode === 'forgot' && 'Send Reset Email'}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">OR CONTINUE WITH</span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
+
+          {/* Social Provider Buttons */}
+          <div className="grid grid-cols-2 gap-3">
             {/* Continue with Google */}
             <button
               onClick={handleGoogle}
               disabled={busyProvider !== null}
-              className="w-full py-3.5 px-4 rounded-2xl bg-white/5 border border-white/15 hover:bg-white/10 hover:border-purple-500/40 text-white font-extrabold text-xs flex items-center justify-center gap-3 transition-all shadow-lg hover:scale-[1.02] disabled:opacity-50"
+              className="py-2.5 px-3 rounded-2xl bg-white/5 border border-white/15 hover:bg-white/10 hover:border-purple-500/40 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
             >
               {busyProvider === 'google' ? (
                 <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
               ) : (
                 <GoogleIcon />
               )}
-              <span>Continue with Google</span>
+              <span>Google</span>
             </button>
 
             {/* Continue with GitHub */}
             <button
               onClick={handleGithub}
               disabled={busyProvider !== null}
-              className="w-full py-3.5 px-4 rounded-2xl bg-[#24292e] border border-white/20 hover:bg-[#2f363d] text-white font-extrabold text-xs flex items-center justify-center gap-3 transition-all shadow-lg hover:scale-[1.02] disabled:opacity-50 shadow-[0_0_20px_rgba(36,41,46,0.5)]"
+              className="py-2.5 px-3 rounded-2xl bg-[#24292e] border border-white/20 hover:bg-[#2f363d] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
             >
               {busyProvider === 'github' ? (
                 <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
               ) : (
                 <GithubIcon />
               )}
-              <span>Continue with GitHub</span>
+              <span>GitHub</span>
             </button>
           </div>
 
           <div className="pt-2 text-center border-t border-white/10">
             <p className="text-[11px] font-mono text-emerald-400 font-semibold flex items-center justify-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Instant Repository &amp; Container Access Granted
+              <Sparkles className="w-3 h-3 text-emerald-400 animate-pulse" />
+              Autonomous Cloud Orchestration Engine
             </p>
           </div>
         </div>

@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Check, Copy, Eye, EyeOff, Trash2 } from 'lucide-react';
+
 
 interface SecretRowProps {
   secretKey: string;
@@ -38,24 +40,28 @@ export function SecretRow({ secretKey, value, comment, onDelete }: SecretRowProp
       <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={() => setRevealed(!revealed)}
-          className="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-text-muted hover:text-text-primary transition-all text-[11px]"
+          className="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-text-muted hover:text-text-primary transition-all text-[11px] flex items-center gap-1"
         >
-          {revealed ? 'Hide' : 'Reveal'}
+          {revealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+          <span>{revealed ? 'Hide' : 'Reveal'}</span>
         </button>
 
         <button
           onClick={handleCopy}
-          className="px-2.5 py-1 rounded-lg bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet-light border border-accent-violet/30 transition-all text-[11px]"
+          className="px-2.5 py-1 rounded-lg bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet-light border border-accent-violet/30 transition-all text-[11px] flex items-center gap-1"
         >
-          {copied ? 'Copied ✓' : 'Copy'}
+          {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+          <span>{copied ? 'Copied' : 'Copy'}</span>
         </button>
 
         <button
           onClick={() => onDelete(secretKey)}
-          className="px-2 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-all text-[11px]"
+          className="px-2 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-all text-[11px] flex items-center gap-1"
         >
-          Delete
+          <Trash2 className="w-3 h-3" />
+          <span>Delete</span>
         </button>
+
       </div>
     </div>
   );

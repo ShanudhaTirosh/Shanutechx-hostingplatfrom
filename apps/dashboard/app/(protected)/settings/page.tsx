@@ -376,7 +376,22 @@ function SecurityPinTab() {
   const [confirmPin, setConfirmPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSocialProvider, setIsSocialProvider] = useState(false);
+  const [providerName, setProviderName] = useState('');
   const { toast } = useToast();
+
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem('stx_auth_user');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.provider === 'google' || parsed.provider === 'github') {
+          setIsSocialProvider(true);
+          setProviderName(parsed.provider === 'google' ? 'Google' : 'GitHub');
+        }
+      }
+    } catch {}
+  }, []);
 
   async function handleUpdatePin(e: React.FormEvent) {
     e.preventDefault();
@@ -409,6 +424,32 @@ function SecurityPinTab() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (isSocialProvider) {
+    return (
+      <Card className="max-w-lg border border-indigo-500/20 p-6 space-y-4 bg-indigo-950/20">
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-300 font-bold shrink-0">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-white">Managed Identity Provider ({providerName})</h3>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              You are signed in using <strong>{providerName} OAuth</strong>. Password management, 2FA, and credential security settings are managed securely by your provider. Password &amp; security PIN forms are hidden.
+            </p>
+            <div className="pt-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                OAuth Identity Active ({providerName})
+              </span>
+            </div>
+          </div>
+        </div>
+      </Card>
+    );
   }
 
   return (
@@ -456,6 +497,7 @@ function SecurityPinTab() {
     </Card>
   );
 }
+
 
 // ── Tab 6: Payment Info Configuration Component ──
 function PaymentInfoTab() {

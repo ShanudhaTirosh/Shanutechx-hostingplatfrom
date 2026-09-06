@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Check, Copy } from 'lucide-react';
 import { ClientSupabaseProject } from '@/lib/supabaseAdmin';
 import { useToast } from '@/components/ui';
+
 
 interface ProjectConfigModalProps {
   project: ClientSupabaseProject | null;
@@ -297,7 +299,9 @@ curl -X GET "${restUrl}/" \\
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
-                      {copiedField === item.label ? 'Copied ✓' : 'Copy'}
+                      {copiedField === item.label ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedField === item.label ? 'Copied' : 'Copy'}</span>
+
                     </button>
                   </div>
                   <p className="font-mono text-xs text-emerald-400 break-all">{item.value}</p>
@@ -324,7 +328,8 @@ curl -X GET "${restUrl}/" \\
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
-                    {copiedField === 'anon Public Key' ? 'Copied ✓' : 'Copy Key'}
+                    {copiedField === 'anon Public Key' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedField === 'anon Public Key' ? 'Copied' : 'Copy Key'}</span>
                   </button>
                 </div>
                 <pre className="font-mono text-xs text-teal-300 break-all bg-black/60 p-3 rounded-xl border border-white/[0.04]">
@@ -356,10 +361,8 @@ curl -X GET "${restUrl}/" \\
                       onClick={() => copyToClipboard(project.serviceKey, 'service_role Secret Key')}
                       className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 text-xs font-semibold transition-all flex items-center gap-1"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                      {copiedField === 'service_role Secret Key' ? 'Copied ✓' : 'Copy Secret Key'}
+                      {copiedField === 'service_role Secret Key' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedField === 'service_role Secret Key' ? 'Copied' : 'Copy Secret Key'}</span>
                     </button>
                   </div>
                 </div>
@@ -384,10 +387,8 @@ curl -X GET "${restUrl}/" \\
                     onClick={() => copyToClipboard(envContent, '.env Content')}
                     className="px-3 py-1.5 rounded-lg bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet-light border border-accent-violet/30 text-xs font-semibold transition-all flex items-center gap-1"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    {copiedField === '.env Content' ? 'Copied ✓' : 'Copy .env to Clipboard'}
+                    {copiedField === '.env Content' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedField === '.env Content' ? 'Copied' : 'Copy .env to Clipboard'}</span>
                   </button>
 
                   <button
@@ -447,11 +448,10 @@ curl -X GET "${restUrl}/" \\
                   onClick={() => copyToClipboard(sdkSnippets[sdkLang], `${sdkLang.toUpperCase()} SDK Code`)}
                   className="px-3 py-1.5 rounded-lg bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet-light border border-accent-violet/30 text-xs font-semibold transition-all flex items-center gap-1"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  {copiedField === `${sdkLang.toUpperCase()} SDK Code` ? 'Copied ✓' : 'Copy Code Snippet'}
+                  {copiedField === `${sdkLang.toUpperCase()} SDK Code` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedField === `${sdkLang.toUpperCase()} SDK Code` ? 'Copied' : 'Copy Code Snippet'}</span>
                 </button>
+
               </div>
 
               <pre className="w-full h-64 rounded-xl bg-black/80 border border-white/[0.08] p-4 font-mono text-xs text-teal-300 overflow-y-auto select-text">

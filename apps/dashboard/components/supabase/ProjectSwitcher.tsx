@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
+
 import { supabaseAdmin, ClientSupabaseProject } from '@/lib/supabaseAdmin';
 import { ProjectConfigModal } from './ProjectConfigModal';
 
@@ -133,8 +134,9 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
                 onClick={() => setShowModal(false)}
                 className="text-text-muted hover:text-text-primary text-xs"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
+
             </div>
 
             <form onSubmit={handleCreateProject} className="space-y-3">

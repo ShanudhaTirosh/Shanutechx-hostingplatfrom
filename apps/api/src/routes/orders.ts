@@ -232,6 +232,14 @@ ordersRouter.post('/cart/checkout', idempotent, async (req: AuthedRequest, res) 
     void fireWebhook(req.user!.id, 'order_paid', { orderId: order.id, total, currency: currency ?? 'LKR' });
     void notifyDiscordChannel('new_order', { 'Order': order.id, 'Customer': req.user!.email, 'Total': `${total} ${currency ?? 'LKR'}`, 'Status': 'paid (free)' });
 
+    void sendInvoiceDeliveryNotification(
+      req.user!,
+      order.id,
+      0,
+      [{ name: 'Free Cloud Package', quantity: 1, price: 0 }]
+    ).catch(() => {});
+
+
     return res.json({
       order: updated,
       total,
