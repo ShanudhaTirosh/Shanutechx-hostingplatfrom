@@ -15,6 +15,7 @@ import { executeSSLRenewalJob } from './jobs/ssl-renewal';
 import { runBillingChecks } from './lib/billing';
 import { runUptimeChecks } from './lib/uptimeMonitor';
 import { executeWorkspaceCleanupJob } from './jobs/workspace-cleanup';
+import { checkMetricAlerts } from './lib/alerts';
 import { logger } from './lib/logger';
 
 // SSL Certificate Renewal Worker
@@ -126,11 +127,12 @@ billingSweepWorker.on('failed', (job, err) => {
   }
 })();
 
-// Uptime monitoring sweep worker.
+// Uptime monitoring & metric alert sweep worker.
 const uptimeSweepWorker = new Worker<UptimeSweepJob>(
   'uptime-sweep',
   async (job) => {
     await runUptimeChecks();
+    await checkMetricAlerts();
   },
   { connection: redisConnectionOptions, concurrency: 1 }
 );

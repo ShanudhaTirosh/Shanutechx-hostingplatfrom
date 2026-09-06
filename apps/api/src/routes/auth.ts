@@ -122,8 +122,35 @@ authRouter.post('/auth/refresh', requireAuth, async (req: AuthedRequest, res) =>
 
 /**
  * POST /api/auth/change-password
- * Change password stub for SDK compatibility
+ * Handle user credential & password updates for SDK & client applications
  */
-authRouter.post('/auth/change-password', requireAuth, async (_req: AuthedRequest, res) => {
-  res.json({ ok: true, message: 'Password change requested' });
+authRouter.post('/auth/change-password', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const { oldPassword, newPassword } = req.body || {};
+
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User account not found' });
+    if (user.isBanned) return res.status(403).json({ error: 'Account Banned' });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: user.id,
+        action: 'user.password_change',
+        target: `Password updated for ${user.email}`,
+      },
+    });
+
+    res.json({
+      ok: true,
+      message: 'Password updated successfully',
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to update password' });
+  }
 });

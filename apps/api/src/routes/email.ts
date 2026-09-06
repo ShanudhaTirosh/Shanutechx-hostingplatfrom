@@ -856,22 +856,22 @@ emailRouter.post('/email/send', async (req: AuthedRequest, res) => {
   }
 });
 
+// In-memory per-user store for tasks and calendar events (per-account isolate)
+interface EmailUserTodo { id: string; title: string; completed: boolean; createdAt: string; }
+interface EmailUserEvent { id: string; title: string; dateStr: string; timeStr: string; participants: string[]; createdAt: string; }
+
+const userTodosStore = new Map<string, EmailUserTodo[]>();
+const userEventsStore = new Map<string, EmailUserEvent[]>();
+
 /**
  * GET /api/email/todos
- * Fetch user's to-do checklist items.
+ * Fetch user's to-do checklist items dynamically.
  */
 emailRouter.get('/email/todos', async (req: AuthedRequest, res) => {
   try {
-    // Return live user task list
-    res.json({
-      todos: [
-        { id: 't1', title: 'Design landing page for Oylers', completed: true },
-        { id: 't2', title: 'AI research & study', completed: true },
-        { id: 't3', title: 'Setup Claude Code for Mike', completed: false },
-        { id: 't4', title: 'Publish 3 designs on Dribbble', completed: false },
-        { id: 't5', title: 'Buy more coffee filters', completed: false },
-      ],
-    });
+    const userId = req.user!.id;
+    const todos = userTodosStore.get(userId) || [];
+    res.json({ todos });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch todos' });
   }
@@ -879,28 +879,99 @@ emailRouter.get('/email/todos', async (req: AuthedRequest, res) => {
 
 /**
  * POST /api/email/todos
+ * Create a new to-do task item.
  */
 emailRouter.post('/email/todos', async (req: AuthedRequest, res) => {
   const { title } = req.body || {};
-  if (!title) return res.status(400).json({ error: 'title is required' });
-  res.status(201).json({ todo: { id: `t-${Date.now()}`, title, completed: false } });
+  if (!title || typeof title !== 'string' || !title.trim()) {
+    return res.status(400).json({ error: 'Valid title string is required' });
+  }
+
+  const userId = req.user!.id;
+  const userList = userTodosStore.get(userId) || [];
+  const newTodo: EmailUserTodo = {
+    id: `t-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    title: title.trim(),
+    completed: false,
+    createdAt: new Date().toISOString(),
+  };
+
+  userList.push(newTodo);
+  userTodosStore.set(userId, userList);
+
+  res.status(201).json({ todo: newTodo });
+});
+
+/**
+ * PATCH /api/email/todos/:id
+ * Toggle or update a to-do item.
+ */
+emailRouter.patch('/email/todos/:id', async (req: AuthedRequest, res) => {
+  const userId = req.user!.id;
+  const { completed, title } = req.body || {};
+  const userList = userTodosStore.get(userId) || [];
+  const targetIndex = userList.findIndex((t) => t.id === req.params.id);
+
+  if (targetIndex === -1) {
+    return res.status(404).json({ error: 'Todo item not found' });
+  }
+
+  if (completed !== undefined) userList[targetIndex].completed = !!completed;
+  if (title && typeof title === 'string') userList[targetIndex].title = title.trim();
+
+  userTodosStore.set(userId, userList);
+  res.json({ todo: userList[targetIndex] });
+});
+
+/**
+ * DELETE /api/email/todos/:id
+ * Delete a to-do item.
+ */
+emailRouter.delete('/email/todos/:id', async (req: AuthedRequest, res) => {
+  const userId = req.user!.id;
+  const userList = userTodosStore.get(userId) || [];
+  const filtered = userList.filter((t) => t.id !== req.params.id);
+  userTodosStore.set(userId, filtered);
+  res.json({ ok: true, id: req.params.id });
 });
 
 /**
  * GET /api/email/events
- * Fetch user's upcoming calendar events.
+ * Fetch user's upcoming calendar events dynamically.
  */
 emailRouter.get('/email/events', async (req: AuthedRequest, res) => {
   try {
-    res.json({
-      events: [
-        { id: 'e1', title: 'Brainstorm UI Redesign', dateStr: '16 May', timeStr: '10:30 AM', participants: ['M', 'S', 'A'] },
-        { id: 'e2', title: 'Team Sync & Standup', dateStr: '18 May', timeStr: '12:00 PM', participants: ['D', 'K'] },
-      ],
-    });
+    const userId = req.user!.id;
+    const events = userEventsStore.get(userId) || [];
+    res.json({ events });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch events' });
   }
+});
+
+/**
+ * POST /api/email/events
+ * Create a new calendar event.
+ */
+emailRouter.post('/email/events', async (req: AuthedRequest, res) => {
+  const { title, dateStr, timeStr, participants } = req.body || {};
+  if (!title) return res.status(400).json({ error: 'Event title is required' });
+
+  const userId = req.user!.id;
+  const userList = userEventsStore.get(userId) || [];
+  const newEvent: EmailUserEvent = {
+    id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    title: String(title).trim(),
+    dateStr: dateStr || new Date().toLocaleDateString(),
+    timeStr: timeStr || '10:00 AM',
+    participants: Array.isArray(participants) ? participants : [],
+    createdAt: new Date().toISOString(),
+  };
+
+  userList.push(newEvent);
+  userEventsStore.set(userId, userList);
+
+  res.status(201).json({ event: newEvent });
 });
 
 /**

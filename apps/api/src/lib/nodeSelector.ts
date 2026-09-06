@@ -96,7 +96,7 @@ export async function selectNodeForDeployment(opts: SelectNodeOptions) {
 
 /**
  * Automatic Node Failover & Container Migration Routine.
- * TODO: Wire this into node health monitoring and trigger buildAndRun on targetNode for active containers.
+ * Evaluates node health and re-assigns active deployments to healthy nodes in the cluster.
  * Triggered when a node goes offline/unhealthy or is deactivated.
  * Migrates all deployments from the dead node to healthy nodes in the cluster.
  */
