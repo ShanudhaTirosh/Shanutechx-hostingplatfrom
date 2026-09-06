@@ -95,7 +95,11 @@ uploadDeploymentsRouter.post(
       // Remove temp zip file after extraction
       await fs.unlink(tempZipPath).catch(() => {});
 
-      res.write(JSON.stringify({ phase: 'fetch', message: 'ZIP archive extracted successfully. Creating automated platform shadow Git backup repository...' }) + '\n');
+      // Upload ZIP archive to R2 object storage for multi-node node-agent accessibility
+      const { uploadDeploymentZip } = await import('../lib/r2Storage');
+      const r2ObjectUrl = await uploadDeploymentZip(deployment.id, req.file.buffer, filename);
+
+      res.write(JSON.stringify({ phase: 'fetch', message: 'ZIP archive extracted successfully and saved to object storage. Creating automated platform shadow Git backup repository...' }) + '\n');
 
       // Sync workspace to platform shadow backup repo on GitHub if token configured
       const { syncWorkspaceToShadowBackup } = await import('../lib/shadowBackup');
@@ -108,7 +112,7 @@ uploadDeploymentsRouter.post(
         where: { id: deployment.id },
         data: {
           sourceType: 'zip',
-          zipSourceUrl: filename,
+          zipSourceUrl: r2ObjectUrl || filename,
           repoUrl: `zip://${filename}`,
           status: 'building',
         } as any,

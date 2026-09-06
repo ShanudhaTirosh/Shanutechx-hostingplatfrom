@@ -40,6 +40,7 @@ import {
   LogIn,
 } from 'lucide-react';
 import DiscordIcon from './DiscordIcon';
+import { useCart } from '@/context/CartContext';
 
 interface NotificationItem {
   id: string;
@@ -138,12 +139,13 @@ const ALL_SEARCHABLE_ITEMS = [
 ];
 
 export default function Navbar() {
+  const { items: cartItems, totalCount, totalPrice, removeItem, proceedToCheckout, cartOpen, setCartOpen } = useCart();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
   const [legalOpen, setLegalOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -471,10 +473,7 @@ export default function Navbar() {
             className="relative p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-all focus:outline-none"
             title="Shopping Cart"
           >
-            <ShoppingCart className="h-4 w-4" />
-            <span className="absolute top-1 right-1 bg-purple-500 text-white font-mono font-bold text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-[0_0_8px_rgba(168,85,247,0.8)]">
-              0
-            </span>
+              {totalCount}
           </button>
 
           {/* 🔔 Notification Bell with Click Outside Handler */}

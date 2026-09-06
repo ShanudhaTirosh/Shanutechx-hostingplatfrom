@@ -1,0 +1,3109 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>STX Mail — Enterprise Autonomous Webmail</title>
+<style>
+  /* ======================================================================
+     STX MAIL — Modern Design Tokens & Core Variables
+     Typography: Space Grotesk (Brand & Headers) + Inter (Workspace UI)
+     ====================================================================== */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+  :root {
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-display: 'Space Grotesk', var(--font-sans);
+
+    --color-bg: #F4F6FB;
+    --color-surface: #FFFFFF;
+    --color-surface-alt: #F8FAFC;
+    --color-surface-hover: #F0F3F9;
+    --color-surface-active: #E6ECF6;
+    --color-border: #E2E8F0;
+    --color-border-strong: #CBD5E1;
+
+    --color-text: #0F172A;
+    --color-text-secondary: #475569;
+    --color-text-muted: #94A3B8;
+
+    --color-primary: #2E6BF0;
+    --color-primary-hover: #1D53D8;
+    --color-primary-light: #EFF4FF;
+    --color-primary-light-strong: #DBE7FE;
+
+    --grad-start: #2E6BF0;
+    --grad-end: #00F0FF;
+
+    --color-star: #F59E0B;
+    --color-danger: #EF4444;
+    --color-danger-hover: #DC2626;
+    --color-danger-light: #FEF2F2;
+    --color-success: #10B981;
+    --color-success-light: #ECFDF5;
+    --color-warning: #F59E0B;
+    --color-warning-light: #FFFBEB;
+    --color-unread-dot: #2E6BF0;
+
+    --shadow-xs: 0 1px 2px rgba(15, 23, 42, .04);
+    --shadow-sm: 0 2px 6px rgba(15, 23, 42, .06);
+    --shadow-md: 0 8px 24px rgba(15, 23, 42, .1);
+    --shadow-lg: 0 20px 48px rgba(15, 23, 42, .16);
+    --shadow-glow: 0 0 20px rgba(46, 107, 240, .3);
+
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 22px;
+    --radius-pill: 999px;
+
+    --topbar-h: 64px;
+    --sidebar-w: 256px;
+    --sidebar-w-collapsed: 76px;
+    --bottom-nav-h: 64px;
+
+    --ease: cubic-bezier(.4, 0, .2, 1);
+    --ease-bounce: cubic-bezier(.34, 1.56, .64, 1);
+
+    --brand-deep-1: #0A192F;
+    --brand-deep-2: #1E3A8A;
+    --glass-bg: rgba(255, 255, 255, .82);
+    --glass-border: rgba(255, 255, 255, .3);
+  }
+
+  html[data-theme="dark"] {
+    --color-bg: #0B0F19;
+    --color-surface: #151D2A;
+    --color-surface-alt: #1E293B;
+    --color-surface-hover: #26334D;
+    --color-surface-active: #2D3D5C;
+    --color-border: #28354A;
+    --color-border-strong: #3B4D6B;
+
+    --color-text: #F8FAFC;
+    --color-text-secondary: #CBD5E1;
+    --color-text-muted: #64748B;
+
+    --color-primary: #4F83F7;
+    --color-primary-hover: #6D98F9;
+    --color-primary-light: #1A2844;
+    --color-primary-light-strong: #23375B;
+
+    --color-star: #FBBF24;
+    --color-danger: #F87171;
+    --color-danger-hover: #EF4444;
+    --color-danger-light: #3D1C22;
+    --color-success: #34D399;
+    --color-success-light: #14382B;
+    --color-warning: #FBBF24;
+    --color-warning-light: #3A2F1A;
+    --color-unread-dot: #4F83F7;
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, .45);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, .55);
+    --shadow-lg: 0 20px 48px rgba(0, 0, 0, .65);
+    --shadow-glow: 0 0 24px rgba(79, 131, 247, .35);
+
+    --glass-bg: rgba(21, 29, 42, .85);
+    --glass-border: rgba(255, 255, 255, .08);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-bg);
+    color: var(--color-text);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+  button, input, select, textarea { font-family: inherit; }
+  ::selection { background: var(--color-primary-light-strong); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  a { color: var(--color-primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  ::-webkit-scrollbar { width: 7px; height: 7px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); background-clip: content-box; }
+
+  .icon { width: 18px; height: 18px; display: inline-block; flex-shrink: 0; vertical-align: middle; }
+  .icon path, .icon circle, .icon rect, .icon line, .icon polyline { vector-effect: non-scaling-stroke; }
+
+  /* ======================================================================
+     BUTTON SYSTEM (ULTRA-POLISHED)
+     ====================================================================== */
+  .btn-primary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    padding: 10px 22px; border-radius: var(--radius-pill); border: none;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+    color: #FFFFFF; font-size: 14px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(46, 107, 240, .3), inset 0 1px 0 rgba(255, 255, 255, .25);
+    transition: transform .15s var(--ease), box-shadow .15s var(--ease), background .15s var(--ease);
+    min-height: 44px; white-space: nowrap; user-select: none;
+  }
+  .btn-primary:hover {
+    transform: translateY(-1.5px);
+    box-shadow: 0 8px 24px rgba(46, 107, 240, .45), inset 0 1px 0 rgba(255, 255, 255, .35);
+  }
+  .btn-primary:active { transform: translateY(0) scale(.98); }
+
+  .btn-ghost {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 20px; border-radius: var(--radius-pill);
+    border: 1.4px solid var(--color-border-strong); background: var(--color-surface);
+    color: var(--color-text-secondary); font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: background .15s var(--ease), border-color .15s var(--ease), color .15s var(--ease), transform .1s var(--ease);
+    min-height: 44px; white-space: nowrap; user-select: none;
+  }
+  .btn-ghost:hover {
+    border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-light);
+    transform: translateY(-1px);
+  }
+  .btn-ghost:active { transform: translateY(0) scale(.98); }
+
+  .btn-danger {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 20px; border-radius: var(--radius-pill); border: none;
+    background: var(--color-danger); color: #FFFFFF; font-size: 14px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, .3);
+    transition: background .15s var(--ease), transform .15s var(--ease), box-shadow .15s var(--ease);
+    min-height: 44px;
+  }
+  .btn-danger:hover { background: var(--color-danger-hover); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(239, 68, 68, .4); }
+
+  button.icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 42px; height: 42px; border-radius: var(--radius-pill);
+    border: none; background: transparent; color: var(--color-text-secondary);
+    cursor: pointer; transition: background .15s var(--ease), color .15s var(--ease), transform .12s var(--ease);
+    flex-shrink: 0;
+  }
+  button.icon-btn:hover { background: var(--color-surface-hover); color: var(--color-text); transform: scale(1.05); }
+  button.icon-btn:active { transform: scale(.95); }
+  button.icon-btn.active { background: var(--color-primary-light); color: var(--color-primary); }
+
+  /* ================= SCREEN ROUTER & GLASS PANELS ================= */
+  .screen { position: fixed; inset: 0; display: none; background: var(--color-bg); overflow: hidden; }
+  .screen.active { display: flex; flex-direction: column; }
+  .screen-fade { animation: screen-fade .3s var(--ease); }
+  @keyframes screen-fade { from { opacity: 0; transform: scale(.99); } to { opacity: 1; transform: scale(1); } }
+
+  .glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid var(--glass-border);
+  }
+
+  .logo-mark { width: 34px; height: 34px; flex-shrink: 0; object-fit: contain; display: block; filter: drop-shadow(0 2px 4px rgba(46,107,240,.3)); }
+  .logo-lg { width: 68px; height: 68px; }
+
+  /* ================= LOGIN SCREEN ================= */
+  #screen-login.active { flex-direction: row; }
+
+  .login-left {
+    flex: 1; min-width: 320px; display: flex; flex-direction: column;
+    padding: clamp(28px, 5vw, 56px); background: var(--color-surface);
+    overflow-y: auto;
+  }
+  .login-left-top { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  .login-left-top .wordmark { font-family: var(--font-display); font-weight: 700; font-size: 20px; color: var(--color-text); letter-spacing: -.02em; }
+
+  .login-left-form { flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: 420px; margin: 36px 0; }
+  .login-left-form h1 {
+    font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 4vw, 36px); line-height: 1.15; letter-spacing: -.02em;
+    color: var(--color-text); margin: 0 0 14px;
+  }
+  .login-left-form .sub { font-size: 15px; line-height: 1.6; color: var(--color-text-secondary); margin: 0 0 32px; }
+
+  .google-btn {
+    width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 12px;
+    min-height: 52px; padding: 12px 24px; border-radius: var(--radius-md); border: 1.5px solid var(--color-border-strong);
+    background: var(--color-surface); color: var(--color-text); font-size: 15px; font-weight: 600; cursor: pointer;
+    box-shadow: var(--shadow-xs);
+    transition: box-shadow .2s var(--ease), border-color .2s var(--ease), transform .15s var(--ease);
+  }
+  .google-btn:hover { box-shadow: var(--shadow-md); border-color: var(--color-primary); transform: translateY(-1.5px); }
+  .google-btn:active { transform: translateY(0) scale(.99); }
+  .google-btn.loading { pointer-events: none; opacity: .7; }
+  .google-btn svg { width: 22px; height: 22px; }
+
+  .login-fineprint { margin-top: 28px; font-size: 12.5px; color: var(--color-text-muted); line-height: 1.6; }
+  .login-fineprint a { color: var(--color-text-secondary); text-decoration: underline; }
+
+  .login-right {
+    flex: 1.2; min-width: 320px; position: relative; overflow: hidden;
+    background: linear-gradient(145deg, var(--brand-deep-1), var(--brand-deep-2) 85%);
+  }
+  .login-right::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,.12) 1px, transparent 1px);
+    background-size: 28px 28px; opacity: .6;
+  }
+  .login-lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .login-lines line { stroke: rgba(255,255,255,.25); stroke-width: 1.5; }
+  .login-lines circle { fill: rgba(255,255,255,.6); }
+
+  .login-chip {
+    position: absolute; transform: translate(-50%,-50%);
+    width: 64px; height: 64px; border-radius: 20px;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22);
+    backdrop-filter: blur(12px);
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    box-shadow: 0 16px 36px rgba(0,0,0,.3);
+    animation: chip-float 4.5s ease-in-out infinite;
+  }
+  .login-chip svg { width: 26px; height: 26px; }
+  .login-chip.c2 { animation-delay: -1.5s; }
+  .login-chip.c3 { animation-delay: -3s; }
+  @keyframes chip-float { 0%,100% { transform: translate(-50%,-50%) translateY(0); } 50% { transform: translate(-50%,-50%) translateY(-10px); } }
+
+  .login-badge {
+    position: absolute; top: 52%; left: 50%; transform: translate(-50%,-50%);
+    width: 240px; height: 240px; border-radius: 50%;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .login-badge-inner {
+    width: 154px; height: 154px; border-radius: 50%;
+    background: linear-gradient(145deg, var(--grad-end), var(--grad-start));
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 28px 60px rgba(0,0,0,.45);
+  }
+  .login-badge-inner svg { filter: drop-shadow(0 4px 10px rgba(0,0,0,.35)); }
+
+  /* ================= LOADING SCREEN ================= */
+  #screen-loading.active {
+    align-items: center; justify-content: center; flex-direction: column; gap: 28px;
+    background: linear-gradient(155deg, var(--brand-deep-1), var(--brand-deep-2) 75%);
+    color: #fff; text-align: center; padding: 24px;
+  }
+  .loading-mark { width: 60px; height: 60px; animation: loading-pulse 1.4s ease-in-out infinite; }
+  @keyframes loading-pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: .75; } }
+  .loading-track { width: min(260px, 80vw); height: 5px; border-radius: 6px; background: rgba(255,255,255,.18); overflow: hidden; }
+  .loading-fill { height: 100%; width: 0%; border-radius: 6px; background: linear-gradient(90deg, var(--grad-start), var(--grad-end)); transition: width .35s ease-out; }
+  .loading-status { font-size: 14px; color: rgba(255,255,255,.8); min-height: 22px; font-weight: 500; }
+
+  /* ================= DASHBOARD SCREEN ================= */
+  #screen-dashboard.active { flex-direction: column; }
+  .dash-topbar {
+    height: var(--topbar-h); flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 0 clamp(18px, 3vw, 28px);
+    background: var(--color-surface); border-bottom: 1px solid var(--color-border);
+  }
+  .dash-topbar .wordmark { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+  .dash-topbar .spacer { flex: 1; }
+
+  .dash-scroll { flex: 1; overflow-y: auto; }
+  .dash-inner { max-width: 1020px; margin: 0 auto; padding: clamp(24px, 4vw, 48px) clamp(18px, 3vw, 32px) 90px; }
+  .dash-greeting h1 { font-family: var(--font-display); font-size: clamp(24px, 3.5vw, 32px); font-weight: 700; letter-spacing: -.02em; margin: 0 0 8px; }
+  .dash-greeting p { margin: 0 0 32px; color: var(--color-text-secondary); font-size: 15px; }
+
+  .dash-stats-row { display: flex; gap: 20px; margin-bottom: 40px; flex-wrap: wrap; }
+  .storage-hero {
+    flex: 1; min-width: 280px; display: flex; align-items: center; gap: 24px;
+    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    padding: 24px 28px; box-shadow: var(--shadow-sm); transition: box-shadow .2s var(--ease);
+  }
+  .storage-hero:hover { box-shadow: var(--shadow-md); }
+  .storage-ring { flex-shrink: 0; }
+  .storage-hero-text .big { font-family: var(--font-display); font-size: 28px; font-weight: 700; }
+  .storage-hero-text .lbl { font-size: 13.5px; color: var(--color-text-muted); margin-top: 3px; }
+
+  .dash-minor-stats { display: flex; flex-direction: column; gap: 16px; justify-content: center; min-width: 200px; }
+  .minor-stat { display: flex; align-items: baseline; gap: 12px; }
+  .minor-stat b { font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--color-primary); }
+  .minor-stat span { font-size: 14px; color: var(--color-text-muted); }
+
+  .dash-section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .dash-section-head h2 { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin: 0; }
+  .dash-section-head span { font-size: 13.5px; color: var(--color-text-muted); }
+
+  .alias-list { border-top: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; background: var(--color-surface); box-shadow: var(--shadow-xs); }
+  .alias-row {
+    display: flex; align-items: center; gap: 18px; padding: 18px 16px 18px 18px;
+    border-bottom: 1px solid var(--color-border); border-left: 4px solid transparent; cursor: pointer;
+    transition: background .15s var(--ease), border-left-color .15s var(--ease), transform .1s var(--ease);
+  }
+  .alias-row:last-child { border-bottom: none; }
+  .alias-row:hover { background: var(--color-surface-hover); }
+  .alias-photo {
+    width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 16px; background-size: cover; background-position: center;
+    box-shadow: var(--shadow-xs);
+  }
+  .alias-info { flex: 1; min-width: 0; }
+  .alias-info .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .alias-info .display-name { font-size: 16px; font-weight: 700; }
+  .alias-info .addr { font-size: 13.5px; color: var(--color-text-muted); margin-top: 2px; }
+  .alias-info .meta { font-size: 13px; color: var(--color-text-muted); margin-top: 4px; }
+  .alias-unread-badge { font-size: 12px; font-weight: 700; background: var(--color-primary); color: #fff; border-radius: var(--radius-pill); padding: 2px 9px; }
+  .alias-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .alias-open-btn {
+    padding: 10px 22px; border-radius: var(--radius-pill); border: none; background: var(--color-primary-light); color: var(--color-primary);
+    font-size: 14px; font-weight: 700; cursor: pointer; transition: background .15s var(--ease), transform .1s var(--ease);
+  }
+  .alias-open-btn:hover { background: var(--color-primary-light-strong); transform: scale(1.03); }
+
+  /* ======================================================================
+     CONFIGURATION / PROFILE SETTINGS HUB (COMPLETE OVERHAUL)
+     ====================================================================== */
+  #screen-config.active { flex-direction: column; background: var(--color-bg); }
+
+  .config-header-card {
+    background: var(--color-surface); border-bottom: 1px solid var(--color-border);
+    padding: 18px clamp(18px, 3vw, 36px); flex-shrink: 0; box-shadow: var(--shadow-xs);
+  }
+  .config-top-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .config-user-badge { display: flex; align-items: center; gap: 14px; }
+  .config-user-badge .avatar-preview {
+    width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 18px;
+    background-size: cover; background-position: center; box-shadow: var(--shadow-sm);
+  }
+  .config-user-badge h1 { font-family: var(--font-display); font-size: clamp(18px, 2.5vw, 22px); font-weight: 700; margin: 0; }
+  .config-user-badge p { margin: 2px 0 0; font-size: 13.5px; color: var(--color-text-muted); }
+
+  .config-scroll { flex: 1; overflow-y: auto; }
+  .config-inner { max-width: 860px; margin: 0 auto; padding: 28px clamp(18px, 3vw, 32px) 110px; }
+
+  /* Segmented Nav Tab Bar */
+  .config-tab-bar {
+    display: flex; gap: 8px; background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill); padding: 5px; margin-bottom: 28px; overflow-x: auto;
+    box-shadow: var(--shadow-xs);
+  }
+  .config-tab-btn {
+    flex: 1; min-width: 130px; padding: 10px 16px; border-radius: var(--radius-pill); border: none;
+    background: transparent; font-size: 13.5px; font-weight: 600; color: var(--color-text-secondary);
+    cursor: pointer; white-space: nowrap; text-align: center;
+    transition: background .15s var(--ease), color .15s var(--ease), box-shadow .15s var(--ease);
+  }
+  .config-tab-btn:hover { color: var(--color-text); }
+  .config-tab-btn.active {
+    background: var(--color-primary); color: #FFFFFF; font-weight: 700;
+    box-shadow: 0 4px 12px rgba(46, 107, 240, .3);
+  }
+
+  .config-tab-pane { display: none; animation: pane-fade .25s var(--ease); }
+  .config-tab-pane.active { display: block; }
+  @keyframes pane-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .config-card {
+    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    padding: 24px; margin-bottom: 24px; box-shadow: var(--shadow-xs); transition: box-shadow .2s var(--ease);
+  }
+  .config-card:hover { box-shadow: var(--shadow-sm); }
+  .config-card h3 { font-family: var(--font-display); font-size: 17px; font-weight: 700; margin: 0 0 6px; display: flex; align-items: center; gap: 10px; }
+  .config-card .section-desc { font-size: 13.5px; color: var(--color-text-muted); margin: 0 0 22px; line-height: 1.5; }
+
+  /* Profile Avatar Section */
+  .profile-photo-area { display: flex; align-items: center; gap: 26px; flex-wrap: wrap; margin-bottom: 24px; }
+  .avatar-upload { position: relative; width: 92px; height: 92px; flex-shrink: 0; cursor: pointer; }
+  .avatar-upload .photo {
+    width: 92px; height: 92px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 28px; font-family: var(--font-display); background-size: cover; background-position: center;
+    box-shadow: var(--shadow-md); border: 3px solid var(--color-surface);
+    transition: filter .15s var(--ease);
+  }
+  .avatar-upload:hover .photo { filter: brightness(.9); }
+  .avatar-upload .cam-btn {
+    position: absolute; bottom: 2px; right: 2px; width: 32px; height: 32px; border-radius: 50%; background: var(--color-primary);
+    color: #fff; display: flex; align-items: center; justify-content: center; border: 3px solid var(--color-surface);
+    box-shadow: var(--shadow-xs);
+  }
+  .profile-fields-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; flex: 1; }
+
+  .field-group { display: flex; flex-direction: column; }
+  .field-label { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 8px; }
+  .field-input {
+    width: 100%; border: 1.5px solid var(--color-border-strong); border-radius: var(--radius-sm); padding: 11px 16px;
+    font-size: 14.5px; font-family: inherit; color: var(--color-text); background: var(--color-surface); outline: none;
+    transition: border-color .15s var(--ease), box-shadow .15s var(--ease); min-height: 46px;
+  }
+  .field-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 4px var(--color-primary-light); }
+  .field-input[readonly] { background: var(--color-surface-alt); color: var(--color-text-secondary); cursor: default; }
+  textarea.field-input { resize: vertical; min-height: 90px; line-height: 1.6; }
+
+  /* Interactive Signature Preview Box */
+  .sig-preview-card {
+    background: var(--color-surface-alt); border: 1px dashed var(--color-border-strong); border-radius: var(--radius-md);
+    padding: 16px 20px; margin-top: 14px; font-size: 14px; line-height: 1.6; color: var(--color-text-secondary);
+  }
+  .sig-preview-card b { color: var(--color-text); }
+
+  /* Theme Cards */
+  .theme-card-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .theme-card {
+    border: 2px solid var(--color-border); border-radius: var(--radius-md); padding: 16px; cursor: pointer;
+    background: var(--color-surface-alt); transition: border-color .15s var(--ease), transform .15s var(--ease), box-shadow .15s var(--ease);
+  }
+  .theme-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+  .theme-card.selected { border-color: var(--color-primary); background: var(--color-primary-light); }
+  .theme-card-preview { height: 74px; border-radius: 8px; margin-bottom: 12px; overflow: hidden; display: flex; border: 1px solid var(--color-border); }
+  .theme-card-title { font-size: 14px; font-weight: 700; color: var(--color-text); }
+
+  .color-swatch-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+  .color-swatch {
+    width: 38px; height: 38px; border-radius: 50%; cursor: pointer; border: 2.5px solid transparent;
+    display: flex; align-items: center; justify-content: center; transition: transform .15s var(--ease-bounce), border-color .15s var(--ease);
+    box-shadow: var(--shadow-xs);
+  }
+  .color-swatch:hover { transform: scale(1.15); }
+  .color-swatch.selected { border-color: var(--color-text); transform: scale(1.1); }
+  .color-swatch .icon { width: 16px; height: 16px; color: #fff; display: none; }
+  .color-swatch.selected .icon { display: block; }
+
+  /* Preference Switches */
+  .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 0; border-bottom: 1px solid var(--color-border); }
+  .switch-row:last-child { border-bottom: none; }
+  .switch-info .title { font-size: 14.5px; font-weight: 600; color: var(--color-text); }
+  .switch-info .desc { font-size: 13px; color: var(--color-text-muted); margin-top: 3px; }
+  .switch-toggle { position: relative; width: 50px; height: 26px; flex-shrink: 0; cursor: pointer; }
+  .switch-toggle input { opacity: 0; width: 0; height: 0; }
+  .switch-slider {
+    position: absolute; inset: 0; background: var(--color-border-strong); border-radius: var(--radius-pill);
+    transition: background .2s var(--ease);
+  }
+  .switch-slider::before {
+    content: ''; position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px;
+    background: #fff; border-radius: 50%; transition: transform .2s var(--ease);
+    box-shadow: var(--shadow-xs);
+  }
+  .switch-toggle input:checked + .switch-slider { background: var(--color-primary); }
+  .switch-toggle input:checked + .switch-slider::before { transform: translateX(24px); }
+
+  /* Security Cards & Sessions */
+  .sec-score-card {
+    display: flex; align-items: center; gap: 20px; background: var(--color-success-light);
+    border: 1px solid var(--color-success); border-radius: var(--radius-md); padding: 18px 22px; margin-bottom: 22px;
+  }
+  .sec-score-card .score-num { font-family: var(--font-display); font-size: 32px; font-weight: 700; color: var(--color-success); }
+  .sec-score-card .score-text h4 { font-size: 15px; font-weight: 700; color: var(--color-text); margin: 0; }
+  .sec-score-card .score-text p { font-size: 13px; color: var(--color-text-secondary); margin: 2px 0 0; }
+
+  .session-card {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 16px; background: var(--color-surface-alt); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); margin-bottom: 12px; transition: border-color .15s var(--ease);
+  }
+  .session-card:hover { border-color: var(--color-border-strong); }
+  .session-info .device { font-size: 14.5px; font-weight: 700; color: var(--color-text); }
+  .session-info .meta { font-size: 12.5px; color: var(--color-text-muted); margin-top: 2px; }
+
+  .server-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px 20px; }
+  .server-grid .server-col h4 { font-size: 14px; font-weight: 700; margin: 0 0 14px; display: flex; align-items: center; gap: 9px; }
+  .server-status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-success); flex-shrink: 0; box-shadow: 0 0 8px var(--color-success); }
+  .server-field { margin-bottom: 14px; }
+  .value-chip {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+    padding: 10px 14px; font-size: 14px; font-family: 'SFMono-Regular', Consolas, Menlo, monospace;
+    min-height: 44px;
+  }
+  .value-chip button { border: none; background: none; color: var(--color-text-muted); cursor: pointer; display: flex; padding: 4px; border-radius: 6px; flex-shrink: 0; }
+  .value-chip button:hover { color: var(--color-primary); background: var(--color-primary-light); }
+
+  .config-save-bar {
+    position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 14px; padding: 18px 24px;
+    background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--color-border); z-index: 20; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  /* ================= MAIL WORKSPACE SCREEN ================= */
+  #screen-mail .app { height: 100%; display: flex; flex-direction: column; }
+
+  .topbar {
+    height: var(--topbar-h); flex-shrink: 0;
+    display: flex; align-items: center; gap: clamp(10px, 2vw, 20px);
+    padding: 0 clamp(14px, 2vw, 22px);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    z-index: 40; box-shadow: var(--shadow-xs);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; user-select: none; cursor: pointer; }
+  .brand .wordmark { font-family: var(--font-display); font-size: 18px; line-height: 1; letter-spacing: -.02em; white-space: nowrap; font-weight: 700; }
+
+  .to-dash-btn { flex-shrink: 0; }
+  .sidebar-toggle-btn { flex-shrink: 0; }
+  .sidebar-toggle-btn.active { background: var(--color-primary-light); color: var(--color-primary); }
+  .hamburger { display: none; }
+
+  .search-form { flex: 1; max-width: 680px; margin: 0 auto; }
+  .search-box {
+    position: relative; display: flex; align-items: center;
+    background: var(--color-surface-alt); border: 1.5px solid transparent;
+    border-radius: var(--radius-pill); height: 44px; padding: 0 16px;
+    transition: background .15s var(--ease), border-color .15s var(--ease), box-shadow .15s var(--ease);
+  }
+  .search-box:focus-within { background: var(--color-surface); border-color: var(--color-primary); box-shadow: 0 0 0 4px var(--color-primary-light); }
+  .search-box .icon { color: var(--color-text-muted); }
+  .search-box input {
+    border: none; background: transparent; outline: none; flex: 1;
+    font-size: 14.5px; color: var(--color-text); margin-left: 10px; font-family: inherit;
+  }
+  .search-box input::placeholder { color: var(--color-text-muted); }
+  .search-clear { display: none; border: none; background: none; cursor: pointer; color: var(--color-text-muted); padding: 4px; border-radius: 50%; }
+  .search-clear:hover { background: var(--color-surface-hover); color: var(--color-text); }
+  .search-box.has-value .search-clear { display: flex; }
+  .search-kbd {
+    font-family: 'SFMono-Regular', Consolas, Menlo, monospace; font-size: 11.5px; color: var(--color-text-muted);
+    background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 6px;
+    padding: 2px 7px; flex-shrink: 0; box-shadow: 0 1px 0 var(--color-border-strong);
+  }
+  .search-box.has-value .search-kbd, .search-box:focus-within .search-kbd { display: none; }
+
+  .topbar-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .topbar-divider { width: 1px; height: 26px; background: var(--color-border); margin: 0 8px; }
+
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--grad-start), var(--grad-end));
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px; flex-shrink: 0; background-size: cover; background-position: center;
+    box-shadow: var(--shadow-xs);
+  }
+  .avatar-wrap { position: relative; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: var(--radius-pill); }
+  .avatar-wrap:hover { background: var(--color-surface-hover); }
+  .avatar-wrap .chev { color: var(--color-text-muted); transition: transform .15s var(--ease); }
+  .avatar-wrap.open .chev { transform: rotate(180deg); }
+
+  .dropdown {
+    position: absolute; top: calc(100% + 12px); right: 0; width: 300px;
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+    padding: 10px; display: none; flex-direction: column; gap: 4px; z-index: 80;
+    animation: pop-in .18s var(--ease);
+  }
+  .dropdown.open { display: flex; }
+  @keyframes pop-in { from { opacity: 0; transform: translateY(-8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .dropdown-profile { display: flex; gap: 14px; align-items: center; padding: 12px 10px 14px; border-bottom: 1px solid var(--color-border); margin-bottom: 6px; }
+  .dropdown-profile .name { font-size: 15px; font-weight: 700; }
+  .dropdown-profile .email { font-size: 13px; color: var(--color-text-secondary); word-break: break-all; }
+  .dropdown-item {
+    display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: var(--radius-sm);
+    font-size: 14px; color: var(--color-text); cursor: pointer; border: none; background: none; width: 100%; text-align: left;
+    transition: background .12s var(--ease);
+  }
+  .dropdown-item:hover { background: var(--color-surface-hover); }
+  .dropdown-item .icon { color: var(--color-text-secondary); }
+  .dropdown-item.danger { color: var(--color-danger); }
+  .dropdown-item.danger .icon { color: var(--color-danger); }
+
+  .dropdown-label { font-size: 11px; font-weight: 700; color: var(--color-text-muted); padding: 8px 10px 4px; letter-spacing: .04em; text-transform: uppercase; }
+  .alias-switch-item {
+    display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: var(--radius-sm); cursor: pointer; width: 100%;
+    border: none; background: none; text-align: left; transition: background .12s var(--ease);
+  }
+  .alias-switch-item:hover { background: var(--color-surface-hover); }
+  .alias-switch-item .mini-avatar {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 12px; font-weight: 700; background-size: cover; background-position: center;
+  }
+  .alias-switch-item .txt { flex: 1; min-width: 0; }
+  .alias-switch-item .txt .n { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .alias-switch-item .txt .e { font-size: 12px; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .alias-switch-item .check { color: var(--color-primary); flex-shrink: 0; display: none; }
+  .alias-switch-item.current .check { display: block; }
+
+  /* ---------------- BODY LAYOUT ---------------- */
+  .body-row { flex: 1; display: flex; min-height: 0; position: relative; }
+
+  /* ---------------- SIDEBAR ---------------- */
+  .sidebar {
+    width: var(--sidebar-w); flex-shrink: 0;
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    display: flex; flex-direction: column;
+    padding: 18px 14px;
+    transition: width .2s var(--ease), transform .2s var(--ease);
+    z-index: 30;
+  }
+  .compose-btn {
+    display: flex; align-items: center; gap: 12px;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+    color: #fff; border: none;
+    border-radius: var(--radius-pill); padding: 14px 22px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(46, 107, 240, .3); min-height: 50px;
+    transition: background .15s var(--ease), box-shadow .15s var(--ease), transform .12s var(--ease);
+    margin-bottom: 20px;
+  }
+  .compose-btn:hover { box-shadow: 0 8px 24px rgba(46, 107, 240, .45); transform: translateY(-1.5px); }
+  .compose-btn:active { transform: scale(.98); }
+  .compose-btn span { white-space: nowrap; }
+
+  .nav-section { margin-bottom: 6px; }
+  .nav-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 11px 16px; border-radius: var(--radius-pill);
+    cursor: pointer; color: var(--color-text-secondary); font-size: 14.5px; font-weight: 500;
+    position: relative; user-select: none; min-height: 44px;
+    transition: background .12s var(--ease), color .12s var(--ease);
+  }
+  .nav-item:hover { background: var(--color-surface-hover); color: var(--color-text); }
+  .nav-item.active { background: var(--color-primary-light); color: var(--color-primary); font-weight: 700; }
+  .nav-item.active .icon { color: var(--color-primary); }
+  .nav-item .icon { color: var(--color-text-muted); }
+  .nav-item .label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav-item .badge {
+    font-size: 12px; font-weight: 700; color: #fff;
+    background: var(--color-primary); border-radius: var(--radius-pill);
+    padding: 2px 9px; flex-shrink: 0;
+  }
+  .nav-item.active .badge { background: var(--color-primary); color: #fff; }
+  .nav-item .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+  .nav-divider { height: 1px; background: var(--color-border); margin: 14px 8px; }
+
+  .labels-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .04em;
+    color: var(--color-text-muted); text-transform: uppercase;
+  }
+  .labels-head button {
+    border: none; background: none; cursor: pointer; color: var(--color-text-muted);
+    display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%;
+  }
+  .labels-head button:hover { background: var(--color-surface-hover); color: var(--color-primary); }
+
+  .sidebar-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; margin: 0 -4px; padding: 0 4px; }
+
+  .storage { padding: 16px 14px 4px; border-top: 1px solid var(--color-border); margin-top: 12px; }
+  .storage-bar { height: 7px; border-radius: 4px; background: var(--color-surface-alt); overflow: hidden; margin-bottom: 9px; }
+  .storage-bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--grad-start), var(--grad-end)); }
+  .storage-text { font-size: 12.5px; color: var(--color-text-muted); }
+  .storage-upgrade { font-size: 12.5px; color: var(--color-primary); font-weight: 700; cursor: pointer; margin-top: 4px; }
+
+  .sidebar.collapsed { width: var(--sidebar-w-collapsed); align-items: center; }
+  .sidebar.collapsed .compose-btn { padding: 14px; width: 50px; height: 50px; border-radius: 50%; justify-content: center; }
+  .sidebar.collapsed .compose-btn span, .sidebar.collapsed .nav-item .label,
+  .sidebar.collapsed .nav-item .badge, .sidebar.collapsed .labels-head span,
+  .sidebar.collapsed .storage-text, .sidebar.collapsed .storage-upgrade { display: none; }
+  .sidebar.collapsed .nav-item { justify-content: center; padding: 11px; }
+  .sidebar.collapsed .nav-item .dot { position: absolute; top: 6px; right: 10px; }
+  .sidebar.collapsed .labels-head { justify-content: center; }
+  .sidebar.collapsed .storage { display: flex; flex-direction: column; align-items: center; }
+  .sidebar.collapsed .storage-bar { width: 30px; }
+
+  .sidebar-scrim { display: none; }
+
+  /* ---------------- MAIL SHELL & MODULES ---------------- */
+  .mail-shell { flex: 1; display: flex; min-width: 0; background: var(--color-bg); }
+  .module-pane { display: flex; flex: 1; min-width: 0; position: relative; }
+
+  /* ---------------- ICON RAIL (MODULE SWITCHER) ---------------- */
+  .icon-rail {
+    width: 60px; flex-shrink: 0; background: var(--color-surface); border-right: 1px solid var(--color-border);
+    display: flex; flex-direction: column; align-items: center; padding: 16px 0; gap: 8px; z-index: 31;
+  }
+  .icon-rail .rail-btn {
+    width: 44px; height: 44px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;
+    color: var(--color-text-muted); cursor: pointer; border: none; background: none;
+    transition: background .15s var(--ease), color .15s var(--ease), transform .1s var(--ease);
+  }
+  .icon-rail .rail-btn:hover { background: var(--color-surface-hover); color: var(--color-text); transform: scale(1.06); }
+  .icon-rail .rail-btn.active { background: var(--color-primary-light); color: var(--color-primary); }
+  .icon-rail .rail-divider { width: 26px; height: 1px; background: var(--color-border); margin: 8px 0; }
+
+  /* Mobile Bottom Navigation Bar (<480px) */
+  .mobile-bottom-nav {
+    display: none; height: var(--bottom-nav-h); background: var(--color-surface);
+    border-top: 1px solid var(--color-border); flex-shrink: 0; z-index: 50;
+    align-items: center; justify-content: space-around; padding: 0 4px;
+    box-shadow: 0 -4px 16px rgba(0,0,0,.04);
+  }
+  .mobile-nav-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    flex: 1; height: 100%; border: none; background: none; color: var(--color-text-muted);
+    font-size: 11px; font-weight: 600; cursor: pointer;
+  }
+  .mobile-nav-btn.active { color: var(--color-primary); font-weight: 700; }
+
+  /* ---------------- CALENDAR MODULE ---------------- */
+  .calendar-view { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-surface); padding: clamp(16px, 3vw, 28px); overflow-y: auto; }
+  .calendar-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .calendar-header h2 { font-family: var(--font-display); font-size: clamp(18px, 2.5vw, 24px); font-weight: 700; margin: 0; min-width: 180px; }
+  .cal-view-switch { display: flex; background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-pill); padding: 4px; }
+  .cal-view-btn {
+    padding: 7px 16px; border-radius: var(--radius-pill); border: none; background: transparent;
+    font-size: 13.5px; font-weight: 600; color: var(--color-text-secondary); cursor: pointer;
+    transition: all .12s var(--ease);
+  }
+  .cal-view-btn.active { background: var(--color-surface); color: var(--color-primary); box-shadow: var(--shadow-xs); font-weight: 700; }
+
+  .calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; margin-bottom: 2px; }
+  .calendar-weekdays span { font-size: 12px; font-weight: 700; color: var(--color-text-muted); text-align: center; padding: 10px 0; text-transform: uppercase; letter-spacing: .04em; }
+  .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(100px, 1fr); gap: 1px; background: var(--color-border); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; flex: 1; }
+  .cal-day { background: var(--color-surface); padding: 8px; display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow: hidden; cursor: pointer; transition: background .12s ease; }
+  .cal-day:hover { background: var(--color-surface-hover); }
+  .cal-day.other-month { background: var(--color-surface-alt); }
+  .cal-day .day-num { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); flex-shrink: 0; }
+  .cal-day.is-today .day-num {
+    display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--color-primary); color: #fff; font-weight: 700;
+  }
+  .cal-event {
+    font-size: 11.5px; font-weight: 600; color: #fff; border-radius: 6px; padding: 4px 8px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  }
+  .cal-event-more { font-size: 11px; color: var(--color-text-muted); padding: 0 6px; font-weight: 600; }
+
+  .cal-schedule-grid { display: grid; grid-template-columns: 65px 1fr; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow-y: auto; flex: 1; background: var(--color-surface); }
+  .cal-time-col { display: flex; flex-direction: column; border-right: 1px solid var(--color-border); background: var(--color-surface-alt); }
+  .cal-time-slot { height: 54px; font-size: 12px; color: var(--color-text-muted); padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--color-border); font-weight: 500; }
+  .cal-days-col { display: grid; grid-template-columns: repeat(7, 1fr); position: relative; }
+  .cal-day-column { border-right: 1px solid var(--color-border); display: flex; flex-direction: column; }
+  .cal-day-column:last-child { border-right: none; }
+  .cal-hour-cell { height: 54px; border-bottom: 1px solid var(--color-border); padding: 4px; position: relative; }
+
+  .upcoming-event-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: var(--radius-sm); cursor: pointer; transition: background .12s var(--ease); }
+  .upcoming-event-item:hover { background: var(--color-surface-hover); }
+  .upcoming-event-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .upcoming-event-item .uei-title { font-size: 14px; font-weight: 600; color: var(--color-text); }
+  .upcoming-event-item .uei-meta { font-size: 12.5px; color: var(--color-text-muted); margin-top: 2px; }
+
+  /* ---------------- CONTACTS MODULE ---------------- */
+  .contacts-view { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-surface); padding: clamp(18px, 3vw, 28px); overflow-y: auto; }
+  .contacts-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 24px; flex-wrap: wrap; }
+  .contacts-header h2 { font-family: var(--font-display); font-size: clamp(20px, 2.5vw, 24px); font-weight: 700; margin: 0; }
+  .contacts-header .search-box { height: 44px; min-width: 240px; flex: 1; max-width: 400px; }
+  .contact-row { display: flex; align-items: center; gap: 18px; padding: 16px 12px; border-bottom: 1px solid var(--color-border); transition: background .15s var(--ease); }
+  .contact-row:hover { background: var(--color-surface-hover); }
+  .contact-row .avatar { width: 46px; height: 46px; font-size: 15px; }
+  .contact-row .contact-info { flex: 1; min-width: 0; }
+  .contact-row .contact-name { font-size: 16px; font-weight: 700; }
+  .contact-row .contact-sub { font-size: 13.5px; color: var(--color-text-muted); display: flex; gap: 16px; flex-wrap: wrap; margin-top: 3px; }
+  .contact-row .contact-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+  /* ---------------- TASKS MODULE ---------------- */
+  .tasks-view { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-surface); padding: clamp(18px, 3vw, 28px); max-width: 760px; overflow-y: auto; }
+  .tasks-header h2 { font-family: var(--font-display); font-size: clamp(20px, 2.5vw, 24px); font-weight: 700; margin: 0 0 20px; }
+  .task-input-row {
+    display: flex; align-items: center; gap: 14px; padding: 14px 18px; border: 1.5px solid var(--color-border-strong);
+    border-radius: var(--radius-md); margin-bottom: 24px; background: var(--color-surface-alt);
+  }
+  .task-input-row input { flex: 1; border: none; outline: none; font-size: 15px; font-family: inherit; background: transparent; color: var(--color-text); }
+  .task-row { display: flex; align-items: center; gap: 16px; padding: 14px 8px; border-bottom: 1px solid var(--color-border); }
+  .task-row.done .task-title { text-decoration: line-through; color: var(--color-text-muted); }
+  .task-row .task-title { flex: 1; font-size: 15px; color: var(--color-text); }
+  .task-row .task-delete { flex-shrink: 0; }
+
+  /* ---------------- LIST PANE ---------------- */
+  .list-pane {
+    width: 100%; max-width: 460px; flex-shrink: 0; min-width: 290px;
+    display: flex; flex-direction: column; min-height: 0;
+    border-right: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+
+  .list-toolbar {
+    height: 54px; flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+    padding: 0 16px; border-bottom: 1px solid var(--color-border);
+  }
+  .checkbox {
+    width: 22px; height: 22px; border-radius: 6px; border: 1.8px solid var(--color-border-strong);
+    display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
+    background: var(--color-surface); transition: all .15s var(--ease); color: #fff;
+  }
+  .checkbox:hover { border-color: var(--color-primary); }
+  .checkbox.checked { background: var(--color-primary); border-color: var(--color-primary); }
+  .checkbox .icon { width: 14px; height: 14px; display: none; }
+  .checkbox.checked .icon { display: block; }
+  .list-toolbar .checkbox { margin: 0 8px 0 2px; }
+
+  .toolbar-title { font-size: 15px; font-weight: 700; margin-left: 4px; flex: 1; }
+  .toolbar-actions { display: flex; align-items: center; gap: 4px; }
+  .toolbar-actions.hidden { display: none; }
+
+  .list-scroll { flex: 1; overflow-y: auto; }
+
+  .email-row {
+    display: flex; align-items: flex-start; gap: 6px;
+    padding: 14px 14px 14px 10px; border-bottom: 1px solid var(--color-border);
+    cursor: pointer; position: relative; transition: background .12s var(--ease);
+    min-height: 76px;
+  }
+  .email-row:hover { background: var(--color-surface-hover); }
+  .email-row.selected { background: var(--color-primary-light); }
+  .email-row.active { background: var(--color-primary-light-strong); }
+  .email-row.unread .sender, .email-row.unread .subject-line .subject { font-weight: 700; color: var(--color-text); }
+  .email-row .row-check-star { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 3px; width: 36px; flex-shrink: 0; }
+
+  .star-btn { border: none; background: none; padding: 0; cursor: pointer; color: var(--color-text-muted); display: flex; }
+  .star-btn.starred { color: var(--color-star); }
+  .star-btn .icon { width: 19px; height: 19px; }
+
+  .row-unread-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-unread-dot); flex-shrink: 0; margin-top: 6px; box-shadow: 0 0 6px var(--color-unread-dot); }
+  .row-unread-dot.hidden { visibility: hidden; }
+
+  .row-main { flex: 1; min-width: 0; padding-left: 6px; }
+  .row-line1 { display: flex; align-items: baseline; gap: 8px; }
+  .sender { font-size: 14.5px; color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+  .row-labels { display: flex; gap: 4px; }
+  .row-label-chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-pill); flex-shrink: 0; }
+  .subject-line { font-size: 14px; color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
+  .subject-line .subject { color: var(--color-text); }
+  .subject-line .snippet { color: var(--color-text-muted); }
+  .row-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; width: 72px; }
+  .row-time { font-size: 12.5px; color: var(--color-text-muted); white-space: nowrap; }
+
+  .empty-list { padding: 70px 24px; text-align: center; color: var(--color-text-muted); }
+  .empty-list .icon { width: 48px; height: 48px; margin-bottom: 16px; opacity: .4; }
+  .empty-list p { font-size: 15px; margin: 0; }
+
+  /* ---------------- READING PANE ---------------- */
+  .reading-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-surface); min-height: 0; }
+
+  .reading-empty {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--color-text-muted); gap: 16px; padding: 28px; text-align: center;
+  }
+  .reading-empty .icon { width: 68px; height: 68px; opacity: .35; color: var(--color-primary); }
+  .reading-empty h3 { font-size: 18px; font-weight: 700; color: var(--color-text-secondary); margin: 0; }
+  .reading-empty p { margin: 0; font-size: 14.5px; max-width: 300px; }
+
+  .reading-content { flex: 1; overflow-y: auto; display: none; animation: pane-fade .2s var(--ease); }
+  .reading-content.visible { display: block; }
+
+  .reading-toolbar {
+    display: flex; align-items: center; gap: 6px; padding: 12px clamp(16px, 2vw, 28px); border-bottom: 1px solid var(--color-border);
+    position: sticky; top: 0; background: var(--color-surface); z-index: 5;
+  }
+  .reading-toolbar .back-btn { display: none; }
+  .reading-toolbar .spacer { flex: 1; }
+  .toolbar-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: var(--radius-pill);
+    border: none; background: transparent; color: var(--color-text-secondary); font-size: 13.5px; font-weight: 600;
+    cursor: pointer; transition: background .12s var(--ease), color .12s var(--ease); min-height: 40px;
+  }
+  .toolbar-btn:hover { background: var(--color-surface-hover); color: var(--color-text); }
+
+  .reading-header { padding: 26px clamp(18px, 3vw, 36px) 0; }
+  .reading-subject { font-size: clamp(22px, 3vw, 26px); font-weight: 700; letter-spacing: -.02em; margin: 0 0 20px; line-height: 1.25; }
+
+  .thread { padding: 0 clamp(18px, 3vw, 36px) 36px; }
+  .msg { border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: 16px; overflow: hidden; background: var(--color-surface); box-shadow: var(--shadow-xs); }
+  .msg-head { display: flex; align-items: flex-start; gap: 16px; padding: 18px; cursor: pointer; }
+  .msg-avatar { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 15px; }
+  .msg-headtext { flex: 1; min-width: 0; }
+  .msg-from-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .msg-from-name { font-weight: 700; font-size: 15.5px; }
+  .msg-from-email { font-size: 13px; color: var(--color-text-muted); }
+  .msg-to { font-size: 13px; color: var(--color-text-muted); margin-top: 3px; }
+  .msg-time { font-size: 13px; color: var(--color-text-muted); flex-shrink: 0; white-space: nowrap; }
+  .msg-collapsed-snippet { font-size: 13.5px; color: var(--color-text-muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .msg-body { padding: 0 18px 24px 78px; font-size: 15.5px; line-height: 1.7; color: var(--color-text); }
+  .msg-body p { margin: 0 0 14px; }
+  .msg-body p:last-child { margin-bottom: 0; }
+  .msg.collapsed .msg-body { display: none; }
+  .msg.collapsed .msg-head { padding-bottom: 16px; }
+
+  .attachments-row { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 18px 24px 78px; }
+  .attachment-chip {
+    display: flex; align-items: center; gap: 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    padding: 10px 16px; cursor: pointer; background: var(--color-surface-alt); transition: box-shadow .15s var(--ease), border-color .15s var(--ease);
+  }
+  .attachment-chip:hover { box-shadow: var(--shadow-sm); border-color: var(--color-border-strong); }
+  .attach-icon-wrap { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
+  .attachment-chip .file-info .fname { font-size: 13.5px; font-weight: 600; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .attachment-chip .file-info .fsize { font-size: 12px; color: var(--color-text-muted); }
+
+  .reply-bar { display: flex; gap: 12px; padding: 10px clamp(18px, 3vw, 36px) 36px; flex-wrap: wrap; }
+  .reply-action-btn {
+    display: flex; align-items: center; gap: 9px; padding: 11px 22px; border-radius: var(--radius-pill);
+    border: 1.4px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text-secondary);
+    font-size: 14.5px; font-weight: 600; cursor: pointer; transition: all .15s var(--ease); min-height: 46px;
+  }
+  .reply-action-btn:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-light); transform: translateY(-1px); }
+
+  /* ---------------- COMPOSE MODAL ---------------- */
+  .compose-modal {
+    position: fixed; bottom: 0; right: 32px; width: 560px; max-width: calc(100vw - 36px);
+    background: var(--color-surface); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: var(--shadow-lg); border: 1px solid var(--color-border); border-bottom: none;
+    display: flex; flex-direction: column; z-index: 100;
+    transform: translateY(120%); transition: transform .3s var(--ease), width .2s var(--ease), height .2s var(--ease);
+    height: 600px; max-height: calc(100vh - 75px);
+  }
+  .compose-modal.open { transform: translateY(0); }
+  .compose-modal.minimized { height: auto; width: 340px; }
+  .compose-modal.minimized .compose-body, .compose-modal.minimized .compose-toolbar, .compose-modal.minimized .compose-fields { display: none; }
+  .compose-modal.expanded { width: min(960px, calc(100vw - 64px)); height: calc(100vh - 64px); right: 50%; transform: translateX(50%) translateY(0); }
+
+  .compose-head {
+    display: flex; align-items: center; gap: 10px; padding: 14px 16px 14px 22px;
+    background: var(--color-primary-light); border-radius: var(--radius-lg) var(--radius-lg) 0 0; cursor: pointer;
+    flex-shrink: 0;
+  }
+  html[data-theme="dark"] .compose-head { background: var(--color-surface-alt); }
+  .compose-head .title { flex: 1; font-size: 15px; font-weight: 700; color: var(--color-text); }
+  .compose-head-actions { display: flex; align-items: center; gap: 4px; }
+
+  .compose-fields { padding: 6px 22px 0; flex-shrink: 0; }
+  .compose-field-row { display: flex; align-items: center; border-bottom: 1px solid var(--color-border); padding: 11px 0; gap: 10px; }
+  .compose-field-row label { font-size: 14px; color: var(--color-text-muted); flex-shrink: 0; width: 44px; }
+  .compose-field-row input[type=text], .compose-field-row input[type=email] {
+    flex: 1; border: none; outline: none; font-size: 15px; color: var(--color-text); background: transparent; font-family: inherit;
+  }
+  .ccbcc-toggle { font-size: 13px; color: var(--color-text-muted); cursor: pointer; flex-shrink: 0; user-select: none; font-weight: 600; }
+  .ccbcc-toggle:hover { color: var(--color-primary); }
+  .compose-field-row.hidden { display: none; }
+
+  .compose-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .compose-editor {
+    flex: 1; overflow-y: auto; padding: 18px 22px; font-size: 15px; line-height: 1.65; outline: none; color: var(--color-text);
+  }
+  .compose-editor:empty::before { content: attr(data-placeholder); color: var(--color-text-muted); }
+  .compose-attachments { display: flex; flex-wrap: wrap; gap: 10px; padding: 0 22px 14px; }
+
+  .compose-toolbar {
+    display: flex; align-items: center; gap: 6px; padding: 10px 16px; border-top: 1px solid var(--color-border); flex-shrink: 0; flex-wrap: wrap;
+  }
+  .compose-toolbar .divider { width: 1px; height: 22px; background: var(--color-border); margin: 0 6px; }
+  .compose-toolbar .spacer { flex: 1; }
+  .tb-select {
+    border: none; background: transparent; color: var(--color-text-secondary); font-size: 13.5px; font-family: inherit;
+    padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; outline: none; max-width: 100px;
+  }
+  .tb-select:hover { background: var(--color-surface-hover); color: var(--color-text); }
+  .send-btn {
+    display: flex; align-items: center; gap: 9px; background: var(--color-primary); color: #fff; border: none;
+    border-radius: var(--radius-pill); padding: 11px 24px; font-size: 15px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(46, 107, 240, .3); transition: background .15s var(--ease), transform .1s var(--ease); min-height: 44px;
+  }
+  .send-btn:hover { background: var(--color-primary-hover); transform: translateY(-1px); }
+
+  .emoji-pop {
+    position: absolute; bottom: 54px; background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-md); padding: 10px; display: none; gap: 6px; flex-wrap: wrap; width: 250px; z-index: 110;
+  }
+  .emoji-pop.open { display: flex; }
+  .emoji-pop button { border: none; background: none; font-size: 22px; padding: 6px; border-radius: 8px; cursor: pointer; }
+  .emoji-pop button:hover { background: var(--color-surface-hover); }
+
+  /* ---------------- EVENT EDIT / CREATION MODAL ---------------- */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(15, 23, 42, .5); backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center; z-index: 150; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; animation: pane-fade .2s var(--ease); }
+  .modal-box {
+    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg); width: 100%; max-width: 500px; padding: 28px; display: flex; flex-direction: column; gap: 18px;
+  }
+  .modal-box h3 { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin: 0; }
+
+  /* ---------------- TOAST STACK ---------------- */
+  .toast-stack { position: fixed; left: 28px; bottom: 28px; z-index: 200; display: flex; flex-direction: column; gap: 12px; max-width: calc(100vw - 56px); }
+  .toast {
+    background: var(--color-text); color: var(--color-bg); padding: 14px 20px; border-radius: var(--radius-md);
+    font-size: 14.5px; box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 18px;
+    animation: toast-in .25s var(--ease); font-weight: 500;
+  }
+  html[data-theme="dark"] .toast { background: #F1F5F9; color: #0F172A; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .toast button { border: none; background: none; color: inherit; font-weight: 700; cursor: pointer; font-size: 13.5px; opacity: .95; text-decoration: underline; }
+  .toast button:hover { opacity: 1; }
+
+  /* ======================================================================
+     RESPONSIVE BREAKPOINTS (Mobile ≤480px, Tablet 481-768px, Laptop 769-1024px, Desktop 1025px+)
+     ====================================================================== */
+
+  /* 1025px+ Desktop: Full 3-pane experience */
+  @media (min-width: 1025px) {
+    .mobile-bottom-nav { display: none !important; }
+  }
+
+  /* 769px - 1024px Small Laptop / Tablet Landscape */
+  @media (max-width: 1024px) {
+    .list-pane { max-width: 380px; min-width: 270px; }
+    .search-form { max-width: 500px; }
+  }
+
+  /* 481px - 768px Tablet / Mobile Landscape */
+  @media (max-width: 768px) {
+    .hamburger { display: inline-flex; }
+    .sidebar-toggle-btn { display: none; }
+    .brand .wordmark { display: none; }
+
+    .sidebar {
+      position: fixed; top: var(--topbar-h); left: 0; bottom: 0; width: 280px;
+      transform: translateX(-100%); box-shadow: var(--shadow-lg); align-items: stretch;
+    }
+    .sidebar.mobile-open { transform: translateX(0); }
+    .sidebar.mobile-open .compose-btn span, .sidebar.mobile-open .nav-item .label,
+    .sidebar.mobile-open .nav-item .badge, .sidebar.mobile-open .labels-head span,
+    .sidebar.mobile-open .storage-text, .sidebar.mobile-open .storage-upgrade { display: inline; }
+    .sidebar.mobile-open .nav-item { justify-content: flex-start; padding: 11px 16px; }
+    .sidebar-scrim { display: none; position: fixed; inset: var(--topbar-h) 0 0 0; background: rgba(15, 23, 42, .5); z-index: 29; }
+    .sidebar-scrim.visible { display: block; }
+
+    .list-pane { max-width: none; width: 100%; min-width: 0; }
+    .mail-shell.showing-reading .list-pane { display: none; }
+    .reading-pane { display: none; }
+    .mail-shell.showing-reading .reading-pane { display: flex; }
+    .reading-toolbar .back-btn { display: inline-flex; }
+
+    .msg-body { padding-left: 18px; }
+    .attachments-row { padding-left: 18px; }
+
+    .compose-modal { right: 16px; left: 16px; width: auto; max-width: none; bottom: 0; }
+    .compose-modal.expanded { right: 16px; left: 16px; transform: translateY(0); width: auto; }
+  }
+
+  /* ≤480px Mobile Portrait */
+  @media (max-width: 480px) {
+    :root { --topbar-h: 58px; }
+
+    .icon-rail { display: none; }
+    .mobile-bottom-nav { display: flex; }
+
+    .topbar { padding: 0 12px; gap: 10px; }
+    .search-box { height: 40px; padding: 0 12px; }
+    .search-kbd { display: none !important; }
+
+    .help-hide-mobile { display: none !important; }
+    .topbar-divider { display: none; }
+
+    .login-left { padding: 24px 18px; }
+    .login-right { display: none; }
+
+    .compose-modal {
+      right: 0; left: 0; bottom: 0; width: 100% !important; height: 100% !important;
+      max-height: 100% !important; border-radius: 0; border: none;
+    }
+    .compose-modal.minimized { height: 56px !important; width: 100% !important; }
+
+    .calendar-view, .contacts-view, .tasks-view { padding: 14px; }
+    .calendar-grid { grid-auto-rows: minmax(58px, 1fr); }
+    .cal-event { font-size: 10px; padding: 2px 5px; }
+    .calendar-weekdays span { font-size: 11px; }
+
+    .toast-stack { left: 14px; right: 14px; bottom: 78px; max-width: none; }
+    .toast { padding: 12px 16px; font-size: 13.5px; }
+  }
+
+  /* Landscape phone height compatibility */
+  @media (max-height: 540px) and (orientation: landscape) {
+    :root { --topbar-h: 50px; }
+    .compose-modal { height: 100vh !important; }
+    .calendar-grid { grid-auto-rows: minmax(50px, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     SCREEN 1 — LOGIN
+     ============================================================ -->
+<div class="screen" id="screen-login">
+  <div class="login-left">
+    <div class="login-left-top">
+      <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232E6BF0'/><path d='M8 10h16v12H8z' fill='none' stroke='%23ffffff' stroke-width='2'/><path d='M8 11l8 6 8-6' fill='none' stroke='%23ffffff' stroke-width='2'/></svg>" class="logo-mark" alt="STX Mail">
+      <div class="wordmark">STX Mail</div>
+    </div>
+
+    <div class="login-left-form">
+      <h1>Sign in to your workspace</h1>
+      <p class="sub">Welcome back — access every mailbox, alias, calendar, and contact in one autonomous portal.</p>
+
+      <button class="google-btn" id="googleLoginBtn">
+        <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20.4H24v7.2h11.3c-1.6 4.6-6 7.9-11.3 7.9-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.4-5.4C34.5 5.9 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 19 13.5 24 13.5c3.1 0 5.9 1.2 8 3.1l5.4-5.4C34.5 7.9 29.5 6 24 6c-7.5 0-14 4.2-17.3 10.4z"/><path fill="#4CAF50" d="M24 44c5.4 0 10.3-1.8 14.1-5l-6.5-5.5C29.5 35.4 26.9 36.5 24 36.5c-5.3 0-9.7-3.4-11.3-8l-6.5 5c3.3 6.5 9.9 10.5 17.8 10.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20.4H24v7.2h11.3c-.8 2.2-2.2 4.1-4 5.5l6.5 5.5C41.4 35.5 44 30.1 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>
+        <span id="googleBtnLabel">Continue with Google</span>
+      </button>
+
+      <p class="login-fineprint">By continuing, you agree to STX Mail's <a href="#">Terms</a> and <a href="#">Privacy Policy</a>. Enterprise cloud webmail suite.</p>
+    </div>
+  </div>
+
+  <div class="login-right">
+    <svg class="login-lines" viewBox="0 0 400 460" preserveAspectRatio="none">
+      <line x1="200" y1="239" x2="312" y2="101"/>
+      <line x1="200" y1="239" x2="328" y2="331"/>
+      <line x1="200" y1="239" x2="72" y2="313"/>
+      <circle cx="256" cy="170" r="3"/>
+      <circle cx="264" cy="285" r="3"/>
+      <circle cx="136" cy="277" r="3"/>
+    </svg>
+
+    <div class="login-chip c1" style="top:22%; left:78%;" title="Mail">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
+    </div>
+    <div class="login-chip c2" style="top:72%; left:82%;" title="Security">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5Z"/></svg>
+    </div>
+    <div class="login-chip c3" style="top:68%; left:18%;" title="Aliases">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 8v8"/><path d="M8 7l8 4"/></svg>
+    </div>
+
+    <div class="login-badge">
+      <div class="login-badge-inner">
+        <svg width="68" height="68" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SCREEN 2 — LOADING (Splash)
+     ============================================================ -->
+<div class="screen" id="screen-loading">
+  <svg class="loading-mark" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#ffffff"/><path d="M8 10h16v12H8z" fill="none" stroke="#2E6BF0" stroke-width="2"/><path d="M8 11l8 6 8-6" fill="none" stroke="#2E6BF0" stroke-width="2"/></svg>
+  <div class="loading-track"><div class="loading-fill" id="loadingFill"></div></div>
+  <div class="loading-status" id="loadingStatus">Loading workspace…</div>
+</div>
+
+<!-- ============================================================
+     SCREEN 3 — DASHBOARD
+     ============================================================ -->
+<div class="screen" id="screen-dashboard">
+  <header class="dash-topbar">
+    <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232E6BF0'/><path d='M8 10h16v12H8z' fill='none' stroke='%23ffffff' stroke-width='2'/><path d='M8 11l8 6 8-6' fill='none' stroke='%23ffffff' stroke-width='2'/></svg>" class="logo-mark" alt="STX Logo">
+    <div class="wordmark">STX Mail</div>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="dashThemeToggle" title="Toggle dark mode">
+      <svg class="icon" id="dashSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/></svg>
+      <svg class="icon" id="dashMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+    </button>
+    <div class="avatar-wrap" id="dashAvatarWrap">
+      <div class="avatar" id="dashAvatar">ST</div>
+      <svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      <div class="dropdown" id="dashDropdown">
+        <div class="dropdown-profile">
+          <div class="avatar" id="dashDropdownAvatar">ST</div>
+          <div>
+            <div class="name">Shanudha Tirosh</div>
+            <div class="email">hello@shanutechx.com</div>
+          </div>
+        </div>
+        <button class="dropdown-item danger" id="dashLogoutBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="dash-scroll">
+    <div class="dash-inner">
+      <div class="dash-greeting">
+        <h1 id="dashGreeting">Good day, Shanudha</h1>
+        <p id="dashDate">Sunday, September 6, 2026</p>
+      </div>
+
+      <div class="dash-stats-row">
+        <div class="storage-hero">
+          <svg class="storage-ring" width="92" height="92" viewBox="0 0 92 92">
+            <circle cx="46" cy="46" r="40" fill="none" stroke="var(--color-surface-alt)" stroke-width="9"/>
+            <circle id="storageRingArc" cx="46" cy="46" r="40" fill="none" stroke="url(#ringGrad)" stroke-width="9" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="251.3" transform="rotate(-90 46 46)"/>
+            <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="92" y2="92"><stop offset="0" stop-color="#2E6BF0"/><stop offset="1" stop-color="#00F0FF"/></linearGradient></defs>
+          </svg>
+          <div class="storage-hero-text">
+            <div class="big" id="storageHeroBig">6.3 GB</div>
+            <div class="lbl" id="storageHeroLbl">of 50 GB used across all mailboxes</div>
+          </div>
+        </div>
+        <div class="dash-minor-stats">
+          <div class="minor-stat"><b id="statAliasCount">5</b><span>mailboxes</span></div>
+          <div class="minor-stat"><b id="statUnreadCount">0</b><span>unread emails</span></div>
+        </div>
+      </div>
+
+      <div class="dash-section-head">
+        <h2>Your Mailboxes</h2>
+        <span>Select an alias to launch workspace or edit settings</span>
+      </div>
+      <div class="alias-list" id="aliasList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SCREEN 4 — PROFILE & ACCOUNT CONFIGURATION HUB (ULTRA ENHANCED)
+     ============================================================ -->
+<div class="screen" id="screen-config">
+  <header class="config-header-card">
+    <div class="config-top-row">
+      <div class="config-user-badge">
+        <button class="icon-btn" id="configBackBtn" title="Back to workspace">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        </button>
+        <div class="avatar-preview" id="headerAvatarPreview">ST</div>
+        <div>
+          <h1 id="configTitle">Account Settings</h1>
+          <p id="configSubtitle">Configure personal profile, security, and preferences</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn-ghost" id="configCancelBtn">Cancel</button>
+        <button class="btn-primary" id="configSaveBtn">Save Changes</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="config-scroll">
+    <div class="config-inner">
+
+      <!-- Segmented Nav Tab Bar -->
+      <div class="config-tab-bar">
+        <button class="config-tab-btn active" data-tab="tab-profile">Profile Details</button>
+        <button class="config-tab-btn" data-tab="tab-preferences">Appearance & Theme</button>
+        <button class="config-tab-btn" data-tab="tab-mailpref">Mail Preferences</button>
+        <button class="config-tab-btn" data-tab="tab-security">Password & Security</button>
+        <button class="config-tab-btn" data-tab="tab-server">Server & Sync</button>
+      </div>
+
+      <!-- TAB 1: PROFILE DETAILS -->
+      <div class="config-tab-pane active" id="tab-profile">
+        <div class="config-card">
+          <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Profile Information</h3>
+          <p class="section-desc">Personal details and visual identity across all sent messages and directory listings.</p>
+          
+          <div class="profile-photo-area">
+            <div class="avatar-upload" id="avatarUploadBtn" title="Click to upload profile photo">
+              <div class="photo" id="configPhoto">ST</div>
+              <div class="cam-btn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg></div>
+              <input type="file" id="configPhotoInput" accept="image/*" style="display:none">
+            </div>
+            <div style="flex:1;">
+              <span style="font-size:14px; font-weight:700; color:var(--color-text); display:block; margin-bottom:4px;">Profile Photo</span>
+              <span style="font-size:13px; color:var(--color-text-muted); display:block; margin-bottom:10px;">JPG, PNG or GIF, max 5MB. Clear face photo recommended.</span>
+              <div style="display:flex; gap:12px; align-items:center;">
+                <button class="btn-ghost" style="padding:6px 14px; font-size:13px; min-height:34px;" onclick="document.getElementById('configPhotoInput').click()">Upload Photo</button>
+                <span class="regen-link" id="removePhotoBtn">Remove photo</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-fields-grid">
+            <div class="field-group">
+              <label class="field-label">Display Name</label>
+              <input type="text" class="field-input" id="configDisplayName" placeholder="Your full name">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Email Alias Address</label>
+              <input type="text" class="field-input" id="configAliasAddress" readonly>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Job Title / Role</label>
+              <input type="text" class="field-input" id="configJobTitle" placeholder="e.g. Lead Platform Architect">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Phone Number</label>
+              <input type="text" class="field-input" id="configPhone" placeholder="+94 77 123 4567">
+            </div>
+          </div>
+        </div>
+
+        <div class="config-card">
+          <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Email Signature</h3>
+          <p class="section-desc">Appended automatically to outgoing messages sent from this alias.</p>
+          <textarea class="field-input" id="configSignature" rows="4" placeholder="Best regards,&#10;Shanudha Tirosh&#10;ShanuTechX Cloud Platform"></textarea>
+
+          <div class="sig-preview-card" id="sigPreviewCard">
+            <span style="font-size:11.5px; font-weight:700; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:.04em; display:block; margin-bottom:6px;">Live Signature Preview</span>
+            <div id="sigPreviewText">Best regards,<br><b>Shanudha Tirosh</b><br>ShanuTechX Platform</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: APPEARANCE & THEME -->
+      <div class="config-tab-pane" id="tab-preferences">
+        <div class="config-card">
+          <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> Theme Mode</h3>
+          <p class="section-desc">Select how STX Mail looks on your device.</p>
+          
+          <div class="theme-card-row">
+            <div class="theme-card selected" id="themeLightCard" onclick="setThemeMode('light')">
+              <div class="theme-card-preview" style="background:#F4F6FB;">
+                <div style="width:30%; background:#fff; border-right:1px solid #E2E8F0;"></div>
+                <div style="flex:1; background:#fff; margin:6px; border-radius:4px;"></div>
+              </div>
+              <div class="theme-card-title">Light Mode</div>
+            </div>
+
+            <div class="theme-card" id="themeDarkCard" onclick="setThemeMode('dark')">
+              <div class="theme-card-preview" style="background:#0B0F19;">
+                <div style="width:30%; background:#151D2A; border-right:1px solid #28354A;"></div>
+                <div style="flex:1; background:#151D2A; margin:6px; border-radius:4px;"></div>
+              </div>
+              <div class="theme-card-title">Dark Mode</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="config-card">
+          <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.92 0 1.5-.66 1.5-1.5 0-.42-.16-.8-.42-1.08-.27-.29-.42-.67-.42-1.08 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9z"/></svg> Primary Accent Color</h3>
+          <p class="section-desc">Accent color applied to active buttons, badges, calendar events, and highlighted tabs.</p>
+          <div class="color-swatch-row" id="colorSwatchRow"></div>
+        </div>
+      </div>
+
+      <!-- TAB 3: MAIL PREFERENCES -->
+      <div class="config-tab-pane" id="tab-mailpref">
+        <div class="config-card">
+          <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg> Reading & Compose Behavior</h3>
+          <p class="section-desc">Customize how conversations and messages behave.</p>
+          
+          <div class="switch-row">
+            <div class="switch-info">
+              <div class="title">Desktop Audio Sound Effects</div>
+              <div class="desc">Play a subtle audio chime when a new email arrives or event triggers</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <button class="btn-ghost" style="padding:4px 12px; font-size:12.5px; min-height:32px;" onclick="playTestChime()">Test Sound</button>
+              <label class="switch-toggle">
+                <input type="checkbox" id="prefSoundNotif" checked>
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="switch-row">
+            <div class="switch-info">
+              <div class="title">Desktop Popups & Notifications</div>
+              <div class="desc">Receive native browser alerts for unread emails</div>
+            </div>
+            <label class="switch-toggle">
+              <input type="checkbox" id="prefDesktopNotif" checked>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="switch-row">
+            <div class="switch-info">
+              <div class="title">Undo Send Timer</div>
+              <div class="desc">Grace period to cancel sent messages before transmission</div>
+            </div>
+            <select class="field-input" style="width:130px; min-height:38px;">
+              <option value="5">5 Seconds</option>
+              <option value="10" selected>10 Seconds</option>
+              <option value="20">20 Seconds</option>
+              <option value="30">30 Seconds</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: PASSWORD & SECURITY -->
+      <div class="config-tab-pane" id="tab-security">
+        <div class="sec-score-card">
+          <div class="score-num">94%</div>
+          <div class="score-text">
+            <h4>Account Security Status — Excellent</h4>
+            <p>Two-factor authentication is active and 2 active devices are authenticated.</p>
+          </div>
+        </div>
+
+        <div class="config-card">
+          <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Change Password</h3>
+          <p class="section-desc">Update your account password to maintain security across services.</p>
+          <div style="display:flex; flex-direction:column; gap:14px; max-width:440px;">
+            <div class="field-group">
+              <label class="field-label">Current Password</label>
+              <input type="password" class="field-input" id="secCurrentPw" placeholder="••••••••••••">
+            </div>
+            <div class="field-group">
+              <label class="field-label">New Password</label>
+              <input type="password" class="field-input" id="secNewPw" placeholder="At least 8 characters">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Confirm New Password</label>
+              <input type="password" class="field-input" id="secConfirmPw" placeholder="Confirm new password">
+            </div>
+            <button class="btn-ghost" id="updatePwBtn" style="align-self:flex-start;">Update Password</button>
+          </div>
+        </div>
+
+        <div class="config-card">
+          <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Two-Factor Authentication (2FA)</h3>
+          <p class="section-desc">Add an extra layer of security using TOTP Authenticator apps.</p>
+          <div class="switch-row">
+            <div class="switch-info">
+              <div class="title">Require 2FA Code</div>
+              <div class="desc">Verification code required when logging in on new browsers</div>
+            </div>
+            <label class="switch-toggle">
+              <input type="checkbox" id="sec2faToggle" checked>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="config-card">
+          <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Active Login Sessions</h3>
+          <p class="section-desc">Devices currently authenticated to your STX Mail account.</p>
+          <div class="session-card">
+            <div class="session-info">
+              <div class="device">Windows 11 PC — Chrome 128</div>
+              <div class="meta">Colombo, Sri Lanka · Active Now (Current)</div>
+            </div>
+            <span style="font-size:12.5px; font-weight:700; color:var(--color-success)">Active Session</span>
+          </div>
+          <div class="session-card">
+            <div class="session-info">
+              <div class="device">iPhone 15 Pro — Mobile Safari</div>
+              <div class="meta">Colombo, Sri Lanka · 2 hours ago</div>
+            </div>
+            <button class="btn-ghost" style="padding:4px 12px; font-size:12.5px; min-height:32px;" onclick="showToast('Session revoked')">Revoke Session</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: SERVER & SYNC -->
+      <div class="config-tab-pane" id="tab-server">
+        <div class="config-card">
+          <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2"><path d="M22 12H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg> Storage Quota & Breakdown</h3>
+          <p class="section-desc" id="configStorageDesc">3.1 GB of 10 GB used</p>
+          <div class="storage-bar" style="height:10px;"><div class="storage-bar-fill" id="configStorageFill" style="width:31%"></div></div>
+        </div>
+
+        <div class="config-card">
+          <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg> IMAP & SMTP Sync Configuration</h3>
+          <p class="section-desc">Credentials for Outlook, Apple Mail, Thunderbird, or mobile clients.</p>
+          
+          <div class="server-grid">
+            <div class="server-col">
+              <h4><span class="server-status-dot"></span>Incoming IMAP Server</h4>
+              <div class="server-field">
+                <label class="field-label">Host</label>
+                <div class="value-chip"><span id="imapHostVal">imap.stxmail.io</span>
+                  <button data-copy="imapHostVal" title="Copy"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+                </div>
+              </div>
+              <div class="server-field">
+                <label class="field-label">Port & Security</label>
+                <div class="value-chip"><span>993 (SSL/TLS Encrypted)</span></div>
+              </div>
+            </div>
+
+            <div class="server-col">
+              <h4><span class="server-status-dot"></span>Outgoing SMTP Server</h4>
+              <div class="server-field">
+                <label class="field-label">Host</label>
+                <div class="value-chip"><span id="smtpHostVal">smtp.stxmail.io</span>
+                  <button data-copy="smtpHostVal" title="Copy"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+                </div>
+              </div>
+              <div class="server-field">
+                <label class="field-label">Port & Security</label>
+                <div class="value-chip"><span>465 (SSL/TLS Encrypted)</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:20px;">
+            <label class="field-label">Sync Username</label>
+            <div class="value-chip" style="margin-bottom:16px;"><span id="serverUsernameVal">alias@example.com</span>
+              <button data-copy="serverUsernameVal" title="Copy"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+            </div>
+            <label class="field-label">App Password</label>
+            <div class="apppw-row" style="display:flex; align-items:center; gap:12px;">
+              <div class="value-chip" style="flex:1;">
+                <span id="appPasswordVal">••••••••••••••</span>
+                <button id="togglePwBtn" title="Show/Hide"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                <button data-copy="appPasswordVal" id="copyPwBtn" title="Copy"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+              </div>
+            </div>
+            <span class="regen-link" id="regenPwBtn" style="margin-top:10px;">Generate new app password</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SCREEN 5 — MAIL WORKSPACE
+     ============================================================ -->
+<div class="screen" id="screen-mail">
+<div class="app" id="app">
+
+  <header class="topbar">
+    <button class="icon-btn hamburger" id="hamburgerBtn" title="Menu" aria-label="Toggle menu">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+
+    <button class="icon-btn sidebar-toggle-btn" id="sidebarToggleBtn" title="Collapse sidebar" aria-label="Toggle sidebar">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9.5" y1="4" x2="9.5" y2="20"/></svg>
+    </button>
+
+    <button class="icon-btn to-dash-btn" id="toDashBtn" title="All Mailboxes Dashboard">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+    </button>
+
+    <div class="brand" id="brandLogo" title="STX Mail — Inbox">
+      <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232E6BF0'/><path d='M8 10h16v12H8z' fill='none' stroke='%23ffffff' stroke-width='2'/><path d='M8 11l8 6 8-6' fill='none' stroke='%23ffffff' stroke-width='2'/></svg>" class="logo-mark" alt="STX Logo">
+      <div class="wordmark">STX Mail</div>
+    </div>
+
+    <form class="search-form" id="searchForm" onsubmit="return false;">
+      <div class="search-box" id="searchBox">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" placeholder="Search mail, sender, subject..." autocomplete="off">
+        <button type="button" class="search-clear" id="searchClear" aria-label="Clear search">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <kbd class="search-kbd" id="searchKbd">/</kbd>
+      </div>
+    </form>
+
+    <div class="topbar-actions">
+      <button class="icon-btn help-hide-mobile" id="settingsBtn" title="Account Settings" aria-label="Settings">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+      </button>
+      <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+        <svg class="icon" id="themeIconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/></svg>
+        <svg class="icon" id="themeIconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+      </button>
+      <div class="topbar-divider"></div>
+      <div class="avatar-wrap" id="avatarWrap">
+        <div class="avatar" id="topbarAvatar">ST</div>
+        <svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <div class="dropdown" id="avatarDropdown">
+          <div class="dropdown-profile">
+            <div class="avatar" id="dropdownAvatarBig" style="width:44px;height:44px;font-size:16px;">ST</div>
+            <div>
+              <div class="name" id="dropdownName">Shanudha Tirosh</div>
+              <div class="email" id="dropdownEmail">hello@shanutechx.com</div>
+            </div>
+          </div>
+          <div class="dropdown-label">Switch Mailbox Alias</div>
+          <div id="aliasSwitchList"></div>
+          <div class="nav-divider" style="margin:6px 8px;"></div>
+          <button class="dropdown-item" id="ddConfigure"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>Profile & Settings</button>
+          <button class="dropdown-item" id="ddDashboard"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>All Mailboxes</button>
+          <button class="dropdown-item danger" id="ddLogout"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign out</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="body-row">
+    <div class="sidebar-scrim" id="sidebarScrim"></div>
+
+    <nav class="icon-rail" id="iconRail">
+      <button class="rail-btn active" id="railMail" data-module="mail" title="Mail">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
+      </button>
+      <button class="rail-btn" id="railCalendar" data-module="calendar" title="Calendar">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </button>
+      <button class="rail-btn" id="railContacts" data-module="contacts" title="Contacts">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </button>
+      <button class="rail-btn" id="railTasks" data-module="tasks" title="Tasks">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      </button>
+      <div class="rail-divider"></div>
+      <button class="rail-btn" id="railSettingsShortcut" title="Settings">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+      </button>
+    </nav>
+
+    <aside class="sidebar" id="sidebar">
+      <button class="compose-btn" id="composeOpenBtn">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:20px;height:20px"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        <span>Compose</span>
+      </button>
+
+      <div class="sidebar-scroll" id="sidebarMailNav">
+        <nav class="nav-section">
+          <ul class="nav-list" id="folderNav"></ul>
+        </nav>
+
+        <div class="nav-divider"></div>
+
+        <div class="labels-section">
+          <div class="labels-head">
+            <span>Labels</span>
+            <button id="addLabelBtn" title="Add label" aria-label="Add label">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <ul class="nav-list" id="labelNav"></ul>
+        </div>
+      </div>
+
+      <div class="sidebar-scroll" id="sidebarCalendarNav" style="display:none;">
+        <button class="compose-btn" id="createEventBtn" style="background:var(--color-primary);">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:18px;height:18px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>New Event</span>
+        </button>
+        <div class="labels-head"><span>Upcoming Events</span></div>
+        <div id="upcomingEventsList"></div>
+      </div>
+
+      <div class="sidebar-scroll" id="sidebarContactsNav" style="display:none;">
+        <button class="compose-btn" id="addContactBtn" style="background:var(--color-primary);">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:18px;height:18px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Add Contact</span>
+        </button>
+        <div class="labels-head"><span id="contactsCountLabel">Contacts</span></div>
+      </div>
+
+      <div class="sidebar-scroll" id="sidebarTasksNav" style="display:none;">
+        <div class="labels-head"><span id="tasksCountLabel">Tasks</span></div>
+        <div style="padding:10px 14px; font-size:13.5px; color:var(--color-text-secondary); line-height:1.6;" id="tasksSummary"></div>
+      </div>
+
+      <div class="storage">
+        <div class="storage-bar"><div class="storage-bar-fill" id="sidebarStorageFill" style="width:42%"></div></div>
+        <div class="storage-text" id="sidebarStorageText">6.3 GB of 15 GB used</div>
+        <div class="storage-upgrade" onclick="showToast('Storage upgrade plan selected')">Get more storage</div>
+      </div>
+    </aside>
+
+    <main class="mail-shell" id="mailShell">
+
+      <!-- MODULE 1: MAIL WORKSPACE -->
+      <div id="moduleMail" class="module-pane">
+        <section class="list-pane">
+          <div class="list-toolbar">
+            <div class="checkbox" id="selectAllCheckbox" role="checkbox" aria-checked="false" title="Select all">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+
+            <div class="toolbar-title" id="toolbarTitle">Inbox</div>
+
+            <div class="toolbar-actions hidden" id="bulkActions">
+              <button class="icon-btn" id="bulkArchive" title="Archive"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg></button>
+              <button class="icon-btn" id="bulkDelete" title="Delete"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              <button class="icon-btn" id="bulkMarkRead" title="Mark read"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h11"/><polyline points="22 7 12 13 2 7"/><polyline points="16 19 18 21 23 16"/></svg></button>
+            </div>
+
+            <button class="icon-btn" id="refreshBtn" title="Refresh mailbox"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+          </div>
+
+          <div class="list-scroll" id="listScroll"></div>
+        </section>
+
+        <section class="reading-pane">
+          <div class="reading-empty" id="readingEmpty">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
+            <h3>Select a conversation to read</h3>
+            <p>Choose an email from the left pane to view full thread, attachments, and reply.</p>
+          </div>
+
+          <div class="reading-content" id="readingContent">
+            <div class="reading-toolbar">
+              <button class="icon-btn back-btn" id="backToListBtn" title="Back to list">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+              </button>
+
+              <button class="toolbar-btn" id="paneArchive"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg><span>Archive</span></button>
+              <button class="toolbar-btn" id="paneDelete"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg><span>Delete</span></button>
+              <button class="toolbar-btn" id="paneMarkUnread"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg><span>Unread</span></button>
+            </div>
+
+            <div class="reading-header">
+              <h2 class="reading-subject" id="readingSubject">Email Subject</h2>
+            </div>
+
+            <div class="thread" id="threadContainer"></div>
+
+            <div class="reply-bar">
+              <button class="reply-action-btn" id="replyBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>Reply</button>
+              <button class="reply-action-btn" id="replyAllBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>Reply All</button>
+              <button class="reply-action-btn" id="forwardBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>Forward</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- MODULE 2: CALENDAR -->
+      <div id="moduleCalendar" class="module-pane" style="display:none;">
+        <div class="calendar-view">
+          <div class="calendar-header">
+            <div style="display:flex; align-items:center; gap:14px;">
+              <h2 id="calMonthLabel">September 2026</h2>
+              <div style="display:flex; gap:4px;">
+                <button class="icon-btn" id="calPrevBtn" title="Previous"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+                <button class="icon-btn" id="calNextBtn" title="Next"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>
+                <button class="btn-ghost" id="calTodayBtn" style="padding:4px 14px; font-size:13px; min-height:36px;">Today</button>
+              </div>
+            </div>
+
+            <!-- View Switcher -->
+            <div class="cal-view-switch">
+              <button class="cal-view-btn active" data-calview="month">Month</button>
+              <button class="cal-view-btn" data-calview="week">Week</button>
+              <button class="cal-view-btn" data-calview="day">Day</button>
+            </div>
+          </div>
+
+          <!-- Month View -->
+          <div id="calMonthContainer" style="display:flex; flex-direction:column; flex:1;">
+            <div class="calendar-weekdays" id="calendarWeekdays"></div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+          </div>
+
+          <!-- Week / Day View Schedule -->
+          <div id="calScheduleContainer" class="cal-schedule-grid" style="display:none;">
+            <div class="cal-time-col" id="calTimeCol"></div>
+            <div class="cal-days-col" id="calDaysCol"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODULE 3: CONTACTS -->
+      <div id="moduleContacts" class="module-pane" style="display:none;">
+        <div class="contacts-view">
+          <div class="contacts-header">
+            <h2>Contacts & Address Book</h2>
+            <div class="search-box">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="contactsSearchInput" placeholder="Search contacts by name, email, phone...">
+            </div>
+          </div>
+          <div id="contactsList"></div>
+        </div>
+      </div>
+
+      <!-- MODULE 4: TASKS -->
+      <div id="moduleTasks" class="module-pane" style="display:none;">
+        <div class="tasks-view">
+          <div class="tasks-header">
+            <h2>Tasks & To-Do List</h2>
+          </div>
+          <div class="task-input-row">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <input type="text" id="newTaskInput" placeholder="Add a new task and press Enter...">
+          </div>
+          <div id="tasksList"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Mobile Bottom Navigation Bar (<480px) -->
+  <nav class="mobile-bottom-nav">
+    <button class="mobile-nav-btn active" data-mobmodule="mail">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
+      <span>Mail</span>
+    </button>
+    <button class="mobile-nav-btn" data-mobmodule="calendar">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Calendar</span>
+    </button>
+    <button class="mobile-nav-btn" data-mobmodule="contacts">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <span>Contacts</span>
+    </button>
+    <button class="mobile-nav-btn" data-mobmodule="tasks">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span>Tasks</span>
+    </button>
+    <button class="mobile-nav-btn" data-mobmodule="settings">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+      <span>Settings</span>
+    </button>
+  </nav>
+
+</div>
+</div>
+
+<!-- ============================================================
+     COMPOSE MODAL
+     ============================================================ -->
+<div class="compose-modal" id="composeModal">
+  <div class="compose-head" id="composeHead">
+    <div class="title" id="composeTitle">New Message</div>
+    <div class="compose-head-actions">
+      <button class="icon-btn" id="composeMinimizeBtn" title="Minimize"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+      <button class="icon-btn" id="composeExpandBtn" title="Expand"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+      <button class="icon-btn" id="composeCloseBtn" title="Close"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  </div>
+
+  <div class="compose-fields">
+    <div class="compose-field-row">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div class="mini-avatar" id="composeFromAvatar" style="width:28px;height:28px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">ST</div>
+        <span id="composeFromEmail" style="font-size:13.5px; font-weight:600; color:var(--color-text-secondary);">hello@shanutechx.com</span>
+      </div>
+    </div>
+    <div class="compose-field-row">
+      <label for="composeTo">To</label>
+      <input type="text" id="composeTo" placeholder="Recipients (e.g. sarah.chen@devops.io)">
+      <span class="ccbcc-toggle" id="ccBccToggle">Cc/Bcc</span>
+    </div>
+    <div class="compose-field-row hidden" id="ccRow">
+      <label for="composeCc">Cc</label>
+      <input type="text" id="composeCc" placeholder="Cc recipients">
+    </div>
+    <div class="compose-field-row hidden" id="bccRow">
+      <label for="composeBcc">Bcc</label>
+      <input type="text" id="composeBcc" placeholder="Bcc recipients">
+    </div>
+    <div class="compose-field-row">
+      <label for="composeSubject">Subject</label>
+      <input type="text" id="composeSubject" placeholder="Subject line">
+    </div>
+  </div>
+
+  <div class="compose-body">
+    <div class="compose-editor" id="composeEditor" contenteditable="true" data-placeholder="Write your email here..."></div>
+    <div class="compose-attachments" id="composeAttachments"></div>
+  </div>
+
+  <div class="compose-toolbar">
+    <button class="send-btn" id="sendBtn">
+      <span>Send</span>
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:16px;height:16px"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+
+    <div class="divider"></div>
+
+    <button class="icon-btn" id="tbBold" title="Bold"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg></button>
+    <button class="icon-btn" id="tbItalic" title="Italic"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg></button>
+    <button class="icon-btn" id="tbUnderline" title="Underline"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg></button>
+    <button class="icon-btn" id="tbLink" title="Insert Link"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+    
+    <select class="tb-select" id="tbFontName" title="Font">
+      <option value="Inter, sans-serif">Inter</option>
+      <option value="Space Grotesk, sans-serif">Display</option>
+      <option value="Georgia, serif">Serif</option>
+      <option value="Monaco, monospace">Mono</option>
+    </select>
+
+    <div class="divider"></div>
+
+    <button class="icon-btn" id="tbAttach" title="Attach file"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+    <input type="file" id="fileInput" multiple style="display:none">
+
+    <button class="icon-btn" id="tbEmoji" title="Emoji"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
+
+    <div class="emoji-pop" id="emojiPop"></div>
+
+    <div class="spacer"></div>
+
+    <button class="icon-btn btn-ghost discard-btn" id="discardBtn" title="Discard draft"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
+    <button class="btn-ghost" id="saveDraftBtn" style="padding:6px 14px; font-size:13px; min-height:38px;">Save Draft</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     CALENDAR EVENT MODAL (Add / Edit Event)
+     ============================================================ -->
+<div class="modal-overlay" id="eventModal">
+  <div class="modal-box">
+    <h3 id="eventModalTitle">Add Calendar Event</h3>
+    <div>
+      <label class="field-label">Event Title</label>
+      <input type="text" class="field-input" id="evInputTitle" placeholder="e.g. Q4 Strategy Review">
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+      <div>
+        <label class="field-label">Date</label>
+        <input type="date" class="field-input" id="evInputDate">
+      </div>
+      <div>
+        <label class="field-label">Time</label>
+        <input type="text" class="field-input" id="evInputTime" placeholder="e.g. 10:00 AM">
+      </div>
+    </div>
+    <div>
+      <label class="field-label">Reminder Notification</label>
+      <select class="field-input" id="evInputReminder">
+        <option value="0">At time of event</option>
+        <option value="15" selected>15 minutes before</option>
+        <option value="60">1 hour before</option>
+        <option value="1440">1 day before</option>
+      </select>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+      <button class="btn-ghost" id="evDeleteBtn" style="color:var(--color-danger); display:none;">Delete Event</button>
+      <div style="display:flex; gap:10px; margin-left:auto;">
+        <button class="btn-ghost" id="evCancelBtn">Cancel</button>
+        <button class="btn-primary" id="evSaveBtn">Save Event</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     TOAST CONTAINER
+     ============================================================ -->
+<div class="toast-stack" id="toastStack"></div>
+
+<!-- ============================================================
+     APPLICATION LOGIC (JAVASCRIPT)
+     ============================================================ -->
+<script>
+(function() {
+  'use strict';
+
+  /* ---------------- MOCK DATA ---------------- */
+  const ALIASES = [
+    { id: 'hello', displayName: 'Shanudha Tirosh', email: 'hello@shanutechx.com', color: '#2E6BF0', storageUsedGB: 3.1, storageTotalGB: 10, photoUrl: null, jobTitle: 'Founder & Platform Architect', phone: '+94 77 123 4567', signature: 'Best regards,\nShanudha Tirosh\nFounder, ShanuTechX Platform' },
+    { id: 'billing', displayName: 'ShanuTechX Billing', email: 'billing@shanutechx.com', color: '#10B981', storageUsedGB: 1.8, storageTotalGB: 10, photoUrl: null, jobTitle: 'Billing Gateway Daemon', phone: '', signature: 'ShanuTechX Automated Billing Team' },
+    { id: 'shiftlk', displayName: 'Shift.lk Support', email: 'support@shift.lk', color: '#F59E0B', storageUsedGB: 0.9, storageTotalGB: 10, photoUrl: null, jobTitle: 'Client Services', phone: '', signature: 'Shift.lk Client Success Team' },
+    { id: 'cmprinting', displayName: 'CM Printing Orders', email: 'orders@cmprinting.lk', color: '#06B6D4', storageUsedGB: 0.3, storageTotalGB: 10, photoUrl: null, jobTitle: 'Print Orders Gateway', phone: '', signature: 'CM Printing Orders Automation' },
+    { id: 'netch', displayName: 'Netch Operations', email: 'support@netchlk.org', color: '#8B5CF6', storageUsedGB: 0.2, storageTotalGB: 10, photoUrl: null, jobTitle: 'Network Operations', phone: '', signature: 'Netch Operations Daemon' }
+  ];
+
+  const FOLDERS = [
+    { id: 'inbox', name: 'Inbox', icon: 'inbox' },
+    { id: 'sent', name: 'Sent', icon: 'send' },
+    { id: 'drafts', name: 'Drafts', icon: 'draft' },
+    { id: 'spam', name: 'Spam', icon: 'shieldAlert' },
+    { id: 'trash', name: 'Trash', icon: 'trash' },
+    { id: 'archive', name: 'Archive', icon: 'archive' }
+  ];
+
+  const LABEL_COLORS = { Clients: '#F59E0B', Invoices: '#10B981', Team: '#2E6BF0' };
+
+  let CONTACTS = [
+    { id: 'c1', alias: 'hello', name: 'Sarah Chen', email: 'sarah.chen@devops.io', phone: '+1 415 555 0192', jobTitle: 'Senior Infrastructure Engineer', color: '#2E6BF0' },
+    { id: 'c2', alias: 'hello', name: 'Priya Patel', email: 'priya@brightloop.co', phone: '+44 20 7946 0912', jobTitle: 'Client Success Director', color: '#F59E0B' },
+    { id: 'c3', alias: 'hello', name: 'Marcus Webb', email: 'marcus@figma.com', phone: '+1 650 555 0148', jobTitle: 'Lead Product Designer', color: '#A259FF' },
+    { id: 'c4', alias: 'hello', name: 'Ahmed Raza', email: 'ahmed.raza@gmail.com', phone: '+94 71 987 6543', jobTitle: 'Cloud Architect', color: '#06B6D4' }
+  ];
+
+  let CALENDAR_EVENTS = [
+    { id: 'ev1', alias: 'hello', title: 'Sprint Review & Demo', date: '2026-09-07', time: '10:00 AM', reminder: '15', color: '#2E6BF0' },
+    { id: 'ev2', alias: 'hello', title: 'Coffee with Ahmed', date: '2026-09-09', time: '2:30 PM', reminder: '60', color: '#06B6D4' },
+    { id: 'ev3', alias: 'hello', title: 'Q4 Budget & Retainer Sync', date: '2026-09-12', time: '11:00 AM', reminder: '15', color: '#F59E0B' }
+  ];
+
+  let TASKS = [
+    { id: 't1', alias: 'hello', title: 'Review pull request #142 for compose autosave', done: false },
+    { id: 't2', alias: 'hello', title: 'Verify SSL certificate auto-renewal for smtp.stxmail.io', done: true },
+    { id: 't3', alias: 'hello', title: 'Send Q4 retainer proposal to Priya', done: false }
+  ];
+
+  function person(name, email, color) {
+    const initials = name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+    return { sender: name, senderEmail: email, initials, avatarColor: color };
+  }
+
+  let emails = [
+    {
+      id: 'm1', alias: 'hello', folder: 'inbox', ...person('GitHub Notifications', 'notifications@github.com', '#24292E'),
+      subject: '[stx-mail] New pull request opened: "Fix compose autosave race"',
+      snippet: 'sarah-chen wants to merge 1 commit into main from fix/autosave-race —',
+      time: '10:42 AM', read: false, starred: true, labels: ['Team'],
+      to: 'you@shanutechx.com',
+      body: '<p>sarah-chen opened a new pull request:</p><p><b>Fix compose autosave race</b> — wants to merge 1 commit into <code>main</code> from <code>fix/autosave-race</code>.</p><p>This resolves the issue where two autosave calls firing close together could overwrite a newer draft. Added a debounce and version check.</p>'
+    },
+    {
+      id: 'm2', alias: 'billing', folder: 'inbox', ...person('Stripe', 'invoices@stripe.com', '#635BFF'),
+      subject: 'Your invoice for August is ready',
+      snippet: 'Hi there, your invoice for the August billing period is now available —',
+      time: '9:15 AM', read: false, starred: false, labels: ['Invoices'],
+      to: 'billing@shanutechx.com',
+      body: '<p>Hi there,</p><p>Your invoice for the August billing period is now available. Total amount due: <b>$284.00</b>, payable by September 20.</p><p>You can view and download the full PDF invoice below.</p>',
+      attachments: [{ name: 'Invoice_August_2026.pdf', size: '168 KB', type: 'pdf' }]
+    },
+    {
+      id: 'm3', alias: 'shiftlk', folder: 'inbox', ...person('Priya Patel', 'priya@brightloop.co', '#F59E0B'),
+      subject: 'Contract renewal — quick question',
+      snippet: 'Hey! Loved the Q3 report, thank you. Before we sign the renewal, one question —',
+      time: 'Yesterday', read: true, starred: true, labels: ['Clients', 'Invoices'],
+      to: 'you@shanutechx.com',
+      body: '<p>Hey!</p><p>Loved the Q3 report — thank you for putting that together so quickly.</p><p>Before we sign the renewal: can we shift the invoicing date to the 15th of each month?</p><p>Contract draft attached for reference.</p>',
+      attachments: [{ name: 'Contract_Renewal_2026.pdf', size: '482 KB', type: 'pdf' }]
+    },
+    {
+      id: 'm4', alias: 'hello', folder: 'inbox', ...person('Vercel', 'notify@vercel.com', '#000000'),
+      subject: 'Deployment succeeded: stx-mail-prod',
+      snippet: 'Your latest deployment to Production is live — build completed in 48s —',
+      time: 'Yesterday', read: true, starred: false, labels: [],
+      to: 'you@shanutechx.com',
+      body: '<p>Your latest deployment to <b>Production</b> is live.</p><p>Build completed in 48s. No errors reported. 0 warnings.</p>'
+    }
+  ];
+
+  /* ---------------- GLOBAL STATE ---------------- */
+  const state = {
+    currentAlias: ALIASES[0],
+    folder: 'inbox',
+    label: null,
+    view: null,
+    searchQuery: '',
+    selectedEmailId: null,
+    checkedIds: new Set(),
+    theme: 'light',
+    labels: ['Clients', 'Invoices', 'Team'],
+    module: 'mail',
+    calendarViewDate: new Date(),
+    calendarSubView: 'month',
+    activeEditingEventId: null
+  };
+
+  /* ---------------- DOM UTILS ---------------- */
+  function $(sel) { return document.querySelector(sel); }
+  function $all(sel) { return Array.from(document.querySelectorAll(sel)); }
+  function el(tag, cls, html) {
+    const e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(html !== undefined) e.innerHTML = html;
+    return e;
+  }
+  function escapeHtml(str) {
+    return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  const ICON = {
+    inbox: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>',
+    send: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
+    draft: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+    shieldAlert: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+    trash: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>',
+    archive: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>',
+    star: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+    check: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>',
+    file: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>',
+    gear: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>'
+  };
+
+  function setAvatarEl(element, aliasObj) {
+    if (!element) return;
+    if (aliasObj && aliasObj.photoUrl) {
+      element.textContent = '';
+      element.style.backgroundImage = 'url(' + aliasObj.photoUrl + ')';
+      element.style.backgroundColor = 'transparent';
+    } else {
+      element.style.backgroundImage = 'none';
+      element.style.backgroundColor = (aliasObj && aliasObj.color) ? aliasObj.color : 'var(--color-primary)';
+      element.textContent = aliasObj ? aliasObj.displayName.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase() : 'ST';
+    }
+  }
+
+  function showToast(message, actionLabel, actionFn) {
+    const t = el('div', 'toast');
+    t.innerHTML = '<span>' + escapeHtml(message) + '</span>';
+    if (actionLabel) {
+      const btn = el('button', null, escapeHtml(actionLabel));
+      btn.addEventListener('click', () => { actionFn && actionFn(); t.remove(); });
+      t.appendChild(btn);
+    }
+    $('#toastStack').appendChild(t);
+    setTimeout(() => {
+      t.style.opacity = '0'; t.style.transition = 'opacity .25s';
+      setTimeout(() => t.remove(), 250);
+    }, 3200);
+  }
+
+  function playTestChime() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+      showToast('Notification audio chime played');
+    } catch(e) {
+      showToast('Audio chime played');
+    }
+  }
+  window.playTestChime = playTestChime;
+
+  /* ---------------- ROUTER & THEME ---------------- */
+  function showScreen(id) {
+    $all('.screen').forEach(s => s.classList.remove('active', 'screen-fade'));
+    const target = document.getElementById(id);
+    if(target) target.classList.add('active', 'screen-fade');
+  }
+
+  function applyTheme() {
+    document.documentElement.setAttribute('data-theme', state.theme);
+    const dark = state.theme === 'dark';
+    $all('#themeIconSun, #dashSun').forEach(e => e.style.display = dark ? 'none' : 'block');
+    $all('#themeIconMoon, #dashMoon').forEach(e => e.style.display = dark ? 'block' : 'none');
+    $('#prefDarkModeToggle') ? $('#prefDarkModeToggle').checked = dark : null;
+
+    $all('.theme-card').forEach(c => c.classList.remove('selected'));
+    if (dark) {
+      $('#themeDarkCard') ? $('#themeDarkCard').classList.add('selected') : null;
+    } else {
+      $('#themeLightCard') ? $('#themeLightCard').classList.add('selected') : null;
+    }
+  }
+
+  function setThemeMode(mode) {
+    state.theme = mode;
+    applyTheme();
+    showToast('Theme updated to ' + mode + ' mode');
+  }
+  window.setThemeMode = setThemeMode;
+
+  function toggleTheme() {
+    state.theme = state.theme === 'dark' ? 'light' : 'dark';
+    applyTheme();
+  }
+  $('#themeToggle').addEventListener('click', toggleTheme);
+  $('#dashThemeToggle').addEventListener('click', toggleTheme);
+
+  /* ---------------- LOGIN & LOADING ---------------- */
+  $('#googleLoginBtn').addEventListener('click', () => {
+    const btn = $('#googleLoginBtn');
+    btn.classList.add('loading');
+    $('#googleBtnLabel').textContent = 'Signing in…';
+    setTimeout(() => {
+      btn.classList.remove('loading');
+      $('#googleBtnLabel').textContent = 'Continue with Google';
+      runLoadingSequence(['Signing you in…', 'Loading aliases…', 'Connecting mailboxes…'], () => {
+        renderDashboard();
+        showScreen('screen-dashboard');
+      });
+    }, 450);
+  });
+
+  function runLoadingSequence(messages, done) {
+    showScreen('screen-loading');
+    const fill = $('#loadingFill');
+    const status = $('#loadingStatus');
+    const totalMs = 1500;
+    fill.style.width = '0%';
+    void fill.offsetWidth;
+    fill.style.transition = 'width ' + totalMs + 'ms linear';
+    requestAnimationFrame(() => { fill.style.width = '100%'; });
+    status.textContent = messages[0];
+    messages.forEach((msg, i) => {
+      setTimeout(() => { status.textContent = msg; }, Math.round((totalMs / messages.length) * i));
+    });
+    setTimeout(done, totalMs + 200);
+  }
+
+  /* ---------------- DASHBOARD ---------------- */
+  function renderDashboard() {
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening');
+    $('#dashGreeting').textContent = greeting + ', Shanudha';
+    $('#dashDate').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+    setAvatarEl($('#dashAvatar'), state.currentAlias);
+    setAvatarEl($('#dashDropdownAvatar'), state.currentAlias);
+
+    const totalUsed = ALIASES.reduce((s, a) => s + a.storageUsedGB, 0);
+    const totalQuota = ALIASES.reduce((s, a) => s + a.storageTotalGB, 0);
+    $('#storageHeroBig').textContent = totalUsed.toFixed(1) + ' GB';
+    $('#storageHeroLbl').textContent = 'of ' + totalQuota + ' GB used across all mailboxes';
+    const pct = Math.min(1, totalUsed / totalQuota);
+    $('#storageRingArc').style.strokeDashoffset = (251.3 * (1 - pct)).toFixed(1);
+
+    $('#statAliasCount').textContent = ALIASES.length;
+    $('#statUnreadCount').textContent = emails.filter(m => !m.read && m.folder !== 'trash').length;
+
+    const listEl = $('#aliasList');
+    listEl.innerHTML = '';
+    ALIASES.forEach(a => {
+      const unread = emails.filter(m => m.alias === a.id && m.folder === 'inbox' && !m.read).length;
+      const row = el('div', 'alias-row');
+      row.style.borderLeftColor = a.color;
+      row.innerHTML =
+        '<div class="alias-photo" data-avatar></div>' +
+        '<div class="alias-info">' +
+          '<div class="top"><span class="display-name">' + escapeHtml(a.displayName) + '</span>' + (unread > 0 ? '<span class="alias-unread-badge">' + unread + '</span>' : '') + '</div>' +
+          '<div class="addr">' + escapeHtml(a.email) + '</div>' +
+          '<div class="meta">' + a.storageUsedGB + ' GB of ' + a.storageTotalGB + ' GB used</div>' +
+        '</div>' +
+        '<div class="alias-actions">' +
+          '<button class="icon-btn" data-action="config" title="Settings">' + ICON.gear + '</button>' +
+          '<button class="alias-open-btn" data-action="open">Open Workspace</button>' +
+        '</div>';
+      setAvatarEl(row.querySelector('[data-avatar]'), a);
+      row.addEventListener('click', (e) => {
+        const actionBtn = e.target.closest('[data-action]');
+        if (actionBtn && actionBtn.dataset.action === 'config') {
+          e.stopPropagation();
+          openConfigScreen(a.id);
+        } else {
+          enterMailbox(a.id);
+        }
+      });
+      listEl.appendChild(row);
+    });
+  }
+
+  function enterMailbox(aliasId) {
+    const a = ALIASES.find(x => x.id === aliasId);
+    if(a) state.currentAlias = a;
+    updateAliasHeaderUI();
+    renderFolderNav(); renderLabelNav(); renderList();
+    showScreen('screen-mail');
+  }
+
+  function updateAliasHeaderUI() {
+    if(!state.currentAlias) return;
+    const a = state.currentAlias;
+    setAvatarEl($('#topbarAvatar'), a);
+    setAvatarEl($('#dropdownAvatarBig'), a);
+    $('#dropdownName').textContent = a.displayName;
+    $('#dropdownEmail').textContent = a.email;
+    setAvatarEl($('#composeFromAvatar'), a);
+    $('#composeFromEmail').textContent = a.email;
+    renderAliasSwitchList();
+  }
+
+  function renderAliasSwitchList() {
+    const container = $('#aliasSwitchList');
+    if(!container) return;
+    container.innerHTML = '';
+    ALIASES.forEach(a => {
+      const isCurrent = state.currentAlias && state.currentAlias.id === a.id;
+      const unread = emails.filter(m => m.alias === a.id && m.folder === 'inbox' && !m.read).length;
+      const item = el('button', 'alias-switch-item' + (isCurrent ? ' current' : ''));
+      item.innerHTML =
+        '<div class="mini-avatar" data-avatar></div>' +
+        '<div class="txt"><div class="n">' + escapeHtml(a.displayName) + '</div><div class="e">' + escapeHtml(a.email) + '</div></div>' +
+        (unread > 0 ? '<span class="alias-unread-badge">' + unread + '</span>' : '') +
+        '<div class="check">' + ICON.check + '</div>';
+      setAvatarEl(item.querySelector('[data-avatar]'), a);
+      item.addEventListener('click', () => {
+        state.currentAlias = a;
+        updateAliasHeaderUI();
+        renderFolderNav(); renderList();
+        $('#avatarDropdown').classList.remove('open');
+      });
+      container.appendChild(item);
+    });
+  }
+
+  /* ---------------- PROFILE CONFIGURATION HUB (COMPLETE OVERHAUL) ---------------- */
+  function openConfigScreen(aliasId) {
+    const a = ALIASES.find(x => x.id === aliasId) || state.currentAlias;
+    state.configTarget = a;
+    $('#configTitle').textContent = 'Settings — ' + a.displayName;
+    $('#configSubtitle').textContent = a.email;
+    $('#configDisplayName').value = a.displayName;
+    $('#configAliasAddress').value = a.email;
+    $('#configJobTitle').value = a.jobTitle || '';
+    $('#configPhone').value = a.phone || '';
+    $('#configSignature').value = a.signature || '';
+    setAvatarEl($('#configPhoto'), a);
+    setAvatarEl($('#headerAvatarPreview'), a);
+
+    $('#configStorageDesc').textContent = a.storageUsedGB + ' GB of ' + a.storageTotalGB + ' GB used';
+    $('#configStorageFill').style.width = Math.round((a.storageUsedGB / a.storageTotalGB) * 100) + '%';
+    $('#serverUsernameVal').textContent = a.email;
+
+    updateSignaturePreview();
+    renderColorSwatches(a.color);
+    showScreen('screen-config');
+  }
+
+  function updateSignaturePreview() {
+    const sigText = $('#configSignature').value;
+    const prev = $('#sigPreviewText');
+    if(prev) {
+      prev.innerHTML = escapeHtml(sigText).replace(/\n/g, '<br>');
+    }
+  }
+  $('#configSignature').addEventListener('input', updateSignaturePreview);
+
+  function renderColorSwatches(selectedColor) {
+    const row = $('#colorSwatchRow');
+    if(!row) return;
+    row.innerHTML = '';
+    const palette = ['#2E6BF0', '#10B981', '#F59E0B', '#06B6D4', '#EC4899', '#EF4444', '#8B5CF6', '#1E293B'];
+    palette.forEach(c => {
+      const sw = el('div', 'color-swatch' + (c === selectedColor ? ' selected' : ''));
+      sw.style.backgroundColor = c;
+      sw.innerHTML = ICON.check;
+      sw.addEventListener('click', () => {
+        $all('.color-swatch').forEach(x => x.classList.remove('selected'));
+        sw.classList.add('selected');
+        if(state.configTarget) {
+          state.configTarget.color = c;
+          setAvatarEl($('#configPhoto'), state.configTarget);
+          setAvatarEl($('#headerAvatarPreview'), state.configTarget);
+        }
+      });
+      row.appendChild(sw);
+    });
+  }
+
+  // Profile Sub-tab Switching
+  $all('.config-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $all('.config-tab-btn').forEach(b => b.classList.remove('active'));
+      $all('.config-tab-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const targetPane = $('#' + btn.dataset.tab);
+      if(targetPane) targetPane.classList.add('active');
+    });
+  });
+
+  // Profile Picture Upload Handler
+  $('#avatarUploadBtn').addEventListener('click', () => $('#configPhotoInput').click());
+  $('#configPhotoInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(file) {
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        if(state.configTarget) {
+          state.configTarget.photoUrl = evt.target.result;
+          setAvatarEl($('#configPhoto'), state.configTarget);
+          setAvatarEl($('#headerAvatarPreview'), state.configTarget);
+          showToast('Profile photo updated preview');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+  $('#removePhotoBtn').addEventListener('click', () => {
+    if(state.configTarget) {
+      state.configTarget.photoUrl = null;
+      setAvatarEl($('#configPhoto'), state.configTarget);
+      setAvatarEl($('#headerAvatarPreview'), state.configTarget);
+      showToast('Profile photo removed');
+    }
+  });
+
+  $('#configSaveBtn').addEventListener('click', () => {
+    if(state.configTarget) {
+      state.configTarget.displayName = $('#configDisplayName').value.trim() || state.configTarget.displayName;
+      state.configTarget.jobTitle = $('#configJobTitle').value.trim();
+      state.configTarget.phone = $('#configPhone').value.trim();
+      state.configTarget.signature = $('#configSignature').value;
+      updateAliasHeaderUI();
+      renderDashboard();
+    }
+    showToast('Settings saved successfully');
+    showScreen('screen-mail');
+  });
+  $('#configCancelBtn, #configBackBtn').addEventListener('click', () => showScreen('screen-mail'));
+
+  // Password & App Password actions
+  $('#updatePwBtn').addEventListener('click', () => {
+    const cur = $('#secCurrentPw').value, n1 = $('#secNewPw').value, n2 = $('#secConfirmPw').value;
+    if(!n1 || n1.length < 6) { showToast('Password must be at least 6 characters'); return; }
+    if(n1 !== n2) { showToast('New passwords do not match'); return; }
+    $('#secCurrentPw').value = ''; $('#secNewPw').value = ''; $('#secConfirmPw').value = '';
+    showToast('Account password updated successfully');
+  });
+
+  $('#regenPwBtn').addEventListener('click', () => {
+    const newPass = 'stx_' + Math.random().toString(36).slice(2, 14);
+    $('#appPasswordVal').textContent = newPass;
+    showToast('New app password generated and copied');
+  });
+  $('#togglePwBtn').addEventListener('click', () => {
+    const el = $('#appPasswordVal');
+    el.textContent = el.textContent.includes('•') ? 'stx_984a2bf17c9' : '••••••••••••••';
+  });
+
+  $all('[data-copy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.dataset.copy;
+      const text = $('#' + targetId).textContent;
+      navigator.clipboard ? navigator.clipboard.writeText(text) : null;
+      showToast('Copied to clipboard: ' + text);
+    });
+  });
+
+  /* ---------------- MAIL WORKSPACE ---------------- */
+  function renderFolderNav() {
+    const nav = $('#folderNav');
+    if(!nav) return;
+    nav.innerHTML = '';
+    FOLDERS.forEach(f => {
+      const count = emails.filter(m => m.alias === state.currentAlias.id && m.folder === f.id && !m.read).length;
+      const li = el('li', 'nav-item' + (state.folder === f.id ? ' active' : ''));
+      li.innerHTML = ICON[f.icon] + '<span class="label">' + f.name + '</span>' + (count > 0 ? '<span class="badge">' + count + '</span>' : '');
+      li.addEventListener('click', () => selectFolder(f.id));
+      nav.appendChild(li);
+    });
+  }
+
+  function renderLabelNav() {
+    const nav = $('#labelNav');
+    if(!nav) return;
+    nav.innerHTML = '';
+    state.labels.forEach(l => {
+      const color = LABEL_COLORS[l] || 'var(--color-primary)';
+      const li = el('li', 'nav-item' + (state.label === l ? ' active' : ''));
+      li.innerHTML = '<span class="dot" style="background:' + color + '"></span><span class="label">' + escapeHtml(l) + '</span>';
+      li.addEventListener('click', () => selectLabel(l));
+      nav.appendChild(li);
+    });
+  }
+
+  function selectFolder(fid) {
+    state.folder = fid; state.label = null; state.searchQuery = '';
+    $('#searchInput').value = ''; $('#searchBox').classList.remove('has-value');
+    state.checkedIds.clear();
+    closeReadingPane();
+    renderFolderNav(); renderLabelNav(); renderList();
+    closeMobileSidebar();
+  }
+  function selectLabel(lname) {
+    state.label = lname; state.folder = null; state.searchQuery = '';
+    $('#searchInput').value = ''; $('#searchBox').classList.remove('has-value');
+    state.checkedIds.clear();
+    closeReadingPane();
+    renderFolderNav(); renderLabelNav(); renderList();
+    closeMobileSidebar();
+  }
+
+  function renderList() {
+    const scrollEl = $('#listScroll');
+    if(!scrollEl || !state.currentAlias) return;
+
+    let filtered = emails.filter(m => m.alias === state.currentAlias.id);
+    if(state.folder) filtered = filtered.filter(m => m.folder === state.folder);
+    if(state.label) filtered = filtered.filter(m => m.labels && m.labels.includes(state.label));
+
+    if(state.searchQuery.trim()) {
+      const q = state.searchQuery.trim().toLowerCase();
+      filtered = filtered.filter(m =>
+        m.subject.toLowerCase().includes(q) ||
+        m.sender.toLowerCase().includes(q) ||
+        m.snippet.toLowerCase().includes(q) ||
+        m.body.toLowerCase().includes(q)
+      );
+    }
+
+    const folderObj = FOLDERS.find(f => f.id === state.folder);
+    $('#toolbarTitle').textContent = state.searchQuery ? 'Search results (' + filtered.length + ')' : (state.label || (folderObj ? folderObj.name : 'Mailbox'));
+
+    scrollEl.innerHTML = '';
+    if(filtered.length === 0) {
+      scrollEl.innerHTML = '<div class="empty-list">' + ICON.inbox + '<p>No conversations found</p></div>';
+      return;
+    }
+
+    filtered.forEach(mail => {
+      const isChecked = state.checkedIds.has(mail.id);
+      const isSelected = state.selectedEmailId === mail.id;
+      const row = el('div', 'email-row' + (mail.read ? '' : ' unread') + (isChecked ? ' selected' : '') + (isSelected ? ' active' : ''));
+
+      const labelsHtml = (mail.labels || []).map(l =>
+        '<span class="row-label-chip" style="background:' + (LABEL_COLORS[l] || 'var(--color-primary)') + '20; color:' + (LABEL_COLORS[l] || 'var(--color-primary)') + '">' + escapeHtml(l) + '</span>'
+      ).join('');
+
+      row.innerHTML =
+        '<div class="row-check-star">' +
+          '<div class="checkbox' + (isChecked ? ' checked' : '') + '" data-action="check">' + ICON.check + '</div>' +
+          '<button class="star-btn' + (mail.starred ? ' starred' : '') + '" data-action="star" title="Star">' + ICON.star + '</button>' +
+        '</div>' +
+        '<div class="row-main" data-action="open">' +
+          '<div class="row-line1"><span class="sender">' + escapeHtml(mail.sender) + '</span><div class="row-labels">' + labelsHtml + '</div></div>' +
+          '<div class="subject-line"><span class="subject">' + escapeHtml(mail.subject) + '</span> <span class="snippet">— ' + escapeHtml(mail.snippet) + '</span></div>' +
+        '</div>' +
+        '<div class="row-meta">' +
+          '<span class="row-time">' + escapeHtml(mail.time) + '</span>' +
+          '<div class="row-unread-dot' + (mail.read ? ' hidden' : '') + '"></div>' +
+        '</div>';
+
+      row.addEventListener('click', (e) => {
+        const actionBtn = e.target.closest('[data-action]');
+        if(actionBtn) {
+          const act = actionBtn.dataset.action;
+          if(act === 'check') {
+            e.stopPropagation();
+            isChecked ? state.checkedIds.delete(mail.id) : state.checkedIds.add(mail.id);
+            renderList(); updateBulkToolbar();
+            return;
+          }
+          if(act === 'star') {
+            e.stopPropagation();
+            mail.starred = !mail.starred;
+            renderList();
+            return;
+          }
+        }
+        openEmail(mail.id);
+      });
+      scrollEl.appendChild(row);
+    });
+    updateBulkToolbar();
+  }
+
+  function updateBulkToolbar() {
+    const count = state.checkedIds.size;
+    const actions = $('#bulkActions');
+    const selectAll = $('#selectAllCheckbox');
+    if(count > 0) {
+      actions.classList.remove('hidden');
+      selectAll.classList.add('checked');
+    } else {
+      actions.classList.add('hidden');
+      selectAll.classList.remove('checked');
+    }
+  }
+
+  function toggleSelectAll() {
+    const currentMails = emails.filter(m => m.alias === state.currentAlias.id && (!state.folder || m.folder === state.folder));
+    if(state.checkedIds.size === currentMails.length) {
+      state.checkedIds.clear();
+    } else {
+      currentMails.forEach(m => state.checkedIds.add(m.id));
+    }
+    renderList();
+  }
+
+  function openEmail(id) {
+    const mail = emails.find(m => m.id === id);
+    if(!mail) return;
+    state.selectedEmailId = id;
+    if(!mail.read) { mail.read = true; renderFolderNav(); }
+    renderList();
+    renderReadingPane(mail);
+    $('#mailShell').classList.add('showing-reading');
+  }
+
+  function closeReadingPane() {
+    state.selectedEmailId = null;
+    $('#readingContent').classList.remove('visible');
+    $('#readingEmpty').style.display = 'flex';
+    $('#mailShell').classList.remove('showing-reading');
+  }
+
+  function renderReadingPane(mail) {
+    $('#readingEmpty').style.display = 'none';
+    const content = $('#readingContent');
+    content.classList.add('visible');
+    $('#readingSubject').textContent = mail.subject;
+
+    const messages = (mail.thread && mail.thread.length) ? mail.thread : [{
+      sender: mail.sender, senderEmail: mail.senderEmail, initials: mail.initials, avatarColor: mail.avatarColor,
+      time: mail.time, to: mail.to, body: mail.body, attachments: mail.attachments
+    }];
+
+    const container = $('#threadContainer');
+    container.innerHTML = '';
+    messages.forEach((msg, idx) => {
+      const isLast = idx === messages.length - 1;
+      const msgEl = el('div', 'msg' + (isLast ? '' : ' collapsed'));
+      const atts = msg.attachments || (isLast ? mail.attachments : null) || [];
+
+      let attsHtml = '';
+      if(atts.length) {
+        attsHtml = '<div class="attachments-row">' + atts.map(att =>
+          '<div class="attachment-chip" onclick="showToast(\'Downloading ' + escapeHtml(att.name) + '\')">' +
+            '<div class="attach-icon-wrap" style="background:#2563EB">' + ICON.file + '</div>' +
+            '<div class="file-info"><div class="fname">' + escapeHtml(att.name) + '</div><div class="fsize">' + escapeHtml(att.size) + '</div></div>' +
+          '</div>'
+        ).join('') + '</div>';
+      }
+
+      msgEl.innerHTML =
+        '<div class="msg-head" data-toggle="collapse">' +
+          '<div class="msg-avatar" style="background:' + (msg.avatarColor || '#2E6BF0') + '">' + (msg.initials || 'ST') + '</div>' +
+          '<div class="msg-headtext">' +
+            '<div class="msg-from-row"><span class="msg-from-name">' + escapeHtml(msg.sender) + '</span><span class="msg-from-email">&lt;' + escapeHtml(msg.senderEmail||'') + '&gt;</span></div>' +
+            '<div class="msg-to">to ' + escapeHtml(msg.to || 'me') + '</div>' +
+            '<div class="msg-collapsed-snippet">' + escapeHtml(msg.body.replace(/<[^>]*>/g,'')).slice(0, 90) + '</div>' +
+          '</div>' +
+          '<div class="msg-time">' + escapeHtml(msg.time) + '</div>' +
+        '</div>' +
+        '<div class="msg-body">' + msg.body + '</div>' +
+        attsHtml;
+
+      msgEl.querySelector('[data-toggle="collapse"]').addEventListener('click', () => {
+        if(messages.length > 1) msgEl.classList.toggle('collapsed');
+      });
+      container.appendChild(msgEl);
+    });
+  }
+
+  /* ---------------- MODULE SWITCHING ---------------- */
+  function setModule(name) {
+    state.module = name;
+    $all('.rail-btn[data-module]').forEach(b => b.classList.toggle('active', b.dataset.module === name));
+    $all('.mobile-nav-btn[data-mobmodule]').forEach(b => b.classList.toggle('active', b.dataset.mobmodule === name));
+
+    $('#sidebarMailNav').style.display = name === 'mail' ? 'block' : 'none';
+    $('#sidebarCalendarNav').style.display = name === 'calendar' ? 'block' : 'none';
+    $('#sidebarContactsNav').style.display = name === 'contacts' ? 'block' : 'none';
+    $('#sidebarTasksNav').style.display = name === 'tasks' ? 'block' : 'none';
+
+    $('#moduleMail').style.display = name === 'mail' ? 'flex' : 'none';
+    $('#moduleCalendar').style.display = name === 'calendar' ? 'flex' : 'none';
+    $('#moduleContacts').style.display = name === 'contacts' ? 'flex' : 'none';
+    $('#moduleTasks').style.display = name === 'tasks' ? 'flex' : 'none';
+
+    if(name === 'calendar') { renderCalendar(); renderUpcomingEvents(); }
+    else if(name === 'contacts') { renderContacts(); }
+    else if(name === 'tasks') { renderTasks(); }
+    else if(name === 'settings') { openConfigScreen(state.currentAlias.id); }
+
+    closeMobileSidebar();
+  }
+
+  $all('.rail-btn[data-module]').forEach(btn => btn.addEventListener('click', () => setModule(btn.dataset.module)));
+  $all('.mobile-nav-btn[data-mobmodule]').forEach(btn => btn.addEventListener('click', () => setModule(btn.dataset.mobmodule)));
+  $('#railSettingsShortcut').addEventListener('click', () => openConfigScreen(state.currentAlias.id));
+
+  /* ---------------- CALENDAR MODULE (MONTH, WEEK, DAY VIEWS) ---------------- */
+  function renderCalendar() {
+    if(!state.currentAlias) return;
+    const viewDate = state.calendarViewDate;
+    const year = viewDate.getFullYear(), month = viewDate.getMonth();
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    $('#calMonthLabel').textContent = monthNames[month] + ' ' + year;
+
+    const subView = state.calendarSubView;
+    if(subView === 'month') {
+      $('#calMonthContainer').style.display = 'flex';
+      $('#calScheduleContainer').style.display = 'none';
+      renderCalendarMonthView(year, month);
+    } else {
+      $('#calMonthContainer').style.display = 'none';
+      $('#calScheduleContainer').style.display = 'grid';
+      renderCalendarScheduleView(subView, viewDate);
+    }
+  }
+
+  function renderCalendarMonthView(year, month) {
+    $('#calendarWeekdays').innerHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => '<span>'+d+'</span>').join('');
+    const firstOfMonth = new Date(year, month, 1);
+    const startWeekday = firstOfMonth.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+    const todayStr = new Date().toISOString().slice(0,10);
+
+    const gridEl = $('#calendarGrid');
+    gridEl.innerHTML = '';
+    const totalCells = Math.ceil((startWeekday + daysInMonth) / 7) * 7;
+
+    for(let i = 0; i < totalCells; i++) {
+      const dayNum = i - startWeekday + 1;
+      let cellDate, otherMonth = false;
+      if(dayNum < 1) { cellDate = new Date(year, month - 1, daysInPrevMonth + dayNum); otherMonth = true; }
+      else if(dayNum > daysInMonth) { cellDate = new Date(year, month + 1, dayNum - daysInMonth); otherMonth = true; }
+      else { cellDate = new Date(year, month, dayNum); }
+
+      const dateStr = cellDate.toISOString().slice(0,10);
+      const isToday = dateStr === todayStr;
+      const dayEvents = CALENDAR_EVENTS.filter(e => e.alias === state.currentAlias.id && e.date === dateStr);
+
+      const cell = el('div', 'cal-day' + (otherMonth ? ' other-month' : '') + (isToday ? ' is-today' : ''));
+      cell.innerHTML = '<div class="day-num">' + cellDate.getDate() + '</div>';
+
+      dayEvents.slice(0, 3).forEach(ev => {
+        const chip = el('div', 'cal-event', escapeHtml(ev.title));
+        chip.style.backgroundColor = ev.color || 'var(--color-primary)';
+        chip.addEventListener('click', (e) => { e.stopPropagation(); openEditEventModal(ev); });
+        cell.appendChild(chip);
+      });
+      if(dayEvents.length > 3) {
+        cell.appendChild(el('div', 'cal-event-more', '+' + (dayEvents.length - 3) + ' more'));
+      }
+
+      cell.addEventListener('click', () => openAddEventModal(dateStr));
+      gridEl.appendChild(cell);
+    }
+  }
+
+  function renderCalendarScheduleView(mode, viewDate) {
+    const timeCol = $('#calTimeCol'), daysCol = $('#calDaysCol');
+    timeCol.innerHTML = ''; daysCol.innerHTML = '';
+
+    const hours = ['8 AM','9 AM','10 AM','11 AM','12 PM','1 PM','2 PM','3 PM','4 PM','5 PM','6 PM','7 PM'];
+    hours.forEach(h => timeCol.appendChild(el('div', 'cal-time-slot', h)));
+
+    const numCols = mode === 'day' ? 1 : 7;
+    daysCol.style.gridTemplateColumns = 'repeat(' + numCols + ', 1fr)';
+
+    for(let c = 0; c < numCols; c++) {
+      const colDate = new Date(viewDate);
+      if(mode === 'week') colDate.setDate(viewDate.getDate() - viewDate.getDay() + c);
+      const dateStr = colDate.toISOString().slice(0,10);
+      const dayCol = el('div', 'cal-day-column');
+
+      hours.forEach((h, hIdx) => {
+        const cell = el('div', 'cal-hour-cell');
+        const matchEvent = CALENDAR_EVENTS.find(e => e.alias === state.currentAlias.id && e.date === dateStr && e.time.includes(parseInt(h)+''));
+        if(matchEvent) {
+          const chip = el('div', 'cal-event', escapeHtml(matchEvent.title) + ' (' + matchEvent.time + ')');
+          chip.style.backgroundColor = matchEvent.color || 'var(--color-primary)';
+          chip.addEventListener('click', (e) => { e.stopPropagation(); openEditEventModal(matchEvent); });
+          cell.appendChild(chip);
+        }
+        dayCol.appendChild(cell);
+      });
+      daysCol.appendChild(dayCol);
+    }
+  }
+
+  function renderUpcomingEvents() {
+    const listEl = $('#upcomingEventsList');
+    if(!listEl || !state.currentAlias) return;
+    const todayStr = new Date().toISOString().slice(0,10);
+    const events = CALENDAR_EVENTS.filter(e => e.alias === state.currentAlias.id && e.date >= todayStr)
+      .sort((a,b) => a.date.localeCompare(b.date)).slice(0, 5);
+
+    listEl.innerHTML = '';
+    if(events.length === 0) {
+      listEl.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:var(--color-text-muted);">No upcoming events.</div>';
+      return;
+    }
+    events.forEach(ev => {
+      const item = el('div', 'upcoming-event-item');
+      item.innerHTML = '<span class="upcoming-event-dot" style="background:' + (ev.color||'var(--color-primary)') + '"></span>' +
+        '<div><div class="uei-title">' + escapeHtml(ev.title) + '</div><div class="uei-meta">' + ev.date + ' · ' + escapeHtml(ev.time) + '</div></div>';
+      item.addEventListener('click', () => openEditEventModal(ev));
+      listEl.appendChild(item);
+    });
+  }
+
+  $all('.cal-view-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $all('.cal-view-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.calendarSubView = btn.dataset.calview;
+      renderCalendar();
+    });
+  });
+
+  $('#calPrevBtn').addEventListener('click', () => { state.calendarViewDate.setMonth(state.calendarViewDate.getMonth()-1); renderCalendar(); });
+  $('#calNextBtn').addEventListener('click', () => { state.calendarViewDate.setMonth(state.calendarViewDate.getMonth()+1); renderCalendar(); });
+  $('#calTodayBtn').addEventListener('click', () => { state.calendarViewDate = new Date(); renderCalendar(); });
+
+  // Event Modal Handlers
+  function openAddEventModal(dateStr) {
+    state.activeEditingEventId = null;
+    $('#eventModalTitle').textContent = 'Add Calendar Event';
+    $('#evInputTitle').value = '';
+    $('#evInputDate').value = dateStr || new Date().toISOString().slice(0,10);
+    $('#evInputTime').value = '10:00 AM';
+    $('#evDeleteBtn').style.display = 'none';
+    $('#eventModal').classList.add('open');
+  }
+
+  function openEditEventModal(ev) {
+    state.activeEditingEventId = ev.id;
+    $('#eventModalTitle').textContent = 'Edit Event';
+    $('#evInputTitle').value = ev.title;
+    $('#evInputDate').value = ev.date;
+    $('#evInputTime').value = ev.time;
+    $('#evDeleteBtn').style.display = 'inline-block';
+    $('#eventModal').classList.add('open');
+  }
+
+  $('#createEventBtn').addEventListener('click', () => openAddEventModal());
+  $('#evCancelBtn').addEventListener('click', () => $('#eventModal').classList.remove('open'));
+
+  $('#evSaveBtn').addEventListener('click', () => {
+    const title = $('#evInputTitle').value.trim();
+    if(!title) { showToast('Event title is required'); return; }
+    const date = $('#evInputDate').value;
+    const time = $('#evInputTime').value.trim() || 'All Day';
+
+    if(state.activeEditingEventId) {
+      const ev = CALENDAR_EVENTS.find(x => x.id === state.activeEditingEventId);
+      if(ev) { ev.title = title; ev.date = date; ev.time = time; }
+      showToast('Event updated');
+    } else {
+      CALENDAR_EVENTS.push({
+        id: 'ev' + Date.now(), alias: state.currentAlias.id, title, date, time,
+        color: state.currentAlias.color || '#2E6BF0'
+      });
+      showToast('Event added (Reminder scheduled)');
+    }
+    $('#eventModal').classList.remove('open');
+    renderCalendar(); renderUpcomingEvents();
+  });
+
+  $('#evDeleteBtn').addEventListener('click', () => {
+    if(state.activeEditingEventId) {
+      const idx = CALENDAR_EVENTS.findIndex(x => x.id === state.activeEditingEventId);
+      if(idx > -1) CALENDAR_EVENTS.splice(idx, 1);
+      showToast('Event deleted');
+    }
+    $('#eventModal').classList.remove('open');
+    renderCalendar(); renderUpcomingEvents();
+  });
+
+  /* ---------------- CONTACTS MODULE ---------------- */
+  function renderContacts() {
+    const listEl = $('#contactsList');
+    if(!listEl || !state.currentAlias) return;
+    const q = ($('#contactsSearchInput').value || '').trim().toLowerCase();
+    const list = CONTACTS.filter(c => !q || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
+
+    $('#contactsCountLabel').textContent = 'Contacts (' + list.length + ')';
+    listEl.innerHTML = '';
+
+    if(list.length === 0) {
+      listEl.innerHTML = '<div style="padding:28px 0;color:var(--color-text-muted);font-size:14.5px;">No contacts found.</div>';
+      return;
+    }
+
+    list.forEach(c => {
+      const row = el('div', 'contact-row');
+      row.innerHTML =
+        '<div class="avatar" style="background:' + c.color + '">' + c.name.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase() + '</div>' +
+        '<div class="contact-info">' +
+          '<div class="contact-name">' + escapeHtml(c.name) + '</div>' +
+          '<div class="contact-sub"><span>' + escapeHtml(c.email) + '</span>' + (c.phone ? '<span>' + escapeHtml(c.phone) + '</span>' : '') + '<span>' + escapeHtml(c.jobTitle||'') + '</span></div>' +
+        '</div>' +
+        '<div class="contact-actions">' +
+          '<button class="icon-btn" data-act="email" title="Send Email"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg></button>' +
+          '<button class="icon-btn" data-act="delete" title="Delete Contact"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>' +
+        '</div>';
+
+      row.querySelector('[data-act="email"]').addEventListener('click', () => openCompose({ to: c.email }));
+      row.querySelector('[data-act="delete"]').addEventListener('click', () => {
+        const idx = CONTACTS.findIndex(x => x.id === c.id);
+        if(idx > -1) CONTACTS.splice(idx, 1);
+        renderContacts();
+        showToast('Contact removed');
+      });
+      listEl.appendChild(row);
+    });
+  }
+
+  $('#contactsSearchInput').addEventListener('input', renderContacts);
+  $('#addContactBtn').addEventListener('click', () => {
+    const name = prompt('Contact Name:'); if(!name) return;
+    const email = prompt('Email Address:'); if(!email) return;
+    const phone = prompt('Phone Number (Optional):') || '';
+    CONTACTS.push({ id: 'c' + Date.now(), alias: state.currentAlias.id, name: name.trim(), email: email.trim(), phone: phone.trim(), color: '#2E6BF0' });
+    renderContacts();
+    showToast('Contact added');
+  });
+
+  /* ---------------- TASKS MODULE ---------------- */
+  function renderTasks() {
+    const listEl = $('#tasksList');
+    if(!listEl || !state.currentAlias) return;
+    const list = TASKS.filter(t => t.alias === state.currentAlias.id);
+    const openCount = list.filter(t => !t.done).length;
+
+    $('#tasksCountLabel').textContent = 'Tasks (' + list.length + ')';
+    $('#tasksSummary').textContent = openCount + ' open, ' + (list.length - openCount) + ' completed';
+
+    listEl.innerHTML = '';
+    if(list.length === 0) {
+      listEl.innerHTML = '<div style="padding:24px 0;color:var(--color-text-muted);font-size:14.5px;">No tasks yet.</div>';
+      return;
+    }
+
+    list.forEach(t => {
+      const row = el('div', 'task-row' + (t.done ? ' done' : ''));
+      row.innerHTML =
+        '<div class="checkbox' + (t.done ? ' checked' : '') + '" data-act="toggle">' + ICON.check + '</div>' +
+        '<div class="task-title">' + escapeHtml(t.title) + '</div>' +
+        '<button class="icon-btn task-delete" data-act="delete" title="Delete">' + ICON.trash + '</button>';
+
+      row.querySelector('[data-act="toggle"]').addEventListener('click', () => { t.done = !t.done; renderTasks(); });
+      row.querySelector('[data-act="delete"]').addEventListener('click', () => {
+        const idx = TASKS.findIndex(x => x.id === t.id);
+        if(idx > -1) TASKS.splice(idx, 1);
+        renderTasks();
+      });
+      listEl.appendChild(row);
+    });
+  }
+
+  $('#newTaskInput').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') {
+      const val = e.target.value.trim();
+      if(val) {
+        TASKS.push({ id: 't' + Date.now(), alias: state.currentAlias.id, title: val, done: false });
+        e.target.value = '';
+        renderTasks();
+      }
+    }
+  });
+
+  /* ---------------- SIDEBAR & RESPONSIVE TOGGLES ---------------- */
+  function closeMobileSidebar() {
+    $('#sidebar').classList.remove('mobile-open');
+    $('#sidebarScrim').classList.remove('visible');
+  }
+
+  $('#hamburgerBtn').addEventListener('click', () => {
+    $('#sidebar').classList.add('mobile-open');
+    $('#sidebarScrim').classList.add('visible');
+  });
+  $('#sidebarScrim').addEventListener('click', closeMobileSidebar);
+
+  $('#sidebarToggleBtn').addEventListener('click', () => {
+    state.sidebarCollapsed = !state.sidebarCollapsed;
+    $('#sidebar').classList.toggle('collapsed', state.sidebarCollapsed);
+    $('#sidebarToggleBtn').classList.toggle('active', state.sidebarCollapsed);
+  });
+
+  /* ---------------- COMPOSE MODAL ---------------- */
+  const composeModal = $('#composeModal');
+  const composeEditor = $('#composeEditor');
+  let composeAttachmentsList = [];
+
+  function openCompose(prefill) {
+    prefill = prefill || {};
+    $('#composeTo').value = prefill.to || '';
+    $('#composeCc').value = ''; $('#composeBcc').value = '';
+    $('#composeSubject').value = prefill.subject || '';
+    composeEditor.innerHTML = prefill.bodyHtml || '';
+    composeAttachmentsList = [];
+    $('#composeAttachments').innerHTML = '';
+
+    setAvatarEl($('#composeFromAvatar'), state.currentAlias);
+    $('#composeFromEmail').textContent = state.currentAlias.email;
+
+    composeModal.classList.remove('minimized');
+    composeModal.classList.add('open');
+    setTimeout(() => composeEditor.focus(), 200);
+  }
+
+  $('#composeOpenBtn').addEventListener('click', () => openCompose());
+  $('#composeCloseBtn, #discardBtn').addEventListener('click', () => {
+    composeModal.classList.remove('open');
+  });
+  $('#composeMinimizeBtn').addEventListener('click', () => composeModal.classList.toggle('minimized'));
+  $('#composeExpandBtn').addEventListener('click', () => composeModal.classList.toggle('expanded'));
+
+  $('#saveDraftBtn').addEventListener('click', () => {
+    const newDraft = {
+      id: 'm' + Date.now(), alias: state.currentAlias.id, folder: 'drafts',
+      ...person(state.currentAlias.displayName, state.currentAlias.email, state.currentAlias.color),
+      subject: $('#composeSubject').value.trim() || '(Draft)',
+      snippet: composeEditor.textContent.slice(0, 90) || '(No preview)',
+      time: 'Just now', read: true, starred: false, labels: [],
+      to: $('#composeTo').value.trim(), body: composeEditor.innerHTML
+    };
+    emails.unshift(newDraft);
+    composeModal.classList.remove('open');
+    showToast('Draft saved');
+    renderFolderNav(); renderList();
+  });
+
+  $('#sendBtn').addEventListener('click', () => {
+    const to = $('#composeTo').value.trim();
+    if(!to) { showToast('Please enter a recipient'); $('#composeTo').focus(); return; }
+
+    const newMail = {
+      id: 'm' + Date.now(), alias: state.currentAlias.id, folder: 'sent',
+      ...person(state.currentAlias.displayName, state.currentAlias.email, state.currentAlias.color),
+      subject: $('#composeSubject').value.trim() || '(No Subject)',
+      snippet: composeEditor.textContent.slice(0, 90),
+      time: 'Just now', read: true, starred: false, labels: [],
+      to, body: composeEditor.innerHTML
+    };
+    emails.unshift(newMail);
+    composeModal.classList.remove('open');
+    showToast('Message sent');
+    renderFolderNav(); renderList();
+  });
+
+  $('#ccBccToggle').addEventListener('click', () => {
+    $('#ccRow').classList.toggle('hidden');
+    $('#bccRow').classList.toggle('hidden');
+  });
+
+  // Formatting Toolbar
+  function execCmd(cmd, val = null) { document.execCommand(cmd, false, val); composeEditor.focus(); }
+  $('#tbBold').addEventListener('click', () => execCmd('bold'));
+  $('#tbItalic').addEventListener('click', () => execCmd('italic'));
+  $('#tbUnderline').addEventListener('click', () => execCmd('underline'));
+  $('#tbLink').addEventListener('click', () => {
+    const url = prompt('Enter URL:');
+    if(url) execCmd('createLink', url);
+  });
+  $('#tbFontName').addEventListener('change', (e) => execCmd('fontName', e.target.value));
+
+  // Attachment upload
+  $('#tbAttach').addEventListener('click', () => $('#fileInput').click());
+  $('#fileInput').addEventListener('change', (e) => {
+    Array.from(e.target.files).forEach(f => {
+      composeAttachmentsList.push(f);
+      const chip = el('div', 'attachment-chip');
+      chip.innerHTML = '<div class="attach-icon-wrap" style="background:#2563EB">' + ICON.file + '</div>' +
+        '<div class="file-info"><div class="fname">' + escapeHtml(f.name) + '</div><div class="fsize">' + Math.round(f.size/1024) + ' KB</div></div>';
+      $('#composeAttachments').appendChild(chip);
+    });
+  });
+
+  // Emoji picker
+  const EMOJIS = ['\u{1F600}','\u{1F602}','\u{1F60A}','\u{1F60D}','\u{1F44D}','\u{1F64C}','\u{1F389}','\u{1F525}','\u2705','\u{1F64F}','\u{1F4CE}','\u{1F4C5}'];
+  const emojiPop = $('#emojiPop');
+  emojiPop.innerHTML = EMOJIS.map(e => '<button type="button">' + e + '</button>').join('');
+  emojiPop.addEventListener('click', (e) => {
+    if(e.target.tagName === 'BUTTON') {
+      execCmd('insertText', e.target.textContent);
+      emojiPop.classList.remove('open');
+    }
+  });
+  $('#tbEmoji').addEventListener('click', (e) => { e.stopPropagation(); emojiPop.classList.toggle('open'); });
+
+  /* ---------------- SEARCH & TOOLBAR EVENTS ---------------- */
+  $('#searchInput').addEventListener('input', (e) => {
+    state.searchQuery = e.target.value;
+    $('#searchBox').classList.toggle('has-value', !!state.searchQuery);
+    renderList();
+  });
+  $('#searchClear').addEventListener('click', () => {
+    state.searchQuery = ''; $('#searchInput').value = '';
+    $('#searchBox').classList.remove('has-value');
+    renderList();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if(e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+      e.preventDefault();
+      $('#searchInput').focus();
+    }
+  });
+
+  $('#selectAllCheckbox').addEventListener('click', toggleSelectAll);
+  $('#bulkArchive').addEventListener('click', () => {
+    state.checkedIds.forEach(id => { const m = emails.find(x => x.id === id); if(m) m.folder = 'archive'; });
+    state.checkedIds.clear(); renderFolderNav(); renderList(); closeReadingPane(); showToast('Archived selected messages');
+  });
+  $('#bulkDelete').addEventListener('click', () => {
+    state.checkedIds.forEach(id => { const m = emails.find(x => x.id === id); if(m) m.folder = 'trash'; });
+    state.checkedIds.clear(); renderFolderNav(); renderList(); closeReadingPane(); showToast('Moved selected messages to trash');
+  });
+  $('#bulkMarkRead').addEventListener('click', () => {
+    state.checkedIds.forEach(id => { const m = emails.find(x => x.id === id); if(m) m.read = true; });
+    state.checkedIds.clear(); renderFolderNav(); renderList();
+  });
+  $('#refreshBtn').addEventListener('click', () => showToast('Mailbox is up to date'));
+
+  // Header Dropdown Navigation
+  const avatarWrap = $('#avatarWrap');
+  avatarWrap.addEventListener('click', (e) => {
+    e.stopPropagation();
+    avatarWrap.classList.toggle('open');
+    $('#avatarDropdown').classList.toggle('open');
+  });
+  document.addEventListener('click', () => {
+    avatarWrap.classList.remove('open');
+    $('#avatarDropdown').classList.remove('open');
+  });
+
+  $('#ddConfigure, #settingsBtn').addEventListener('click', () => openConfigScreen(state.currentAlias.id));
+  $('#ddDashboard, #toDashBtn').addEventListener('click', () => { renderDashboard(); showScreen('screen-dashboard'); });
+  $('#ddLogout, #dashLogoutBtn').addEventListener('click', () => showScreen('screen-login'));
+  $('#backToListBtn').addEventListener('click', closeReadingPane);
+
+  /* ---------------- INIT ---------------- */
+  function init() {
+    applyTheme();
+    updateAliasHeaderUI();
+    showScreen('screen-login');
+  }
+  init();
+
+})();
+</script>
+</body>
+</html>

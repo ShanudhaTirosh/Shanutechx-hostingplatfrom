@@ -4,6 +4,7 @@ import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 import { siteMetadata } from '@/lib/metadata';
 import MeshBackground from '@/components/MeshBackground';
+import { CartProvider } from '@/context/CartContext';
 
 export const metadata: Metadata = {
   ...siteMetadata,
@@ -46,11 +47,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body suppressHydrationWarning className="bg-[#030014] text-white antialiased relative selection:bg-purple-500 selection:text-white min-h-screen">
-        <MeshBackground />
-        <div className="grain-overlay" aria-hidden="true" />
-        <div className="relative z-10">
-          {children}
-        </div>
+        <CartProvider>
+          <MeshBackground />
+          <div className="grain-overlay" aria-hidden="true" />
+          <div className="relative z-10">
+            {children}
+          </div>
+        </CartProvider>
       </body>
     </html>
   );
