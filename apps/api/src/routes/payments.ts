@@ -4,7 +4,8 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdmin, AuthedRequest } from '../middleware/auth';
 import { paymentReviewVisibilityWhere, canReviewPayment } from '../middleware/rbac';
 import { uploadPaymentProof } from '../lib/uploads';
-import { notifyCustomer, notifyAdmins } from '../lib/notifications';
+import { notifyCustomer, notifyAdmins, sendInvoiceDeliveryNotification } from '../lib/notifications';
+
 import { notifyDiscordChannel } from '../lib/discordWebhooks';
 import { parsePagination } from '../lib/pagination';
 import { paymentUploadLimiter } from '../middleware/rateLimit';
@@ -208,6 +209,22 @@ paymentsRouter.post('/payments/:id/review', requireAdmin, async (req: AuthedRequ
       payment.order.user,
       `Your payment for order ${payment.orderId} has been confirmed. Your products have been provisioned!`
     );
+
+    // Send automatic PDF & HTML invoice delivery email to customer
+    if (orderWithItems) {
+      const items = orderWithItems.items.map((item: any) => ({
+        name: item.plan ? item.plan.name : 'Cloud Service',
+        quantity: item.quantity,
+        price: item.plan ? item.plan.price : 0,
+      }));
+      void sendInvoiceDeliveryNotification(
+        payment.order.user,
+        payment.orderId,
+        payment.order.totalLkr,
+        items
+      ).catch(() => {});
+    }
+
   } else {
     void notifyCustomer(
       payment.order.user,

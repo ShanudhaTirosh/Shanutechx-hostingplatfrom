@@ -1654,3 +1654,15 @@ model NodePortExposure {
   @@unique([nodeId, port])
   @@index([nodeId])
 }
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+}
+

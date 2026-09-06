@@ -355,3 +355,95 @@ export function renderDeploymentStatusEmail({
 
   return { subject, html, text };
 }
+
+export function renderPasswordResetEmail({
+  customerName,
+  resetLink,
+}: {
+  customerName: string;
+  resetLink: string;
+}): { subject: string; html: string; text: string } {
+  const safeName = escapeHtml(customerName);
+  const safeLink = escapeHtml(resetLink);
+  const subject = `Reset Your ShanuTechX Account Password`;
+
+  const html = baseEmailLayout(
+    subject,
+    `
+    <div class="status-badge status-info">Password Reset Request</div>
+    <h1>Hello, ${safeName}</h1>
+    <p>We received a request to reset your password for your ShanuTechX Cloud Hosting account.</p>
+    <p>Click the button below to set a new password. This link is valid for 1 hour.</p>
+
+    <a href="${safeLink}" class="btn">Reset My Password →</a>
+
+    <p style="margin-top: 20px; font-size: 12px; color: #64748b;">
+      If you did not request a password reset, you can safely ignore this email — your account remains secure.
+    </p>
+  `
+  );
+
+  const text = `Hello ${customerName},\n\nReset your ShanuTechX password by visiting the following link:\n${resetLink}\n\nThis link expires in 1 hour.`;
+
+  return { subject, html, text };
+}
+
+export function renderInvoiceDeliveryEmail({
+  customerName,
+  orderId,
+  totalLkr,
+  items,
+  invoiceUrl,
+}: {
+  customerName: string;
+  orderId: string;
+  totalLkr: number;
+  items: Array<{ name: string; quantity: number; price: number }>;
+  invoiceUrl?: string;
+}): { subject: string; html: string; text: string } {
+  const safeName = escapeHtml(customerName);
+  const subject = `Official Tax Invoice — Order #${orderId.slice(0, 8).toUpperCase()}`;
+
+  const itemsHtml = items
+    .map(
+      (item) => `<tr>
+      <td>${escapeHtml(item.name)}</td>
+      <td style="text-align: center;">${item.quantity}</td>
+      <td style="text-align: right;">Rs ${item.price.toLocaleString('en-LK')}</td>
+    </tr>`
+    )
+    .join('');
+
+  const targetLink = invoiceUrl || `https://${env.rootDomain}/orders`;
+
+  const html = baseEmailLayout(
+    subject,
+    `
+    <div class="status-badge status-success">Invoice Delivered</div>
+    <h1>Invoice for ${safeName}</h1>
+    <p>Your invoice for Order <strong>#${orderId.slice(0, 8).toUpperCase()}</strong> is ready.</p>
+    
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Service / Description</th>
+          <th style="text-align: center;">Qty</th>
+          <th style="text-align: right;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsHtml}
+      </tbody>
+    </table>
+
+    <p style="text-align: right; font-size: 16px; font-weight: 700; color: #4ade80;">Total Paid: Rs ${totalLkr.toLocaleString('en-LK')}</p>
+
+    <a href="${targetLink}" class="btn">Download Official Invoice PDF →</a>
+  `
+  );
+
+  const text = `Invoice for ${customerName} (Order #${orderId.slice(0, 8).toUpperCase()}):\nTotal: Rs ${totalLkr}\nDownload PDF at ${targetLink}`;
+
+  return { subject, html, text };
+}
+

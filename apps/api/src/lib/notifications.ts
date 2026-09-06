@@ -72,8 +72,11 @@ import {
   renderWelcomeEmail,
   renderSubscriptionGracePeriodEmail,
   renderDeploymentStatusEmail,
+  renderPasswordResetEmail,
+  renderInvoiceDeliveryEmail,
 } from './emailTemplates';
 import { sendSmtpEmail } from './smtpDispatcher';
+
 
 async function sendEmailFallback(email: string, message: string, customHtml?: string, customSubject?: string): Promise<void> {
   const rendered = customHtml
@@ -151,6 +154,32 @@ export async function sendDeploymentStatusNotification(
   await notifyCustomer(user, rendered.text, rendered.html, rendered.subject);
 }
 
+export async function sendPasswordResetNotification(
+  email: string,
+  customerName: string,
+  resetLink: string
+): Promise<void> {
+  const rendered = renderPasswordResetEmail({ customerName, resetLink });
+  await sendEmailFallback(email, rendered.text, rendered.html, rendered.subject);
+}
+
+export async function sendInvoiceDeliveryNotification(
+  user: NotifiableUser & { name?: string },
+  orderId: string,
+  totalLkr: number,
+  items: Array<{ name: string; quantity: number; price: number }>,
+  invoiceUrl?: string
+): Promise<void> {
+  const rendered = renderInvoiceDeliveryEmail({
+    customerName: user.name || user.email.split('@')[0],
+    orderId,
+    totalLkr,
+    items,
+    invoiceUrl,
+  });
+  await notifyCustomer(user, rendered.text, rendered.html, rendered.subject);
+}
+
 /**
  * Posts an operational alert to the admin Discord channel (new orders,
  * manual review, node issues) AND pushes it to every staff member's phone
@@ -168,3 +197,4 @@ export async function notifyAdmins(message: string): Promise<void> {
     }),
   ]);
 }
+
