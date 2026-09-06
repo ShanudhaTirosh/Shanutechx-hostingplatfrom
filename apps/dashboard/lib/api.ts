@@ -610,7 +610,36 @@ export const api = {
       apiFetch(`/api/nodes/${nodeId}/failover-status`).then((r) => asJson<{ logs: any[] }>(r)),
   },
 
-
+  managedDatabases: {
+    list: () => apiFetch('/api/managed-databases').then((r) => asJson<{ databases: ManagedDatabase[] }>(r)),
+    create: (data: { type: string; dbName?: string; masterUsername?: string; masterPassword?: string }) =>
+      apiFetch('/api/managed-databases', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ database: ManagedDatabase }>(r)
+      ),
+    revealPassword: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}/reveal-password`).then((r) => asJson<{ password: string }>(r)),
+    connection: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}/connection`).then((r) =>
+        asJson<{ connectionString: string; host: string; port: number; username: string; password: string; databaseName: string; type: string }>(r)
+      ),
+    action: (id: string, action: 'start' | 'stop' | 'restart') =>
+      apiFetch(`/api/managed-databases/${id}/action`, { method: 'POST', body: JSON.stringify({ action }) }).then((r) =>
+        asJson<{ ok: boolean; database: ManagedDatabase }>(r)
+      ),
+    delete: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean; deletedId: string }>(r)),
+    migrate: (id: string, targetNodeId?: string) =>
+      apiFetch(`/api/managed-databases/${id}/migrate`, { method: 'POST', body: JSON.stringify({ targetNodeId }) }).then((r) =>
+        asJson<{ ok: boolean; message: string; database: ManagedDatabase }>(r)
+      ),
+    scale: (
+      id: string,
+      data: { cpuLimit?: number; memoryLimitMb?: number; storageLimitGb?: number; maxConnections?: number; dbVersion?: string }
+    ) =>
+      apiFetch(`/api/managed-databases/${id}/scale`, { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ ok: boolean; message: string; database: ManagedDatabase }>(r)
+      ),
+  },
 
   payments: {
     reviewQueue: () => apiFetch('/api/payments/review-queue').then((r) => asJson<{ payments: Payment[] }>(r)),

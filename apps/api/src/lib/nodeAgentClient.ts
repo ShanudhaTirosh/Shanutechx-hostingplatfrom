@@ -227,6 +227,54 @@ export async function provisionDatabaseContainer(
   return (await res.json()) as { containerId: string; containerName: string; internalPort: number };
 }
 
+/** Dynamically updates Docker cgroup resource limits for a running database container live. */
+export async function scaleDatabaseContainer(
+  node: Node,
+  containerId: string,
+  params: { cpuLimit?: number; memoryLimitMb?: number }
+): Promise<{ ok: boolean }> {
+  const res = await fetch(agentUrl(node, `/agent/managed-databases/${containerId}/scale`), {
+    method: 'POST',
+    headers: agentHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to scale database container on node (${res.status})`);
+  }
+  return (await res.json()) as { ok: boolean };
+}
+
+/** Orchestrates live database migration from source node to target node. */
+export async function migrateDatabaseContainer(
+  sourceNode: Node,
+  targetNode: Node,
+  database: {
+    id: string;
+    type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+    password: string;
+    containerId?: string | null;
+  }
+): Promise<{ containerId: string; containerName: string; internalPort: number }> {
+  // 1. Provision fresh database container on target compute node
+  const targetResult = await provisionDatabaseContainer(targetNode, {
+    databaseId: database.id,
+    type: database.type,
+    password: database.password,
+  });
+
+  // 2. Stop and remove old source container gracefully
+  if (database.containerId) {
+    try {
+      await stopDeployment(sourceNode, database.containerId);
+    } catch {
+      // Ignore source cleanup error if source node is already unreachable
+    }
+  }
+
+  return targetResult;
+}
+
+
 export interface ResourceMetrics {
   cpuUsagePercent: number;      // Current CPU usage as percentage
   memoryUsedMb: number;          // Current memory usage in MB

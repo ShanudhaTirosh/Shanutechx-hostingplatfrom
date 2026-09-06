@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { SupabaseClientProject, Node } from '@/lib/types';
 import { useAppUser } from '@/lib/AppUserContext';
+import DatabaseMigrationScaleModal from '@/components/DatabaseMigrationScaleModal';
 
 export default function UnifiedDevProjectsPage() {
   const { apiUser } = useAppUser();
@@ -19,7 +20,11 @@ export default function UnifiedDevProjectsPage() {
   const [activeTab, setActiveTab] = useState<'supabase' | 'databases' | 'nodes'>('supabase');
 
   // Selected Supabase Project for detailed configuration
-  const [selectedSupabaseProject, setSelectedSupabaseProject] = useState<SupabaseClientProject | null>(null);
+  const setSelectedSupabaseProject_State = useState<SupabaseClientProject | null>(null);
+  const [selectedSupabaseProject, setSelectedSupabaseProject] = setSelectedSupabaseProject_State;
+  
+  // Selected Database for Migration & Scaling modal
+  const [selectedDbForScale, setSelectedDbForScale] = useState<any | null>(null);
 
   // New Provisioning Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -533,12 +538,18 @@ export default function UnifiedDevProjectsPage() {
                           )}
                         </div>
 
-                        <div className="flex items-center justify-between pt-2">
+                        <div className="flex items-center justify-between pt-2 gap-2">
                           <button
                             onClick={() => handleRevealDbPassword(db.id)}
                             className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white text-xs font-mono transition-all"
                           >
                             🔑 {revealedPass ? 'Revealed' : 'Reveal Credentials'}
+                          </button>
+                          <button
+                            onClick={() => setSelectedDbForScale(db)}
+                            className="px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 border border-cyan-500/30 text-xs font-mono font-semibold transition-all flex items-center gap-1.5"
+                          >
+                            <span>⚡ Scale & Migrate</span>
                           </button>
                         </div>
                       </div>
@@ -804,6 +815,15 @@ export default function UnifiedDevProjectsPage() {
           </div>
         </div>
       )}
+
+      {/* DATABASE MIGRATION & SCALING MODAL */}
+      <DatabaseMigrationScaleModal
+        isOpen={!!selectedDbForScale}
+        onClose={() => setSelectedDbForScale(null)}
+        database={selectedDbForScale}
+        onSuccess={loadAllData}
+      />
     </div>
   );
 }
+

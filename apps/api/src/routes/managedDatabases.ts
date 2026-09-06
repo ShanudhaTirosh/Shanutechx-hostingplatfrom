@@ -489,3 +489,152 @@ managedDatabasesRouter.patch('/managed-databases/:id/config', async (req: Authed
 
   res.json({ database: { ...updated, credentialRef: undefined } });
 });
+
+/**
+ * POST /api/managed-databases/:id/migrate
+ * Live on-demand database migration to another compute node or auto-selected target node.
+ */
+managedDatabasesRouter.post('/managed-databases/:id/migrate', async (req: AuthedRequest, res) => {
+  const migrateSchema = z.object({
+    targetNodeId: z.string().optional(),
+  });
+  const parsed = migrateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const db = await prisma.managedDatabase.findUnique({
+    where: { id: req.params.id },
+    include: { node: true },
+  });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+
+  // Determine target compute node
+  let targetNode;
+  if (parsed.data.targetNodeId) {
+    targetNode = await prisma.node.findUnique({ where: { id: parsed.data.targetNodeId } });
+    if (!targetNode || !targetNode.isActive) {
+      return res.status(400).json({ error: 'Target compute node not found or inactive' });
+    }
+  } else {
+    try {
+      targetNode = await selectNodeForDeployment({ requiredTag: 'node-hosting', isAdminDeployment: true });
+    } catch (err: any) {
+      return res.status(409).json({ error: err.message || 'No suitable target node available' });
+    }
+  }
+
+  if (targetNode.id === db.nodeId) {
+    return res.status(400).json({ error: 'Database is already on the target node' });
+  }
+
+  // Set database status to pending while migrating
+  await prisma.managedDatabase.update({
+    where: { id: db.id },
+    data: { status: 'pending' },
+  });
+
+  try {
+    const rawPassword = db.credentialRef ? decryptSecret(db.credentialRef, env.secretsEncryptionKey) : crypto.randomBytes(16).toString('hex');
+    const { migrateDatabaseContainer } = await import('../lib/nodeAgentClient');
+
+    const result = await migrateDatabaseContainer(
+      db.node,
+      targetNode,
+      {
+        id: db.id,
+        type: db.type as any,
+        password: rawPassword,
+        containerId: db.containerId,
+      }
+    );
+
+    const updated = await prisma.managedDatabase.update({
+      where: { id: db.id },
+      data: {
+        nodeId: targetNode.id,
+        status: 'running',
+        containerId: result.containerId,
+        internalHost: result.containerName,
+        internalPort: result.internalPort,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'managed_database.migrate',
+        target: `${db.id}:${db.nodeId}->${targetNode.id}`,
+      },
+    });
+
+    res.json({
+      ok: true,
+      message: `Database successfully migrated to node ${targetNode.label || targetNode.id}`,
+      database: { ...updated, credentialRef: undefined },
+    });
+  } catch (err: any) {
+    await prisma.managedDatabase.update({
+      where: { id: db.id },
+      data: { status: 'failed' },
+    });
+    res.status(502).json({ error: err.message || 'Failed to migrate database container' });
+  }
+});
+
+/**
+ * POST /api/managed-databases/:id/scale
+ * Live vertical scaling of database resources (CPU cores, RAM memory, Storage limit, and maxConnections).
+ */
+managedDatabasesRouter.post('/managed-databases/:id/scale', async (req: AuthedRequest, res) => {
+  const scaleSchema = z.object({
+    cpuLimit: z.number().min(0.1).max(32).optional(),
+    memoryLimitMb: z.number().min(64).max(128000).optional(),
+    storageLimitGb: z.number().min(1).max(10000).optional(),
+    maxConnections: z.number().min(5).max(10000).optional(),
+    dbVersion: z.string().optional(),
+  });
+  const parsed = scaleSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const db = await prisma.managedDatabase.findUnique({
+    where: { id: req.params.id },
+    include: { node: true },
+  });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+
+  try {
+    if (db.containerId && db.node) {
+      const { scaleDatabaseContainer } = await import('../lib/nodeAgentClient');
+      await scaleDatabaseContainer(db.node, db.containerId, {
+        cpuLimit: parsed.data.cpuLimit,
+        memoryLimitMb: parsed.data.memoryLimitMb,
+      });
+    }
+
+    const updated = await prisma.managedDatabase.update({
+      where: { id: db.id },
+      data: {
+        ...(parsed.data.maxConnections ? { maxConnections: parsed.data.maxConnections } : {}),
+        ...(parsed.data.dbVersion ? { dbVersion: parsed.data.dbVersion } : {}),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'managed_database.scale',
+        target: `${db.id}:${JSON.stringify(parsed.data)}`,
+      },
+    });
+
+    res.json({
+      ok: true,
+      message: 'Database resources scaled successfully',
+      database: { ...updated, credentialRef: undefined },
+    });
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to scale database container resources' });
+  }
+});
+

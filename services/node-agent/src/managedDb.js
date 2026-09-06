@@ -60,4 +60,23 @@ async function provisionDatabase({ databaseId, type, password }) {
   return { containerId: container.id, containerName, internalPort };
 }
 
-module.exports = { provisionDatabase };
+/**
+ * Dynamically updates Docker cgroup resource limits (CPU cores, RAM memory)
+ * for a running database container live without restarting it.
+ */
+async function scaleDatabase({ containerId, cpuLimit, memoryLimitMb }) {
+  const container = docker.getContainer(containerId);
+  const updateConfig = {};
+  if (cpuLimit && cpuLimit > 0) {
+    updateConfig.NanoCpus = Math.floor(cpuLimit * 1e9);
+  }
+  if (memoryLimitMb && memoryLimitMb > 0) {
+    updateConfig.Memory = memoryLimitMb * 1024 * 1024;
+  }
+
+  await container.update(updateConfig);
+  return { ok: true, containerId, cpuLimit, memoryLimitMb };
+}
+
+module.exports = { provisionDatabase, scaleDatabase };
+

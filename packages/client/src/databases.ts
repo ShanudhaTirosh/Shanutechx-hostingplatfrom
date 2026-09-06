@@ -32,4 +32,16 @@ export class DatabasesResource extends BaseClient {
     const res = await this.httpGet<{ connectionString: string }>(`/api/managed-databases/${id}/connection`);
     return res.connectionString ?? '';
   }
+
+  async migrate(id: string, targetNodeId?: string): Promise<{ ok: boolean; message: string; database: ManagedDatabase }> {
+    return this.httpPost<{ ok: boolean; message: string; database: ManagedDatabase }>(`/api/managed-databases/${id}/migrate`, { targetNodeId });
+  }
+
+  async scale(
+    id: string,
+    params: { cpuLimit?: number; memoryLimitMb?: number; storageLimitGb?: number; maxConnections?: number; dbVersion?: string }
+  ): Promise<{ ok: boolean; message: string; database: ManagedDatabase }> {
+    return this.httpPost<{ ok: boolean; message: string; database: ManagedDatabase }>(`/api/managed-databases/${id}/scale`, params);
+  }
 }
+

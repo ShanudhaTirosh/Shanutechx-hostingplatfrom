@@ -9,7 +9,7 @@ const { runContainer, stopAndRemove, stopContainer, getLogs, streamLogs, startCo
 const { collectStats } = require('./stats');
 const { addKey } = require('./livekit');
 const { addDomainRoute, removeDomainRoute } = require('./customDomain');
-const { provisionDatabase } = require('./managedDb');
+const { provisionDatabase, scaleDatabase } = require('./managedDb');
 const { listDir, readFile, writeFile, writeBinaryFile, extractArchive, makeDir, remove: fsRemove, rename } = require('./filesystem');
 const { provisionProject, deprovisionProject, execSql, listTables, validateIdentifier, insertRow, updateRow, deleteRow } = require('./projects');
 
@@ -427,6 +427,21 @@ app.post('/agent/managed-databases', async (req, res) => {
     res.status(500).json({ error: 'Failed to provision managed database' });
   }
 });
+
+app.post('/agent/managed-databases/:containerId/scale', async (req, res) => {
+  const { containerId } = req.params;
+  const { cpuLimit, memoryLimitMb } = req.body || {};
+
+  try {
+    const result = await scaleDatabase({ containerId, cpuLimit, memoryLimitMb });
+    logger.info({ containerId, cpuLimit, memoryLimitMb }, 'Managed database scaled');
+    res.json(result);
+  } catch (err) {
+    logger.error({ containerId, err }, 'Failed to scale managed database');
+    res.status(500).json({ error: 'Failed to scale managed database' });
+  }
+});
+
 
 // ── Filesystem routes (browser File Manager / IDE) ───────────────────────────
 
