@@ -615,6 +615,9 @@ managedDatabasesRouter.post('/managed-databases/:id/scale', async (req: AuthedRe
     const updated = await prisma.managedDatabase.update({
       where: { id: db.id },
       data: {
+        ...(parsed.data.cpuLimit !== undefined ? { cpuLimit: parsed.data.cpuLimit } : {}),
+        ...(parsed.data.memoryLimitMb !== undefined ? { memoryLimitMb: parsed.data.memoryLimitMb } : {}),
+        ...(parsed.data.storageLimitGb !== undefined ? { storageLimitGb: parsed.data.storageLimitGb } : {}),
         ...(parsed.data.maxConnections ? { maxConnections: parsed.data.maxConnections } : {}),
         ...(parsed.data.dbVersion ? { dbVersion: parsed.data.dbVersion } : {}),
       },

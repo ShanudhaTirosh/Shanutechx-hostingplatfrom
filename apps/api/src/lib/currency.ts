@@ -22,13 +22,15 @@ export type Currency = 'LKR' | 'USD';
  */
 const DEFAULT_USD_TO_LKR_RATE = 300;
 
-export function convertToLkr(amount: number, currency: Currency, usdToLkrRate = DEFAULT_USD_TO_LKR_RATE): number {
-  if (currency === 'LKR') return amount;
+export function convertToLkr(amount: number, currency: Currency | string, usdToLkrRate = DEFAULT_USD_TO_LKR_RATE): number {
+  const norm = (currency || 'LKR').toString().toUpperCase();
+  if (norm === 'LKR') return amount;
   return Math.round(amount * usdToLkrRate);
 }
 
-export function formatCurrency(amountInSmallestUnit: number, currency: Currency): string {
+export function formatCurrency(amountInSmallestUnit: number, currency: Currency | string): string {
   const amount = amountInSmallestUnit / 100;
   const formatted = amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return currency === 'LKR' ? `LKR ${formatted}` : `$${formatted}`;
+  const norm = (currency || 'LKR').toString().toUpperCase();
+  return norm === 'LKR' ? `LKR ${formatted}` : `$${formatted}`;
 }

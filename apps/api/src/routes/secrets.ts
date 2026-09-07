@@ -165,7 +165,7 @@ secretsRouter.post('/secrets/projects/:id/secrets', requireAuth, requireAdminOrD
       name: project.name,
       environment: project.environment,
       createdAt: project.createdAt.toISOString(),
-      secrets: secrets.map(decryptItem),
+      secrets: secrets.map(safeListItem),
     },
   });
 });

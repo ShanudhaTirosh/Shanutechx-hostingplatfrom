@@ -69,6 +69,7 @@ import { globalLimiter } from './middleware/rateLimit';
 import { csrfProtection, isOriginAllowed } from './middleware/csrfProtection';
 
 const app = express();
+app.set('trust proxy', 1);
 app.set('etag', false);
 
 // CORS: explicit allowlist.

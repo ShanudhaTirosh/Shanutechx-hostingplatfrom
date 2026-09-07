@@ -83,9 +83,10 @@ export async function generateSubdomain(
 ): Promise<string> {
   if (userRequestedSubdomain && userRequestedSubdomain.trim()) {
     const check = await validateCustomSubdomain(userRequestedSubdomain);
-    if (check.valid && check.formatted) {
-      return check.formatted;
+    if (!check.valid || !check.formatted) {
+      throw new Error(check.error || 'Invalid custom subdomain');
     }
+    return check.formatted;
   }
 
   const baseSlug = slugify(preferredName) || 'app';

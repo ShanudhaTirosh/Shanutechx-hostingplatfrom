@@ -159,9 +159,20 @@ export async function restartDeployment(node: Node, containerId: string) {
 }
 
 export async function fetchNodeStats(node: Node) {
-  const res = await fetch(agentUrl(node, '/agent/stats'), { headers: agentHeaders() });
-  if (!res.ok) throw new Error(`Failed to fetch node stats (${res.status})`);
-  return (await res.json()) as { cpuUsedPct: number; ramUsedMb: number; diskUsedGb: number };
+  try {
+    const res = await fetch(agentUrl(node, '/agent/stats'), { headers: agentHeaders(), signal: AbortSignal.timeout(5000) });
+    if (!res.ok) {
+      return { cpuUsedPct: 0, ramUsedMb: 0, diskUsedGb: 0 };
+    }
+    const data: any = await res.json();
+    return {
+      cpuUsedPct: typeof data.cpuUsedPct === 'number' ? data.cpuUsedPct : (parseFloat(data.cpuUsedPct) || 0),
+      ramUsedMb: typeof data.ramUsedMb === 'number' ? data.ramUsedMb : (parseInt(data.ramUsedMb, 10) || 0),
+      diskUsedGb: typeof data.diskUsedGb === 'number' ? data.diskUsedGb : (parseInt(data.diskUsedGb, 10) || 0),
+    };
+  } catch {
+    return { cpuUsedPct: 0, ramUsedMb: 0, diskUsedGb: 0 };
+  }
 }
 
 /**

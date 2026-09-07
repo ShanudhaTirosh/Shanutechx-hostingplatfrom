@@ -64,7 +64,7 @@ function isStaffAuthorized(member, user) {
   if (member?.permissions?.has && (member.permissions.has('Administrator') || member.permissions.has('ManageGuild'))) {
     return true;
   }
-  return ALLOWED_DISCORD_USERS.length === 0 && ALLOWED_DISCORD_ROLES.length === 0;
+  return false;
 }
 
 async function handleInteraction(interaction) {

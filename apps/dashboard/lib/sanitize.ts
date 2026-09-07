@@ -55,6 +55,28 @@ export function sanitizeHtml(html: string): string {
       });
     });
 
+    // Enforce safe <a> tags (add rel="noopener noreferrer" and validate href schemes)
+    const links = doc.querySelectorAll('a');
+    links.forEach((a) => {
+      a.setAttribute('rel', 'noopener noreferrer');
+      const href = (a.getAttribute('href') || '').trim();
+      if (href) {
+        const lowerHref = href.toLowerCase().replace(/[\x00-\x20\s]/g, '');
+        const isAllowedScheme =
+          lowerHref.startsWith('http:') ||
+          lowerHref.startsWith('https:') ||
+          lowerHref.startsWith('mailto:') ||
+          lowerHref.startsWith('tel:') ||
+          lowerHref.startsWith('/') ||
+          lowerHref.startsWith('#') ||
+          lowerHref.startsWith('.');
+
+        if (!isAllowedScheme) {
+          a.removeAttribute('href');
+        }
+      }
+    });
+
     return doc.body.innerHTML;
   } catch {
     return html.replace(/<[^>]*>/g, '');

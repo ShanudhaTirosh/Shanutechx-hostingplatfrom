@@ -1033,8 +1033,8 @@ model SupabaseSmtpDeliveryLog {
 
 model AuditLog {
   id        String   @id @default(cuid())
-  adminId   String
-  admin     User     @relation("AdminAuditLogs", fields: [adminId], references: [id])
+  adminId   String?
+  admin     User?    @relation("AdminAuditLogs", fields: [adminId], references: [id])
   action    String
   target    String?
   createdAt DateTime @default(now())
@@ -1196,6 +1196,9 @@ model ManagedDatabase {
   allowedIps     String[]              @default(["0.0.0.0/0"])
   maxConnections Int?                  @default(100)
   dbVersion      String?               @default("latest")
+  cpuLimit       Float?
+  memoryLimitMb  Int?
+  storageLimitGb Int?
   createdAt      DateTime              @default(now())
 
   dbUsers ManagedDatabaseUser[]

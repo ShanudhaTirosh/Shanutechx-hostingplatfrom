@@ -462,18 +462,28 @@ async function createDockerNetwork(name, driver = 'bridge') {
   return { ok: true, id: net.id, name };
 }
 
+const REGEX_PROJECT_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
+
 async function deployDockerCompose(yamlContent, projectName = 'stx-stack') {
+  if (!REGEX_PROJECT_NAME.test(projectName)) {
+    throw new Error('Invalid project name format. Only alphanumeric characters, dashes, and underscores are allowed.');
+  }
+
   const targetDir = path.join('/tmp', `stx-compose-${Date.now()}`);
   await fs.mkdir(targetDir, { recursive: true });
   const composePath = path.join(targetDir, 'docker-compose.yml');
   await fs.writeFile(composePath, yamlContent, 'utf8');
 
   try {
-    const { stdout, stderr } = await execAsync(`docker compose -f "${composePath}" -p "${projectName}" up -d`);
+    const { stdout, stderr } = await execFileAsync('docker', ['compose', '-f', composePath, '-p', projectName, 'up', '-d']);
     return { ok: true, output: stdout + '\n' + stderr };
   } catch (err) {
-    const { stdout, stderr } = await execAsync(`docker-compose -f "${composePath}" -p "${projectName}" up -d`);
-    return { ok: true, output: stdout + '\n' + stderr };
+    try {
+      const { stdout, stderr } = await execFileAsync('docker-compose', ['-f', composePath, '-p', projectName, 'up', '-d']);
+      return { ok: true, output: stdout + '\n' + stderr };
+    } catch (e) {
+      throw new Error(`Docker Compose deployment failed: ${err.message || e.message}`);
+    }
   } finally {
     await fs.rm(targetDir, { recursive: true, force: true }).catch(() => {});
   }

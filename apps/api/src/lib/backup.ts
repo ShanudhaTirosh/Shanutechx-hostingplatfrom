@@ -174,20 +174,6 @@ export async function restoreBackup(key: string): Promise<{ success: boolean; du
     gunzip.on('error', (err) => reject(err));
     psql.on('error', (err) => reject(err));
 
-    if (response.Body && 'pipe' in response.Body) {
-      (response.Body as any).pipe(gunzip.stdin);
-    } else if (response.Body) {
-      const reader = (response.Body as any).getReader();
-      (async () => {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          gunzip.stdin.write(Buffer.from(value));
-        }
-        gunzip.stdin.end();
-      })().catch(reject);
-    } else {
-      reject(new Error('Failed to retrieve backup stream'));
-    }
+    gunzip.stdin.end(Buffer.from(byteArray));
   });
 }

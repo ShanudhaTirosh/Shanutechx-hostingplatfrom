@@ -11,6 +11,15 @@ export const UPLOADS_DIR = process.env.UPLOADS_DIR || '/var/lib/shanutechx/uploa
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
 const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024; // 8MB — plenty for a screenshot
 
+import crypto from 'crypto';
+
+const MIME_EXTENSION_MAP: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'application/pdf': '.pdf',
+};
+
 const storage = multer.diskStorage({
   destination: async (req, _file, cb) => {
     const rawOrderId = req.params.orderId || 'default';
@@ -20,8 +29,8 @@ const storage = multer.diskStorage({
     cb(null, dir);
   },
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || '';
-    cb(null, `${Date.now()}${ext}`);
+    const ext = MIME_EXTENSION_MAP[file.mimetype] || '.bin';
+    cb(null, `${Date.now()}_${crypto.randomBytes(6).toString('hex')}${ext}`);
   },
 });
 

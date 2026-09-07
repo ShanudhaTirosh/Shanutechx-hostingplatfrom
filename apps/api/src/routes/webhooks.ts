@@ -2,9 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
+import { env } from '../env';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { encryptSecret } from '../lib/secretsVault';
-import { env } from '../env';
+import { isSafeWebhookUrl } from '../lib/webhooks';
 
 export const webhooksRouter = Router();
 
@@ -19,6 +20,11 @@ const createWebhookSchema = z.object({
 webhooksRouter.post('/webhooks', async (req: AuthedRequest, res) => {
   const parsed = createWebhookSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const safeCheck = isSafeWebhookUrl(parsed.data.url);
+  if (!safeCheck.safe) {
+    return res.status(400).json({ error: 'Invalid webhook URL', reason: safeCheck.reason });
+  }
 
   const rawSecret = crypto.randomBytes(24).toString('hex');
   const encryptedSecret = encryptSecret(rawSecret, env.secretsEncryptionKey);

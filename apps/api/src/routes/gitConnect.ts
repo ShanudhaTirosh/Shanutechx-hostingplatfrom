@@ -71,6 +71,7 @@ gitConnectRouter.get('/git/connect/:provider/start', (req: AuthedRequest, res: R
 /**
  * GitHub App installation callback. GitHub redirects here after the user
  * finishes the "Install App" flow.
+ */
 gitConnectRouter.get('/git/github/callback', async (req, res: Response) => {
   const { installation_id, state, setup_action } = req.query as Record<string, string | undefined>;
 

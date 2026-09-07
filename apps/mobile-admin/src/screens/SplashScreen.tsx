@@ -23,14 +23,8 @@ export function SplashScreen() {
   useEffect(() => {
     if (loading) return;
     const timer = setTimeout(() => {
-      if (firebaseUser) {
-        // Staff-only check: if user is signed in with a customer-role account,
-        // redirect to Login page with error rather than opening staff console
-        if (apiUser && apiUser.role === 'customer') {
-          navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-        } else {
-          navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
-        }
+      if (firebaseUser && apiUser && ['admin', 'dev', 'support'].includes(apiUser.role)) {
+        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
       } else {
         navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
       }

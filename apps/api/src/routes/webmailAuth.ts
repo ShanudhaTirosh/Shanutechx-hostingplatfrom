@@ -7,6 +7,8 @@ import { decryptSecret } from '../lib/secretsVault';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { logger } from '../lib/logger';
 
+import crypto from 'crypto';
+
 export const webmailAuthRouter = Router();
 
 const loginSchema = z.object({
@@ -60,7 +62,11 @@ webmailAuthRouter.post('/webmail/auth/login', async (req: Request, res: Response
 
   try {
     const storedPass = decryptSecret(account.credentialRef, env.secretsEncryptionKey);
-    if (storedPass !== password) {
+    const passBuffer = Buffer.from(password);
+    const storedBuffer = Buffer.from(storedPass);
+    const passwordsMatch = passBuffer.length === storedBuffer.length && crypto.timingSafeEqual(passBuffer, storedBuffer);
+
+    if (!passwordsMatch) {
       return res.status(401).json({ error: 'Invalid email address or password' });
     }
 
@@ -72,8 +78,8 @@ webmailAuthRouter.post('/webmail/auth/login', async (req: Request, res: Response
         customDomain: account.customDomain || env.rootDomain,
         type: 'webmail_session',
       },
-      env.secretsEncryptionKey,
-      { expiresIn: '7d' }
+      env.projectAuthJwtSecret,
+      { expiresIn: '7d', algorithm: 'HS256' }
     );
 
     logger.info({ accountId: account.id, email: inputClean }, 'Webmail direct authentication successful');
@@ -123,8 +129,8 @@ webmailAuthRouter.post('/webmail/auth/sso-ticket', requireAuth, async (req: Auth
       email: account.smtpUsername,
       type: 'sso_ticket',
     },
-    env.secretsEncryptionKey,
-    { expiresIn: '60s' }
+    env.projectAuthJwtSecret,
+    { expiresIn: '60s', algorithm: 'HS256' }
   );
 
   res.json({ ssoToken, webmailUrl: `/webmail?ssoToken=${ssoToken}` });
@@ -139,7 +145,7 @@ webmailAuthRouter.post('/webmail/auth/sso-exchange', async (req: Request, res: R
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   try {
-    const payload = jwt.verify(parsed.data.ssoToken, env.secretsEncryptionKey) as any;
+    const payload = jwt.verify(parsed.data.ssoToken, env.projectAuthJwtSecret, { algorithms: ['HS256'] }) as any;
     if (payload.type !== 'sso_ticket' || !payload.accountId) {
       return res.status(401).json({ error: 'Invalid or expired SSO token' });
     }
@@ -161,8 +167,8 @@ webmailAuthRouter.post('/webmail/auth/sso-exchange', async (req: Request, res: R
         customDomain: account.customDomain || env.rootDomain,
         type: 'webmail_session',
       },
-      env.secretsEncryptionKey,
-      { expiresIn: '7d' }
+      env.projectAuthJwtSecret,
+      { expiresIn: '7d', algorithm: 'HS256' }
     );
 
     res.json({
@@ -188,7 +194,7 @@ webmailAuthRouter.get('/webmail/auth/me', async (req: Request, res: Response) =>
   }
 
   try {
-    const payload = jwt.verify(token, env.secretsEncryptionKey) as any;
+    const payload = jwt.verify(token, env.projectAuthJwtSecret, { algorithms: ['HS256'] }) as any;
     if (payload.type !== 'webmail_session' || !payload.accountId) {
       return res.status(401).json({ error: 'Invalid session token' });
     }

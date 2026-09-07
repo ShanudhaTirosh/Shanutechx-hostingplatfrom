@@ -81,12 +81,13 @@ export async function banUserAndTeardownResources({
       stoppedCount++;
     }
 
-    // 4. Log Audit Log event (BUG-12 FIX: use SYSTEM_ABUSE_DETECTOR when automated)
+    // 4. Log Audit Log event
     await prisma.auditLog.create({
       data: {
-        adminId: actorId || 'SYSTEM_ABUSE_DETECTOR',
+        adminId: actorId || null,
         action: 'USER_SUSPENDED_ABUSE',
         target: `User:${updatedUser.email} (Stopped:${stoppedCount}, Reason:${reason})`,
+        actorRole: actorId ? null : 'system',
       },
     });
 
