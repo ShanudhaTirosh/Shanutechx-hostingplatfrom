@@ -1698,11 +1698,11 @@ export const api = {
         asJson<{ user: ManagedDatabaseUser & { password?: string } }>(r)
       ),
     deleteUser: (id: string, username: string) =>
-      apiFetch(`/api/managed-databases/${id}/users/${username}`, { method: 'DELETE' }).then((r) =>
+      apiFetch(`/api/managed-databases/${id}/users/${encodeURIComponent(username)}`, { method: 'DELETE' }).then((r) =>
         asJson<{ ok: boolean; deletedUsername: string }>(r)
       ),
     updateUser: (id: string, username: string, data: { password?: string; role?: 'admin' | 'read_write' | 'read_only' }) =>
-      apiFetch(`/api/managed-databases/${id}/users/${username}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) =>
+      apiFetch(`/api/managed-databases/${id}/users/${encodeURIComponent(username)}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) =>
         asJson<{ user: ManagedDatabaseUser & { password?: string } }>(r)
       ),
     updateConfig: (id: string, data: { dbName?: string; allowedIps?: string[]; maxConnections?: number; dbVersion?: string }) =>
