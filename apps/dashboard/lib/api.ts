@@ -55,6 +55,10 @@ export const api = {
       asJson<{ user: ApiUser; rootDomain: string }>(r)
     ),
 
+  nodes: {
+    list: () => apiFetch('/api/nodes').then((r) => asJson<{ nodes: Node[] }>(r)),
+  },
+
   admin: {
     customers: (takeOrSearch?: number | string, skip = 0, search?: string) => {
       let takeVal = 50;
@@ -155,6 +159,36 @@ export const api = {
     }) =>
       apiFetch('/api/admin/email/provision', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<{ mailbox: any; message: string }>(r)
+      ),
+    getConfig: () => apiFetch('/api/admin/mail/config').then((r) => asJson<{ config: any; node: any }>(r)),
+    saveConfig: (data: {
+      mailNodeId?: string;
+      s3Endpoint?: string;
+      s3BucketName?: string;
+      s3Region?: string;
+      s3AccessKeyId?: string;
+      s3SecretAccessKey?: string;
+      autoSyncAttachments?: boolean;
+    }) => apiFetch('/api/admin/mail/config', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
+    verifyS3: (data?: {
+      s3Endpoint?: string;
+      s3BucketName?: string;
+      s3Region?: string;
+      s3AccessKeyId?: string;
+      s3SecretAccessKey?: string;
+    }) => apiFetch('/api/admin/mail/s3/verify', { method: 'POST', body: JSON.stringify(data || {}) }).then((r) => asJson<{ ok: boolean; message: string; latencyMs?: number; error?: string }>(r)),
+    getTelemetry: () =>
+      apiFetch('/api/admin/mail/telemetry').then((r) =>
+        asJson<{
+          totalMailboxes: number;
+          totalStorageMb: number;
+          totalUsedStorageMb: number;
+          totalSentToday: number;
+          totalDomains: number;
+          s3Configured: boolean;
+          s3BucketName: string | null;
+          assignedNode: any;
+        }>(r)
       ),
   },
 

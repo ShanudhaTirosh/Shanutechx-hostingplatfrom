@@ -11,6 +11,7 @@ import { sendSmtpEmail } from '../lib/smtpDispatcher';
 import { wildduckClient } from '../lib/wildduckClient';
 import dns from 'dns';
 import { getServerIp, buildSpfRecord } from '../lib/mailAuth';
+import { getWebmailClusterConfig, updateWebmailClusterConfig, verifyS3StorageConnection } from '../lib/webmailS3Storage';
 
 export const emailRouter = Router();
 
@@ -1284,3 +1285,104 @@ emailRouter.get('/email/domains/:id/dns', async (req: AuthedRequest, res) => {
     res.status(500).json({ error: err.message || 'Failed to fetch DNS details' });
   }
 });
+
+/**
+ * GET /api/admin/mail/config
+ * Dev/Admin endpoint to view active Webmail VPS node assignment and S3 storage config.
+ */
+emailRouter.get('/admin/mail/config', requireAdminOrDev, async (req: AuthedRequest, res) => {
+  const config = getWebmailClusterConfig();
+  let node = null;
+  if (config.mailNodeId) {
+    node = await prisma.node.findUnique({
+      where: { id: config.mailNodeId },
+      select: { id: true, label: true, ip: true, isActive: true },
+    });
+  }
+  res.json({
+    config: {
+      mailNodeId: config.mailNodeId || null,
+      s3Endpoint: config.s3Endpoint || '',
+      s3BucketName: config.s3BucketName || '',
+      s3Region: config.s3Region || 'auto',
+      s3AccessKeyId: config.s3AccessKeyId || '',
+      hasSecretAccessKey: Boolean(config.s3SecretAccessKeyEncrypted),
+      autoSyncAttachments: config.autoSyncAttachments ?? true,
+    },
+    node,
+  });
+});
+
+/**
+ * POST /api/admin/mail/config
+ * Dev/Admin endpoint to save Webmail VPS node assignment & S3/R2 storage settings.
+ */
+const mailConfigSchema = z.object({
+  mailNodeId: z.string().optional(),
+  s3Endpoint: z.string().optional(),
+  s3BucketName: z.string().optional(),
+  s3Region: z.string().optional(),
+  s3AccessKeyId: z.string().optional(),
+  s3SecretAccessKey: z.string().optional(),
+  autoSyncAttachments: z.boolean().optional(),
+});
+
+emailRouter.post('/admin/mail/config', requireAdminOrDev, async (req: AuthedRequest, res) => {
+  const parse = mailConfigSchema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: 'Invalid mail config data', details: parse.error.format() });
+
+  const updated = updateWebmailClusterConfig(parse.data);
+  await prisma.auditLog.create({
+    data: {
+      adminId: req.user!.id,
+      action: 'email.update_cluster_config',
+      target: `Updated Webmail VPS Node & S3 Storage Config (Node: ${updated.mailNodeId || 'Default'}, Bucket: ${updated.s3BucketName || 'None'})`,
+    },
+  });
+
+  res.json({ ok: true, message: 'Webmail VPS node & S3 storage configuration saved successfully.' });
+});
+
+/**
+ * POST /api/admin/mail/s3/verify
+ * Dev/Admin endpoint to verify S3/R2 object storage connectivity.
+ */
+emailRouter.post('/admin/mail/s3/verify', requireAdminOrDev, async (req: AuthedRequest, res) => {
+  const result = await verifyS3StorageConnection(req.body || {});
+  res.json(result);
+});
+
+/**
+ * GET /api/admin/mail/telemetry
+ * Dev/Admin telemetry endpoint returning aggregated webmail stats & S3 status.
+ */
+emailRouter.get('/admin/mail/telemetry', requireAdminOrDev, async (req: AuthedRequest, res) => {
+  const [totalMailboxes, accountsAgg, domainsCount] = await Promise.all([
+    prisma.smtpAccount.count(),
+    prisma.smtpAccount.aggregate({
+      _sum: { storageQuotaMb: true, storageUsedMb: true, dailySendCount: true },
+    }),
+    prisma.emailDomain.count(),
+  ]);
+
+  const config = getWebmailClusterConfig();
+  let assignedNode = null;
+  if (config.mailNodeId) {
+    assignedNode = await prisma.node.findUnique({
+      where: { id: config.mailNodeId },
+      select: { id: true, label: true, ip: true, isActive: true },
+    });
+  }
+
+  res.json({
+    totalMailboxes,
+    totalStorageMb: accountsAgg._sum.storageQuotaMb || 0,
+    totalUsedStorageMb: accountsAgg._sum.storageUsedMb || 0,
+    totalSentToday: accountsAgg._sum.dailySendCount || 0,
+    totalDomains: domainsCount,
+    s3Configured: Boolean(config.s3Endpoint && config.s3BucketName && config.s3AccessKeyId),
+    s3BucketName: config.s3BucketName || null,
+    assignedNode,
+  });
+});
+

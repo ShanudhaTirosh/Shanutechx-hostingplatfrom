@@ -200,6 +200,30 @@ export default function AdminEmailPage() {
         </div>
       )}
 
+      {/* S3 Storage & Dev Webmail Banner */}
+      <div className="p-4 rounded-2xl border border-sky-500/30 bg-sky-500/10 text-sky-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-sky-500/20 rounded-xl text-sky-400 font-bold text-xs">
+            S3 / VPS
+          </div>
+          <div>
+            <span className="font-bold text-sm block">Webmail Cluster & S3 Storage Extension</span>
+            <p className="text-xs opacity-80">
+              {telemetry?.s3Configured
+                ? `Attached Cloudflare R2 / S3 Storage Bucket: ${telemetry.s3BucketName || 'Active'}`
+                : 'S3 Object Storage is currently unconfigured (Local VPS disk storage in use).'}
+              {telemetry?.assignedNode && ` • Host VPS: ${telemetry.assignedNode.label} (${telemetry.assignedNode.ip})`}
+            </p>
+          </div>
+        </div>
+        <a
+          href="/dev/webmail"
+          className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition-all shadow-md shrink-0 flex items-center gap-1.5"
+        >
+          ⚙ Open Dev Control Center & S3 Setup →
+        </a>
+      </div>
+
       {/* Admin Telemetry Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="p-4 border border-white/10 rounded-2xl bg-white/[0.02] space-y-1">
