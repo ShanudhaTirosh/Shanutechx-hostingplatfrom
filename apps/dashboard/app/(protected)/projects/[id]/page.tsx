@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Editor from '@monaco-editor/react';
 import { api } from '@/lib/api';
 import { Project, ProjectTable, SqlResult } from '@/lib/types';
+import { Clock, XCircle, Edit2, X } from 'lucide-react';
 import {
   Card,
   Button,
@@ -83,8 +84,8 @@ export default function ProjectDetailPage() {
             {project.status === 'running'
               ? '● Online'
               : project.status === 'pending'
-              ? '⏳ Provisioning…'
-              : '✕ Failed'}
+              ? <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-amber-400" /> Provisioning…</span>
+              : <span className="inline-flex items-center gap-1"><XCircle className="w-3.5 h-3.5 text-red-400" /> Failed</span>}
           </span>
         }
         action={
@@ -755,14 +756,14 @@ function TableEditorPanel({
                           className="text-text-muted hover:text-text-primary transition-colors p-1 rounded-lg hover:bg-white/5 mr-1"
                           title="Edit row"
                         >
-                          ✎
+                          <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => setDeleteTarget(row[pkCol] as string | number)}
                           className="text-red-400/50 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-red-500/10"
                           title="Delete row"
                         >
-                          ✕
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </td>
                     </tr>
@@ -1076,7 +1077,7 @@ function TableEditorPanel({
                         className="text-text-muted hover:text-text-primary transition-colors text-xs p-1"
                         title="Rename Column"
                       >
-                        ✎
+                        <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
@@ -1087,7 +1088,7 @@ function TableEditorPanel({
                         }`}
                         title={col.isPrimaryKey ? 'Cannot drop primary key' : 'Drop Column'}
                       >
-                        ✕
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   )}

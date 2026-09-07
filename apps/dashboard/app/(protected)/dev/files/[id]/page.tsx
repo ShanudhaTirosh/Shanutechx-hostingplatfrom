@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Deployment } from '@/lib/types';
+import { Folder, FileText, Edit2, X, Code, FileCode } from 'lucide-react';
 import {
   Card,
   Button,
@@ -283,8 +284,8 @@ export default function FileManagerPage() {
                   }`}
                   onClick={() => openFileInEditor(item)}
                 >
-                  <span className="shrink-0 text-[12px]">
-                    {item.type === 'dir' ? '📁' : getFileIcon(item.name)}
+                  <span className="shrink-0 text-[12px] flex items-center justify-center">
+                    {item.type === 'dir' ? <Folder className="w-3.5 h-3.5 text-amber-400" /> : getFileIcon(item.name)}
                   </span>
                   <span className="text-xs truncate flex-1 font-mono">{item.name}</span>
                   {item.size !== null && (
@@ -303,14 +304,14 @@ export default function FileManagerPage() {
                       className="text-[10px] px-1 py-0.5 rounded hover:bg-white/[0.08] text-text-faint hover:text-text-muted"
                       title="Rename"
                     >
-                      ✏
+                      <Edit2 className="w-3 h-3" />
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
                       className="text-[10px] px-1 py-0.5 rounded hover:bg-red-500/20 text-text-faint hover:text-red-400"
                       title="Delete"
                     >
-                      ✕
+                      <X className="w-3 h-3" />
                     </button>
                   </div>
                 </div>
@@ -351,7 +352,7 @@ export default function FileManagerPage() {
                     size="sm"
                     onClick={() => setOpenFile(null)}
                   >
-                    ✕
+                    <X className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
@@ -373,7 +374,7 @@ export default function FileManagerPage() {
             </>
           ) : (
             <Card className="flex-1 flex flex-col items-center justify-center border border-dashed border-white/[0.08] text-center">
-              <div className="text-4xl mb-4">📝</div>
+              <FileText className="w-10 h-10 text-text-faint mb-4" />
               <p className="text-sm font-medium text-text-primary">No file open</p>
               <p className="text-xs text-text-muted mt-1">
                 Click any file in the tree to open it in the editor.
@@ -457,14 +458,10 @@ export default function FileManagerPage() {
   );
 }
 
-function getFileIcon(name: string): string {
+function getFileIcon(name: string): React.ReactNode {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
-  const map: Record<string, string> = {
-    js: '🟨', ts: '🔷', tsx: '⚛', jsx: '⚛', json: '📋',
-    md: '📄', py: '🐍', sh: '⚙', env: '🔑', dockerfile: '🐳',
-    html: '🌐', css: '🎨', sql: '🗄', txt: '📝', yml: '⚙', yaml: '⚙',
-    png: '🖼', jpg: '🖼', gif: '🖼', svg: '🎭', ico: '🖼',
-    pdf: '📕', zip: '📦', tar: '📦',
-  };
-  return map[ext] ?? '📄';
+  if (['js', 'ts', 'tsx', 'jsx', 'json', 'py', 'sh', 'sql'].includes(ext)) {
+    return <FileCode className="w-3.5 h-3.5 text-sky-400" />;
+  }
+  return <FileText className="w-3.5 h-3.5 text-slate-400" />;
 }

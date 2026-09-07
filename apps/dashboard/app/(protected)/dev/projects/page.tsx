@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Zap, Database, Globe, Settings, Key } from 'lucide-react';
 import { api } from '@/lib/api';
 import { SupabaseClientProject, Node } from '@/lib/types';
 import { useAppUser } from '@/lib/AppUserContext';
@@ -264,7 +265,8 @@ export default function UnifiedDevProjectsPage() {
               : 'text-text-muted hover:text-white hover:bg-white/5'
           }`}
         >
-          <span>⚡ Self-Hosted Supabase Stacks</span>
+          <Zap className="w-3.5 h-3.5" />
+          <span>Self-Hosted Supabase Stacks</span>
           <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-[10px]">{supabaseProjects.length}</span>
         </button>
 
@@ -276,7 +278,8 @@ export default function UnifiedDevProjectsPage() {
               : 'text-text-muted hover:text-white hover:bg-white/5'
           }`}
         >
-          <span>🗄️ Managed Databases</span>
+          <Database className="w-3.5 h-3.5" />
+          <span>Managed Databases</span>
           <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-[10px]">{managedDbs.length}</span>
         </button>
 
@@ -288,7 +291,8 @@ export default function UnifiedDevProjectsPage() {
               : 'text-text-muted hover:text-white hover:bg-white/5'
           }`}
         >
-          <span>🌐 Node Domain & Port Exposure</span>
+          <Globe className="w-3.5 h-3.5" />
+          <span>Node Domain & Port Exposure</span>
           <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-[10px]">{nodes.length}</span>
         </button>
       </div>
@@ -305,7 +309,7 @@ export default function UnifiedDevProjectsPage() {
               {supabaseProjects.length === 0 ? (
                 <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-10 text-center space-y-4">
                   <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl font-black mx-auto">
-                    ⚡
+                    <Zap className="w-6 h-6" />
                   </div>
                   <h3 className="text-base font-bold text-white">No Supabase Stacks Provisioned</h3>
                   <p className="text-xs text-text-muted max-w-md mx-auto">
@@ -411,7 +415,8 @@ export default function UnifiedDevProjectsPage() {
                       {/* INLINE CONFIGURATION PANEL */}
                       <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-6 space-y-6">
                         <h3 className="text-sm font-bold text-white border-b border-white/10 pb-3 flex items-center gap-2">
-                          <span>⚙️ Supabase Stack Configuration & Settings</span>
+                          <Settings className="w-4 h-4 text-emerald-400" />
+                          <span>Supabase Stack Configuration & Settings</span>
                         </h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono">
@@ -541,15 +546,17 @@ export default function UnifiedDevProjectsPage() {
                         <div className="flex items-center justify-between pt-2 gap-2">
                           <button
                             onClick={() => handleRevealDbPassword(db.id)}
-                            className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white text-xs font-mono transition-all"
+                            className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white text-xs font-mono transition-all flex items-center gap-1.5"
                           >
-                            🔑 {revealedPass ? 'Revealed' : 'Reveal Credentials'}
+                            <Key className="w-3.5 h-3.5 text-amber-400" />
+                            <span>{revealedPass ? 'Revealed' : 'Reveal Credentials'}</span>
                           </button>
                           <button
                             onClick={() => setSelectedDbForScale(db)}
                             className="px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 border border-cyan-500/30 text-xs font-mono font-semibold transition-all flex items-center gap-1.5"
                           >
-                            <span>⚡ Scale & Migrate</span>
+                            <Zap className="w-3.5 h-3.5" />
+                            <span>Scale & Migrate</span>
                           </button>
                         </div>
                       </div>
@@ -702,24 +709,26 @@ export default function UnifiedDevProjectsPage() {
               <button
                 type="button"
                 onClick={() => setCreateCategory('supabase')}
-                className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                className={`py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   createCategory === 'supabase'
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                     : 'text-text-muted hover:text-white'
                 }`}
               >
-                ⚡ Supabase Stack
+                <Zap className="w-3.5 h-3.5" />
+                <span>Supabase Stack</span>
               </button>
               <button
                 type="button"
                 onClick={() => setCreateCategory('database')}
-                className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                className={`py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   createCategory === 'database'
                     ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
                     : 'text-text-muted hover:text-white'
                 }`}
               >
-                🗄️ Managed Database
+                <Database className="w-3.5 h-3.5" />
+                <span>Managed Database</span>
               </button>
             </div>
 

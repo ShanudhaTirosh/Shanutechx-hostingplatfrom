@@ -1081,7 +1081,7 @@ export default function WebmailPage() {
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-[var(--color-text-muted)] text-xs">
                       <div className="w-16 h-16 rounded-full bg-[var(--color-surface)] flex items-center justify-center text-2xl mb-3 border border-[var(--color-border)]">
-                        ✉️
+                        <Mail className="w-8 h-8 text-[var(--color-text-muted)]" />
                       </div>
                       <span>Select an email from the list to view details</span>
                     </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Zap, Copy, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { KbArticle } from '@/lib/types';
 import { Card, Button, Spinner, PageHeader, useToast, Badge } from '@/components/ui';
@@ -85,7 +86,7 @@ export default function SupportRunbooksPage() {
       {/* Ticket Response Macro Templates Quick Panel */}
       <Card className="bg-cyan-500/10 border border-cyan-500/20 p-5 space-y-4">
         <h3 className="text-sm font-bold text-white flex items-center gap-2">
-          ⚡ Ready Support Ticket Macro Templates
+          <Zap className="w-4 h-4 text-amber-400 shrink-0" /> Ready Support Ticket Macro Templates
         </h3>
         <div className="grid md:grid-cols-3 gap-3">
           {SUPPORT_MACROS.map((macro, idx) => (
@@ -103,9 +104,9 @@ export default function SupportRunbooksPage() {
                 size="sm"
                 variant="secondary"
                 onClick={() => handleCopyMacro(macro.template)}
-                className="w-full text-xs text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/20 mt-2"
+                className="w-full text-xs text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/20 mt-2 flex items-center justify-center gap-1.5"
               >
-                📋 Copy Response Macro
+                <Copy className="w-3.5 h-3.5" /> Copy Response Macro
               </Button>
             </div>
           ))}
@@ -177,9 +178,9 @@ export default function SupportRunbooksPage() {
               <button
                 type="button"
                 onClick={() => setSelectedArticle(null)}
-                className="text-text-muted hover:text-white text-lg p-1"
+                className="text-text-muted hover:text-white p-1"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 

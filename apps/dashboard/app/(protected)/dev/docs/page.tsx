@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Layers, Radio, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { KbArticle } from '@/lib/types';
 import { Card, Button, Spinner, PageHeader, useToast } from '@/components/ui';
@@ -80,7 +81,7 @@ export default function DevTechnicalDocsPage() {
         <div className="space-y-6">
           <Card className="border border-white/10 p-6 space-y-4 bg-neutral-900/60 backdrop-blur-md">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              🏗️ Platform Monorepo Architecture Overview
+              <Layers className="w-5 h-5 text-accent-violet-light shrink-0" /> Platform Monorepo Architecture Overview
             </h3>
             <p className="text-xs text-text-muted leading-relaxed">
               ShanuTechX is built as a high-performance npm workspace monorepo. Core modules and execution layers:
@@ -126,7 +127,9 @@ export default function DevTechnicalDocsPage() {
       {/* TAB 2: REST API SPEC */}
       {selectedTab === 'api' && (
         <Card className="border border-white/10 p-6 space-y-4 bg-neutral-900/60 backdrop-blur-md">
-          <h3 className="text-base font-bold text-white">📡 Core REST API Contract Specification</h3>
+          <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <Radio className="w-4 h-4 text-emerald-400 shrink-0" /> Core REST API Contract Specification
+          </h3>
           <p className="text-xs text-text-muted">
             All requests require Bearer Token authorization (`Authorization: Bearer &lt;token&gt;`).
           </p>
@@ -207,9 +210,9 @@ export default function DevTechnicalDocsPage() {
               <button
                 type="button"
                 onClick={() => setSelectedArticle(null)}
-                className="text-text-muted hover:text-white text-lg p-1"
+                className="text-text-muted hover:text-white p-1"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 

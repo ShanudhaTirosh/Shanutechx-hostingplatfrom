@@ -23,6 +23,7 @@ import {
   Key,
   Layers,
   CloudCheck,
+  Clock,
 } from 'lucide-react';
 
 interface Mailbox {
@@ -369,8 +370,8 @@ export default function DevWebmailControlCenterPage() {
             </div>
           </div>
           {s3Result.latencyMs && (
-            <span className="font-mono text-[11px] bg-slate-900 border border-slate-700/60 px-3 py-1 rounded-full text-emerald-400 font-semibold">
-              ⚡ {s3Result.latencyMs}ms Latency
+            <span className="font-mono text-[11px] bg-slate-900 border border-slate-700/60 px-3 py-1 rounded-full text-emerald-400 font-semibold flex items-center gap-1">
+              <Zap className="w-3.5 h-3.5 text-amber-400" /> {s3Result.latencyMs}ms Latency
             </span>
           )}
         </div>
@@ -881,7 +882,11 @@ export default function DevWebmailControlCenterPage() {
                             : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                         }`}
                       >
-                        {dom.status === 'verified' ? '✓ DNS Verified' : '⏳ Pending DNS'}
+                        {dom.status === 'verified' ? (
+                          <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-400" /> DNS Verified</span>
+                        ) : (
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-amber-400" /> Pending DNS</span>
+                        )}
                       </span>
 
                       <Button

@@ -78,10 +78,10 @@ async function handleInteraction(interaction) {
       const health = await apiFetch('/api/health');
 
       const embed = new EmbedBuilder()
-        .setTitle('⚡ ShanuTechX System Status')
+        .setTitle('[STATUS] ShanuTechX System Status')
         .setColor(health?.ok ? 0x22c55e : 0xef4444)
         .addFields(
-          { name: 'Cluster Health', value: health?.ok ? '🟢 ONLINE' : '🔴 DEGRADED', inline: true },
+          { name: 'Cluster Health', value: health?.ok ? '[ONLINE]' : '[DEGRADED]', inline: true },
           { name: 'Environment', value: process.env.NODE_ENV || 'production', inline: true },
           { name: 'Checked At', value: new Date().toLocaleString(), inline: false }
         )
@@ -93,12 +93,12 @@ async function handleInteraction(interaction) {
       const data = await apiFetch('/api/internal/all-deployments');
 
       if (!data || !data.deployments || data.deployments.length === 0) {
-        await interaction.editReply('🚀 No active deployments found in cluster.');
+        await interaction.editReply('No active deployments found in cluster.');
         return;
       }
 
       const embed = new EmbedBuilder()
-        .setTitle('🚀 Active Cluster Deployments')
+        .setTitle('[DEPLOYMENTS] Active Cluster Deployments')
         .setColor(0x7c3aed)
         .setDescription(
           data.deployments
@@ -114,12 +114,12 @@ async function handleInteraction(interaction) {
       const data = await apiFetch('/api/internal/open-tickets');
 
       if (!data || !data.tickets || data.tickets.length === 0) {
-        await interaction.editReply('🎫 No open support tickets right now! 🎉');
+        await interaction.editReply('No open support tickets right now.');
         return;
       }
 
       const embed = new EmbedBuilder()
-        .setTitle('🎫 Open Support Tickets')
+        .setTitle('[TICKETS] Open Support Tickets')
         .setColor(0x06b6d4)
         .setDescription(
           data.tickets
@@ -130,7 +130,7 @@ async function handleInteraction(interaction) {
       await interaction.editReply({ embeds: [embed] });
     } else if (commandName === 'review-payment') {
       if (!isStaffAuthorized(interaction.member, interaction.user)) {
-        await interaction.reply({ content: '🚫 Unauthorized: You do not have staff permissions to review payments.', ephemeral: true });
+        await interaction.reply({ content: '[UNAUTHORIZED] You do not have staff permissions to review payments.', ephemeral: true });
         return;
       }
       await interaction.deferReply({ ephemeral: true });
@@ -139,7 +139,7 @@ async function handleInteraction(interaction) {
       const reason = interaction.options.getString('reason');
 
       if (action === 'decline' && !reason) {
-        await interaction.editReply('⚠️ A decline reason is required when declining a payment proof.');
+        await interaction.editReply('[WARNING] A decline reason is required when declining a payment proof.');
         return;
       }
 
@@ -156,12 +156,12 @@ async function handleInteraction(interaction) {
       });
 
       if (!reviewRes || !reviewRes.ok) {
-        await interaction.editReply(`❌ Payment review failed: ${reviewRes?.error || 'Order or payment not found'}`);
+        await interaction.editReply(`[FAILED] Payment review failed: ${reviewRes?.error || 'Order or payment not found'}`);
         return;
       }
 
       const embed = new EmbedBuilder()
-        .setTitle(action === 'approve' ? '✅ Payment Approved via Discord' : '❌ Payment Declined via Discord')
+        .setTitle(action === 'approve' ? '[APPROVED] Payment Approved via Discord' : '[DECLINED] Payment Declined via Discord')
         .setColor(action === 'approve' ? 0x22c55e : 0xef4444)
         .addFields(
           { name: 'Order ID', value: `#${orderId.slice(0, 8).toUpperCase()}`, inline: true },
@@ -176,9 +176,9 @@ async function handleInteraction(interaction) {
   } catch (err) {
     console.error('Failed to handle Discord interaction:', err);
     if (interaction.deferred || interaction.replied) {
-      await interaction.editReply({ content: '⚠️ An error occurred processing this command.' }).catch(() => {});
+      await interaction.editReply({ content: '[ERROR] An error occurred processing this command.' }).catch(() => {});
     } else {
-      await interaction.reply({ content: '⚠️ An error occurred processing this command.', ephemeral: true }).catch(() => {});
+      await interaction.reply({ content: '[ERROR] An error occurred processing this command.', ephemeral: true }).catch(() => {});
     }
   }
 }

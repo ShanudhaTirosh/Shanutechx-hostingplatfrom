@@ -319,13 +319,13 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
             if (event.type === 'step') {
               setProvisionLog((p) => [...p, event.message]);
             } else if (event.type === 'done') {
-              setProvisionLog((p) => [...p, '🎉 [SUCCESS] Node provisioned and registered successfully!']);
+              setProvisionLog((p) => [...p, '[SUCCESS] Node provisioned and registered successfully!']);
               setProvisionDone(true);
               toast('Node provisioned and connected via SSH successfully!', 'success');
               onCreated();
             } else if (event.type === 'error') {
               setSshError(event.error || 'Provisioning failed');
-              setProvisionLog((p) => [...p, `❌ [ERROR] Error: ${event.error}`]);
+              setProvisionLog((p) => [...p, `[ERROR] Error: ${event.error}`]);
             }
           } catch { /* skip malformed lines */ }
         }

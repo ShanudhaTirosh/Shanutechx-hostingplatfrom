@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FileText, X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { FileText, X, CheckCircle2, AlertCircle, Lightbulb } from 'lucide-react';
 
 interface BulkEnvImportModalProps {
   isOpen: boolean;
@@ -114,7 +114,7 @@ export default function BulkEnvImportModal({ isOpen, onClose, onImport }: BulkEn
           </div>
 
           <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 text-xs text-slate-400 space-y-1">
-            <p className="font-semibold text-slate-300">💡 Import Guide:</p>
+            <p className="font-semibold text-slate-300 flex items-center gap-1.5"><Lightbulb className="w-4 h-4 text-amber-400 shrink-0" /> Import Guide:</p>
             <ul className="list-disc list-inside space-y-0.5 text-slate-400">
               <li>Lines starting with <code className="text-slate-300">#</code> are automatically ignored.</li>
               <li>Values wrapped in single or double quotes are unquoted automatically.</li>

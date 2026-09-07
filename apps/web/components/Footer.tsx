@@ -112,8 +112,8 @@ export default function Footer() {
                 </button>
               </div>
               {status === "success" && (
-                <p className="text-emerald-400 text-[11px] font-mono animate-fade-in">
-                  ✓ Successfully subscribed to platform releases!
+                <p className="text-emerald-400 text-[11px] font-mono animate-fade-in flex items-center gap-1">
+                  <Check size={14} /> Successfully subscribed to platform releases!
                 </p>
               )}
             </form>

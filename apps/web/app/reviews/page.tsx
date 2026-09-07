@@ -201,7 +201,7 @@ export default function ReviewsPage() {
         return;
       }
 
-      setSubmitSuccess('✨ Thank you! Your verified client review has been published.');
+      setSubmitSuccess('Thank you! Your verified client review has been published.');
       fetchReviews(1, selectedCategory);
       setTimeout(() => {
         setModalOpen(false);

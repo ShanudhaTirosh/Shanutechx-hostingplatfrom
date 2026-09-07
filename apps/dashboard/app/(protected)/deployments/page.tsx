@@ -17,6 +17,7 @@ import {
   PageHeader,
 } from "@/components/ui";
 import { IconLock, IconGlobe, IconGitBranch } from "@/components/Icons";
+import { Zap, Lock, Globe } from "lucide-react";
 import { DomainManagement } from "@/components/DomainManagement";
 import { ResourceScopeSelector } from "@/components/ResourceScopeSelector";
 
@@ -51,15 +52,15 @@ const SERVICE_TYPES = [
 const EXPOSURE_MODES = [
   {
     value: "internal_only",
-    label: "🔒 No Open Ports (Internal Only — Recommended for Bots, Background Workers & Private DBs)",
+    label: "No Open Ports (Internal Only — Recommended for Bots, Background Workers & Private DBs)",
   },
   {
     value: "ssl_with_proxy",
-    label: "🌐 Subdomain Reverse Proxy SSL (443/80 — Recommended for Web Apps & Webhooks)",
+    label: "Subdomain Reverse Proxy SSL (443/80 — Recommended for Web Apps & Webhooks)",
   },
   {
     value: "ssl_direct",
-    label: "🔒 Domain + Port with SSL (Container Direct TLS)",
+    label: "Domain + Port with SSL (Container Direct TLS)",
   },
   {
     value: "no_ssl",
@@ -67,7 +68,7 @@ const EXPOSURE_MODES = [
   },
   {
     value: "raw_tcp",
-    label: "⚡ Raw Host:Port TCP Direct (Game Servers, Lavalink Audio, Direct Sockets)",
+    label: "Raw Host:Port TCP Direct (Game Servers, Lavalink Audio, Direct Sockets)",
   },
 ];
 
@@ -118,7 +119,13 @@ export default function DeploymentsPage() {
                 variant="secondary"
                 onClick={() => setShowAdminForm(!showAdminForm)}
               >
-                {showAdminForm ? "Hide Infrastructure Panel" : "⚡ Admin Manual Provision"}
+                {showAdminForm ? (
+                  "Hide Infrastructure Panel"
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <Zap size={14} /> Admin Manual Provision
+                  </span>
+                )}
               </Button>
             )}
           </div>
@@ -639,8 +646,8 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
               />
               <div>
                 <span className="text-xs font-semibold text-white block flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  ⚡ Auto-Deploy on Push
+                  <Zap size={12} className="text-amber-400" />
+                  Auto-Deploy on Push
                 </span>
                 <span className="text-[11px] text-text-muted block">
                   Rebuild container automatically when new commits hit branch &apos;{branch || "main"}&apos;
@@ -844,7 +851,7 @@ function DeploymentRow({
             {deployment.autoDeploy !== undefined && (
               <span className={`text-[10px] rounded-full px-2.5 py-0.5 font-medium flex items-center gap-1 ${deployment.autoDeploy ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-white/5 text-text-muted border border-white/10'}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${deployment.autoDeploy ? 'bg-emerald-400 animate-pulse' : 'bg-text-muted'}`} />
-                {deployment.autoDeploy ? '⚡ Auto-Deploy Active' : 'Manual Deploy'}
+                {deployment.autoDeploy ? 'Auto-Deploy Active' : 'Manual Deploy'}
               </span>
             )}
             {deployment.exposureMode && (
@@ -858,7 +865,7 @@ function DeploymentRow({
                 }`}
               >
                 {deployment.exposureMode === "internal_only"
-                  ? "🔒 Internal Only (No Ports)"
+                  ? "Internal Only (No Ports)"
                   : deployment.exposureMode === "raw_tcp"
                     ? "Raw TCP Direct"
                     : deployment.exposureMode === "no_ssl"
