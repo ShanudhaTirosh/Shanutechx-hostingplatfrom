@@ -55,10 +55,6 @@ export const api = {
       asJson<{ user: ApiUser; rootDomain: string }>(r)
     ),
 
-  nodes: {
-    list: () => apiFetch('/api/nodes').then((r) => asJson<{ nodes: Node[] }>(r)),
-  },
-
   admin: {
     customers: (takeOrSearch?: number | string, skip = 0, search?: string) => {
       let takeVal = 50;
