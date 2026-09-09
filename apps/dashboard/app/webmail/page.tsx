@@ -5,17 +5,28 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui';
 import { WebmailMessage, WebmailThread } from '@/lib/types';
-import { WebmailLayout } from '@/components/webmail/WebmailLayout';
-import { WebmailThreadList } from '@/components/webmail/WebmailThreadList';
-import { WebmailThreadViewer } from '@/components/webmail/WebmailThreadViewer';
-import { WebmailRichComposer } from '@/components/webmail/WebmailRichComposer';
-import { WebmailContactsTab } from '@/components/webmail/WebmailContactsTab';
-import { WebmailCalendarTab } from '@/components/webmail/WebmailCalendarTab';
-import { WebmailSettingsModal } from '@/components/webmail/WebmailSettingsModal';
-import { WebmailFoldersAndLabelsModal } from '@/components/webmail/WebmailFoldersAndLabelsModal';
-import { WebmailRulesModal } from '@/components/webmail/WebmailRulesModal';
-import { WebmailOnboardingWizard } from '@/components/webmail/WebmailOnboardingWizard';
-import { WebmailAdminPanel } from '@/components/webmail/WebmailAdminPanel';
+import {
+  WebmailLayout,
+  WebmailThreadList,
+  WebmailThreadViewer,
+  WebmailRichComposer,
+  WebmailContactsTab,
+  WebmailCalendarTab,
+  WebmailSettingsModal,
+  WebmailFoldersAndLabelsModal,
+  WebmailRulesModal,
+  WebmailOnboardingWizard,
+  WebmailAdminPanel,
+  WebmailKeyboardShortcutsModal,
+  WebmailDelegationModal,
+  WebmailCredentialsModal,
+  WebmailScheduledModal,
+  WebmailAnalyticsView,
+  WebmailMailMergeModal,
+  WebmailSecurityDrawer,
+  WebmailAuditLogModal,
+  WebmailActiveSessionsModal,
+} from '@/components/webmail';
 import { Mail, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 
 export default function WebmailPage() {
@@ -43,7 +54,7 @@ export default function WebmailPage() {
   const [loadingStatus, setLoadingStatus] = useState('Authenticating session...');
 
   // ── Workspace state ───────────────────────────────────────────────────────
-  const [mainTab, setMainTab] = useState<'mail' | 'calendar' | 'contacts' | 'tasks' | 'admin'>('mail');
+  const [mainTab, setMainTab] = useState<'mail' | 'calendar' | 'contacts' | 'tasks' | 'admin' | 'analytics'>('mail');
   const [activeFolder, setActiveFolder] = useState<string>('inbox');
   const [activeCategory, setActiveCategory] = useState<string>('primary');
   const [activeTag, setActiveTag] = useState<string | null>(null);
@@ -71,9 +82,33 @@ export default function WebmailPage() {
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [foldersModalOpen, setFoldersModalOpen] = useState(false);
   const [rulesModalOpen, setRulesModalOpen] = useState(false);
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+  const [delegationModalOpen, setDelegationModalOpen] = useState(false);
+  const [credentialsModalOpen, setCredentialsModalOpen] = useState(false);
+  const [scheduledModalOpen, setScheduledModalOpen] = useState(false);
+  const [mailMergeModalOpen, setMailMergeModalOpen] = useState(false);
+  const [securityDrawerOpen, setSecurityDrawerOpen] = useState(false);
+  const [auditLogsModalOpen, setAuditLogsModalOpen] = useState(false);
+  const [sessionsModalOpen, setSessionsModalOpen] = useState(false);
 
   // ── Onboarding wizard ─────────────────────────────────────────────────────
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+
+  // ── Global Keyboard Shortcuts Listener ──────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+      if (e.key === '?') {
+        e.preventDefault();
+        setShortcutsModalOpen((prev) => !prev);
+      } else if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        setComposeOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // ──────────────────────────────────────────────────────────────────────────
   // Boot / SSO
@@ -493,6 +528,15 @@ export default function WebmailPage() {
           onOpenFoldersModal={() => setFoldersModalOpen(true)}
           onOpenRulesModal={() => setRulesModalOpen(true)}
           onOpenSettingsModal={() => setSettingsModalOpen(true)}
+          onOpenShortcuts={() => setShortcutsModalOpen(true)}
+          onOpenDelegation={() => setDelegationModalOpen(true)}
+          onOpenCredentials={() => setCredentialsModalOpen(true)}
+          onOpenScheduled={() => setScheduledModalOpen(true)}
+          onOpenAnalytics={() => setMainTab('analytics')}
+          onOpenMailMerge={() => setMailMergeModalOpen(true)}
+          onOpenSecurityDrawer={() => setSecurityDrawerOpen(true)}
+          onOpenAuditLogs={() => setAuditLogsModalOpen(true)}
+          onOpenSessions={() => setSessionsModalOpen(true)}
           activeMainTab={mainTab}
           onChangeMainTab={(t) => setMainTab(t)}
           userRole={userRole}
@@ -559,6 +603,9 @@ export default function WebmailPage() {
             />
           )}
 
+          {/* ── Analytics tab ───────────────────────────────────────────── */}
+          {mainTab === 'analytics' && <WebmailAnalyticsView />}
+
           {/* ── Admin/Dev tab ─────────────────────────────────────────────── */}
           {mainTab === 'admin' && (
             <WebmailAdminPanel />
@@ -606,6 +653,47 @@ export default function WebmailPage() {
       <WebmailRulesModal
         isOpen={rulesModalOpen}
         onClose={() => setRulesModalOpen(false)}
+      />
+
+      {/* ─── Enterprise Feature Modals ────────────────────────────────────── */}
+      <WebmailKeyboardShortcutsModal
+        isOpen={shortcutsModalOpen}
+        onClose={() => setShortcutsModalOpen(false)}
+      />
+
+      <WebmailDelegationModal
+        isOpen={delegationModalOpen}
+        onClose={() => setDelegationModalOpen(false)}
+      />
+
+      <WebmailCredentialsModal
+        isOpen={credentialsModalOpen}
+        onClose={() => setCredentialsModalOpen(false)}
+      />
+
+      <WebmailScheduledModal
+        isOpen={scheduledModalOpen}
+        onClose={() => setScheduledModalOpen(false)}
+      />
+
+      <WebmailMailMergeModal
+        isOpen={mailMergeModalOpen}
+        onClose={() => setMailMergeModalOpen(false)}
+      />
+
+      <WebmailSecurityDrawer
+        isOpen={securityDrawerOpen}
+        onClose={() => setSecurityDrawerOpen(false)}
+      />
+
+      <WebmailAuditLogModal
+        isOpen={auditLogsModalOpen}
+        onClose={() => setAuditLogsModalOpen(false)}
+      />
+
+      <WebmailActiveSessionsModal
+        isOpen={sessionsModalOpen}
+        onClose={() => setSessionsModalOpen(false)}
       />
     </div>
   );

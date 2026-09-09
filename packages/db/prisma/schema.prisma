@@ -185,6 +185,10 @@ model User {
   webmailAutoReplies    WebmailAutoReply[]
   webmailBlockedSenders WebmailBlockedSender[]
   webmailCalendarSyncs  WebmailCalendarSync[]
+  webmailSnoozes        WebmailSnooze[]
+  webmailScheduledSends WebmailScheduledSend[]
+  webmailAuditLogs      WebmailAuditLog[]
+  webmailSessions       WebmailSession[]
   reviews               Review[]
 }
 
@@ -695,6 +699,78 @@ model WebmailCalendarSync {
   refreshTokenEnc String? // Encrypted OAuth refresh token
   lastSyncedAt    DateTime?
   createdAt       DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// Snoozed webmail messages
+model WebmailSnooze {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messageId    String
+  snoozedUntil DateTime
+  returnFolder String   @default("inbox")
+  createdAt    DateTime @default(now())
+
+  @@index([userId, snoozedUntil])
+}
+
+// Scheduled send queue
+model WebmailScheduledSend {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientTo     String
+  subject         String
+  body            String   @db.Text
+  scheduledFor    DateTime
+  status          String   @default("pending") // "pending" | "sent" | "failed" | "cancelled"
+  attachmentsJson Json?
+  createdAt       DateTime @default(now())
+
+  @@index([userId, scheduledFor])
+}
+
+// Account delegation
+model WebmailDelegation {
+  id             String   @id @default(cuid())
+  ownerUserId    String
+  delegateUserId String
+  delegateEmail  String
+  permission     String   @default("full") // "full" | "read_only"
+  status         String   @default("active")
+  createdAt      DateTime @default(now())
+
+  @@index([ownerUserId])
+  @@index([delegateUserId])
+}
+
+// Webmail audit and activity logs
+model WebmailAuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  ipAddress String?
+  userAgent String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Active webmail login sessions
+model WebmailSession {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device     String
+  ipAddress  String
+  userAgent  String
+  isCurrent  Boolean  @default(false)
+  lastActive DateTime @default(now())
+  createdAt  DateTime @default(now())
 
   @@index([userId])
 }

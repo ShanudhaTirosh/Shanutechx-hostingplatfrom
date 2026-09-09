@@ -317,6 +317,46 @@ export const api = {
         apiFetch('/api/webmail/delegations', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ ok: boolean; message: string; account: any }>(r)),
     },
 
+    // Core & Advanced features
+    snoozeMessage: (id: string, snoozedUntil: string, returnFolder?: string) =>
+      apiFetch(`/api/webmail/messages/${id}/snooze`, { method: 'POST', body: JSON.stringify({ snoozedUntil, returnFolder }) }).then((r) => asJson<{ ok: boolean; snooze: any }>(r)),
+    listSnoozed: () =>
+      apiFetch('/api/webmail/messages/snoozed').then((r) => asJson<{ snoozed: any[] }>(r)),
+    assignLabels: (id: string, labels: string[]) =>
+      apiFetch(`/api/webmail/messages/${id}/labels`, { method: 'POST', body: JSON.stringify({ labels }) }).then((r) => asJson<{ ok: boolean; labels: string[] }>(r)),
+
+    // Business & Scheduling
+    scheduleSend: (data: { recipientTo: string; subject: string; body: string; scheduledFor: string; attachments?: any[] }) =>
+      apiFetch('/api/webmail/messages/schedule', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ ok: boolean; item: any }>(r)),
+    listScheduled: () =>
+      apiFetch('/api/webmail/messages/scheduled').then((r) => asJson<{ scheduled: any[] }>(r)),
+    cancelScheduled: (id: string) =>
+      apiFetch(`/api/webmail/messages/scheduled/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    getAnalytics: () =>
+      apiFetch('/api/webmail/business/analytics').then((r) => asJson<{ analytics: any }>(r)),
+    mailMerge: (data: { recipients: Array<{ email: string; variables?: Record<string, string> }>; subject: string; bodyTemplate: string }) =>
+      apiFetch('/api/webmail/business/mail-merge', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ ok: boolean; dispatchedCount: number }>(r)),
+
+    // Account & Credentials
+    getAccountDelegations: () =>
+      apiFetch('/api/webmail/account/delegation').then((r) => asJson<{ delegations: any[] }>(r)),
+    addAccountDelegate: (data: { delegateEmail: string; permission?: string }) =>
+      apiFetch('/api/webmail/account/delegation', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ ok: boolean; delegation: any }>(r)),
+    revokeAccountDelegate: (id: string) =>
+      apiFetch(`/api/webmail/account/delegation/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    getCredentials: () =>
+      apiFetch('/api/webmail/account/credentials').then((r) => asJson<{ credentials: any }>(r)),
+
+    // Security & Audit
+    reportThreat: (data: { messageId: string; threatType?: string; comment?: string }) =>
+      apiFetch('/api/webmail/security/threat-report', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ ok: boolean; status: string }>(r)),
+    getSessions: () =>
+      apiFetch('/api/webmail/security/sessions').then((r) => asJson<{ sessions: any[] }>(r)),
+    revokeSession: (id: string) =>
+      apiFetch(`/api/webmail/security/sessions/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    getAuditLogs: () =>
+      apiFetch('/api/webmail/security/audit-log').then((r) => asJson<{ auditLogs: any[] }>(r)),
+
     // Admin telemetry & ops
     adminStats: () =>
       apiFetch('/api/webmail/admin/stats').then((r) => asJson<{ stats: any }>(r)),

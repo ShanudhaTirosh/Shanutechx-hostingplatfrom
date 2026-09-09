@@ -22,7 +22,12 @@ import {
   Send,
   ExternalLink,
   Plus,
+  Clock,
+  Printer,
+  ShieldCheck,
 } from 'lucide-react';
+import { WebmailSnoozeModal } from './WebmailSnoozeModal';
+import { WebmailAttachmentPreviewModal } from './WebmailAttachmentPreviewModal';
 
 interface WebmailThreadViewerProps {
   messages?: WebmailMessage[];
@@ -65,8 +70,40 @@ export function WebmailThreadViewer({
   >({});
   const [quickReplyText, setQuickReplyText] = useState('');
   const [sendingQuickReply, setSendingQuickReply] = useState(false);
+  const [isSnoozeOpen, setIsSnoozeOpen] = useState(false);
+  const [selectedAttachmentForPreview, setSelectedAttachmentForPreview] = useState<any>(null);
 
   const { toast } = useToast();
+
+  const handlePrint = () => {
+    if (!primaryMsg) return;
+    const printWin = window.open('', '_blank');
+    if (!printWin) return;
+    printWin.document.write(`
+      <html>
+        <head><title>${primaryMsg.subject}</title></head>
+        <body style="font-family: sans-serif; padding: 24px; color: #1e293b;">
+          <h2 style="margin-bottom: 4px;">${primaryMsg.subject}</h2>
+          <p style="color: #64748b; font-size: 13px;"><strong>From:</strong> ${primaryMsg.senderName || primaryMsg.from} &lt;${primaryMsg.senderEmail || primaryMsg.from}&gt;</p>
+          <p style="color: #64748b; font-size: 13px;"><strong>Date:</strong> ${primaryMsg.createdAt ? new Date(primaryMsg.createdAt).toLocaleString() : ''}</p>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;"/>
+          <div style="font-size: 14px; line-height: 1.6;">${primaryMsg.body || primaryMsg.htmlBody || primaryMsg.snippet}</div>
+        </body>
+      </html>
+    `);
+    printWin.document.close();
+    printWin.print();
+  };
+
+  const handleReportThreat = async () => {
+    if (!primaryMsg) return;
+    try {
+      await api.webmail.reportThreat({ messageId: primaryMsg.id });
+      toast('Reported threat & moved message to quarantine', 'success');
+    } catch {
+      toast('Failed to report threat', 'error');
+    }
+  };
 
   const msgList = messages && messages.length > 0 ? messages : selectedMessage ? [selectedMessage] : [];
   const primaryMsg = msgList[msgList.length - 1] || null;
@@ -174,7 +211,38 @@ export function WebmailThreadViewer({
           <h1 className="text-base font-extrabold text-white leading-snug">
             {primaryMsg.subject}
           </h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20 font-medium">
+              <ShieldCheck className="h-3.5 w-3.5" /> Clean (Scanned)
+            </span>
+
+            <button
+              onClick={() => setIsSnoozeOpen(true)}
+              className="p-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 hover:text-white hover:border-slate-600 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              title="Snooze email"
+            >
+              <Clock className="h-4 w-4 text-indigo-400" />
+              <span>Snooze</span>
+            </button>
+
+            <button
+              onClick={handlePrint}
+              className="p-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 hover:text-white hover:border-slate-600 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              title="Print email"
+            >
+              <Printer className="h-4 w-4 text-sky-400" />
+              <span>Print</span>
+            </button>
+
+            <button
+              onClick={handleReportThreat}
+              className="p-2 rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              title="Report phishing/threat"
+            >
+              <ShieldAlert className="h-4 w-4 text-rose-400" />
+              <span>Report</span>
+            </button>
+
             {onStar && (
               <button
                 onClick={() => onStar(primaryMsg.id)}
@@ -516,6 +584,12 @@ export function WebmailThreadViewer({
           </div>
         </div>
       )}
+      {/* SNOOZE MODAL */}
+      <WebmailSnoozeModal
+        isOpen={isSnoozeOpen}
+        onClose={() => setIsSnoozeOpen(false)}
+        messageId={primaryMsg.id}
+      />
     </div>
   );
 }

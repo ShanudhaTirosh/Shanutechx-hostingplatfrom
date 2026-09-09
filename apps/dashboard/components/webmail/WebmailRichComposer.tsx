@@ -82,6 +82,21 @@ export function WebmailRichComposer({
 
   const removeToChip = (email: string) => setToChips((prev) => prev.filter((e) => e !== email));
 
+  const [undoCountdown, setUndoCountdown] = useState<number | null>(null);
+  const [undoTimerId, setUndoTimerId] = useState<any>(null);
+
+  const insertVariable = (varName: string) => {
+    setBody((prev) => `${prev} {{${varName}}}`);
+  };
+
+  const cancelUndoSend = () => {
+    if (undoTimerId) clearInterval(undoTimerId);
+    setUndoCountdown(null);
+    setUndoTimerId(null);
+    setSending(false);
+    toast('Send cancelled!', 'info');
+  };
+
   const handleSend = async () => {
     const recipientEmail = toChips[0] || toInput.trim();
     if (!recipientEmail) {
@@ -93,6 +108,26 @@ export function WebmailRichComposer({
       return;
     }
     setSending(true);
+
+    // 5-second Undo Send countdown
+    let count = 5;
+    setUndoCountdown(count);
+
+    const timer = setInterval(() => {
+      count -= 1;
+      if (count > 0) {
+        setUndoCountdown(count);
+      } else {
+        clearInterval(timer);
+        setUndoCountdown(null);
+        executeActualSend(recipientEmail);
+      }
+    }, 1000);
+
+    setUndoTimerId(timer);
+  };
+
+  const executeActualSend = async (recipientEmail: string) => {
     try {
       const htmlBody = body.replace(/\n/g, '<br/>');
       const sigContent = signatures.find((s) => s.id === selectedSig);
@@ -353,15 +388,27 @@ export function WebmailRichComposer({
             </div>
           )}
 
+          {undoCountdown !== null && (
+            <div className="mx-4 mb-2 p-2.5 rounded-xl bg-indigo-900/80 border border-indigo-500/40 text-xs text-white flex items-center justify-between animate-pulse">
+              <span>Sending in {undoCountdown}s…</span>
+              <button
+                onClick={cancelUndoSend}
+                className="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition-colors"
+              >
+                Undo Send
+              </button>
+            </div>
+          )}
+
           {/* Footer */}
           <div className="flex items-center gap-2 px-3 py-2.5 border-t border-white/5 bg-[#1e1e2e] rounded-b-2xl">
             <button
               onClick={handleSend}
-              disabled={sending}
+              disabled={sending || undoCountdown !== null}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-violet-600/20 disabled:opacity-50 transition-all"
             >
               <Send className="h-3.5 w-3.5" />
-              {sending ? 'Sending…' : (scheduledAt ? 'Schedule Send' : 'Send')}
+              {sending ? (undoCountdown !== null ? `Sending in ${undoCountdown}s` : 'Sending…') : (scheduledAt ? 'Schedule Send' : 'Send')}
             </button>
 
             {/* Schedule send */}

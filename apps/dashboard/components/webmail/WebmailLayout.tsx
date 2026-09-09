@@ -33,8 +33,17 @@ interface WebmailLayoutProps {
   onOpenFoldersModal: () => void;
   onOpenRulesModal: () => void;
   onOpenSettingsModal: () => void;
-  activeMainTab?: 'mail' | 'calendar' | 'contacts' | 'tasks' | 'admin';
-  onChangeMainTab?: (tab: 'mail' | 'calendar' | 'contacts' | 'tasks' | 'admin') => void;
+  onOpenShortcuts?: () => void;
+  onOpenDelegation?: () => void;
+  onOpenCredentials?: () => void;
+  onOpenScheduled?: () => void;
+  onOpenAnalytics?: () => void;
+  onOpenMailMerge?: () => void;
+  onOpenSecurityDrawer?: () => void;
+  onOpenAuditLogs?: () => void;
+  onOpenSessions?: () => void;
+  activeMainTab?: 'mail' | 'calendar' | 'contacts' | 'tasks' | 'admin' | 'analytics';
+  onChangeMainTab?: (tab: 'mail' | 'calendar' | 'contacts' | 'tasks' | 'admin' | 'analytics') => void;
   onOpenCalendarTab?: () => void;
   onOpenContactsTab?: () => void;
   storageUsedMb?: number;
@@ -97,6 +106,15 @@ export function WebmailLayout({
   onOpenFoldersModal,
   onOpenRulesModal,
   onOpenSettingsModal,
+  onOpenShortcuts,
+  onOpenDelegation,
+  onOpenCredentials,
+  onOpenScheduled,
+  onOpenAnalytics,
+  onOpenMailMerge,
+  onOpenSecurityDrawer,
+  onOpenAuditLogs,
+  onOpenSessions,
   activeMainTab = 'mail',
   onChangeMainTab,
   storageUsedMb = 434,
