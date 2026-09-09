@@ -1,8 +1,9 @@
+import crypto from 'node:crypto';
 import { prisma } from './prisma';
 import { selectNodeForDeployment } from './nodeSelector';
 import { buildAndRun, provisionDatabaseContainer, registerLiveKitKey } from './nodeAgentClient';
 import { createSubdomainRecord } from './cloudflare';
-import { decryptSecret } from './secretsVault';
+import { decryptSecret, encryptSecret } from './secretsVault';
 import { env } from '../env';
 import { logger } from './logger';
 import { fireWebhook } from './webhooks';
@@ -183,11 +184,17 @@ export async function evacuateNodeWorkloads(failedNodeId: string): Promise<Failo
         throw new Error(`No healthy target database node available for database ${db.id}`);
       }
 
-      let password = 'db_password_default';
+      let password = crypto.randomBytes(16).toString('hex');
       if (db.credentialRef) {
         try {
           password = decryptSecret(db.credentialRef, env.secretsEncryptionKey);
-        } catch { /* fallback default */ }
+        } catch {
+          const newEnc = encryptSecret(password, env.secretsEncryptionKey);
+          await prisma.managedDatabase.update({
+            where: { id: db.id },
+            data: { credentialRef: newEnc },
+          }).catch(() => {});
+        }
       }
 
       const containerInfo = await provisionDatabaseContainer(targetDbNode, {

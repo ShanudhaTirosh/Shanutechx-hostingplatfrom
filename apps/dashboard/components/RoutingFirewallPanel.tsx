@@ -51,7 +51,11 @@ export function RoutingFirewallPanel({
     e.preventDefault();
     setUpdatingRouting(true);
     try {
-      await api.deployments.updateSubdomain(deploymentId, ''); // Keep current subdomain
+      const mode = routingMode === 'direct' ? 'raw_tcp' : routingMode === 'no_ssl' ? 'internal_only' : 'ssl_with_proxy';
+      await api.deployments.updateConfig(deploymentId, {
+        exposureMode: mode,
+        internalPort: publishedPort,
+      });
       toast(
         routingMode === 'direct'
           ? `Direct Mode enabled! Bound container to host port ${publishedPort}`

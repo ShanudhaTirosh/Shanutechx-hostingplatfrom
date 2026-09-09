@@ -73,16 +73,46 @@ export function WebmailCalendarTab() {
     }
   };
 
-  const handleAddEvent = (e: React.FormEvent) => {
+  const now = new Date();
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth(); // 0-indexed
+  const monthName = currentDate.toLocaleString('default', { month: 'long' });
+
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const isCurrentMonthToday = now.getFullYear() === currentYear && now.getMonth() === currentMonth;
+  const todayDateNum = now.getDate();
+
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+  };
+
+  const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle) return;
+    const participantsList = newParticipants ? newParticipants.split(',').map((p) => p.trim()) : ['Me'];
     const newEv: CalendarEvent = {
       id: `ev-${Date.now()}`,
       title: newTitle,
       dateStr: newDate || 'Today',
       timeStr: newTime || '12:00 PM',
-      participants: newParticipants ? newParticipants.split(',').map((p) => p.trim()) : ['Me'],
+      participants: participantsList,
     };
+    try {
+      if (api.email.createEvent) {
+        await api.email.createEvent({
+          title: newTitle,
+          dateStr: newDate || 'Today',
+          timeStr: newTime || '12:00 PM',
+          participants: participantsList,
+        }).catch(() => {});
+      }
+    } catch {}
     setEvents((prev) => [...prev, newEv]);
     toast(`Event "${newTitle}" saved to calendar!`, 'success');
     setShowAddEventModal(false);
@@ -148,12 +178,12 @@ export function WebmailCalendarTab() {
         {/* MINI CALENDAR WIDGET */}
         <div className="lg:col-span-5 bg-slate-950/60 border border-slate-800 rounded-3xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">September 2026</h3>
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">{monthName} {currentYear}</h3>
             <div className="flex gap-1">
-              <button className="p-1 bg-slate-800 rounded text-slate-400 hover:text-white text-xs">
+              <button onClick={handlePrevMonth} className="p-1 bg-slate-800 rounded text-slate-400 hover:text-white text-xs">
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <button className="p-1 bg-slate-800 rounded text-slate-400 hover:text-white text-xs">
+              <button onClick={handleNextMonth} className="p-1 bg-slate-800 rounded text-slate-400 hover:text-white text-xs">
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
@@ -164,9 +194,9 @@ export function WebmailCalendarTab() {
           </div>
 
           <div className="grid grid-cols-7 gap-1.5 text-center text-xs">
-            {Array.from({ length: 30 }).map((_, i) => {
+            {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
-              const isToday = day === 2;
+              const isToday = isCurrentMonthToday && day === todayDateNum;
               return (
                 <div
                   key={day}

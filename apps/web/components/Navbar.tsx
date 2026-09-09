@@ -186,7 +186,7 @@ export default function Navbar() {
 
   // Fetch REAL notifications from backend API
   useEffect(() => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const apiBase = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
     fetch(`${apiBase}/api/notifications/public`)
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
       .then((data) => {

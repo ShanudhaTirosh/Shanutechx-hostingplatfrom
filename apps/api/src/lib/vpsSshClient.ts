@@ -278,15 +278,18 @@ export async function extractArchiveSsh(
   const dir = targetDirectory || archivePath.substring(0, archivePath.lastIndexOf('/')) || '/root';
   const ext = archivePath.toLowerCase();
 
+  const safeDir = dir.replace(/'/g, "'\\''");
+  const safeArchive = archivePath.replace(/'/g, "'\\''");
+
   let cmd = '';
   if (ext.endsWith('.zip')) {
-    cmd = `cd '${dir}' && (unzip -o '${archivePath}' || busybox unzip -o '${archivePath}' || python3 -m zipfile -e '${archivePath}' .)`;
+    cmd = `cd '${safeDir}' && (unzip -o '${safeArchive}' || busybox unzip -o '${safeArchive}' || python3 -m zipfile -e '${safeArchive}' .)`;
   } else if (ext.endsWith('.tar.gz') || ext.endsWith('.tgz')) {
-    cmd = `cd '${dir}' && tar -xzf '${archivePath}'`;
+    cmd = `cd '${safeDir}' && tar -xzf '${safeArchive}'`;
   } else if (ext.endsWith('.tar')) {
-    cmd = `cd '${dir}' && tar -xf '${archivePath}'`;
+    cmd = `cd '${safeDir}' && tar -xf '${safeArchive}'`;
   } else if (ext.endsWith('.gz')) {
-    cmd = `cd '${dir}' && gunzip -k '${archivePath}'`;
+    cmd = `cd '${safeDir}' && gunzip -k '${safeArchive}'`;
   } else {
     throw new Error('Unsupported archive format. Supported formats: .zip, .tar, .tar.gz, .tgz, .gz');
   }
@@ -422,10 +425,27 @@ export async function addVpsFirewallRuleSsh(
   }
 ): Promise<{ success: boolean; message: string }> {
   const action = rule.action === 'deny' ? 'deny' : 'allow';
-  const proto = rule.protocol && rule.protocol !== 'any' ? `proto ${rule.protocol}` : '';
-  const from = rule.sourceIp && rule.sourceIp.trim() !== '' ? `from ${rule.sourceIp.trim()}` : 'from any';
-  const portStr = rule.port ? `to any port ${rule.port}` : 'to any';
-  const commentStr = rule.comment ? `comment '${rule.comment.replace(/'/g, '')}'` : '';
+  const proto = rule.protocol && rule.protocol !== 'any' ? `proto ${rule.protocol.replace(/[^a-z0-9]/gi, '')}` : '';
+  
+  let from = 'from any';
+  if (rule.sourceIp && rule.sourceIp.trim() !== '') {
+    const cleanIp = rule.sourceIp.trim();
+    if (!/^[a-zA-Z0-9\.\:\/_-]+$/.test(cleanIp)) {
+      throw new Error('Invalid source IP / CIDR format');
+    }
+    from = `from ${cleanIp}`;
+  }
+
+  let portStr = 'to any';
+  if (rule.port) {
+    const cleanPort = String(rule.port).trim();
+    if (!/^[0-9:\/-]+$/.test(cleanPort)) {
+      throw new Error('Invalid port format');
+    }
+    portStr = `to any port ${cleanPort}`;
+  }
+
+  const commentStr = rule.comment ? `comment '${rule.comment.replace(/'/g, "'\\''")}'` : '';
 
   const cmd = `sudo ufw ${action} ${from} ${portStr} ${proto} ${commentStr} || ufw ${action} ${from} ${portStr} ${proto} ${commentStr}`;
 

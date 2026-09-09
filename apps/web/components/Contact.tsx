@@ -103,7 +103,7 @@ export default function Contact() {
     setStatus('loading');
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
+      const apiBase = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
       const res = await fetch(`${apiBase}/api/cms/contact`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

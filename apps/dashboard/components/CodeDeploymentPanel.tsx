@@ -55,8 +55,12 @@ export function CodeDeploymentPanel({ deployment, onChanged }: Props) {
     e.preventDefault();
     setSavingConfig(true);
     try {
-      await api.deployments.updateEnv(deployment.id, {}, () => {});
-      // Note: we can patch deployment parameters if supported or update subdomain/env
+      await api.deployments.updateConfig(deployment.id, {
+        startCommand: startCommand.trim() || undefined,
+        entryFile: entryFile.trim() || undefined,
+        internalPort: Number(internalPort) || 3000,
+        exposureMode: exposureMode as any,
+      });
       toast('Execution configuration saved!', 'success');
       onChanged();
     } catch (err: any) {

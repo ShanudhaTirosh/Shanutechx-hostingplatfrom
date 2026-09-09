@@ -29,3 +29,14 @@ export async function ensureStaffMarkedInRealtimeDb(firebaseUid: string): Promis
     logger.error({ firebaseUid, err }, 'Failed to sync staff marker to Realtime DB');
   }
 }
+
+export async function removeStaffFromRealtimeDb(firebaseUid: string): Promise<void> {
+  if (!firebaseDb || !firebaseUid) return;
+
+  try {
+    await firebaseDb.ref(`staff/${firebaseUid}`).remove();
+  } catch (err) {
+    logger.error({ firebaseUid, err }, 'Failed to remove staff marker from Realtime DB');
+  }
+}
+

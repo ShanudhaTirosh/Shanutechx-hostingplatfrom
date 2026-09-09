@@ -204,7 +204,7 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
         return fail('VPS provision record not found.');
       }
 
-      const hasAccess = await canAccessResource(provision.userId, { user } as any);
+      const hasAccess = await canAccessResource(provision.userId, { user } as any, 'vps', provision.id);
       if (!hasAccess) {
         return fail('You do not have access to this VPS provision.');
       }

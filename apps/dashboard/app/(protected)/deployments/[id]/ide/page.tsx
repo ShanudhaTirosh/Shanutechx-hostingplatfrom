@@ -6,6 +6,8 @@ import WebIDE from '@/components/ide/WebIDE';
 import { ArrowLeft, Code, ExternalLink, RefreshCw, Terminal, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
+import { api } from '@/lib/api';
+
 export default function DeploymentIDEPage() {
   const params = useParams();
   const router = useRouter();
@@ -15,22 +17,14 @@ export default function DeploymentIDEPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
   useEffect(() => {
     async function loadDeployment() {
       if (!id) return;
       try {
         setLoading(true);
-        const res = await fetch(`${API_BASE_URL}/api/deployments/${id}`, {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-        });
-
-        if (!res.ok) throw new Error('Deployment not found or access denied');
-        const data = await res.json();
+        const data = await api.deployments.get(id);
         setDeployment(data.deployment);
       } catch (err: any) {
         setError(err.message || 'Failed to load deployment details');
@@ -40,7 +34,7 @@ export default function DeploymentIDEPage() {
     }
 
     loadDeployment();
-  }, [id, API_BASE_URL]);
+  }, [id]);
 
   if (loading) {
     return (
@@ -119,6 +113,7 @@ export default function DeploymentIDEPage() {
         repoUrl={deployment.repoUrl}
         subdomain={deployment.subdomain}
         apiBaseUrl={API_BASE_URL}
+        authToken={typeof window !== 'undefined' ? localStorage.getItem('token') || '' : ''}
       />
     </div>
   );

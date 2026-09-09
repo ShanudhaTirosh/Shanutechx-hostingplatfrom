@@ -10,6 +10,7 @@ import {
   orderItemUnitPrice,
   orderItemLineTotal,
   orderItemSubtitle,
+  orderItemCurrency,
 } from '@/lib/orderItem';
 import {
   Card,
@@ -495,12 +496,12 @@ function UnifiedOrdersPortalContent({ initialTab = 'subscriptions' }: { initialT
                       <div className="min-w-0">
                         <p className="font-medium text-text-primary text-sm">{orderItemName(item)}</p>
                         <p className="text-text-muted text-xs mt-0.5">
-                          {orderItemSubtitle(item)} · {formatMoney(orderItemUnitPrice(item))} × {item.quantity}
+                          {orderItemSubtitle(item)} · {formatMoney(orderItemUnitPrice(item), orderItemCurrency(item))} × {item.quantity}
                         </p>
                       </div>
                       <div className="flex items-center gap-4 shrink-0 ml-4">
                         <span className="font-semibold text-text-primary text-sm">
-                          {formatMoney(orderItemLineTotal(item))}
+                          {formatMoney(orderItemLineTotal(item), orderItemCurrency(item))}
                         </span>
                         <Button
                           variant="danger"
@@ -691,14 +692,14 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
                 {orderItemName(item)}
                 <span className="ml-1 text-[10px] text-text-faint">× {item.quantity}</span>
               </span>
-              <span className="text-text-primary font-medium">{formatMoney(orderItemLineTotal(item))}</span>
+              <span className="text-text-primary font-medium">{formatMoney(orderItemLineTotal(item), orderItemCurrency(item))}</span>
             </div>
           ))}
         </div>
 
         <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
           <span className="text-xs text-text-muted font-medium uppercase tracking-wide">Total</span>
-          <span className="font-bold text-text-primary">{formatMoney(order.total)}</span>
+          <span className="font-bold text-text-primary">{formatMoney(order.total, order.items?.[0] ? orderItemCurrency(order.items[0]) : 'LKR')}</span>
         </div>
 
         {error && <div className="mt-4"><ErrorBanner message={error} /></div>}

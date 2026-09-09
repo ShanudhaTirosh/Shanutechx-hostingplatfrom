@@ -11,12 +11,20 @@ export interface SmtpServerOptions {
   timeoutMs?: number;
 }
 
+export interface MailAttachment {
+  filename: string;
+  content?: string;
+  url?: string;
+  contentType?: string;
+}
+
 export interface MailOptions {
   from: string;
   to: string;
   subject: string;
   html: string;
   text?: string;
+  attachments?: MailAttachment[];
 }
 
 /**
@@ -157,9 +165,11 @@ export async function sendSmtpEmail(
           } else if (step === 5 && code === 354) {
             step = 6;
             const plainText = mail.text || mail.html.replace(/<[^>]+>/g, '').trim();
-            const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-            
-            const rawMessage = [
+            const hasAttachments = Array.isArray(mail.attachments) && mail.attachments.length > 0;
+            const mixedBoundary = `----=_Mixed_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const altBoundary = `----=_Alt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+            let rawLines: string[] = [
               `From: ${mail.from}`,
               `To: ${mail.to}`,
               `Subject: ${mail.subject}`,
@@ -167,27 +177,51 @@ export async function sendSmtpEmail(
               `Date: ${new Date().toUTCString()}`,
               `MIME-Version: 1.0`,
               `Auto-Submitted: auto-generated`,
-              `X-Auto-Response-Suppress: All`,
-              `Precedence: bulk`,
-              `List-Unsubscribe: <https://${options.host}/settings>`,
-              `Content-Type: multipart/alternative; boundary="${boundary}"`,
-              ``,
-              `--${boundary}`,
+            ];
+
+            if (hasAttachments) {
+              rawLines.push(`Content-Type: multipart/mixed; boundary="${mixedBoundary}"`, ``);
+              rawLines.push(`--${mixedBoundary}`);
+              rawLines.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`, ``);
+            } else {
+              rawLines.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`, ``);
+            }
+
+            rawLines.push(
+              `--${altBoundary}`,
               `Content-Type: text/plain; charset=UTF-8`,
               `Content-Transfer-Encoding: 8bit`,
               ``,
               plainText,
               ``,
-              `--${boundary}`,
+              `--${altBoundary}`,
               `Content-Type: text/html; charset=UTF-8`,
               `Content-Transfer-Encoding: 8bit`,
               ``,
               mail.html,
               ``,
-              `--${boundary}--`,
-              `.`,
-            ].join('\r\n');
-            send(rawMessage);
+              `--${altBoundary}--`
+            );
+
+            if (hasAttachments && mail.attachments) {
+              for (const att of mail.attachments) {
+                const mimeType = att.contentType || 'application/octet-stream';
+                const base64Data = att.content ? att.content.replace(/^data:[^;]+;base64,/, '') : '';
+                rawLines.push(
+                  ``,
+                  `--${mixedBoundary}`,
+                  `Content-Type: ${mimeType}; name="${att.filename}"`,
+                  `Content-Disposition: attachment; filename="${att.filename}"`,
+                  `Content-Transfer-Encoding: base64`,
+                  ``,
+                  base64Data
+                );
+              }
+              rawLines.push(``, `--${mixedBoundary}--`);
+            }
+
+            rawLines.push(`.`);
+            send(rawLines.join('\r\n'));
           } else if (step === 6 && code === 250) {
             clearTimeout(timeout);
             send('QUIT');

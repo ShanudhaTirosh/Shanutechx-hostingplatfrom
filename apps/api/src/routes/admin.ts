@@ -7,6 +7,7 @@ import { parsePagination } from '../lib/pagination';
 
 import { banUserAndTeardownResources, unbanUser } from '../lib/abuseDetector';
 import { fullFirebaseDataMigration, syncProductsToFirebase, syncPanelSettingsToFirebase } from '../lib/firebaseSync';
+import { removeStaffFromRealtimeDb } from '../lib/chatAdminSync';
 
 export const adminRouter = Router();
 
@@ -188,6 +189,10 @@ adminRouter.patch('/admin/staff/:userId/role', async (req: AuthedRequest, res) =
     data: { role: parsed.data.role },
   });
 
+  if (['customer'].includes(parsed.data.role) && target.firebaseUid) {
+    await removeStaffFromRealtimeDb(target.firebaseUid);
+  }
+
   await prisma.auditLog.create({
     data: {
       adminId: req.user!.id,
@@ -292,6 +297,10 @@ adminRouter.post('/admin/users/:userId/ban', async (req: AuthedRequest, res) => 
     detectedBy: req.user!.email,
     actorId: req.user!.id,
   });
+
+  if (targetUser.firebaseUid) {
+    await removeStaffFromRealtimeDb(targetUser.firebaseUid);
+  }
 
   res.json({
     ok: true,

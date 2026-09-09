@@ -27,7 +27,7 @@
     },
 
     "staff": {
-      ".read": "auth != null",
+      ".read": "auth != null && root.child('staff').child(auth.uid).exists()",
       ".write": false
     }
   }

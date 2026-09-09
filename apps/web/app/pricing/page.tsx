@@ -145,7 +145,7 @@ export default function PricingPage() {
   const [sortOption, setSortOption] = useState<'default' | 'price-low' | 'price-high' | 'name'>('default');
 
   const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  const apiBase = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
     fetch(`${apiBase}/api/products`)

@@ -72,7 +72,31 @@ export function WebmailContactsTab({ onComposeTo }: WebmailContactsTabProps) {
   const handleImportCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    toast(`Imported contacts from ${file.name}!`, 'success');
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const text = evt.target?.result as string;
+      if (!text) return;
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      let count = 0;
+      for (const line of lines) {
+        if (line.toLowerCase().startsWith('name,email')) continue;
+        const cols = line.split(',').map((c) => c.replace(/^"|"$/g, '').trim());
+        if (cols.length >= 2 && cols[1].includes('@')) {
+          try {
+            await api.email.createContact({
+              name: cols[0] || cols[1].split('@')[0],
+              email: cols[1],
+              phone: cols[2] || '',
+              company: cols[3] || '',
+            });
+            count++;
+          } catch {}
+        }
+      }
+      fetchContacts();
+      toast(`Successfully imported ${count} contact(s) from ${file.name}`, 'success');
+    };
+    reader.readAsText(file);
   };
 
   const filteredContacts = contacts.filter((c) =>

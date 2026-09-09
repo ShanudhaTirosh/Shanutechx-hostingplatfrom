@@ -73,7 +73,7 @@ export default function DynamicDnsSetupGuide({
     if (!domain || domain === 'clientdomain.com') return;
     setVerifying(true);
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const token = localStorage.getItem('token') || localStorage.getItem('webmail_token');
 
       const res = await fetch(`${apiBase}/api/smtp/verify-dns`, {

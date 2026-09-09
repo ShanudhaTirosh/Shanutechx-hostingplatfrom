@@ -13,6 +13,7 @@ import { invalidateCache } from '../lib/catalog/catalog-manager';
 import { parseTemplateYaml, validateTemplateStructure } from '../lib/catalog/template-parser';
 import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
 import { syncCatalogToFirebase } from '../lib/firebaseSync';
+import { validateCustomSubdomain } from '../lib/subdomain';
 
 export const catalogRouter = Router();
 catalogRouter.use(requireAuth);
@@ -588,9 +589,17 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
   const resolved = fs.existsSync(filePath) ? filePath : fs.existsSync(altPath) ? altPath : null;
   if (!resolved) return res.status(404).json({ error: `Template "${slug}" not found` });
 
+  let composeName = `${slug}-${Date.now().toString(36)}`;
+  if (projectName && projectName.trim()) {
+    const val = await validateCustomSubdomain(projectName);
+    if (!val.valid || !val.formatted) {
+      return res.status(400).json({ error: val.error ?? 'Invalid project name' });
+    }
+    composeName = val.formatted;
+  }
+
   const yamlContent = fs.readFileSync(resolved, 'utf8');
   const meta = parseMeta(yamlContent, path.basename(resolved));
-  const composeName = projectName ?? `${slug}-${Date.now().toString(36)}`;
 
   const isAdmin = req.user!.role === 'admin' || req.user!.role === 'dev';
   let node;

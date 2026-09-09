@@ -357,6 +357,29 @@ export default function RedesignedMailboxStudioPage() {
     }
   };
 
+  const togglePin = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const target = messages.find((m) => m.id === id);
+    if (!target) return;
+    const nextPinned = !target.isPinned;
+    setMessages((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, isPinned: nextPinned } : m))
+    );
+    api.webmail.bulkAction({ action: nextPinned ? 'pin' : 'unpin', messageIds: [id] }).catch(() => {});
+  };
+
+  const handleBulkAction = async (action: string, ids: string[]) => {
+    try {
+      await api.webmail.bulkAction({ action: action as any, messageIds: ids });
+      toast(`Action "${action}" applied to ${ids.length} message(s)`, 'success');
+      if (action === 'delete' || action === 'archive') {
+        setMessages((prev) => prev.filter((m) => !ids.includes(m.id)));
+      }
+    } catch {
+      toast('Bulk action failed', 'error');
+    }
+  };
+
   const filteredMessages = messages.filter((m) => {
     if (activeFolder === 'starred' && !m.isStarred) return false;
     if (activeFolder !== 'starred' && m.folder !== activeFolder) return false;
@@ -465,7 +488,7 @@ export default function RedesignedMailboxStudioPage() {
             onChangeViewMode={setWebmailViewMode}
             onOpenCompose={() => setShowComposeModal(true)}
             onOpenFoldersModal={() => setShowFoldersModal(true)}
-            onOpenRulesModal={() => setShowRulesModal(true)}
+            onOpenRulesModal={() => setShowRulesModal(false)}
             onOpenSettingsModal={() => setShowSettingsModal(true)}
             onOpenCalendarTab={() => setShowCalendarTab(true)}
             onOpenContactsTab={() => setActiveTab('contacts')}
@@ -486,7 +509,9 @@ export default function RedesignedMailboxStudioPage() {
                   viewMode={webmailViewMode}
                   listDensity={listDensity}
                   onToggleStar={(id, e) => toggleStar(id, e)}
+                  onTogglePin={(id, e) => togglePin(id, e)}
                   onDeleteMessage={(id, e) => handleDeleteMessage(id, e)}
+                  onBulkAction={handleBulkAction}
                 />
               </div>
 

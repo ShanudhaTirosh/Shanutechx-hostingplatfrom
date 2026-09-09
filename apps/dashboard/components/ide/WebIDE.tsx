@@ -64,8 +64,9 @@ export default function WebIDE({
 
   const getAuthHeaders = useCallback(() => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`;
+    const token = authToken || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
     return headers;
   }, [authToken]);

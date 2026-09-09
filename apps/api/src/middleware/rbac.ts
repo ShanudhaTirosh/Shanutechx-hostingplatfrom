@@ -121,7 +121,12 @@ export function verifyResourceOwnership(
  * instead of `verifyResourceOwnershipAsync`, which writes the response
  * itself when access is denied.
  */
-export async function canAccessResource(resourceOwnerId: string, req: AuthedRequest): Promise<boolean> {
+export async function canAccessResource(
+  resourceOwnerId: string,
+  req: AuthedRequest,
+  resourceType?: string,
+  resourceId?: string
+): Promise<boolean> {
   if (req.user?.role === 'dev') return true;
   if (req.user?.role === 'admin') {
     const owner = await prisma.user?.findUnique({
@@ -146,8 +151,18 @@ export async function canAccessResource(resourceOwnerId: string, req: AuthedRequ
       if (['owner', 'admin', 'developer'].includes(membership.role)) {
         return true;
       }
-      if (membership.permissions && membership.permissions.some((p) => p.permission !== 'none')) {
-        return true;
+      if (membership.permissions && membership.permissions.length > 0) {
+        if (resourceType && resourceId) {
+          return membership.permissions.some(
+            (p) => p.resourceType === (resourceType as any) && p.resourceId === resourceId && p.permission !== 'none'
+          );
+        }
+        if (resourceType) {
+          return membership.permissions.some(
+            (p) => p.resourceType === (resourceType as any) && p.permission !== 'none'
+          );
+        }
+        return membership.permissions.some((p) => p.permission !== 'none');
       }
     }
   }

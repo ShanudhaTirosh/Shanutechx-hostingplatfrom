@@ -103,12 +103,25 @@ export function BucketFileBrowser({ bucketName }: BucketFileBrowserProps) {
               <p className="text-[10px] text-text-faint uppercase">Last Modified</p>
               <p className="text-text-muted">{new Date(selectedFile.updatedAt).toLocaleString()}</p>
             </div>
-            <div className="pt-2">
+            <div className="pt-2 space-y-2">
               <button
-                onClick={() => alert(`Public URL: http://localhost:8001/storage/v1/object/public/${bucketName}/${selectedFile.name}`)}
+                onClick={() => {
+                  navigator.clipboard.writeText(`http://localhost:8001/storage/v1/object/public/${bucketName}/${selectedFile.name}`);
+                  alert(`Copied Public URL for ${selectedFile.name}`);
+                }}
                 className="w-full py-2 px-3 rounded-lg bg-teal-500/10 text-teal-300 hover:bg-teal-500/20 border border-teal-500/30 text-xs font-semibold transition-all"
               >
                 Copy Public URL
+              </button>
+              <button
+                onClick={() => {
+                  const updated = files.filter((f) => f.name !== selectedFile.name);
+                  setFiles(updated);
+                  setSelectedFile(updated[0] || null);
+                }}
+                className="w-full py-2 px-3 rounded-lg bg-red-500/10 text-red-300 hover:bg-red-500/20 border border-red-500/30 text-xs font-semibold transition-all"
+              >
+                Delete Object
               </button>
             </div>
           </div>

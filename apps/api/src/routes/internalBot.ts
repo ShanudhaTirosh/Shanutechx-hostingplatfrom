@@ -42,16 +42,25 @@ internalBotRouter.get('/internal/customer-summary', async (req: Request, res: Re
   const phone = typeof req.query.phone === 'string' ? req.query.phone.replace(/[^0-9]/g, '') : '';
   if (!phone) return res.status(400).json({ error: 'Phone number is required' });
 
-  const last9 = phone.slice(-9);
-  const user = await prisma.user.findFirst({
+  let user = await prisma.user.findFirst({
     where: {
       OR: [
         { phoneNumber: phone },
         { phoneNumber: `+${phone}` },
-        { phoneNumber: { endsWith: last9 } },
       ],
     },
   });
+
+  const last9 = phone.slice(-9);
+  if (!user && last9.length === 9) {
+    const matches = await prisma.user.findMany({
+      where: { phoneNumber: { endsWith: last9 } },
+      take: 2,
+    });
+    if (matches.length === 1) {
+      user = matches[0];
+    }
+  }
 
   if (!user) {
     return res.json({ user: null, deployments: [], tickets: [] });

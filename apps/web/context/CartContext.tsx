@@ -76,7 +76,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const dashboardBase = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
     if (items.length === 0) return;
     const firstItem = items[0];
-    const targetUrl = `${dashboardBase}/orders?planId=${encodeURIComponent(firstItem.id)}&price=${firstItem.price}`;
+    const planIds = items.map((i) => i.id).join(',');
+    const totalPrice = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const targetUrl = `${dashboardBase}/orders?planId=${encodeURIComponent(firstItem.id)}&planIds=${encodeURIComponent(planIds)}&price=${totalPrice}`;
     window.location.href = targetUrl;
   };
 

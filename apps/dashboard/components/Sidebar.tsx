@@ -451,7 +451,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                     </svg>
                     Dev Account (Protected)
                   </span>
-                ) : (
+                ) : isAdmin ? (
                   <select
                     value={apiUser.role}
                     onChange={async (e) => {
@@ -474,6 +474,18 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                     <option value="support" className="bg-[#0a0a14] text-cyan-400">Support Account</option>
                     <option value="customer" className="bg-[#0a0a14] text-emerald-400">Customer Account</option>
                   </select>
+                ) : (
+                  <span
+                    className="text-[10px] capitalize font-semibold tracking-wide px-1.5 py-0.5 rounded border border-white/10 bg-white/5"
+                    style={{
+                      color:
+                        apiUser.role === 'support'
+                          ? '#06b6d4'
+                          : '#10b981',
+                    }}
+                  >
+                    {apiUser.role} Account
+                  </span>
                 )}
               </div>
             </div>

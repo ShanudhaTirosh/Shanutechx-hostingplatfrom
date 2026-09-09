@@ -102,7 +102,7 @@ export default function WebmailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const ssoToken = searchParams.get('ssoToken');
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
   // Navigation Screen State: 'login' | 'loading' | 'dashboard' | 'config' | 'mail'
   const [activeScreen, setActiveScreen] = useState<'login' | 'loading' | 'dashboard' | 'config' | 'mail'>('login');

@@ -78,7 +78,9 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
 
               {showDetails && (
                 <pre className="mt-3 p-3 bg-black/60 rounded-xl text-[11px] font-mono text-rose-300/90 overflow-x-auto whitespace-pre-wrap break-all border border-rose-500/20 max-h-48 overflow-y-auto">
-                  {error.message || error.stack || 'No extended stack trace available.'}
+                  {process.env.NODE_ENV === 'development'
+                    ? (error.message || error.stack || 'No extended stack trace available.')
+                    : 'An internal application error occurred. Please report the error reference ID to support.'}
                 </pre>
               )}
             </div>

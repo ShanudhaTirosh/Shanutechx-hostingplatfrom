@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 
+import { authRateLimiter } from '../middleware/rateLimit';
+
 export const settingsRouter = Router();
 
 // All settings routes require authentication
@@ -21,7 +23,7 @@ const verifyPasswordSchema = z.object({
  * response tells the caller to set one via POST /settings/change-pin
  * first. There is no master/bypass value of any kind.
  */
-settingsRouter.post('/verify-password', async (req: AuthedRequest, res) => {
+settingsRouter.post('/verify-password', requireAdminOrDev, authRateLimiter, async (req: AuthedRequest, res) => {
   const parsed = verifyPasswordSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Password or PIN is required' });

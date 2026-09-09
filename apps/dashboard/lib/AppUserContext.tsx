@@ -31,21 +31,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export function AppUserProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [apiUser, setApiUser] = useState<ApiUser | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const cached = localStorage.getItem(USER_CACHE_KEY);
-        const timestamp = localStorage.getItem(USER_CACHE_TIMESTAMP_KEY);
-        if (cached && timestamp) {
-          const age = Date.now() - parseInt(timestamp, 10);
-          if (age < CACHE_DURATION) {
-            return JSON.parse(cached);
-          }
-        }
-      } catch {}
-    }
-    return null;
-  });
+  const [apiUser, setApiUser] = useState<ApiUser | null>(null);
   const [rootDomain, setRootDomain] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('shanutechx_root_domain') || null;

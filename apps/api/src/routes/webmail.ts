@@ -348,7 +348,7 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
         const password = decryptSecret(account.credentialRef, env.secretsEncryptionKey);
         const sendResult = await sendSmtpEmail(
           { host: account.smtpHost, port: account.smtpPort, user: account.smtpUsername, pass: password },
-          { from: `"${senderName}" <${senderEmail}>`, to: recipientEmail, subject, html: htmlBody }
+          { from: `"${senderName}" <${senderEmail}>`, to: recipientEmail, subject, html: htmlBody, attachments }
         );
         logger.info({ recipientEmail, messageId: sendResult.messageId, senderUserId: userId }, 'Delegated webmail message delivered via SMTP');
       }

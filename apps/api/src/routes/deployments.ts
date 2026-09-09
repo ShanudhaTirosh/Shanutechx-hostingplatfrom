@@ -438,6 +438,13 @@ deploymentsRouter.patch('/deployments/:id/config', async (req: AuthedRequest, re
 
   const { repoUrl, branch, frameworkPreset, startCommand, internalPort, exposureMode, subdomain, envVars } = parsed.data;
 
+  if (subdomain !== undefined && subdomain.trim()) {
+    const check = await validateCustomSubdomain(subdomain, deployment.id);
+    if (!check.valid || !check.formatted) {
+      return res.status(400).json({ error: check.error ?? 'Invalid custom subdomain' });
+    }
+  }
+
   let envVarsEncrypted = deployment.envVarsEncrypted;
   if (envVars) {
     envVarsEncrypted = encryptSecret(JSON.stringify(envVars), env.secretsEncryptionKey);

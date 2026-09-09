@@ -58,6 +58,7 @@ export function sanitizeHtml(html: string): string {
     // Enforce safe <a> tags (add rel="noopener noreferrer" and validate href schemes)
     const links = doc.querySelectorAll('a');
     links.forEach((a) => {
+      a.setAttribute('target', '_blank');
       a.setAttribute('rel', 'noopener noreferrer');
       const href = (a.getAttribute('href') || '').trim();
       if (href) {

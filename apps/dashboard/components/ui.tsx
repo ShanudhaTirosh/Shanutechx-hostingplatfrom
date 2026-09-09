@@ -582,8 +582,9 @@ export function StatCard({
 // ─────────────────────────────────────────────────────────────
 // Formatting Helpers
 // ─────────────────────────────────────────────────────────────
-export function formatMoney(amountInSmallestUnit: number, currencyLabel = 'LKR') {
-  return `${currencyLabel} ${(amountInSmallestUnit / 100).toFixed(2)}`;
+export function formatMoney(amountInSmallestUnit: number, currencyLabel?: string) {
+  const currency = currencyLabel || (typeof window !== 'undefined' ? localStorage.getItem('user_currency') || 'LKR' : 'LKR');
+  return `${currency} ${(amountInSmallestUnit / 100).toFixed(2)}`;
 }
 
 export function RevealSecret({ fetchSecret }: { fetchSecret: () => Promise<string> }) {

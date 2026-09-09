@@ -22,7 +22,12 @@ export type Currency = 'LKR' | 'USD';
  */
 const DEFAULT_USD_TO_LKR_RATE = 300;
 
-export function convertToLkr(amount: number, currency: Currency | string, usdToLkrRate = DEFAULT_USD_TO_LKR_RATE): number {
+export function getUsdToLkrRate(): number {
+  const envRate = process.env.USD_TO_LKR_RATE ? parseFloat(process.env.USD_TO_LKR_RATE) : NaN;
+  return !isNaN(envRate) && envRate > 0 ? envRate : DEFAULT_USD_TO_LKR_RATE;
+}
+
+export function convertToLkr(amount: number, currency: Currency | string, usdToLkrRate = getUsdToLkrRate()): number {
   const norm = (currency || 'LKR').toString().toUpperCase();
   if (norm === 'LKR') return amount;
   return Math.round(amount * usdToLkrRate);

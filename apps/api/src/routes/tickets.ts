@@ -93,7 +93,7 @@ ticketsRouter.post('/tickets/:id/messages', async (req: AuthedRequest, res) => {
   // see it labeled "Support" either way; the distinction between admin and
   // support doesn't need to be visible to them, only the access-control
   // logic above needs to know about it.
-  const isStaffReply = req.user!.role === 'admin' || req.user!.role === 'support';
+  const isStaffReply = req.user!.role === 'admin' || req.user!.role === 'support' || req.user!.role === 'dev';
 
   const message = await prisma.ticketMessage.create({
     data: {

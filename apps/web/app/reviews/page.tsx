@@ -69,7 +69,7 @@ export default function ReviewsPage() {
   // Fetch reviews from backend API with pagination & filter
   const fetchReviews = async (currentPage: number, category: string) => {
     setLoading(true);
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const apiBase = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
     try {
       const res = await fetch(`${apiBase}/api/reviews?page=${currentPage}&limit=6&category=${category}`);
       if (res.ok) {
@@ -111,7 +111,7 @@ export default function ReviewsPage() {
     setIsLoggedIn(true);
     setLoadingPurchases(true);
 
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const apiBase = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
     try {
       const res = await fetch(`${apiBase}/api/reviews/purchased-items`, {
@@ -170,7 +170,7 @@ export default function ReviewsPage() {
     } catch (_) {}
 
     setSubmitting(true);
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const apiBase = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
     const selectedItem = purchasedItems.find((p) => p.id === selectedItemId);
 

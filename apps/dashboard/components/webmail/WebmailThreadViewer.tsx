@@ -58,6 +58,7 @@ export function WebmailThreadViewer({
   const [previewAttachment, setPreviewAttachment] = useState<{
     filename: string;
     url?: string;
+    content?: string;
   } | null>(null);
   const [collapsedMessages, setCollapsedMessages] = useState<
     Record<string, boolean>
@@ -493,10 +494,21 @@ export function WebmailThreadViewer({
               </p>
               <button
                 onClick={() => {
-                  toast(`Downloading ${previewAttachment.filename}...`, 'info');
+                  const href = previewAttachment.content || previewAttachment.url;
+                  if (href) {
+                    const a = document.createElement('a');
+                    a.href = href;
+                    a.download = previewAttachment.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    toast(`Downloaded ${previewAttachment.filename}`, 'success');
+                  } else {
+                    toast(`Downloading ${previewAttachment.filename}...`, 'info');
+                  }
                   setPreviewAttachment(null);
                 }}
-                className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl text-xs"
+                className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl text-xs hover:bg-indigo-500 transition-all"
               >
                 Download File
               </button>

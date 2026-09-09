@@ -436,6 +436,9 @@ supabaseRouter.post('/supabase/auth/users', requireAuth, requireAdminOrDev, asyn
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
+  if (typeof password === 'string' && password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+  }
 
   const result = await fetchJson(`${SUPABASE_KONG_URL}/auth/v1/admin/users`, {
     method: 'POST',
@@ -443,29 +446,21 @@ supabaseRouter.post('/supabase/auth/users', requireAuth, requireAdminOrDev, asyn
   });
 
   if (!result.ok) {
-    // Fallback response for dev mode
-    const newUser = {
-      id: `usr_${Date.now().toString().slice(-6)}`,
-      email,
-      role: 'authenticated',
-      created_at: new Date().toISOString(),
-      last_sign_in_at: null,
-      email_confirmed_at: new Date().toISOString(),
-      user_metadata: user_metadata || {},
-    };
-    return res.status(201).json(newUser);
+    return res.status(result.status || 400).json({ error: result.error || 'Failed to create user in Auth service' });
   }
   res.status(201).json(result.data);
 });
 
 supabaseRouter.delete('/supabase/auth/users/:id', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
+  if (!id) return res.status(400).json({ error: 'User ID is required' });
+
   const result = await fetchJson(`${SUPABASE_KONG_URL}/auth/v1/admin/users/${id}`, {
     method: 'DELETE',
   });
 
   if (!result.ok) {
-    return res.json({ ok: true, deletedId: id });
+    return res.status(result.status || 404).json({ error: result.error || 'User not found or failed to delete' });
   }
   res.json({ ok: true, deletedId: id });
 });

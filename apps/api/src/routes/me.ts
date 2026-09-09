@@ -68,6 +68,8 @@ meRouter.patch('/me', requireAuth, async (req: AuthedRequest, res) => {
   });
 });
 
+import { removeStaffFromRealtimeDb } from '../lib/chatAdminSync';
+
 const updateRoleSchema = z.object({
   role: z.enum(['customer', 'support', 'dev', 'admin']),
 });
@@ -75,6 +77,10 @@ const updateRoleSchema = z.object({
 meRouter.patch('/me/role', requireAuth, async (req: AuthedRequest, res) => {
   const parsed = updateRoleSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  if (!['admin', 'dev'].includes(req.user!.role)) {
+    return res.status(403).json({ error: 'Only administrative staff accounts can switch roles.' });
+  }
 
   if (req.user!.role === 'dev' && parsed.data.role !== 'dev') {
     return res.status(403).json({ error: 'Developer accounts cannot be demoted.' });
@@ -95,6 +101,10 @@ meRouter.patch('/me/role', requireAuth, async (req: AuthedRequest, res) => {
       createdAt: true,
     },
   });
+
+  if (['customer'].includes(parsed.data.role) && updatedUser.firebaseUid) {
+    await removeStaffFromRealtimeDb(updatedUser.firebaseUid);
+  }
 
   await prisma.auditLog.create({
     data: {

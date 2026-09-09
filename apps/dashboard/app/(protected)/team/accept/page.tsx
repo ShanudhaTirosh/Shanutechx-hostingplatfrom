@@ -60,8 +60,8 @@ export default function AcceptTeamInvitePage() {
       return;
     }
 
-    // Try public inspection endpoint first (unauthenticated)
-    fetch(`/api/teams/public/invites/${token}`)
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+    fetch(`${apiBase}/api/teams/public/invites/${token}`)
       .then((res) => {
         if (!res.ok) throw new Error('Invalid or expired invitation token');
         return res.json();

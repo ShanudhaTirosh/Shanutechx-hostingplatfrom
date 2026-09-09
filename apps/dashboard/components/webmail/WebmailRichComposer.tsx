@@ -53,7 +53,7 @@ export function WebmailRichComposer({
   const [isPlainHtml, setIsPlainHtml] = useState(false);
 
   const [attachments, setAttachments] = useState<
-    Array<{ filename: string; sizeStr: string; url?: string }>
+    Array<{ filename: string; sizeStr: string; url?: string; content?: string; contentType?: string }>
   >([]);
   const [signatures, setSignatures] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -138,16 +138,24 @@ export function WebmailRichComposer({
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
-    const newAtts: any[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      newAtts.push({
-        filename: file.name,
-        sizeStr: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-      });
-    }
-    setAttachments((prev) => [...prev, ...newAtts]);
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const content = reader.result as string;
+        setAttachments((prev) => [
+          ...prev,
+          {
+            filename: file.name,
+            sizeStr: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+            content,
+            contentType: file.type || 'application/octet-stream',
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
     toast(`Attached ${files.length} file(s)`, 'success');
   };
 
