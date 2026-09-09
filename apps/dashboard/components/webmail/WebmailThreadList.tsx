@@ -240,23 +240,23 @@ export function WebmailThreadList({
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className={`text-xs truncate ${!isRead ? 'font-bold text-white' : 'font-medium text-slate-300'}`}>
+                    <span className={`text-xs truncate ${!isRead ? 'font-bold text-white' : 'font-medium text-slate-200'}`}>
                       {sender}
                     </span>
                     {count && (
-                      <span className="text-[9px] font-bold text-slate-500 bg-white/5 px-1 rounded shrink-0">
+                      <span className="text-[9px] font-bold text-slate-400 bg-white/10 px-1 rounded shrink-0">
                         {count}
                       </span>
                     )}
-                    <span className="text-[10px] text-slate-600 ml-auto shrink-0">{relativeTime(timestamp)}</span>
+                    <span className="text-[10px] text-slate-400 ml-auto shrink-0 font-medium">{relativeTime(timestamp)}</span>
                   </div>
 
-                  <p className={`text-[11px] truncate mb-0.5 ${!isRead ? 'font-semibold text-slate-200' : 'text-slate-400'}`}>
+                  <p className={`text-[11px] truncate mb-0.5 ${!isRead ? 'font-semibold text-slate-100' : 'text-slate-300'}`}>
                     {subject || '(No Subject)'}
                   </p>
 
                   {showSnippet && (
-                    <p className="text-[11px] text-slate-500 truncate leading-tight">
+                    <p className="text-[11px] text-slate-400 truncate leading-tight">
                       {snippet || '—'}
                     </p>
                   )}
@@ -264,12 +264,12 @@ export function WebmailThreadList({
                   {/* Tags row */}
                   <div className="flex items-center gap-1.5 mt-1">
                     {hasAttachments && (
-                      <span className="flex items-center gap-0.5 text-[9px] text-slate-500">
-                        <Paperclip className="h-2.5 w-2.5" /> Attachment
+                      <span className="flex items-center gap-0.5 text-[9px] text-slate-400 font-medium">
+                        <Paperclip className="h-2.5 w-2.5 text-slate-400" /> Attachment
                       </span>
                     )}
                     {item.labels?.slice(0, 2).map((label: string) => (
-                      <span key={label} className="text-[9px] font-semibold bg-violet-600/20 text-violet-400 px-1.5 py-0.5 rounded-full">
+                      <span key={label} className="text-[9px] font-semibold bg-violet-600/25 text-violet-300 px-1.5 py-0.5 rounded-full ring-1 ring-violet-500/20">
                         {label}
                       </span>
                     ))}
@@ -279,34 +279,38 @@ export function WebmailThreadList({
                 {/* Hover action buttons */}
                 {isHovered && (
                   <div
-                    className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-[#1a1a26] rounded-lg border border-white/5 shadow-lg px-1.5 py-1"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-[#1a1a26] rounded-xl border border-white/10 shadow-xl px-1.5 py-1 z-10"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
                       onClick={() => onToggleStar(id)}
-                      className={`p-1 rounded transition-all ${isStarred ? 'text-amber-400' : 'text-slate-500 hover:text-amber-400'}`}
+                      className={`p-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 ${isStarred ? 'text-amber-400' : 'text-slate-400 hover:text-amber-400 hover:bg-white/5'}`}
                       title="Star"
+                      aria-label="Star message"
                     >
                       <Star className="h-3.5 w-3.5" fill={isStarred ? 'currentColor' : 'none'} />
                     </button>
                     <button
                       onClick={() => onBulkAction('archive', [id])}
-                      className="p-1 rounded text-slate-500 hover:text-slate-200 transition-all"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
                       title="Archive"
+                      aria-label="Archive message"
                     >
                       <Archive className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => onDeleteMessage(id)}
-                      className="p-1 rounded text-slate-500 hover:text-rose-400 transition-all"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60"
                       title="Delete"
+                      aria-label="Delete message"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => onBulkAction('snooze', [id])}
-                      className="p-1 rounded text-slate-500 hover:text-blue-400 transition-all"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
                       title="Snooze"
+                      aria-label="Snooze message"
                     >
                       <Clock className="h-3.5 w-3.5" />
                     </button>

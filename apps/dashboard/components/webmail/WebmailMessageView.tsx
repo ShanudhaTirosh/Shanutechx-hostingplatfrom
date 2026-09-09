@@ -120,13 +120,13 @@ function MessageBubble({ msg, defaultExpanded = true, onReply, onToggleStar }: M
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-white truncate">{msg.senderName || msg.senderEmail}</span>
-            <span className="text-xs text-slate-500 truncate">&lt;{msg.senderEmail}&gt;</span>
-            <span className="text-xs text-slate-500 ml-auto shrink-0">{relativeTime(msg.createdAt || msg.timestamp || '')}</span>
+            <span className="text-xs text-slate-400 truncate">&lt;{msg.senderEmail}&gt;</span>
+            <span className="text-xs text-slate-400 ml-auto shrink-0 font-medium">{relativeTime(msg.createdAt || msg.timestamp || '')}</span>
 
           </div>
-          <div className="text-xs text-slate-500 mt-0.5">
+          <div className="text-xs text-slate-400 mt-0.5">
             To: {msg.recipientEmail}
-            {!expanded && <span className="ml-3 text-slate-600 truncate">{(msg.textBody || '').slice(0, 80)}</span>}
+            {!expanded && <span className="ml-3 text-slate-400 truncate font-normal">{(msg.textBody || '').slice(0, 80)}</span>}
           </div>
         </div>
 
@@ -134,17 +134,23 @@ function MessageBubble({ msg, defaultExpanded = true, onReply, onToggleStar }: M
         <div className="flex items-center gap-1.5 shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => onToggleStar(msg.id)}
-            className={`p-1.5 rounded-lg transition-all ${msg.isStarred ? 'text-amber-400' : 'text-slate-600 hover:text-amber-400'}`}
+            aria-label="Star message"
+            className={`p-1.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 ${msg.isStarred ? 'text-amber-400' : 'text-slate-400 hover:text-amber-400 hover:bg-white/5'}`}
           >
             <Star className="h-3.5 w-3.5" fill={msg.isStarred ? 'currentColor' : 'none'} />
           </button>
-          <button onClick={() => onReply(msg, 'reply')} className="p-1.5 rounded-lg text-slate-600 hover:text-slate-200 transition-all">
+          <button
+            onClick={() => onReply(msg, 'reply')}
+            aria-label="Reply to message"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+          >
             <Reply className="h-3.5 w-3.5" />
           </button>
           <div className="relative">
             <button
               onClick={() => setShowMore(!showMore)}
-              className="p-1.5 rounded-lg text-slate-600 hover:text-slate-200 transition-all"
+              aria-label="More message options"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
             >
               <MoreVertical className="h-3.5 w-3.5" />
             </button>

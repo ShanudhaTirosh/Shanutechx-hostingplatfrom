@@ -190,17 +190,29 @@ export function WebmailRichComposer({
   return (
     <div className={`${panelClass} bg-[#1a1a26] border border-white/10 shadow-2xl shadow-black/50 flex flex-col transition-all duration-200`}>
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 bg-[#1e1e2e] border-b border-white/5 rounded-t-2xl">
-        <span className="text-xs font-bold text-white flex-1">
+      <div className="flex items-center gap-2 px-4 py-3 bg-[#1e1e2e] border-b border-white/10 rounded-t-2xl">
+        <span className="text-xs font-bold text-white flex-1 truncate">
           {subject ? subject : 'New Message'}
         </span>
-        <button onClick={() => setMinimized(!minimized)} className="text-slate-500 hover:text-slate-200 transition-all p-1">
+        <button
+          onClick={() => setMinimized(!minimized)}
+          aria-label={minimized ? "Expand composer" : "Minimize composer"}
+          className="text-slate-400 hover:text-white transition-all p-1.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+        >
           <Minimize2 className="h-3.5 w-3.5" />
         </button>
-        <button onClick={() => setMaximized(!maximized)} className="text-slate-500 hover:text-slate-200 transition-all p-1">
+        <button
+          onClick={() => setMaximized(!maximized)}
+          aria-label={maximized ? "Restore composer size" : "Maximize composer"}
+          className="text-slate-400 hover:text-white transition-all p-1.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+        >
           <Maximize2 className="h-3.5 w-3.5" />
         </button>
-        <button onClick={onClose} className="text-slate-500 hover:text-rose-400 transition-all p-1">
+        <button
+          onClick={onClose}
+          aria-label="Close composer"
+          className="text-slate-400 hover:text-rose-400 transition-all p-1.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60"
+        >
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -211,12 +223,12 @@ export function WebmailRichComposer({
           <div className="border-b border-white/5">
             {/* To field with chips */}
             <div className="flex items-start gap-2 px-4 py-2.5 border-b border-white/5">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pt-1 w-8 shrink-0">To</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pt-1 w-8 shrink-0">To</span>
               <div className="flex-1 flex flex-wrap gap-1 items-center">
                 {toChips.map((chip) => (
-                  <span key={chip} className="flex items-center gap-1 bg-violet-600/20 text-violet-300 text-[11px] px-2 py-0.5 rounded-full">
+                  <span key={chip} className="flex items-center gap-1 bg-violet-600/25 text-violet-200 text-[11px] px-2 py-0.5 rounded-full ring-1 ring-violet-500/30">
                     {chip}
-                    <button onClick={() => removeToChip(chip)} className="text-violet-400 hover:text-white ml-0.5">
+                    <button onClick={() => removeToChip(chip)} aria-label={`Remove ${chip}`} className="text-violet-300 hover:text-white ml-0.5">
                       <X className="h-2.5 w-2.5" />
                     </button>
                   </span>
@@ -233,49 +245,49 @@ export function WebmailRichComposer({
                   }}
                   onBlur={() => toInput.trim() && addToChip(toInput)}
                   placeholder="recipient@example.com"
-                  className="flex-1 bg-transparent text-xs text-white placeholder-slate-600 outline-none min-w-[140px]"
+                  className="flex-1 bg-transparent text-xs text-white placeholder-slate-400 outline-none min-w-[140px]"
                 />
               </div>
               <div className="flex items-center gap-1.5 shrink-0 pt-1">
                 {!showCc && (
-                  <button onClick={() => setShowCc(true)} className="text-[10px] text-slate-500 hover:text-violet-400 font-medium transition-all">Cc</button>
+                  <button onClick={() => setShowCc(true)} className="text-[10px] text-slate-400 hover:text-violet-300 font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/60">Cc</button>
                 )}
                 {!showBcc && (
-                  <button onClick={() => setShowBcc(true)} className="text-[10px] text-slate-500 hover:text-violet-400 font-medium transition-all">Bcc</button>
+                  <button onClick={() => setShowBcc(true)} className="text-[10px] text-slate-400 hover:text-violet-300 font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/60">Bcc</button>
                 )}
               </div>
             </div>
 
             {showCc && (
               <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider w-8 shrink-0">Cc</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-8 shrink-0">Cc</span>
                 <input
                   type="text" value={cc} onChange={(e) => setCc(e.target.value)}
                   placeholder="cc@example.com"
-                  className="flex-1 bg-transparent text-xs text-white placeholder-slate-600 outline-none"
+                  className="flex-1 bg-transparent text-xs text-white placeholder-slate-400 outline-none"
                 />
               </div>
             )}
 
             {showBcc && (
               <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider w-8 shrink-0">Bcc</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-8 shrink-0">Bcc</span>
                 <input
                   type="text" value={bcc} onChange={(e) => setBcc(e.target.value)}
                   placeholder="bcc@example.com"
-                  className="flex-1 bg-transparent text-xs text-white placeholder-slate-600 outline-none"
+                  className="flex-1 bg-transparent text-xs text-white placeholder-slate-400 outline-none"
                 />
               </div>
             )}
 
             <div className="flex items-center gap-2 px-4 py-2.5">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider w-8 shrink-0">Re</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-8 shrink-0">Re</span>
               <input
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="Subject line"
-                className="flex-1 bg-transparent text-xs font-semibold text-white placeholder-slate-600 outline-none"
+                className="flex-1 bg-transparent text-xs font-semibold text-white placeholder-slate-400 outline-none"
               />
             </div>
           </div>

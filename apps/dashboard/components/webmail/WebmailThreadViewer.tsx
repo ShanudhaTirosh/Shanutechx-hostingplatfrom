@@ -192,8 +192,12 @@ export function WebmailThreadViewer({
 
   if (!primaryMsg) {
     return (
-      <div className="h-full flex items-center justify-center text-slate-500 text-xs font-semibold bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-xl">
-        Select a conversation or message to view content
+      <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs font-semibold bg-[#13131a] border border-white/5 rounded-3xl p-8 shadow-xl">
+        <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mb-3 text-slate-500">
+          <FileText className="h-6 w-6" />
+        </div>
+        <p className="text-slate-300 font-bold text-sm">No message selected</p>
+        <p className="text-slate-400 text-xs mt-1">Select a conversation or email from the thread list to view its contents.</p>
       </div>
     );
   }
@@ -204,21 +208,22 @@ export function WebmailThreadViewer({
   const displayBody = primaryMsg.body || primaryMsg.htmlBody || primaryMsg.snippet || '';
 
   return (
-    <div className="h-full flex flex-col bg-slate-900 border border-slate-800 rounded-3xl overflow-y-auto p-6 space-y-6 shadow-xl">
+    <div className="h-full flex flex-col bg-[#13131a] border border-white/5 rounded-3xl overflow-y-auto p-6 space-y-6 shadow-xl">
       {/* HEADER BAR */}
-      <div className="border-b border-slate-800 pb-4 space-y-3">
-        <div className="flex items-center justify-between">
+      <div className="border-b border-white/10 pb-4 space-y-3">
+        <div className="flex items-center justify-between gap-4">
           <h1 className="text-base font-extrabold text-white leading-snug">
             {primaryMsg.subject}
           </h1>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20 font-medium">
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            <span className="flex items-center gap-1.5 text-xs text-emerald-300 bg-emerald-500/15 px-2.5 py-1 rounded-xl border border-emerald-500/30 font-medium">
               <ShieldCheck className="h-3.5 w-3.5" /> Clean (Scanned)
             </span>
 
             <button
               onClick={() => setIsSnoozeOpen(true)}
-              className="p-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 hover:text-white hover:border-slate-600 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              aria-label="Snooze email"
+              className="p-2 rounded-xl bg-white/5 text-slate-200 border border-white/10 hover:text-white hover:bg-white/10 text-xs font-semibold flex items-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 active:scale-[0.98]"
               title="Snooze email"
             >
               <Clock className="h-4 w-4 text-indigo-400" />
@@ -227,7 +232,8 @@ export function WebmailThreadViewer({
 
             <button
               onClick={handlePrint}
-              className="p-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 hover:text-white hover:border-slate-600 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              aria-label="Print email"
+              className="p-2 rounded-xl bg-white/5 text-slate-200 border border-white/10 hover:text-white hover:bg-white/10 text-xs font-semibold flex items-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 active:scale-[0.98]"
               title="Print email"
             >
               <Printer className="h-4 w-4 text-sky-400" />
@@ -236,7 +242,8 @@ export function WebmailThreadViewer({
 
             <button
               onClick={handleReportThreat}
-              className="p-2 rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              aria-label="Report phishing or threat"
+              className="p-2 rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/25 hover:bg-rose-500/20 text-xs font-semibold flex items-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 active:scale-[0.98]"
               title="Report phishing/threat"
             >
               <ShieldAlert className="h-4 w-4 text-rose-400" />
@@ -246,10 +253,11 @@ export function WebmailThreadViewer({
             {onStar && (
               <button
                 onClick={() => onStar(primaryMsg.id)}
-                className={`p-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                aria-label="Star email"
+                className={`p-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 active:scale-[0.98] ${
                   primaryMsg.isStarred
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                    : 'bg-white/5 text-slate-300 border-white/10 hover:text-white hover:bg-white/10'
                 }`}
               >
                 <Star
@@ -262,7 +270,8 @@ export function WebmailThreadViewer({
             )}
             <button
               onClick={() => onDelete(primaryMsg.id)}
-              className="p-2 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              aria-label="Delete email"
+              className="p-2 rounded-xl bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 text-xs font-semibold flex items-center gap-1.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 active:scale-[0.98]"
             >
               <Trash2 className="h-4 w-4" />
               <span>Delete</span>

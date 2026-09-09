@@ -163,10 +163,11 @@ export function WebmailLayout({
               key={id}
               onClick={() => onChangeMainTab?.(id as any)}
               title={label}
-              className={`w-full flex flex-col items-center py-2.5 px-1 rounded-xl text-[9px] font-semibold gap-1 transition-all group ${
+              aria-label={label}
+              className={`w-full flex flex-col items-center py-2.5 px-1 rounded-xl text-[9px] font-semibold gap-1 transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 active:scale-[0.97] ${
                 activeMainTab === id
-                  ? 'bg-violet-600/20 text-violet-300'
-                  : 'text-slate-500 hover:text-slate-200 hover:bg-white/5'
+                  ? 'bg-violet-600/20 text-violet-300 ring-1 ring-violet-500/30'
+                  : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
               }`}
             >
               <Icon className="h-4.5 w-4.5" strokeWidth={activeMainTab === id ? 2.2 : 1.7} />
@@ -178,10 +179,11 @@ export function WebmailLayout({
             <button
               onClick={() => onChangeMainTab?.('admin')}
               title="Admin Panel"
-              className={`w-full flex flex-col items-center py-2.5 px-1 rounded-xl text-[9px] font-semibold gap-1 transition-all ${
+              aria-label="Admin Panel"
+              className={`w-full flex flex-col items-center py-2.5 px-1 rounded-xl text-[9px] font-semibold gap-1 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 active:scale-[0.97] ${
                 activeMainTab === 'admin'
-                  ? 'bg-amber-600/20 text-amber-300'
-                  : 'text-slate-500 hover:text-amber-300 hover:bg-amber-500/10'
+                  ? 'bg-amber-600/20 text-amber-300 ring-1 ring-amber-500/30'
+                  : 'text-slate-400 hover:text-amber-300 hover:bg-amber-500/10'
               }`}
             >
               <Shield className="h-4.5 w-4.5" strokeWidth={1.7} />
@@ -197,14 +199,16 @@ export function WebmailLayout({
           <button
             onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
             title="Toggle Theme"
-            className="w-full flex items-center justify-center py-2.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
+            aria-label="Toggle Theme"
+            className="w-full flex items-center justify-center py-2.5 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 active:scale-[0.97]"
           >
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
           <button
             onClick={onOpenSettingsModal}
             title="Settings"
-            className="w-full flex items-center justify-center py-2.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
+            aria-label="Settings"
+            className="w-full flex items-center justify-center py-2.5 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 active:scale-[0.97]"
           >
             <Settings className="h-4 w-4" />
           </button>
@@ -381,21 +385,21 @@ export function WebmailLayout({
             <div className="pt-2 border-t border-white/5 mt-2 space-y-0.5">
               <button
                 onClick={onOpenRulesModal}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
               >
                 <Zap className="h-3.5 w-3.5" />
                 Filter Rules
               </button>
               <button
                 onClick={onOpenFoldersModal}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
               >
                 <FolderPlus className="h-3.5 w-3.5" />
                 Manage Folders
               </button>
               <button
                 onClick={() => onChangeDensity(listDensity === 'comfortable' ? 'compact' : 'comfortable')}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
               >
                 <Sliders className="h-3.5 w-3.5" />
                 {listDensity === 'compact' ? 'Comfortable View' : 'Compact View'}
@@ -403,7 +407,7 @@ export function WebmailLayout({
               {onToggleThreaded && (
                 <button
                   onClick={onToggleThreaded}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
                 >
                   <Hash className="h-3.5 w-3.5" />
                   {isThreaded ? 'Switch to Flat' : 'Switch to Threads'}
