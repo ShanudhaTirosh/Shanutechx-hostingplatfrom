@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui';
+import { sanitizeHtml } from '@/lib/sanitize';
 import {
   Star, Archive, Trash2, MoreVertical, Reply, ReplyAll, Forward, ChevronDown,
   ChevronUp, Shield, Wand2, Languages, ChevronRight, ExternalLink, Paperclip,
@@ -225,7 +226,7 @@ function MessageBubble({ msg, defaultExpanded = true, onReply, onToggleStar }: M
           {msg.htmlBody ? (
             <div
               className="prose prose-invert max-w-none text-slate-300 text-sm leading-relaxed webmail-body"
-              dangerouslySetInnerHTML={{ __html: translatedBody || msg.htmlBody }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(translatedBody || msg.htmlBody) }}
             />
           ) : (
             <pre className="whitespace-pre-wrap font-sans text-sm text-slate-300 leading-relaxed">
