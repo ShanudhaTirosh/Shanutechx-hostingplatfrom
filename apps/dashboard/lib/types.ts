@@ -349,55 +349,54 @@ export interface VpsPlan {
 
 export interface WebmailMessage {
   id: string;
-  userId: string;
+  userId?: string;
   smtpAccountId?: string | null;
-  folder: 'inbox' | 'starred' | 'drafts' | 'sent' | 'spam' | 'trash' | 'archive' | 'snoozed';
+  folder?: string;
   threadId?: string | null;
-  senderName: string;
-  senderEmail: string;
-  recipientEmail: string;
-  subject: string;
-  snippet: string;
-  htmlBody: string;
+  senderName?: string;
+  senderEmail?: string;
+  recipientEmail?: string;
+  subject?: string;
+  snippet?: string;
+  htmlBody?: string;
+  textBody?: string;
   replyTo?: string | null;
   inReplyTo?: string | null;
   tag?: string | null;
-  category?: 'primary' | 'social' | 'promotions' | 'updates';
-  priority?: 'low' | 'normal' | 'high';
-  isRead: boolean;
-  isStarred: boolean;
+  category?: string;
+  priority?: string;
+  isRead?: boolean;
+  isStarred?: boolean;
   isPinned?: boolean;
   snoozedUntil?: string | null;
   scheduledAt?: string | null;
   readReceipt?: boolean;
   hasAttachments?: boolean;
   attachmentsJson?: Array<{ filename: string; sizeStr: string; url?: string }>;
-  attachments?: Array<{ filename: string; sizeStr: string; url?: string }>;
+  attachments?: Array<{ filename: string; sizeStr: string; url?: string; content?: string }>;
   labels?: string[];
-  createdAt: string;
+  createdAt?: string;
   updatedAt?: string;
-
-  // Compatibility fields
+  // Legacy compat aliases
   from?: string;
   to?: string;
   body?: string;
   timestamp?: string;
 }
 
-
 export interface WebmailThread {
   threadId: string;
   messageCount: number;
-  latestMessage: WebmailMessage;
-  participants: string[];
-  subject: string;
-  snippet: string;
-  isRead: boolean;
-  isStarred: boolean;
+  latestMessage?: WebmailMessage;
+  participants?: string[];
+  subject?: string;
+  snippet?: string;
+  isRead?: boolean;
+  isStarred?: boolean;
   isPinned?: boolean;
-  folder: string;
-  timestamp: string;
-  messages: WebmailMessage[];
+  folder?: string;
+  timestamp?: string;
+  messages?: WebmailMessage[];
 }
 
 export interface WebmailFolder {

@@ -33,7 +33,7 @@ export function WebmailComposer({
 
     setSending(true);
     api.webmail
-      .send({
+      .sendMessage({
         recipientEmail: recipient,
         subject,
         htmlBody: body.includes('<') ? body : `<div style="font-family: sans-serif; line-height: 1.5;">${body.replace(/\n/g, '<br/>')}</div>`,
@@ -45,7 +45,7 @@ export function WebmailComposer({
         onSent();
         onClose();
       })
-      .catch((err) => alert(`Failed to send email: ${err.message}`))
+      .catch((err: any) => alert(`Failed to send email: ${err.message}`))
       .finally(() => setSending(false));
   };
 

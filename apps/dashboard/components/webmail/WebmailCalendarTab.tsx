@@ -48,7 +48,7 @@ export function WebmailCalendarTab() {
     e.preventDefault();
     if (!syncName) return;
     try {
-      const res = await api.webmail.calendarSync.create({
+      const res = await api.webmail.calendarSync.add({
         provider: syncProvider,
         name: syncName,
         calendarUrl: iCalUrl || undefined,

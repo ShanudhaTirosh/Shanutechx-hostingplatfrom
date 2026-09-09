@@ -1,613 +1,415 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui';
 import {
-  Sparkles,
-  Paperclip,
-  Clock,
-  Send,
-  X,
-  Bold,
-  Italic,
-  List,
-  FileText,
-  Minimize2,
-  Maximize2,
-  Undo2,
+  X, Minimize2, Maximize2, Send, Bold, Italic, Underline, Link2,
+  Paperclip, Smile, ChevronDown, Plus, Trash2, Wand2, Clock,
+  AlertCircle,
 } from 'lucide-react';
 
 interface WebmailRichComposerProps {
   isOpen: boolean;
   onClose: () => void;
-  onSent?: () => void;
-  defaultRecipient?: string;
+  onSent: () => void;
   defaultTo?: string;
   defaultSubject?: string;
   defaultBody?: string;
-  fromEmail?: string;
-  threadId?: string;
-  inReplyTo?: string;
+  defaultSmtpAccountId?: string;
+  replyToMessageId?: string;
+  replyToThreadId?: string;
 }
 
 export function WebmailRichComposer({
   isOpen,
   onClose,
   onSent,
-  defaultRecipient = '',
   defaultTo = '',
   defaultSubject = '',
   defaultBody = '',
-  fromEmail,
-  threadId,
-  inReplyTo,
+  defaultSmtpAccountId,
+  replyToMessageId,
+  replyToThreadId,
 }: WebmailRichComposerProps) {
-  const initialTo = defaultTo || defaultRecipient;
-  const [recipient, setRecipient] = useState(initialTo);
-  const [showCcBcc, setShowCcBcc] = useState(false);
+  const { toast } = useToast();
+
+  const [to, setTo] = useState(defaultTo);
   const [cc, setCc] = useState('');
   const [bcc, setBcc] = useState('');
   const [subject, setSubject] = useState(defaultSubject);
   const [body, setBody] = useState(defaultBody);
-  const [isPlainHtml, setIsPlainHtml] = useState(false);
-
-  const [attachments, setAttachments] = useState<
-    Array<{ filename: string; sizeStr: string; url?: string; content?: string; contentType?: string }>
-  >([]);
-  const [signatures, setSignatures] = useState<any[]>([]);
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [selectedSignatureId, setSelectedSignatureId] = useState<string>('');
-
-  const [scheduledDate, setScheduledDate] = useState<string>('');
-  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
-
-  const [showAiDraftModal, setShowAiDraftModal] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiTone, setAiTone] = useState('professional');
-  const [generatingAi, setGeneratingAi] = useState(false);
-
-  const [undoTimer, setUndoTimer] = useState<number | null>(null);
-  const [pendingSendPayload, setPendingSendPayload] = useState<any | null>(
-    null
-  );
+  const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
   const [sending, setSending] = useState(false);
   const [minimized, setMinimized] = useState(false);
-
-  const { toast } = useToast();
+  const [maximized, setMaximized] = useState(false);
+  const [signatures, setSignatures] = useState<any[]>([]);
+  const [selectedSig, setSelectedSig] = useState<string>('');
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [toChips, setToChips] = useState<string[]>([]);
+  const [toInput, setToInput] = useState(defaultTo);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [showAiBar, setShowAiBar] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState('');
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      setRecipient(initialTo);
+      setTo(defaultTo);
+      setToInput(defaultTo);
+      setToChips(defaultTo ? [defaultTo] : []);
       setSubject(defaultSubject);
       setBody(defaultBody);
-      api.webmail.signatures
-        .list()
-        .then((res) => {
-          setSignatures(res.signatures || []);
-          const def = res.signatures?.find((s: any) => s.isDefault);
-          if (def) {
-            setSelectedSignatureId(def.id);
-            setBody(
-              (prev) =>
-                prev + `\n\n---\n${def.htmlContent.replace(/<[^>]+>/g, '')}`
-            );
-          }
-        })
-        .catch(() => {});
-
-      api.webmail.templates
-        .list()
-        .then((res) => setTemplates(res.templates || []))
-        .catch(() => {});
+      setShowCc(false);
+      setShowBcc(false);
+      setMinimized(false);
+      api.webmail.signatures.list().then((r) => setSignatures(r.signatures || [])).catch(() => {});
+      api.webmail.templates.list().then((r) => setTemplates(r.templates || [])).catch(() => {});
     }
-  }, [isOpen, initialTo, defaultSubject, defaultBody]);
+  }, [isOpen, defaultTo, defaultSubject, defaultBody]);
 
-  useEffect(() => {
-    if (undoTimer === null) return;
-    if (undoTimer <= 0) {
-      executeActualSend();
+  const addToChip = (val: string) => {
+    const email = val.trim();
+    if (email && !toChips.includes(email)) {
+      setToChips((prev) => [...prev, email]);
+    }
+    setToInput('');
+  };
+
+  const removeToChip = (email: string) => setToChips((prev) => prev.filter((e) => e !== email));
+
+  const handleSend = async () => {
+    const recipientEmail = toChips[0] || toInput.trim();
+    if (!recipientEmail) {
+      toast('Please enter a recipient', 'error');
       return;
     }
-    const interval = setInterval(
-      () => setUndoTimer((t) => (t !== null ? t - 1 : null)),
-      1000
-    );
-    return () => clearInterval(interval);
-  }, [undoTimer]);
-
-  if (!isOpen) return null;
-
-  const handleApplySignature = (sigId: string) => {
-    const sig = signatures.find((s) => s.id === sigId);
-    if (sig) {
-      setSelectedSignatureId(sigId);
-      const cleanSig = sig.htmlContent.replace(/<[^>]+>/g, '');
-      setBody((prev) => `${prev}\n\n---\n${cleanSig}`);
-    }
-  };
-
-  const handleApplyTemplate = (tempId: string) => {
-    const temp = templates.find((t) => t.id === tempId);
-    if (temp) {
-      if (temp.subject) setSubject(temp.subject);
-      setBody(temp.body);
-      toast(`Template "${temp.name}" applied!`, 'info');
-    }
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const content = reader.result as string;
-        setAttachments((prev) => [
-          ...prev,
-          {
-            filename: file.name,
-            sizeStr: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-            content,
-            contentType: file.type || 'application/octet-stream',
-          },
-        ]);
-      };
-      reader.readAsDataURL(file);
-    });
-    toast(`Attached ${files.length} file(s)`, 'success');
-  };
-
-  const handleGenerateAiDraft = async () => {
-    if (!aiPrompt.trim()) return;
-    setGeneratingAi(true);
-    try {
-      const res = await api.webmail.ai.draft(
-        aiPrompt,
-        aiTone,
-        recipient.split('@')[0] || 'Team'
-      );
-      if (res.draft) {
-        setSubject(res.draft.subject);
-        setBody(res.draft.body);
-        setShowAiDraftModal(false);
-        setAiPrompt('');
-        toast('AI draft generated successfully!', 'success');
-      }
-    } catch {
-      toast('Failed to generate draft', 'error');
-    } finally {
-      setGeneratingAi(false);
-    }
-  };
-
-  const handleSendClick = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!recipient || !subject || !body) {
-      toast('Recipient, subject, and email body are required.', 'error');
+    if (!subject.trim()) {
+      toast('Please enter a subject', 'error');
       return;
     }
-
-    const payload = {
-      recipientEmail: recipient,
-      subject,
-      htmlBody: isPlainHtml
-        ? body.replace(/\n/g, '<br/>')
-        : `<div style="font-family: sans-serif; line-height: 1.6;">${body.replace(
-            /\n/g,
-            '<br/>'
-          )}</div>`,
-      threadId,
-      inReplyTo,
-      scheduledAt: scheduledDate || undefined,
-      attachments,
-    };
-
-    setPendingSendPayload(payload);
-    setUndoTimer(10);
-  };
-
-  const cancelUndoSend = () => {
-    setUndoTimer(null);
-    setPendingSendPayload(null);
-    toast('Send cancelled! Returning to draft composer.', 'info');
-  };
-
-  const executeActualSend = async () => {
-    if (!pendingSendPayload) return;
     setSending(true);
-    setUndoTimer(null);
     try {
-      await api.webmail.send(pendingSendPayload);
-      toast(
-        pendingSendPayload.scheduledAt
-          ? 'Email scheduled successfully!'
-          : 'Email dispatched successfully!',
-        'success'
-      );
-      if (onSent) onSent();
-      onClose();
+      const htmlBody = body.replace(/\n/g, '<br/>');
+      const sigContent = signatures.find((s) => s.id === selectedSig);
+      const finalHtml = sigContent ? `${htmlBody}<br/><br/><hr/>${sigContent.htmlContent}` : htmlBody;
+
+      await api.webmail.sendMessage({
+        recipientEmail,
+        subject,
+        htmlBody: finalHtml,
+        smtpAccountId: defaultSmtpAccountId,
+        threadId: replyToThreadId,
+        inReplyTo: replyToMessageId,
+        scheduledAt: scheduledAt || undefined,
+      });
+
+      toast(scheduledAt ? 'Email scheduled!' : 'Email sent successfully!', 'success');
+      onSent();
     } catch (err: any) {
       toast(err.message || 'Failed to send email', 'error');
     } finally {
       setSending(false);
-      setPendingSendPayload(null);
     }
   };
 
-  const handleSaveDraft = async () => {
+  const handleAiDraft = async () => {
+    if (!aiPrompt.trim()) return;
+    setAiLoading(true);
     try {
-      await api.webmail.saveDraft({
-        recipientEmail: recipient,
-        subject,
-        htmlBody: body,
-      });
-      toast('Draft saved to Drafts folder!', 'info');
-      onClose();
+      const res = await api.webmail.ai.draft({ prompt: aiPrompt, tone: 'professional', recipientName: toChips[0] });
+      setSubject(res.draft.subject);
+      setBody(res.draft.body);
+      setShowAiBar(false);
+      setAiPrompt('');
+      toast('AI draft ready!', 'success');
     } catch {
-      toast('Failed to save draft', 'error');
+      toast('AI draft failed', 'error');
+    } finally {
+      setAiLoading(false);
     }
   };
+
+  const applyFormat = (tag: string) => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = body.slice(start, end);
+    const wrapped = `<${tag}>${selected}</${tag}>`;
+    setBody(body.slice(0, start) + wrapped + body.slice(end));
+  };
+
+  if (!isOpen) return null;
+
+  const panelClass = maximized
+    ? 'fixed inset-4 z-50 rounded-2xl'
+    : minimized
+    ? 'fixed bottom-4 right-4 z-50 w-80 rounded-2xl overflow-hidden'
+    : 'fixed bottom-4 right-4 z-50 w-[560px] rounded-2xl';
 
   return (
-    <>
-      {/* UNDO SEND TOAST BANNER */}
-      {undoTimer !== null && (
-        <div className="fixed top-6 right-6 z-50 bg-slate-900 border border-indigo-500/40 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-bounce">
-          <div className="text-xs">
-            <p className="font-bold">Sending email to {recipient}...</p>
-            <p className="text-[11px] text-slate-300">
-              Dispatching in{' '}
-              <span className="font-extrabold text-amber-400 font-mono">
-                {undoTimer}s
-              </span>
-            </p>
-          </div>
-          <button
-            onClick={cancelUndoSend}
-            className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs rounded-xl transition-all shadow flex items-center gap-1"
-          >
-            <Undo2 className="h-3.5 w-3.5" />
-            <span>Undo Send</span>
-          </button>
-        </div>
-      )}
+    <div className={`${panelClass} bg-[#1a1a26] border border-white/10 shadow-2xl shadow-black/50 flex flex-col transition-all duration-200`}>
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 py-3 bg-[#1e1e2e] border-b border-white/5 rounded-t-2xl">
+        <span className="text-xs font-bold text-white flex-1">
+          {subject ? subject : 'New Message'}
+        </span>
+        <button onClick={() => setMinimized(!minimized)} className="text-slate-500 hover:text-slate-200 transition-all p-1">
+          <Minimize2 className="h-3.5 w-3.5" />
+        </button>
+        <button onClick={() => setMaximized(!maximized)} className="text-slate-500 hover:text-slate-200 transition-all p-1">
+          <Maximize2 className="h-3.5 w-3.5" />
+        </button>
+        <button onClick={onClose} className="text-slate-500 hover:text-rose-400 transition-all p-1">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
 
-      {/* COMPOSER DOCKABLE WINDOW */}
-      <div
-        className={`fixed bottom-0 right-6 z-40 w-full max-w-2xl bg-slate-950 border border-slate-800 rounded-t-3xl shadow-2xl transition-all ${
-          minimized ? 'h-14 overflow-hidden' : 'h-[620px]'
-        }`}
-      >
-        {/* Composer Header Bar */}
-        <div className="flex items-center justify-between px-5 py-3.5 bg-slate-900 border-b border-slate-800 rounded-t-3xl">
-          <div className="flex items-center gap-2 text-xs font-bold text-white">
-            <span className="h-2.5 w-2.5 rounded-full bg-indigo-500 animate-pulse" />
-            <span>
-              {subject ? subject : 'New Message'}
-              {fromEmail && (
-                <span className="text-slate-400 font-normal ml-2 text-[11px]">
-                  (From: {fromEmail})
-                </span>
-              )}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3 text-xs text-slate-400">
-            <button
-              onClick={() => setShowAiDraftModal(true)}
-              className="text-indigo-400 hover:underline font-bold flex items-center gap-1"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>AI Draft</span>
-            </button>
-            <button
-              onClick={() => setMinimized(!minimized)}
-              className="hover:text-white p-1"
-            >
-              {minimized ? (
-                <Maximize2 className="h-3.5 w-3.5" />
-              ) : (
-                <Minimize2 className="h-3.5 w-3.5" />
-              )}
-            </button>
-            <button onClick={onClose} className="hover:text-white p-1">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        {!minimized && (
-          <form
-            onSubmit={handleSendClick}
-            className="flex flex-col h-[calc(100%-56px)] p-5 space-y-3"
-          >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+      {!minimized && (
+        <>
+          {/* Fields */}
+          <div className="border-b border-white/5">
+            {/* To field with chips */}
+            <div className="flex items-start gap-2 px-4 py-2.5 border-b border-white/5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pt-1 w-8 shrink-0">To</span>
+              <div className="flex-1 flex flex-wrap gap-1 items-center">
+                {toChips.map((chip) => (
+                  <span key={chip} className="flex items-center gap-1 bg-violet-600/20 text-violet-300 text-[11px] px-2 py-0.5 rounded-full">
+                    {chip}
+                    <button onClick={() => removeToChip(chip)} className="text-violet-400 hover:text-white ml-0.5">
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </span>
+                ))}
                 <input
                   type="email"
-                  placeholder="To: recipient@domain.com"
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  className="w-full bg-transparent text-xs text-white placeholder:text-slate-500 focus:outline-none"
-                  required
+                  value={toInput}
+                  onChange={(e) => setToInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addToChip(toInput); }
+                    if (e.key === 'Backspace' && !toInput && toChips.length > 0) {
+                      setToChips((prev) => prev.slice(0, -1));
+                    }
+                  }}
+                  onBlur={() => toInput.trim() && addToChip(toInput)}
+                  placeholder="recipient@example.com"
+                  className="flex-1 bg-transparent text-xs text-white placeholder-slate-600 outline-none min-w-[140px]"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowCcBcc(!showCcBcc)}
-                  className="text-[11px] text-slate-400 hover:text-indigo-400 font-bold"
-                >
-                  CC/BCC
-                </button>
               </div>
+              <div className="flex items-center gap-1.5 shrink-0 pt-1">
+                {!showCc && (
+                  <button onClick={() => setShowCc(true)} className="text-[10px] text-slate-500 hover:text-violet-400 font-medium transition-all">Cc</button>
+                )}
+                {!showBcc && (
+                  <button onClick={() => setShowBcc(true)} className="text-[10px] text-slate-500 hover:text-violet-400 font-medium transition-all">Bcc</button>
+                )}
+              </div>
+            </div>
 
-              {showCcBcc && (
-                <div className="grid grid-cols-2 gap-2 pt-1">
+            {showCc && (
+              <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider w-8 shrink-0">Cc</span>
+                <input
+                  type="text" value={cc} onChange={(e) => setCc(e.target.value)}
+                  placeholder="cc@example.com"
+                  className="flex-1 bg-transparent text-xs text-white placeholder-slate-600 outline-none"
+                />
+              </div>
+            )}
+
+            {showBcc && (
+              <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider w-8 shrink-0">Bcc</span>
+                <input
+                  type="text" value={bcc} onChange={(e) => setBcc(e.target.value)}
+                  placeholder="bcc@example.com"
+                  className="flex-1 bg-transparent text-xs text-white placeholder-slate-600 outline-none"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 px-4 py-2.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider w-8 shrink-0">Re</span>
+              <input
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Subject line"
+                className="flex-1 bg-transparent text-xs font-semibold text-white placeholder-slate-600 outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Toolbar */}
+          <div className="flex items-center gap-1 px-3 py-2 border-b border-white/5 bg-[#1c1c28]">
+            <button onClick={() => applyFormat('b')} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all" title="Bold">
+              <Bold className="h-3.5 w-3.5" />
+            </button>
+            <button onClick={() => applyFormat('i')} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all" title="Italic">
+              <Italic className="h-3.5 w-3.5" />
+            </button>
+            <button onClick={() => applyFormat('u')} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all" title="Underline">
+              <Underline className="h-3.5 w-3.5" />
+            </button>
+            <div className="w-px h-4 bg-white/10 mx-0.5" />
+            <button className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all" title="Insert Link">
+              <Link2 className="h-3.5 w-3.5" />
+            </button>
+            <button className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all" title="Attach File">
+              <Paperclip className="h-3.5 w-3.5" />
+            </button>
+            <button className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all" title="Emoji">
+              <Smile className="h-3.5 w-3.5" />
+            </button>
+            <div className="w-px h-4 bg-white/10 mx-0.5" />
+            <button
+              onClick={() => setShowAiBar(!showAiBar)}
+              className={`flex items-center gap-1 p-1.5 px-2 rounded-lg text-[10px] font-bold transition-all ${showAiBar ? 'bg-violet-600/20 text-violet-300' : 'text-slate-400 hover:text-violet-300 hover:bg-violet-600/10'}`}
+              title="AI Draft"
+            >
+              <Wand2 className="h-3.5 w-3.5" />
+              AI Draft
+            </button>
+            <div className="flex-1" />
+            {/* Templates picker */}
+            {templates.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowTemplates(!showTemplates)}
+                  className="text-[10px] text-slate-500 hover:text-violet-300 flex items-center gap-1 transition-all"
+                >
+                  Templates <ChevronDown className="h-3 w-3" />
+                </button>
+                {showTemplates && (
+                  <div className="absolute bottom-full right-0 mb-2 w-48 bg-[#1e1e2e] border border-white/10 rounded-xl shadow-xl overflow-hidden">
+                    {templates.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          if (t.subject) setSubject(t.subject);
+                          setBody(t.body);
+                          setShowTemplates(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-white/5 transition-all"
+                      >
+                        {t.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* AI Prompt Bar */}
+          {showAiBar && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-violet-600/10 border-b border-violet-500/20">
+              <Wand2 className="h-3.5 w-3.5 text-violet-400 shrink-0" />
+              <input
+                type="text"
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAiDraft()}
+                placeholder="Describe what to write... (e.g. 'Follow up on invoice #123')"
+                className="flex-1 bg-transparent text-xs text-violet-200 placeholder-violet-400/50 outline-none"
+              />
+              <button
+                onClick={handleAiDraft}
+                disabled={aiLoading}
+                className="px-2.5 py-1 rounded-lg bg-violet-600 text-white text-[10px] font-bold hover:bg-violet-500 disabled:opacity-50 transition-all"
+              >
+                {aiLoading ? 'Generating...' : 'Generate'}
+              </button>
+            </div>
+          )}
+
+          {/* Body */}
+          <textarea
+            ref={bodyRef}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Write your message here…"
+            className={`flex-1 w-full bg-transparent text-xs text-slate-200 placeholder-slate-600 outline-none resize-none px-4 py-3 leading-relaxed ${maximized ? 'min-h-[400px]' : 'min-h-[200px]'}`}
+          />
+
+          {/* Signature select */}
+          {signatures.length > 0 && (
+            <div className="px-4 py-2 border-t border-white/5">
+              <select
+                value={selectedSig}
+                onChange={(e) => setSelectedSig(e.target.value)}
+                className="text-[10px] bg-transparent text-slate-500 outline-none cursor-pointer"
+              >
+                <option value="">No signature</option>
+                {signatures.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="flex items-center gap-2 px-3 py-2.5 border-t border-white/5 bg-[#1e1e2e] rounded-b-2xl">
+            <button
+              onClick={handleSend}
+              disabled={sending}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-violet-600/20 disabled:opacity-50 transition-all"
+            >
+              <Send className="h-3.5 w-3.5" />
+              {sending ? 'Sending…' : (scheduledAt ? 'Schedule Send' : 'Send')}
+            </button>
+
+            {/* Schedule send */}
+            <div className="relative">
+              <button
+                onClick={() => setScheduleOpen(!scheduleOpen)}
+                className="p-2 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
+                title="Schedule send"
+              >
+                <Clock className="h-4 w-4" />
+              </button>
+              {scheduleOpen && (
+                <div className="absolute bottom-full left-0 mb-2 bg-[#1e1e2e] border border-white/10 rounded-xl p-3 shadow-xl w-56">
+                  <p className="text-[10px] font-bold text-slate-400 mb-2">Schedule for:</p>
                   <input
-                    type="text"
-                    placeholder="CC: recipient@domain.com"
-                    value={cc}
-                    onChange={(e) => setCc(e.target.value)}
-                    className="bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none"
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                    className="w-full bg-[#13131a] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
                   />
-                  <input
-                    type="text"
-                    placeholder="BCC: recipient@domain.com"
-                    value={bcc}
-                    onChange={(e) => setBcc(e.target.value)}
-                    className="bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none"
-                  />
+                  {scheduledAt && (
+                    <button
+                      onClick={() => { setScheduledAt(''); setScheduleOpen(false); }}
+                      className="mt-2 text-[10px] text-rose-400 hover:text-rose-300"
+                    >
+                      Clear schedule
+                    </button>
+                  )}
                 </div>
               )}
             </div>
 
-            <div className="border-b border-slate-800/80 pb-2">
-              <input
-                type="text"
-                placeholder="Subject"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="w-full bg-transparent text-xs font-semibold text-white placeholder:text-slate-500 focus:outline-none"
-                required
-              />
-            </div>
+            <button className="p-2 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all" title="Attach File">
+              <Paperclip className="h-4 w-4" />
+            </button>
 
-            <div className="flex items-center justify-between bg-slate-900/60 p-2 rounded-xl border border-slate-800/60 text-xs">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setBody((b) => b + ' **bold** ')}
-                  className="p-1.5 bg-slate-800 rounded text-slate-300 hover:text-white"
-                  title="Bold"
-                >
-                  <Bold className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBody((b) => b + ' *italic* ')}
-                  className="p-1.5 bg-slate-800 rounded text-slate-300 hover:text-white"
-                  title="Italic"
-                >
-                  <Italic className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBody((b) => b + '\n- Item ')}
-                  className="p-1.5 bg-slate-800 rounded text-slate-300 hover:text-white"
-                  title="List"
-                >
-                  <List className="h-3.5 w-3.5" />
-                </button>
+            <div className="flex-1" />
 
-                {templates.length > 0 && (
-                  <select
-                    onChange={(e) => handleApplyTemplate(e.target.value)}
-                    className="bg-slate-800 text-slate-300 border border-slate-700 rounded px-2 py-0.5 text-[11px]"
-                  >
-                    <option value="">Insert Template...</option>
-                    {templates.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-
-                {signatures.length > 0 && (
-                  <select
-                    value={selectedSignatureId}
-                    onChange={(e) => handleApplySignature(e.target.value)}
-                    className="bg-slate-800 text-slate-300 border border-slate-700 rounded px-2 py-0.5 text-[11px]"
-                  >
-                    <option value="">Select Signature...</option>
-                    {signatures.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <label className="text-[11px] text-slate-400 flex items-center gap-1 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isPlainHtml}
-                    onChange={(e) => setIsPlainHtml(e.target.checked)}
-                    className="rounded border-slate-700 bg-slate-800 text-indigo-600"
-                  />
-                  <span>Plain Text</span>
-                </label>
-              </div>
-            </div>
-
-            <textarea
-              rows={8}
-              placeholder="Write your email here..."
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              className="w-full flex-1 bg-slate-900/60 border border-slate-800 rounded-2xl p-4 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none font-sans"
-              required
-            />
-
-            {attachments.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {attachments.map((att, idx) => (
-                  <span
-                    key={idx}
-                    className="bg-slate-900 text-indigo-300 text-[11px] px-2.5 py-1 rounded-xl border border-slate-800 flex items-center gap-1.5"
-                  >
-                    <FileText className="h-3 w-3" />
-                    <span>
-                      {att.filename} ({att.sizeStr})
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setAttachments((prev) =>
-                          prev.filter((_, i) => i !== idx)
-                        )
-                      }
-                      className="text-slate-500 hover:text-rose-400 p-0.5"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {showSchedulePicker && (
-              <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between text-xs">
-                <span className="text-slate-400 flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5 text-amber-400" />
-                  <span>Schedule Date/Time:</span>
-                </span>
-                <input
-                  type="datetime-local"
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  className="bg-slate-800 text-slate-200 border border-slate-700 rounded p-1 text-xs"
-                />
-              </div>
-            )}
-
-            <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-              <div className="flex items-center gap-3">
-                <label className="cursor-pointer text-slate-400 hover:text-white text-xs font-semibold flex items-center gap-1.5">
-                  <Paperclip className="h-3.5 w-3.5" />
-                  <span>Attach</span>
-                  <input
-                    type="file"
-                    multiple
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </label>
-
-                <button
-                  type="button"
-                  onClick={() => setShowSchedulePicker(!showSchedulePicker)}
-                  className="text-slate-400 hover:text-amber-400 text-xs font-semibold flex items-center gap-1.5"
-                >
-                  <Clock className="h-3.5 w-3.5" />
-                  <span>Schedule</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSaveDraft}
-                  className="text-slate-400 hover:text-indigo-400 text-xs font-semibold flex items-center gap-1.5"
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  <span>Save Draft</span>
-                </button>
-              </div>
-
-              <button
-                type="submit"
-                disabled={sending}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50 flex items-center gap-2"
-              >
-                <Send className="h-3.5 w-3.5" />
-                <span>
-                  {scheduledDate ? 'Schedule Mail' : 'Send Message'}
-                </span>
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-
-      {/* AI PROMPT-TO-EMAIL DRAFT MODAL */}
-      {showAiDraftModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-400" />
-                <span>AI Draft Generator</span>
-              </h3>
-              <button
-                onClick={() => setShowAiDraftModal(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <label className="text-slate-400 block">
-                Describe what you want to write (e.g. &quot;Polite decline for meeting proposal next Tuesday&quot;):
-              </label>
-              <textarea
-                rows={3}
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Type your prompt here..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Select Tone:</span>
-                <select
-                  value={aiTone}
-                  onChange={(e) => setAiTone(e.target.value)}
-                  className="bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1 text-xs"
-                >
-                  <option value="professional">Professional</option>
-                  <option value="polite_decline">Polite Decline</option>
-                  <option value="formal">Formal</option>
-                  <option value="casual">Casual</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAiDraftModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleGenerateAiDraft}
-                  disabled={generatingAi || !aiPrompt.trim()}
-                  className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow transition-all disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  <span>
-                    {generatingAi ? 'Generating...' : 'Generate Email Draft'}
-                  </span>
-                </button>
-              </div>
-            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
+              title="Discard"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           </div>
-        </div>
+        </>
       )}
-    </>
+    </div>
   );
 }

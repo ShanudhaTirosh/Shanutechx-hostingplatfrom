@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui';
-import { Zap, Trash2, X, Plus } from 'lucide-react';
+import { Zap, Trash2, X, Plus, Forward } from 'lucide-react';
 
 interface WebmailRulesModalProps {
   isOpen: boolean;
@@ -17,6 +17,7 @@ export function WebmailRulesModal({ isOpen, onClose }: WebmailRulesModalProps) {
   const [subjectContains, setSubjectContains] = useState('');
   const [actionMoveFolder, setActionMoveFolder] = useState('archive');
   const [actionApplyLabel, setActionApplyLabel] = useState('');
+  const [actionForwardTo, setActionForwardTo] = useState('');
 
   const { toast } = useToast();
 
@@ -41,7 +42,8 @@ export function WebmailRulesModal({ isOpen, onClose }: WebmailRulesModalProps) {
 
     const actionsJson = {
       moveToFolder: actionMoveFolder || undefined,
-      applyLabel: actionApplyLabel || undefined,
+      applyLabel: actionApplyLabel.trim() || undefined,
+      forwardTo: actionForwardTo.trim() || undefined,
     };
 
     try {
@@ -50,6 +52,8 @@ export function WebmailRulesModal({ isOpen, onClose }: WebmailRulesModalProps) {
       setRuleName('');
       setFromContains('');
       setSubjectContains('');
+      setActionApplyLabel('');
+      setActionForwardTo('');
       fetchFilters();
     } catch {
       toast('Failed to create rule', 'error');
@@ -125,6 +129,7 @@ export function WebmailRulesModal({ isOpen, onClose }: WebmailRulesModalProps) {
                 <option value="archive">Archive</option>
                 <option value="trash">Trash</option>
                 <option value="spam">Spam</option>
+                <option value="">— No move —</option>
               </select>
             </div>
             <div>
@@ -137,6 +142,19 @@ export function WebmailRulesModal({ isOpen, onClose }: WebmailRulesModalProps) {
                 className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white placeholder:text-slate-600"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] text-slate-400 block mb-1 flex items-center gap-1">
+              <Forward className="h-3 w-3" /> Also Forward to External Email (optional):
+            </label>
+            <input
+              type="email"
+              placeholder="e.g. backup@gmail.com"
+              value={actionForwardTo}
+              onChange={(e) => setActionForwardTo(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white placeholder:text-slate-600"
+            />
           </div>
 
           <button type="submit" className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow flex items-center justify-center gap-1.5">

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui';
-import { Settings, FileSignature, FileText, Sun, Ban, X, Trash2, Plus } from 'lucide-react';
+import { Settings, FileSignature, FileText, Sun, Ban, X, Trash2, Plus, Zap, HardDrive, MailCheck, ArrowUpCircle, CheckCircle2, ExternalLink } from 'lucide-react';
 
 interface WebmailSettingsModalProps {
   isOpen: boolean;
@@ -11,7 +11,10 @@ interface WebmailSettingsModalProps {
 }
 
 export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'signatures' | 'templates' | 'autoreply' | 'blocklist'>('signatures');
+  const [activeSubTab, setActiveSubTab] = useState<'signatures' | 'templates' | 'autoreply' | 'blocklist' | 'upgrade'>('signatures');
+
+  // Upgrade tab state
+  const [mailboxInfo, setMailboxInfo] = useState<any | null>(null);
 
   const [signatures, setSignatures] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -34,7 +37,13 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
   const { toast } = useToast();
 
   useEffect(() => {
-    if (isOpen) fetchAllSettings();
+    if (isOpen) {
+      fetchAllSettings();
+      // Load mailbox info for the upgrade tab
+      api.email.mailboxes().then((r) => {
+        if (r.mailboxes && r.mailboxes.length > 0) setMailboxInfo(r.mailboxes[0]);
+      }).catch(() => {});
+    }
   }, [isOpen]);
 
   const fetchAllSettings = () => {
@@ -120,23 +129,26 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
         </div>
 
         {/* SUB TABS */}
-        <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+        <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto">
           {[
             { id: 'signatures', label: 'Signatures', icon: FileSignature },
             { id: 'templates', label: 'Templates', icon: FileText },
             { id: 'autoreply', label: 'Vacation Reply', icon: Sun },
             { id: 'blocklist', label: 'Blocklist', icon: Ban },
+            { id: 'upgrade', label: 'Upgrade', icon: Zap },
           ].map((tab) => {
             const IconComp = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveSubTab(tab.id as any)}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                  activeSubTab === tab.id ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                className={`flex-1 min-w-[72px] py-2 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${
+                  activeSubTab === tab.id
+                    ? tab.id === 'upgrade' ? 'bg-amber-500 text-white shadow' : 'bg-indigo-600 text-white shadow'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <IconComp className="h-3.5 w-3.5" />
+                <IconComp className="h-3 w-3" />
                 <span>{tab.label}</span>
               </button>
             );
@@ -305,6 +317,128 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* TAB 5: MAILBOX UPGRADE */}
+        {activeSubTab === 'upgrade' && (
+          <div className="space-y-5 text-xs">
+            {/* Current usage summary */}
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
+              <h4 className="font-bold text-amber-400 flex items-center gap-1.5">
+                <HardDrive className="h-3.5 w-3.5" />
+                Current Mailbox Usage
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                  <span className="text-slate-400 block text-[10px] mb-1">Storage Quota</span>
+                  <span className="font-extrabold text-white text-sm">
+                    {mailboxInfo?.storageQuotaMb ? `${mailboxInfo.storageQuotaMb} MB` : '—'}
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                  <span className="text-slate-400 block text-[10px] mb-1">Daily Send Limit</span>
+                  <span className="font-extrabold text-white text-sm">
+                    {mailboxInfo?.dailySendLimit ?? '—'} emails/day
+                  </span>
+                </div>
+              </div>
+              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 flex items-center gap-2">
+                <MailCheck className="h-4 w-4 text-indigo-400" />
+                <span className="text-slate-300">
+                  <span className="font-bold text-white">{mailboxInfo?.email || '—'}</span>
+                  {' '}&mdash; {mailboxInfo?.isActive ? (
+                    <span className="text-emerald-400 font-bold">Active</span>
+                  ) : (
+                    <span className="text-rose-400 font-bold">Suspended</span>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            {/* Upgrade plan cards */}
+            <div className="space-y-2">
+              <h4 className="font-bold text-slate-300 uppercase tracking-wider text-[10px]">Available Upgrade Plans</h4>
+              {[
+                {
+                  name: 'Starter',
+                  storage: '2 GB',
+                  sends: 500,
+                  price: 'Free',
+                  features: ['IMAP/SMTP Access', 'Basic Filters', '1 Alias'],
+                  color: 'border-slate-700',
+                  badge: 'text-slate-400 bg-slate-800',
+                  current: !mailboxInfo?.storageQuotaMb || mailboxInfo.storageQuotaMb <= 2048,
+                },
+                {
+                  name: 'Professional',
+                  storage: '10 GB',
+                  sends: 2000,
+                  price: '$4/mo',
+                  features: ['Everything in Starter', 'AI Drafts & Summarise', '5 Aliases', 'Priority Support'],
+                  color: 'border-indigo-500/40',
+                  badge: 'text-indigo-300 bg-indigo-500/20',
+                  current: mailboxInfo?.storageQuotaMb > 2048 && mailboxInfo?.storageQuotaMb <= 10240,
+                },
+                {
+                  name: 'Business',
+                  storage: '50 GB',
+                  sends: 10000,
+                  price: '$12/mo',
+                  features: ['Everything in Pro', 'Custom Domain', '20 Aliases', 'Delegated Admin', 'SLA 99.9%'],
+                  color: 'border-amber-500/40',
+                  badge: 'text-amber-300 bg-amber-500/20',
+                  current: mailboxInfo?.storageQuotaMb > 10240,
+                },
+              ].map((plan) => (
+                <div
+                  key={plan.name}
+                  className={`p-4 rounded-2xl border ${plan.color} bg-slate-950 flex items-start justify-between gap-3`}
+                >
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${plan.badge}`}>{plan.name}</span>
+                      {plan.current && (
+                        <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-0.5">
+                          <CheckCircle2 className="h-3 w-3" /> Current
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-[11px] text-slate-300">
+                      <span><HardDrive className="h-3 w-3 inline mr-1 text-slate-500" />{plan.storage}</span>
+                      <span><MailCheck className="h-3 w-3 inline mr-1 text-slate-500" />{plan.sends.toLocaleString()} sends/day</span>
+                    </div>
+                    <ul className="space-y-0.5 text-[11px] text-slate-400">
+                      {plan.features.map((f) => (
+                        <li key={f} className="flex items-center gap-1.5">
+                          <span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />{f}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-extrabold text-white">{plan.price}</p>
+                    {!plan.current && (
+                      <a
+                        href="/dashboard/billing"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] rounded-xl transition-all"
+                      >
+                        <ArrowUpCircle className="h-3 w-3" />
+                        Upgrade
+                        <ExternalLink className="h-2.5 w-2.5" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-center text-[10px] text-slate-600">
+              To change your mailbox plan, visit the Billing section of your dashboard.
+              Upgrades apply immediately after payment approval.
+            </p>
           </div>
         )}
       </div>

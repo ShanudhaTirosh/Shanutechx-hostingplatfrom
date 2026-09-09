@@ -93,12 +93,12 @@ export function WebmailThreadViewer({
     const bodyText = primaryMsg.htmlBody || primaryMsg.body || primaryMsg.snippet || '';
 
     api.webmail.ai
-      .threatCheck(senderEmail, primaryMsg.subject, bodyText)
+      .threatCheck({ senderEmail, subject: primaryMsg.subject, body: bodyText })
       .then((res) => setThreatInfo(res.assessment))
       .catch(() => {});
 
     api.webmail.ai
-      .replySuggestions(primaryMsg.snippet, senderName)
+      .replySuggestions({ messageBody: primaryMsg.snippet, senderName })
       .then((res) => setSmartReplies(res.suggestions || []))
       .catch(() => {});
   }, [primaryMsg?.id]);
@@ -109,8 +109,11 @@ export function WebmailThreadViewer({
       const fullText = msgList
         .map((m) => `${m.senderName || m.from || 'Sender'}: ${m.snippet}`)
         .join('\n');
-      const res = await api.webmail.ai.summarize(fullText, primaryMsg.subject);
-      setAiSummary(res.summary);
+      const res = await api.webmail.ai.summarize({ threadBody: fullText, subject: primaryMsg.subject });
+      const summary = typeof res.summary === 'string'
+        ? { keyTakeaway: res.summary, bulletPoints: [] }
+        : res.summary;
+      setAiSummary(summary);
       toast('AI Thread Summary generated!', 'success');
     } catch {
       toast('Failed to generate summary', 'error');
@@ -121,7 +124,7 @@ export function WebmailThreadViewer({
     if (!primaryMsg) return;
     try {
       const bodyText = primaryMsg.body || primaryMsg.snippet || primaryMsg.htmlBody || '';
-      const res = await api.webmail.ai.translate(bodyText, targetLanguage);
+      const res = await api.webmail.ai.translate({ text: bodyText, targetLanguage });
       setTranslatedBody(res.translatedText);
       toast(`Translated to ${targetLanguage}`, 'success');
     } catch {
@@ -134,13 +137,10 @@ export function WebmailThreadViewer({
     const recipientEmail = primaryMsg.senderEmail || primaryMsg.from || '';
     setSendingQuickReply(true);
     try {
-      await api.webmail.send({
+      await api.webmail.sendMessage({
         recipientEmail,
         subject: `Re: ${primaryMsg.subject}`,
-        htmlBody: `<div style="font-family: sans-serif;">${quickReplyText.replace(
-          /\n/g,
-          '<br/>'
-        )}</div>`,
+        htmlBody: `<div style="font-family: sans-serif;">${quickReplyText.replace(/\n/g, '<br/>')}</div>`,
         threadId: primaryMsg.threadId || primaryMsg.id,
         inReplyTo: primaryMsg.id,
       });

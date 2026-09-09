@@ -2,26 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
-import { useToast } from '@/components/ui';
 import {
-  Mail,
-  Calendar,
-  Users,
-  Search,
-  Settings,
-  Plus,
-  Inbox,
-  Star,
-  Clock,
-  FileText,
-  Send,
-  Archive,
-  AlertTriangle,
-  Trash2,
-  Zap,
-  FolderPlus,
-  Sliders,
-  Tag,
+  Mail, Calendar, Users, CheckSquare, Settings, Plus, Inbox, Star, Clock,
+  Send, Archive, AlertTriangle, Trash2, Zap, FolderPlus, Tag, ChevronDown,
+  ChevronRight, Search, Shield, HardDrive, LogOut, MoreVertical, Bell,
+  Sliders, Folder, Hash, RefreshCw, Moon, Sun,
 } from 'lucide-react';
 
 interface WebmailLayoutProps {
@@ -48,20 +33,54 @@ interface WebmailLayoutProps {
   onOpenFoldersModal: () => void;
   onOpenRulesModal: () => void;
   onOpenSettingsModal: () => void;
-  activeMainTab?: 'mail' | 'calendar' | 'contacts';
-  onChangeMainTab?: (tab: 'mail' | 'calendar' | 'contacts') => void;
+  activeMainTab?: 'mail' | 'calendar' | 'contacts' | 'tasks' | 'admin';
+  onChangeMainTab?: (tab: 'mail' | 'calendar' | 'contacts' | 'tasks' | 'admin') => void;
   onOpenCalendarTab?: () => void;
   onOpenContactsTab?: () => void;
   storageUsedMb?: number;
   storageQuotaMb?: number;
+  userRole?: string;
   children: React.ReactNode;
+}
+
+const SYSTEM_FOLDERS = [
+  { id: 'inbox',   label: 'Inbox',   icon: Inbox },
+  { id: 'starred', label: 'Starred', icon: Star },
+  { id: 'snoozed', label: 'Snoozed', icon: Clock },
+  { id: 'sent',    label: 'Sent',    icon: Send },
+  { id: 'drafts',  label: 'Drafts',  icon: Archive },
+  { id: 'archive', label: 'Archive', icon: Archive },
+  { id: 'spam',    label: 'Spam',    icon: AlertTriangle },
+  { id: 'trash',   label: 'Trash',   icon: Trash2 },
+];
+
+const NAV_TABS = [
+  { id: 'mail',      icon: Mail,        label: 'Mail' },
+  { id: 'calendar',  icon: Calendar,    label: 'Calendar' },
+  { id: 'contacts',  icon: Users,       label: 'Contacts' },
+  { id: 'tasks',     icon: CheckSquare, label: 'Tasks' },
+];
+
+function getInitials(name: string): string {
+  return (name || 'U')
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function getAvatarColor(email: string): string {
+  const colors = ['from-violet-500 to-purple-600', 'from-blue-500 to-cyan-500', 'from-emerald-500 to-teal-500',
+    'from-orange-500 to-amber-500', 'from-rose-500 to-pink-500', 'from-indigo-500 to-blue-500'];
+  const idx = (email || '').charCodeAt(0) % colors.length;
+  return colors[idx];
 }
 
 export function WebmailLayout({
   mailboxes,
   selectedMailboxId,
   onSelectMailbox,
-  onSelectMailboxId,
   activeFolder,
   onSelectFolder,
   activeCategory,
@@ -70,396 +89,350 @@ export function WebmailLayout({
   onSelectTag,
   searchQuery,
   onSearchChange,
-  viewDensity = 'comfortable',
-  listDensity,
+  listDensity = 'comfortable',
   onChangeDensity,
   isThreaded = true,
-  viewMode,
   onToggleThreaded,
-  onChangeViewMode,
   onOpenCompose,
   onOpenFoldersModal,
   onOpenRulesModal,
   onOpenSettingsModal,
   activeMainTab = 'mail',
   onChangeMainTab,
-  onOpenCalendarTab,
-  onOpenContactsTab,
   storageUsedMb = 434,
   storageQuotaMb = 1024,
+  userRole,
   children,
 }: WebmailLayoutProps) {
   const [customFolders, setCustomFolders] = useState<any[]>([]);
   const [customLabels, setCustomLabels] = useState<any[]>([]);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [foldersExpanded, setFoldersExpanded] = useState(true);
+  const [labelsExpanded, setLabelsExpanded] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  const selectedMailbox = mailboxes.find((m) => m.id === selectedMailboxId) || mailboxes[0];
+  const mailboxEmail = selectedMailbox
+    ? `${selectedMailbox.smtpUsername}@${selectedMailbox.customDomain || selectedMailbox.smtpHost?.replace(/^mail\./, '') || 'mail'}`
+    : 'webmail@shanutechx.com';
+
+  const storagePercent = Math.min(100, Math.round((storageUsedMb / storageQuotaMb) * 100));
+  const storageColor = storagePercent > 85 ? 'bg-rose-500' : storagePercent > 65 ? 'bg-amber-500' : 'bg-violet-500';
 
   useEffect(() => {
-    api.webmail.folders
-      .list()
-      .then((res) => setCustomFolders(res.folders || []))
-      .catch(() => {});
-    api.webmail.labels
-      .list()
-      .then((res) => setCustomLabels(res.labels || []))
-      .catch(() => {});
+    api.webmail.folders.list().then((res) => setCustomFolders(res.folders || [])).catch(() => {});
+    api.webmail.labels.list().then((res) => setCustomLabels(res.labels || [])).catch(() => {});
   }, []);
 
-  const activeMailbox =
-    mailboxes.find((m) => m.id === selectedMailboxId) || mailboxes[0];
-
-  const handleMailboxChange = (id: string) => {
-    if (onSelectMailbox) onSelectMailbox(id);
-    if (onSelectMailboxId) onSelectMailboxId(id);
-  };
-
-  const currentViewMode = viewMode || (isThreaded ? 'threads' : 'flat');
-
-  const systemFolders = [
-    { id: 'inbox', label: 'Inbox', icon: Inbox },
-    { id: 'starred', label: 'Starred', icon: Star },
-    { id: 'snoozed', label: 'Snoozed', icon: Clock },
-    { id: 'drafts', label: 'Drafts', icon: FileText },
-    { id: 'sent', label: 'Sent', icon: Send },
-    { id: 'archive', label: 'Archive', icon: Archive },
-    { id: 'spam', label: 'Spam', icon: AlertTriangle },
-    { id: 'trash', label: 'Trash', icon: Trash2 },
-  ];
+  const isAdmin = userRole === 'admin' || userRole === 'dev';
 
   return (
-    <div className="flex flex-col h-full min-h-[780px] bg-slate-900/90 text-slate-100 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden animate-fade-in">
-      {/* TOP HEADER BAR */}
-      <div className="bg-slate-950/80 px-6 py-3 border-b border-slate-800/80 flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-md">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 text-white font-extrabold flex items-center justify-center text-lg shadow-lg shadow-indigo-500/20">
-              <Mail className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
-                <span>ShanuTechX Enterprise Webmail</span>
-                <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-indigo-500/30 uppercase">
-                  Production
-                </span>
-              </h2>
-              <p className="text-[11px] text-slate-400">
-                WildDuck REST + Express AI Gateway
-              </p>
-            </div>
-          </div>
+    <div className={`flex h-full w-full overflow-hidden ${theme === 'dark' ? 'bg-[#0f0f13]' : 'bg-slate-100'}`}>
 
-          <div className="hidden sm:flex items-center gap-1 bg-slate-900 p-1 rounded-2xl border border-slate-800">
-            <button
-              onClick={() => {
-                if (onChangeMainTab) onChangeMainTab('mail');
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeMainTab === 'mail'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Mail className="h-3.5 w-3.5" />
-              <span>Mail</span>
-            </button>
-            <button
-              onClick={() => {
-                if (onChangeMainTab) onChangeMainTab('calendar');
-                if (onOpenCalendarTab) onOpenCalendarTab();
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeMainTab === 'calendar'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Calendar className="h-3.5 w-3.5" />
-              <span>Calendar</span>
-            </button>
-            <button
-              onClick={() => {
-                if (onChangeMainTab) onChangeMainTab('contacts');
-                if (onOpenContactsTab) onOpenContactsTab();
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeMainTab === 'contacts'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Users className="h-3.5 w-3.5" />
-              <span>Contacts</span>
-            </button>
-          </div>
+      {/* ─── COL 1: Icon Rail (60px) ─── */}
+      <aside className="flex flex-col items-center py-3 gap-1 w-[60px] shrink-0 bg-[#13131a] border-r border-white/5 z-20">
+        {/* Logo */}
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white font-extrabold text-xs shadow-lg shadow-violet-500/30 mb-2 shrink-0">
+          STX
         </div>
 
-        {/* Center Search Bar */}
-        <div className="flex-1 max-w-xl w-full relative">
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search mail (e.g. from:mike is:unread has:attachment)..."
-              className="w-full bg-slate-900/90 border border-slate-700/80 rounded-2xl py-2 pl-9 pr-4 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-inner"
-            />
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
-          </div>
+        {/* Nav Tabs */}
+        <div className="flex flex-col gap-1 w-full px-2">
+          {NAV_TABS.map(({ id, icon: Icon, label }) => (
+            <button
+              key={id}
+              onClick={() => onChangeMainTab?.(id as any)}
+              title={label}
+              className={`w-full flex flex-col items-center py-2.5 px-1 rounded-xl text-[9px] font-semibold gap-1 transition-all group ${
+                activeMainTab === id
+                  ? 'bg-violet-600/20 text-violet-300'
+                  : 'text-slate-500 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <Icon className="h-4.5 w-4.5" strokeWidth={activeMainTab === id ? 2.2 : 1.7} />
+              <span className="leading-none">{label}</span>
+            </button>
+          ))}
+
+          {isAdmin && (
+            <button
+              onClick={() => onChangeMainTab?.('admin')}
+              title="Admin Panel"
+              className={`w-full flex flex-col items-center py-2.5 px-1 rounded-xl text-[9px] font-semibold gap-1 transition-all ${
+                activeMainTab === 'admin'
+                  ? 'bg-amber-600/20 text-amber-300'
+                  : 'text-slate-500 hover:text-amber-300 hover:bg-amber-500/10'
+              }`}
+            >
+              <Shield className="h-4.5 w-4.5" strokeWidth={1.7} />
+              <span className="leading-none">Admin</span>
+            </button>
+          )}
         </div>
 
-        {/* Right Tools */}
-        <div className="flex items-center gap-2">
+        <div className="flex-1" />
+
+        {/* Bottom actions */}
+        <div className="flex flex-col gap-1 w-full px-2 pb-1">
           <button
-            onClick={() => {
-              const nextMode = currentViewMode === 'threads' ? 'flat' : 'threads';
-              if (onChangeViewMode) onChangeViewMode(nextMode);
-              if (onToggleThreaded) onToggleThreaded();
-            }}
-            title={
-              currentViewMode === 'threads'
-                ? 'Switch to Flat Message List'
-                : 'Switch to Threaded Conversation View'
-            }
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
-              currentViewMode === 'threads'
-                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-            }`}
+            onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+            title="Toggle Theme"
+            className="w-full flex items-center justify-center py-2.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
           >
-            <Sliders className="h-3.5 w-3.5" />
-            <span>{currentViewMode === 'threads' ? 'Threaded' : 'Flat'}</span>
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
-
-          <select
-            value={listDensity || viewDensity}
-            onChange={(e) => onChangeDensity(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-xl text-xs py-1.5 px-2 text-slate-300 focus:outline-none cursor-pointer"
-          >
-            <option value="comfortable">Comfortable</option>
-            <option value="compact">Compact</option>
-            <option value="spacious">Spacious</option>
-          </select>
-
           <button
             onClick={onOpenSettingsModal}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs"
-            title="Webmail Settings"
+            title="Settings"
+            className="w-full flex items-center justify-center py-2.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
           >
             <Settings className="h-4 w-4" />
           </button>
         </div>
-      </div>
+      </aside>
 
-      {/* MAIN CONTAINER LAYOUT */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* SIDEBAR NAVIGATION */}
-        <div className="w-64 bg-slate-950/60 border-r border-slate-800/80 p-4 flex flex-col justify-between shrink-0 space-y-6 overflow-y-auto">
-          <div className="space-y-5">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-1">
-                Active Account
-              </label>
-              <select
-                value={selectedMailboxId}
-                onChange={(e) => handleMailboxChange(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-2.5 text-xs font-bold text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                {mailboxes.length > 0 ? (
-                  mailboxes.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.email}
-                    </option>
-                  ))
-                ) : (
-                  <option value="">me@shanutechx.com</option>
-                )}
-              </select>
-            </div>
+      {/* ─── COL 2: Folder Sidebar (240px) ─── */}
+      {!sidebarCollapsed && (
+        <aside className="flex flex-col w-[240px] shrink-0 bg-[#16161f] border-r border-white/5 z-10 overflow-hidden">
 
+          {/* Account Switcher */}
+          <div className="px-3 pt-3 pb-2">
             <button
-              onClick={onOpenCompose}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs py-3 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 transition-all transform active:scale-95"
+              onClick={() => setAccountMenuOpen(!accountMenuOpen)}
+              className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-white/5 transition-all group"
             >
-              <Plus className="h-4 w-4" />
-              <span>Compose New Email</span>
+              <div className={`w-8 h-8 rounded-lg bg-gradient-to-tr ${getAvatarColor(mailboxEmail)} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
+                {getInitials(selectedMailbox?.smtpUsername || 'Me')}
+              </div>
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-xs font-semibold text-white truncate leading-tight">
+                  {selectedMailbox?.smtpUsername || 'My Mailbox'}
+                </p>
+                <p className="text-[10px] text-slate-400 truncate leading-tight">{mailboxEmail}</p>
+              </div>
+              <ChevronDown className={`h-3.5 w-3.5 text-slate-500 transition-transform shrink-0 ${accountMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* System Folders */}
-            <div className="space-y-1">
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 px-2 mb-1.5">
-                Folders
-              </p>
-              {systemFolders.map((item) => {
-                const IconComp = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      onSelectFolder(item.id);
-                      onSelectTag(null);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-                      activeFolder === item.id && !activeTag
-                        ? 'bg-indigo-600/30 text-indigo-300 font-bold border border-indigo-500/40 shadow-sm'
-                        : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <IconComp className="h-3.5 w-3.5" />
-                      <span>{item.label}</span>
-                    </span>
-                  </button>
-                );
-              })}
+            {/* Account dropdown */}
+            {accountMenuOpen && mailboxes.length > 1 && (
+              <div className="mt-1 bg-[#1e1e2a] rounded-xl border border-white/5 overflow-hidden shadow-xl">
+                {mailboxes.map((mb) => {
+                  const mbEmail = `${mb.smtpUsername}@${mb.customDomain || mb.smtpHost?.replace(/^mail\./, '') || 'mail'}`;
+                  return (
+                    <button
+                      key={mb.id}
+                      onClick={() => { onSelectMailbox?.(mb.id); setAccountMenuOpen(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs transition-all ${mb.id === selectedMailboxId ? 'bg-violet-600/20 text-violet-300' : 'text-slate-300 hover:bg-white/5'}`}
+                    >
+                      <div className={`w-6 h-6 rounded-lg bg-gradient-to-tr ${getAvatarColor(mbEmail)} flex items-center justify-center text-white text-[10px] font-bold shrink-0`}>
+                        {getInitials(mb.smtpUsername)}
+                      </div>
+                      <span className="truncate font-medium">{mbEmail}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Search */}
+          <div className="px-3 pb-2">
+            <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2 border border-white/5 focus-within:border-violet-500/50 focus-within:bg-violet-500/5 transition-all">
+              <Search className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder="Search mail…"
+                className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Compose Button */}
+          <div className="px-3 pb-3">
+            <button
+              onClick={onOpenCompose}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-violet-600/20 transition-all active:scale-95"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Compose
+            </button>
+          </div>
+
+          {/* Folder Tree — scrollable */}
+          <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
+
+            {/* Category Tabs */}
+            <div className="flex items-center gap-1 mb-2 px-1">
+              {['primary', 'social', 'promos', 'updates'].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => onSelectCategory(cat)}
+                  className={`text-[9px] font-bold px-2 py-1 rounded-lg capitalize transition-all ${
+                    activeCategory === cat ? 'bg-violet-600/30 text-violet-300' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                  }`}
+                >
+                  {cat === 'primary' ? 'All' : cat.slice(0, 3)}
+                </button>
+              ))}
             </div>
 
-            {/* Custom Folders Section */}
+            {/* System Folders */}
+            {SYSTEM_FOLDERS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => onSelectFolder(id)}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-all group ${
+                  activeFolder === id
+                    ? 'bg-violet-600/20 text-violet-300'
+                    : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
+                <span className="flex-1 text-left">{label}</span>
+                {id === 'inbox' && unreadCounts.inbox > 0 && (
+                  <span className="text-[10px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                    {unreadCounts.inbox}
+                  </span>
+                )}
+              </button>
+            ))}
+
+            {/* Custom Folders */}
             {customFolders.length > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between px-2 mb-1">
-                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                    Custom Folders
-                  </p>
+              <div className="pt-1">
+                <button
+                  onClick={() => setFoldersExpanded(!foldersExpanded)}
+                  className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-300 transition-all"
+                >
+                  {foldersExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  <Folder className="h-3 w-3" />
+                  Folders
                   <button
-                    onClick={onOpenFoldersModal}
-                    className="text-[10px] text-indigo-400 hover:underline flex items-center gap-1"
+                    onClick={(e) => { e.stopPropagation(); onOpenFoldersModal(); }}
+                    className="ml-auto text-slate-600 hover:text-violet-400"
                   >
-                    <Plus className="h-2.5 w-2.5" />
-                    <span>New</span>
+                    <Plus className="h-3 w-3" />
                   </button>
-                </div>
-                {customFolders.map((cf) => (
+                </button>
+                {foldersExpanded && customFolders.map((f) => (
                   <button
-                    key={cf.id}
-                    onClick={() => {
-                      onSelectFolder(cf.name);
-                      onSelectTag(null);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-                      activeFolder === cf.name
-                        ? 'bg-slate-800 text-white font-bold'
-                        : 'text-slate-400 hover:bg-slate-800/50'
+                    key={f.id}
+                    onClick={() => onSelectFolder(`custom:${f.id}`)}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs transition-all ${
+                      activeFolder === `custom:${f.id}` ? 'bg-violet-600/20 text-violet-300' : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
                     }`}
                   >
-                    <span className="flex items-center gap-2">
-                      <FolderPlus className="h-3.5 w-3.5 text-indigo-400" />
-                      <span className="truncate">{cf.name}</span>
-                    </span>
+                    <span style={{ color: f.color }} className="text-sm">●</span>
+                    <span>{f.name}</span>
                   </button>
                 ))}
               </div>
             )}
 
-            {/* Custom Labels Section */}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between px-2 mb-1">
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+            {/* Labels */}
+            {customLabels.length > 0 && (
+              <div className="pt-1">
+                <button
+                  onClick={() => setLabelsExpanded(!labelsExpanded)}
+                  className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-300 transition-all"
+                >
+                  {labelsExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  <Tag className="h-3 w-3" />
                   Labels
-                </p>
-                <button
-                  onClick={onOpenFoldersModal}
-                  className="text-[10px] text-indigo-400 hover:underline flex items-center gap-1"
-                >
-                  <Tag className="h-2.5 w-2.5" />
-                  <span>Manage</span>
                 </button>
-              </div>
-              {[
-                { name: 'Work', color: 'bg-indigo-500' },
-                { name: 'Documents', color: 'bg-emerald-500' },
-                { name: 'News', color: 'bg-amber-500' },
-                { name: 'Important', color: 'bg-rose-500' },
-                ...customLabels.map((l) => ({
-                  name: l.name,
-                  color: 'bg-purple-500',
-                })),
-              ].map((tag) => (
-                <button
-                  key={tag.name}
-                  onClick={() =>
-                    onSelectTag(activeTag === tag.name ? null : tag.name)
-                  }
-                  className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs transition-all ${
-                    activeTag === tag.name
-                      ? 'bg-slate-800 font-bold text-white'
-                      : 'text-slate-400 hover:bg-slate-800/50'
-                  }`}
-                >
-                  <span className="flex items-center gap-2.5">
-                    <span className={`h-2.5 w-2.5 rounded-full ${tag.color}`} />
-                    <span>{tag.name}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* Rules & Filters Shortcut */}
-            <div className="pt-2 border-t border-slate-800/60">
-              <button
-                onClick={onOpenRulesModal}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition-all"
-              >
-                <Zap className="h-3.5 w-3.5 text-amber-400" />
-                <span>Automated Filters & Rules</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Storage Quota Bar */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-2">
-            <div className="flex justify-between items-center text-[11px]">
-              <span className="font-bold text-slate-300">Mail Storage</span>
-              <span className="font-mono text-slate-400">
-                {(storageUsedMb / 1024).toFixed(2)} GB /{' '}
-                {(storageQuotaMb / 1024).toFixed(0)} GB
-              </span>
-            </div>
-            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="bg-indigo-500 h-full rounded-full transition-all"
-                style={{
-                  width: `${Math.min(
-                    100,
-                    Math.round((storageUsedMb / storageQuotaMb) * 100) || 15
-                  )}%`,
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* BODY AREA (CONTENT) */}
-        <div className="flex-1 flex flex-col min-w-0 bg-slate-900/60">
-          {/* Category Tabs */}
-          {activeMainTab === 'mail' && (
-            <div className="flex items-center gap-2 px-6 py-2 bg-slate-950/40 border-b border-slate-800/60 overflow-x-auto">
-              {[
-                { id: 'primary', label: 'Primary', icon: Inbox },
-                { id: 'social', label: 'Social', icon: Users },
-                { id: 'promotions', label: 'Promotions', icon: Tag },
-                { id: 'updates', label: 'Updates', icon: Clock },
-              ].map((cat) => {
-                const CatIcon = cat.icon;
-                return (
+                {labelsExpanded && customLabels.map((l) => (
                   <button
-                    key={cat.id}
-                    onClick={() => onSelectCategory(cat.id)}
-                    className={`px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all ${
-                      activeCategory === cat.id
-                        ? 'bg-indigo-600 text-white font-bold shadow-sm'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    key={l.id}
+                    onClick={() => onSelectTag(l.name)}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs transition-all ${
+                      activeTag === l.name ? 'bg-violet-600/20 text-violet-300' : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
                     }`}
                   >
-                    <CatIcon className="h-3.5 w-3.5" />
-                    <span>{cat.label}</span>
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
+                    <span>{l.name}</span>
                   </button>
-                );
-              })}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
 
-          {/* Children Slot */}
-          <div className="flex-1 overflow-hidden">{children}</div>
-        </div>
-      </div>
+            {/* Quick Actions */}
+            <div className="pt-2 border-t border-white/5 mt-2 space-y-0.5">
+              <button
+                onClick={onOpenRulesModal}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                Filter Rules
+              </button>
+              <button
+                onClick={onOpenFoldersModal}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
+              >
+                <FolderPlus className="h-3.5 w-3.5" />
+                Manage Folders
+              </button>
+              <button
+                onClick={() => onChangeDensity(listDensity === 'comfortable' ? 'compact' : 'comfortable')}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
+              >
+                <Sliders className="h-3.5 w-3.5" />
+                {listDensity === 'compact' ? 'Comfortable View' : 'Compact View'}
+              </button>
+              {onToggleThreaded && (
+                <button
+                  onClick={onToggleThreaded}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all"
+                >
+                  <Hash className="h-3.5 w-3.5" />
+                  {isThreaded ? 'Switch to Flat' : 'Switch to Threads'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Storage Bar */}
+          <div className="px-3 py-3 border-t border-white/5">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                <HardDrive className="h-3 w-3" />
+                <span>Storage</span>
+              </div>
+              <span className="text-[10px] font-semibold text-slate-400">
+                {storageUsedMb < 1024 ? `${storageUsedMb} MB` : `${(storageUsedMb / 1024).toFixed(1)} GB`}
+                {' / '}
+                {storageQuotaMb < 1024 ? `${storageQuotaMb} MB` : `${(storageQuotaMb / 1024).toFixed(0)} GB`}
+              </span>
+            </div>
+            <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${storageColor}`}
+                style={{ width: `${storagePercent}%` }}
+              />
+            </div>
+            {storagePercent > 80 && (
+              <p className="text-[10px] text-amber-400 mt-1">Storage nearing limit — consider upgrading</p>
+            )}
+          </div>
+        </aside>
+      )}
+
+      {/* Sidebar toggle tab */}
+      <button
+        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        className="absolute left-[300px] top-1/2 -translate-y-1/2 z-30 w-3.5 h-8 bg-[#16161f] border border-white/5 rounded-r-lg flex items-center justify-center text-slate-600 hover:text-slate-300 hover:bg-white/5 transition-all"
+        style={{ left: sidebarCollapsed ? '60px' : '300px' }}
+      >
+        {sidebarCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3 -rotate-90" />}
+      </button>
+
+      {/* ─── COL 3: Main Content ─── */}
+      <main className="flex-1 h-full overflow-hidden flex flex-col bg-[#0f0f13]">
+        {children}
+      </main>
     </div>
   );
 }

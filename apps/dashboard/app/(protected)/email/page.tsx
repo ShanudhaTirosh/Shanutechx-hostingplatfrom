@@ -499,19 +499,21 @@ export default function RedesignedMailboxStudioPage() {
               {/* THREAD LIST (5 COLS) */}
               <div className="lg:col-span-5 h-full min-h-[680px]">
                 <WebmailThreadList
+                  isThreaded={false}
                   messages={filteredMessages}
+                  threads={[]}
                   selectedMessageId={selectedMessage?.id || null}
+                  selectedThreadId={null}
                   onSelectMessage={(msg) => {
                     setSelectedMessage(msg);
                     if (msg.threadId) setActiveThreadId(msg.threadId);
                   }}
+                  onSelectThread={() => {}}
                   activeFolder={activeFolder}
-                  viewMode={webmailViewMode}
-                  listDensity={listDensity}
-                  onToggleStar={(id, e) => toggleStar(id, e)}
-                  onTogglePin={(id, e) => togglePin(id, e)}
-                  onDeleteMessage={(id, e) => handleDeleteMessage(id, e)}
+                  onToggleStar={(id) => toggleStar(id)}
+                  onDeleteMessage={(id) => handleDeleteMessage(id)}
                   onBulkAction={handleBulkAction}
+                  onOpenCompose={() => setShowComposeModal(true)}
                 />
               </div>
 
@@ -552,11 +554,12 @@ export default function RedesignedMailboxStudioPage() {
         <WebmailRichComposer
           isOpen={showComposeModal}
           onClose={() => setShowComposeModal(false)}
+          onSent={() => setShowComposeModal(false)}
           defaultTo={composeTo}
           defaultSubject={composeSubject}
           defaultBody={composeBody}
-          fromEmail={activeMailbox?.email || 'me@shanutechx.com'}
         />
+
       )}
 
 
