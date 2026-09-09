@@ -429,6 +429,7 @@ export const api = {
       branch: string;
       frameworkPreset: string;
       startCommand: string;
+      entryFile: string;
       internalPort: number;
       exposureMode: 'ssl_with_proxy' | 'raw_tcp' | 'internal_only';
       subdomain: string;

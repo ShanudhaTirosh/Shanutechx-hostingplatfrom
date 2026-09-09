@@ -421,6 +421,7 @@ const updateConfigSchema = z.object({
   branch: z.string().optional(),
   frameworkPreset: z.string().optional(),
   startCommand: z.string().optional(),
+  entryFile: z.string().max(255).optional(),
   internalPort: z.number().int().positive().optional(),
   exposureMode: z.enum(['ssl_with_proxy', 'raw_tcp', 'internal_only']).optional(),
   subdomain: z.string().optional(),
@@ -436,7 +437,7 @@ deploymentsRouter.patch('/deployments/:id/config', async (req: AuthedRequest, re
     return res.status(400).json({ error: parsed.error.issues });
   }
 
-  const { repoUrl, branch, frameworkPreset, startCommand, internalPort, exposureMode, subdomain, envVars } = parsed.data;
+  const { repoUrl, branch, frameworkPreset, startCommand, entryFile, internalPort, exposureMode, subdomain, envVars } = parsed.data;
 
   if (subdomain !== undefined && subdomain.trim()) {
     const check = await validateCustomSubdomain(subdomain, deployment.id);
@@ -457,6 +458,7 @@ deploymentsRouter.patch('/deployments/:id/config', async (req: AuthedRequest, re
       branch: branch !== undefined ? branch : deployment.branch,
       frameworkPreset: frameworkPreset !== undefined ? frameworkPreset : deployment.frameworkPreset,
       startCommand: startCommand !== undefined ? startCommand : deployment.startCommand,
+      entryFile: entryFile !== undefined ? entryFile : deployment.entryFile,
       internalPort: internalPort !== undefined ? internalPort : deployment.internalPort,
       exposureMode: exposureMode !== undefined ? exposureMode : deployment.exposureMode,
       subdomain: subdomain !== undefined ? subdomain : deployment.subdomain,

@@ -103,16 +103,6 @@ export function WebmailCalendarTab() {
       timeStr: newTime || '12:00 PM',
       participants: participantsList,
     };
-    try {
-      if (api.email.createEvent) {
-        await api.email.createEvent({
-          title: newTitle,
-          dateStr: newDate || 'Today',
-          timeStr: newTime || '12:00 PM',
-          participants: participantsList,
-        }).catch(() => {});
-      }
-    } catch {}
     setEvents((prev) => [...prev, newEv]);
     toast(`Event "${newTitle}" saved to calendar!`, 'success');
     setShowAddEventModal(false);
