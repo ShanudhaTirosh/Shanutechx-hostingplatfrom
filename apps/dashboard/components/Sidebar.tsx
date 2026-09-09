@@ -394,16 +394,16 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               key={link.href}
               href={link.href}
               onClick={() => onNavigate?.()}
-              className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all group relative ${
+              className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 active:scale-[0.98] ${
                 active
-                  ? 'bg-white/[0.08] text-text-primary font-medium shadow-sm'
-                  : 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]'
+                  ? 'bg-white/[0.08] text-white font-semibold shadow-sm ring-1 ring-white/10'
+                  : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
               }`}
             >
               {active && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-brand-gradient" />
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
               )}
-              <span className={active ? 'text-accent-teal-bright' : 'text-text-faint group-hover:text-text-muted transition-colors'}>
+              <span className={active ? 'text-violet-400' : 'text-slate-400 group-hover:text-slate-200 transition-colors'}>
                 {ICONS[link.icon]}
               </span>
               <span className="truncate">{link.label}</span>

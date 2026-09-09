@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
   greeting: { fontFamily: fontFamily.head, fontSize: 20, color: colors.onSurface },
   role: { fontFamily: fontFamily.bodyMedium, fontSize: 11, color: colors.primary, letterSpacing: 1, marginTop: 2 },
-  bell: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.glassBorder },
+  bell: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.glassBorder },
   bellDot: { position: 'absolute', top: 8, right: 10, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.errorStrong },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.md, columnGap: spacing.md, marginBottom: 8 },
   statCardWrapper: { width: '47%' },
