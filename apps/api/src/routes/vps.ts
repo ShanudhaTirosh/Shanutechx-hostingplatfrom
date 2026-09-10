@@ -389,10 +389,13 @@ vpsRouter.post('/vps-provisions/:id/upgrade-packages', async (req: AuthedRequest
     return res.status(404).json({ error: 'Not found' });
   }
 
+  const upgradeCmd = `export DEBIAN_FRONTEND=noninteractive && if command -v apt-get >/dev/null 2>&1; then apt-get update -qq && apt-get upgrade -y; elif command -v dnf >/dev/null 2>&1; then dnf upgrade -y; elif command -v yum >/dev/null 2>&1; then yum update -y; else echo "Unsupported OS package manager" && exit 1; fi 2>&1`;
+
   try {
     const result = await execVpsSsh(
       provision,
-      'export DEBIAN_FRONTEND=noninteractive && apt-get update -qq && apt-get upgrade -y 2>&1'
+      upgradeCmd,
+      { timeoutMs: 300_000 }
     );
 
     await prisma.auditLog.create({

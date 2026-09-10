@@ -9,7 +9,7 @@ const { runContainer, stopAndRemove, stopContainer, getLogs, streamLogs, startCo
 const { collectStats } = require('./stats');
 const { addKey } = require('./livekit');
 const { addDomainRoute, removeDomainRoute } = require('./customDomain');
-const { provisionDatabase, scaleDatabase } = require('./managedDb');
+const { provisionDatabase, scaleDatabase, rotateDatabasePassword } = require('./managedDb');
 const { listDir, readFile, writeFile, writeBinaryFile, extractArchive, makeDir, remove: fsRemove, rename } = require('./filesystem');
 const { provisionProject, deprovisionProject, execSql, listTables, validateIdentifier, insertRow, updateRow, deleteRow } = require('./projects');
 
@@ -156,6 +156,8 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
     repoUrl,
     branch,
     subdomain,
+    rootDomain: reqRootDomain,
+    deploymentsRootDomain: reqDeploymentsRootDomain,
     internalPort,
     envVars,
     cpuLimit,
@@ -200,7 +202,8 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
       imageTag,
       internalPort,
       subdomain,
-      rootDomain: ROOT_DOMAIN,
+      rootDomain: reqRootDomain || ROOT_DOMAIN,
+      deploymentsRootDomain: reqDeploymentsRootDomain,
       envVars,
       cpuLimit: cpuLimit ?? 1,
       memLimitMb: memoryLimit ?? 512,
@@ -210,6 +213,7 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
       frameworkPreset: frameworkPreset || 'auto',
       publishedPort: publishedPort ?? null,
     });
+
 
     logger.info({ deploymentId, containerId, subdomain }, 'Deployment complete');
     emit({ phase: 'done', containerId, containerName });
@@ -441,6 +445,24 @@ app.post('/agent/managed-databases/:containerId/scale', async (req, res) => {
     res.status(500).json({ error: 'Failed to scale managed database' });
   }
 });
+
+app.post('/agent/managed-databases/:containerId/rotate-password', async (req, res) => {
+  const { containerId } = req.params;
+  const { type, oldPassword, newPassword, masterUsername } = req.body || {};
+  if (!type || !newPassword) {
+    return res.status(400).json({ error: 'type and newPassword are required' });
+  }
+
+  try {
+    const result = await rotateDatabasePassword({ containerId, type, oldPassword, newPassword, masterUsername });
+    logger.info({ containerId, type }, 'Managed database password rotated live');
+    res.json(result);
+  } catch (err) {
+    logger.error({ containerId, err: err.message }, 'Failed to rotate managed database password');
+    res.status(500).json({ error: err.message || 'Failed to rotate managed database password' });
+  }
+});
+
 
 
 // ── Filesystem routes (browser File Manager / IDE) ───────────────────────────

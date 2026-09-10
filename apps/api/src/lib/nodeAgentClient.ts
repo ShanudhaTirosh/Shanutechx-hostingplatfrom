@@ -38,6 +38,8 @@ export interface BuildAndRunParams {
   repoUrl: string;
   branch?: string;
   subdomain?: string;
+  rootDomain?: string;
+  deploymentsRootDomain?: string;
   internalPort: number;
   envVars?: Record<string, string>;
   cpuLimit?: number;      // CPU cores limit (0.1-16)
@@ -69,14 +71,20 @@ export async function buildAndRun(
   params: BuildAndRunParams,
   onEvent: (event: BuildEvent) => void
 ): Promise<BuildEvent> {
+  const payload = {
+    ...params,
+    deploymentsRootDomain: params.deploymentsRootDomain || env.deploymentsRootDomain,
+    rootDomain: params.rootDomain || env.rootDomain,
+  };
   const res = await fetch(
     agentUrl(node, `/agent/deployments/${params.deploymentId}/build-and-run`),
     {
       method: 'POST',
       headers: agentHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(params),
+      body: JSON.stringify(payload),
     }
   );
+
 
   if (!res.body) {
     throw new Error('node-agent returned no response body');
@@ -254,6 +262,30 @@ export async function scaleDatabaseContainer(
   }
   return (await res.json()) as { ok: boolean };
 }
+
+/** Rotates master password live on a running database container via node-agent. */
+export async function rotateDatabasePasswordOnNode(
+  node: Node,
+  containerId: string,
+  params: {
+    type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+    oldPassword?: string;
+    newPassword: string;
+    masterUsername?: string;
+  }
+): Promise<{ ok: boolean }> {
+  const res = await fetch(agentUrl(node, `/agent/managed-databases/${containerId}/rotate-password`), {
+    method: 'POST',
+    headers: agentHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => '');
+    throw new Error(`Failed to rotate live database password on node (${res.status}): ${errorText}`);
+  }
+  return (await res.json()) as { ok: boolean };
+}
+
 
 /** Orchestrates live database migration from source node to target node. */
 export async function migrateDatabaseContainer(

@@ -108,19 +108,22 @@ uploadDeploymentsRouter.post(
 
       res.write(JSON.stringify({ phase: 'fetch', message: 'ZIP archive extracted successfully and saved to object storage. Creating automated platform shadow Git backup repository...' }) + '\n');
 
+      const archiveType = isZip ? 'zip' : 'tar';
+      const archiveScheme = isZip ? `zip://${filename}` : `tar://${filename}`;
+
       // Sync workspace to platform shadow backup repo on GitHub if token configured
       const { syncWorkspaceToShadowBackup } = await import('../lib/shadowBackup');
-      void syncWorkspaceToShadowBackup(deployment.id, `Uploaded ZIP project archive "${filename}"`).catch((err) => {
-        logger.warn({ err, deploymentId: deployment.id }, 'Shadow backup sync failed after ZIP extract (non-fatal)');
+      void syncWorkspaceToShadowBackup(deployment.id, `Uploaded ${archiveType.toUpperCase()} project archive "${filename}"`).catch((err) => {
+        logger.warn({ err, deploymentId: deployment.id }, `Shadow backup sync failed after ${archiveType.toUpperCase()} extract (non-fatal)`);
       });
 
       // Update deployment model in DB
       await prisma.deployment.update({
         where: { id: deployment.id },
         data: {
-          sourceType: 'zip',
+          sourceType: archiveType,
           zipSourceUrl: r2ObjectUrl || filename,
-          repoUrl: `zip://${filename}`,
+          repoUrl: archiveScheme,
           status: 'building',
         } as any,
       });
@@ -132,7 +135,7 @@ uploadDeploymentsRouter.post(
         deployment.node,
         {
           deploymentId: deployment.id,
-          repoUrl: `zip://${filename}`,
+          repoUrl: archiveScheme,
           subdomain: deployment.subdomain ?? undefined,
           internalPort: deployment.internalPort || 3000,
           envVars: getDecryptedEnvVars(deployment),

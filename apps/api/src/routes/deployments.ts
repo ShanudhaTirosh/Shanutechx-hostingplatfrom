@@ -822,7 +822,7 @@ deploymentsRouter.post('/deployments/:id/custom-domain/verify', async (req: Auth
       deployment.id,
       deployment.customDomain,
       deployment.internalPort,
-      env.rootDomain
+      env.deploymentsRootDomain
     );
   } catch (err) {
     return res.status(502).json({ error: 'DNS verified, but failed to wire up routing on the node. Try again shortly.' });
@@ -967,7 +967,7 @@ function getDecryptedEnvVars(deployment: { envVarsEncrypted?: string | null }): 
     }
   }
 
-  res.json({ ok: true, subdomain: newSubdomain, url: `https://${newSubdomain}.${env.rootDomain}` });
+  res.json({ ok: true, subdomain: newSubdomain, url: `https://${newSubdomain}.${env.deploymentsRootDomain}` });
 });
 
 

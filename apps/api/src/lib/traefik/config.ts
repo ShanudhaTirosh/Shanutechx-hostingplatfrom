@@ -81,7 +81,7 @@ export class TraefikConfig {
         deploymentId,
         params.domain,
         params.targetPort,
-        env.rootDomain
+        env.deploymentsRootDomain
       );
 
       logger.info({

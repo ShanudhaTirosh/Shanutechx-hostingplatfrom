@@ -74,22 +74,40 @@ export function connectVpsSsh(provision: VpsProvision): Promise<SshClient> {
  */
 export async function execVpsSsh(
   provision: VpsProvision,
-  command: string
+  command: string,
+  options?: { timeoutMs?: number }
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   const conn = await connectVpsSsh(provision);
+  const timeoutMs = options?.timeoutMs ?? 120_000;
+
   return new Promise((resolve, reject) => {
     let stdout = '';
     let stderr = '';
+    let finished = false;
+
+    const timer = setTimeout(() => {
+      if (!finished) {
+        finished = true;
+        try { conn.end(); } catch {}
+        reject(new Error(`SSH command execution timed out after ${Math.round(timeoutMs / 1000)}s`));
+      }
+    }, timeoutMs);
+
     conn.exec(command, (err, stream) => {
       if (err) {
-        conn.end();
+        clearTimeout(timer);
+        try { conn.end(); } catch {}
         return reject(err);
       }
       stream.on('data', (d: Buffer) => { stdout += d.toString(); });
       stream.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
       stream.on('close', (code: number) => {
-        conn.end();
-        resolve({ code: code ?? 0, stdout, stderr });
+        if (!finished) {
+          finished = true;
+          clearTimeout(timer);
+          try { conn.end(); } catch {}
+          resolve({ code: code ?? 0, stdout, stderr });
+        }
       });
     });
   });

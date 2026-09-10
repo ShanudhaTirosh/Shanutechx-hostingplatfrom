@@ -153,7 +153,7 @@ services:
       - POSTAL_API_KEY=${POSTAL_API_KEY}
       - POSTAL_FROM_ADDRESS=${POSTAL_FROM_ADDRESS:-no-reply@${ROOT_DOMAIN}}
       - WILDDUCK_API_URL=http://wildduck-api:8080
-      - WILDDUCK_API_KEY=${WILDDUCK_API_KEY:-secret-wildduck-api-token}
+      - WILDDUCK_API_KEY=${WILDDUCK_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -590,7 +590,7 @@ services:
     volumes:
       - ../wildduck/api.toml:/etc/wildduck/api.toml:ro
     environment:
-      - WILDDUCK_API_TOKEN=${WILDDUCK_API_KEY:-secret-wildduck-api-token}
+      - WILDDUCK_API_TOKEN=${WILDDUCK_API_KEY}
     networks: [shanutechx-internal, shanutechx-public]
     labels:
       - traefik.enable=true

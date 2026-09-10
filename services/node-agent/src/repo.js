@@ -43,18 +43,29 @@ async function prepareWorkspace(deploymentId, repoUrl, branch = 'main', remoteBa
     }
   }
 
-  // Handle uploaded zip/folder archive sources
-  if (repoUrl && (repoUrl.startsWith('zip://') || repoUrl.startsWith('upload://'))) {
+  const isArchive = repoUrl && (
+    repoUrl.startsWith('zip://') ||
+    repoUrl.startsWith('upload://') ||
+    repoUrl.startsWith('tar://') ||
+    repoUrl.startsWith('archive://')
+  );
+
+  // Handle uploaded zip/folder/tar archive sources
+  if (isArchive) {
+    const filesAfterRestore = fs.readdirSync(dir);
+    if (filesAfterRestore.length === 0) {
+      throw new Error(`Workspace directory for archive deployment ${deploymentId} is empty and shadow backup repository could not be restored.`);
+    }
     return dir;
   }
 
   if (fs.existsSync(path.join(dir, '.git'))) {
-    if (repoUrl && !repoUrl.startsWith('zip://') && !repoUrl.startsWith('upload://')) {
+    if (repoUrl && !isArchive) {
       await run('git', ['remote', 'set-url', 'origin', repoUrl], { cwd: dir }).catch(() => {});
     }
     await run('git', ['fetch', '--depth', '1', 'origin', branch], { cwd: dir }).catch(() => {});
     await run('git', ['reset', '--hard', `origin/${branch}`], { cwd: dir }).catch(() => {});
-  } else if (repoUrl && !repoUrl.startsWith('zip://') && !repoUrl.startsWith('upload://')) {
+  } else if (repoUrl && !isArchive) {
     await run('git', ['clone', '--depth', '1', '--branch', branch, repoUrl, dir]);
   }
 

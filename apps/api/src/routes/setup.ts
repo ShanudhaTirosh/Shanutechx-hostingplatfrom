@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { Client as SshClient } from 'ssh2';
 import { prisma } from '../lib/prisma';
@@ -6,6 +6,7 @@ import { env } from '../env';
 import { encryptSecret } from '../lib/secretsVault';
 import { logger } from '../lib/logger';
 import { initWildDuckOnBoot } from '../lib/wildduckInitializer';
+import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 
 export const setupRouter = Router();
 
@@ -60,8 +61,36 @@ const initializeMainNodeSchema = z.object({
 /**
  * POST /api/setup/initialize-main-node
  * One-click automated setup & main node registration for Linux VPS host node.
+ * Unauthenticated on first boot when isInitialized is false; strictly guarded
+ * by requireAuth + requireAdminOrDev once platform is initialized.
  */
-setupRouter.post('/setup/initialize-main-node', async (req: Request, res: Response) => {
+setupRouter.post('/setup/initialize-main-node', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [existingMainNode, devCount] = await Promise.all([
+      prisma.node.findFirst({ where: { roleTags: { has: 'main-node' } } }),
+      prisma.user.count({ where: { role: 'dev' } }),
+    ]);
+
+    const isInitialized = !!existingMainNode && devCount > 0;
+
+    // If platform is already initialized, enforce strict admin/dev auth
+    if (isInitialized) {
+      return requireAuth(req as AuthedRequest, res, () => {
+        requireAdminOrDev(req as AuthedRequest, res, () => {
+          proceedWithInitialization(req, res);
+        });
+      });
+    }
+
+    // First run bootstrap — proceed directly
+    return proceedWithInitialization(req, res);
+  } catch (err: any) {
+    logger.error({ err: err.message }, 'Setup initialization check failed');
+    return res.status(500).json({ error: 'Setup initialization check failed' });
+  }
+});
+
+async function proceedWithInitialization(req: Request, res: Response) {
   const parsed = initializeMainNodeSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -185,4 +214,4 @@ setupRouter.post('/setup/initialize-main-node', async (req: Request, res: Respon
     },
     wildduck: wildduckStatus,
   });
-});
+}

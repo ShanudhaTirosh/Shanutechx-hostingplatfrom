@@ -18,10 +18,21 @@ export interface WildDuckInitResult {
  * 2. Seeds or updates the platformSmtpConfig in Prisma DB to direct outbound mail via internal Haraka/WildDuck relay
  * 3. Best-effort creates platform default system account
  */
-export async function initWildDuckOnBoot(): Promise<WildDuckInitResult> {
+export async function initWildDuckOnBoot(options?: { force?: boolean }): Promise<WildDuckInitResult> {
   const domain = env.rootDomain || 'shanutechx.com';
 
   try {
+    const existingConfig = await prisma.platformSmtpConfig.findUnique({ where: { id: 'global' } }).catch(() => null);
+
+    // Skip redundant initialization on every boot if already configured and force is false
+    if (existingConfig && !options?.force) {
+      return {
+        success: true,
+        domain,
+        noReplyAddress: `no-reply@${domain}`,
+      };
+    }
+
     // 1. Generate/Fetch DKIM for Root Domain
     const dkim = await wildduckClient.getOrCreateDkim(domain, 'wildduck').catch((err) => {
       logger.warn({ err: err.message, domain }, 'WildDuck DKIM generation deferred or unavailable');
@@ -30,19 +41,19 @@ export async function initWildDuckOnBoot(): Promise<WildDuckInitResult> {
 
     // 2. Ensure Platform Global Outbound SMTP Config points to Haraka / WildDuck
     try {
-      const existing = await prisma.platformSmtpConfig.findUnique({ where: { id: 'global' } });
+      const smtpPass = process.env.SMTP_PASS || env.secretsEncryptionKey;
       const smtpData = {
         provider: 'wildduck',
         host: process.env.SMTP_HOST || 'haraka',
         port: Number(process.env.SMTP_PORT) || 587,
         user: process.env.SMTP_USER || `no-reply@${domain}`,
-        passwordEnc: encryptSecret(process.env.SMTP_PASS || 'default-wildduck-pass', env.secretsEncryptionKey),
+        passwordEnc: encryptSecret(smtpPass, env.secretsEncryptionKey),
         senderEmail: `no-reply@${domain}`,
         senderName: 'ShanuTechX Cloud Mailer',
         secure: false,
       };
 
-      if (existing) {
+      if (existingConfig) {
         await prisma.platformSmtpConfig.update({ where: { id: 'global' }, data: smtpData });
       } else {
         await prisma.platformSmtpConfig.create({ data: { id: 'global', ...smtpData } });

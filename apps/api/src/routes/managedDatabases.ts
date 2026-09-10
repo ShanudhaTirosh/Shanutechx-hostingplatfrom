@@ -499,12 +499,41 @@ managedDatabasesRouter.post('/managed-databases/:id/master-password', async (req
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  const db = await prisma.managedDatabase.findUnique({
+    where: { id: req.params.id },
+    include: { node: true },
+  });
   if (!db) return res.status(404).json({ error: 'Database not found' });
   if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
 
-  const newCredentialRef = encryptSecret(parsed.data.newPassword, env.secretsEncryptionKey);
+  // Decrypt old password for authentication against live database engine
+  let oldPassword: string | undefined;
+  if (db.credentialRef) {
+    try {
+      oldPassword = decryptSecret(db.credentialRef, env.secretsEncryptionKey);
+    } catch {
+      oldPassword = undefined;
+    }
+  }
 
+  // 1. Rotate password live on the running container engine if active
+  if (db.containerId && db.node && db.status === 'running') {
+    try {
+      const { rotateDatabasePasswordOnNode } = await import('../lib/nodeAgentClient');
+      await rotateDatabasePasswordOnNode(db.node, db.containerId, {
+        type: db.type as any,
+        oldPassword,
+        newPassword: parsed.data.newPassword,
+      });
+    } catch (err: any) {
+      return res.status(502).json({
+        error: `Failed to rotate password on live database engine: ${err.message}`,
+      });
+    }
+  }
+
+  // 2. Persist new encrypted password in platform vault
+  const newCredentialRef = encryptSecret(parsed.data.newPassword, env.secretsEncryptionKey);
   const updated = await prisma.managedDatabase.update({
     where: { id: db.id },
     data: { credentialRef: newCredentialRef },
@@ -520,10 +549,11 @@ managedDatabasesRouter.post('/managed-databases/:id/master-password', async (req
 
   res.json({
     ok: true,
-    message: 'Master database password successfully updated in platform vault.',
+    message: 'Master database password successfully rotated live on database engine and updated in platform vault.',
     databaseId: updated.id,
   });
 });
+
 
 /**
  * POST /api/managed-databases/:id/migrate

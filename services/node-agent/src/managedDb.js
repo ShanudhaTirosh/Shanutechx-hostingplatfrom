@@ -78,5 +78,51 @@ async function scaleDatabase({ containerId, cpuLimit, memoryLimitMb }) {
   return { ok: true, containerId, cpuLimit, memoryLimitMb };
 }
 
-module.exports = { provisionDatabase, scaleDatabase };
+/**
+ * Rotates master password live on a running database container.
+ */
+async function rotateDatabasePassword({ containerId, type, oldPassword, newPassword, masterUsername }) {
+  const container = docker.getContainer(containerId);
+  const username = masterUsername || (type === 'redis' ? 'default' : type === 'postgres' ? 'postgres' : 'root');
+
+  let cmd = [];
+  if (type === 'postgres') {
+    const pgUser = username || 'postgres';
+    cmd = ['psql', '-U', pgUser, '-c', `ALTER USER "${pgUser}" WITH PASSWORD '${newPassword}';` ];
+  } else if (type === 'mysql') {
+    const mysqlUser = username || 'root';
+    cmd = ['mysql', `-u${mysqlUser}`, `-p${oldPassword}`, '-e', `ALTER USER '${mysqlUser}'@'%' IDENTIFIED BY '${newPassword}'; FLUSH PRIVILEGES;` ];
+  } else if (type === 'redis') {
+    cmd = oldPassword ? ['redis-cli', '-a', oldPassword, 'CONFIG', 'SET', 'requirepass', newPassword] : ['redis-cli', 'CONFIG', 'SET', 'requirepass', newPassword];
+  } else if (type === 'mongodb') {
+    const mongoUser = username || 'app';
+    cmd = ['mongosh', '-u', mongoUser, '-p', oldPassword, '--eval', `db.changeUserPassword('${mongoUser}', '${newPassword}')` ];
+  } else {
+    throw new Error(`Unsupported database type for password rotation: ${type}`);
+  }
+
+  const exec = await container.exec({
+    Cmd: cmd,
+    AttachStdout: true,
+    AttachStderr: true,
+  });
+
+  const stream = await exec.start();
+  let output = '';
+  await new Promise((resolve, reject) => {
+    stream.on('data', (chunk) => { output += chunk.toString(); });
+    stream.on('end', resolve);
+    stream.on('error', reject);
+  });
+
+  const inspect = await exec.inspect();
+  if (inspect.ExitCode !== 0) {
+    throw new Error(`Live database password rotation failed (exit ${inspect.ExitCode}): ${output || 'exec error'}`);
+  }
+
+  return { ok: true, containerId };
+}
+
+module.exports = { provisionDatabase, scaleDatabase, rotateDatabasePassword };
+
 

@@ -19,6 +19,7 @@ async function runContainer({
   internalPort,
   subdomain,
   rootDomain,
+  deploymentsRootDomain,
   envVars = {},
   cpuLimit = 1, // cores
   memLimitMb = 512,
@@ -54,10 +55,11 @@ async function runContainer({
     const activeSubdomain = subdomain || `app-${deploymentId.slice(0, 8)}`;
     const routerName = `deploy-${deploymentId}`;
     const targetPort = internalPort && Number(internalPort) > 0 ? Number(internalPort) : 3000;
+    const effectiveZone = deploymentsRootDomain || rootDomain || process.env.DEPLOYMENTS_ROOT_DOMAIN || process.env.ROOT_DOMAIN || 'shanutechx.com';
 
     labels['traefik.enable'] = 'true';
     labels['traefik.docker.network'] = PUBLIC_NETWORK;
-    labels[`traefik.http.routers.${routerName}.rule`] = `Host(\`${activeSubdomain}.${rootDomain}\`)`;
+    labels[`traefik.http.routers.${routerName}.rule`] = `Host(\`${activeSubdomain}.${effectiveZone}\`)`;
     labels[`traefik.http.services.${routerName}.loadbalancer.server.port`] = String(targetPort);
 
     if (effectiveMode === 'ssl_direct') {
