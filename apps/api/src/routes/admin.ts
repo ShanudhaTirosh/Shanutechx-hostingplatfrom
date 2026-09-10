@@ -54,7 +54,13 @@ adminRouter.get('/admin/customers', async (req: AuthedRequest, res) => {
     totalSpent: c.orders.reduce((sum: number, o: { total: number }) => sum + o.total, 0),
   }));
 
-  res.json({ customers: result, total, take, skip });
+  res.json({
+    customers: result,
+    total,
+    take,
+    skip,
+    isScoped: req.user!.role === 'admin',
+  });
 });
 
 const createUserSchema = z.object({
