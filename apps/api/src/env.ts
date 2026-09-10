@@ -24,6 +24,7 @@ export const env = {
   cloudflareApiToken: required('CLOUDFLARE_API_TOKEN'),
   cloudflareZoneId: required('CLOUDFLARE_ZONE_ID'),
   rootDomain: required('ROOT_DOMAIN'),
+  deploymentsRootDomain: process.env.DEPLOYMENTS_ROOT_DOMAIN || `app.${process.env.ROOT_DOMAIN || 'shanutechx.com'}`,
   // Traefik's REST API, reachable only over the internal Docker network
   // (see infra/control-plane/docker-compose.yml) — never exposed publicly.
   traefikApiUrl: process.env.TRAEFIK_API_URL ?? 'http://traefik:8080',

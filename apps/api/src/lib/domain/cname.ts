@@ -14,6 +14,16 @@
  * @param rootDomain - Root domain for the platform (e.g., "shanutechx.com")
  * @returns CNAME target string
  */
+/**
+ * Generate CNAME target for a deployment
+ * 
+ * Format: {deployment-id}.app.{root-domain} (or {deployment-id}.{domain} if domain already includes sub-zone)
+ * Example: dep-abc123.app.shanutechx.com
+ * 
+ * @param deploymentId - Unique deployment identifier (typically a subdomain slug or CUID)
+ * @param rootDomain - Root domain for the platform (e.g., "shanutechx.com" or "app.shanutechx.com")
+ * @returns CNAME target string
+ */
 export function generateCnameTarget(deploymentId: string, rootDomain: string): string {
   // Validate inputs
   if (!deploymentId || typeof deploymentId !== 'string') {
@@ -23,8 +33,8 @@ export function generateCnameTarget(deploymentId: string, rootDomain: string): s
     throw new Error('rootDomain must be a non-empty string');
   }
   
-  // Generate CNAME target in format: {deployment-id}.{root-domain}
-  return `${deploymentId}.${rootDomain}`;
+  const zone = rootDomain.startsWith('app.') ? rootDomain : `app.${rootDomain}`;
+  return `${deploymentId}.${zone}`;
 }
 
 /**
@@ -35,12 +45,17 @@ export function generateCnameTarget(deploymentId: string, rootDomain: string): s
  * @returns Deployment ID or null if invalid format
  */
 export function extractDeploymentId(cnameTarget: string, rootDomain: string): string | null {
-  const suffix = `.${rootDomain}`;
-  if (!cnameTarget.endsWith(suffix)) {
-    return null;
+  const zone = rootDomain.startsWith('app.') ? rootDomain : `app.${rootDomain}`;
+  const suffix = `.${zone}`;
+  if (cnameTarget.endsWith(suffix)) {
+    return cnameTarget.slice(0, -suffix.length) || null;
   }
-  const deploymentId = cnameTarget.slice(0, -suffix.length);
-  return deploymentId || null;
+  // Fallback for legacy target format: {deploymentId}.{rootDomain}
+  const legacySuffix = `.${rootDomain}`;
+  if (cnameTarget.endsWith(legacySuffix)) {
+    return cnameTarget.slice(0, -legacySuffix.length) || null;
+  }
+  return null;
 }
 
 /**
@@ -51,20 +66,20 @@ export function extractDeploymentId(cnameTarget: string, rootDomain: string): st
  * @returns true if valid format, false otherwise
  */
 export function isValidCnameTarget(cnameTarget: string, rootDomain: string): boolean {
-  // Check basic format: {deployment-id}.{root-domain}
-  const suffix = `.${rootDomain}`;
+  const zone = rootDomain.startsWith('app.') ? rootDomain : `app.${rootDomain}`;
+  let suffix = `.${zone}`;
   if (!cnameTarget.endsWith(suffix)) {
-    return false;
+    suffix = `.${rootDomain}`;
+    if (!cnameTarget.endsWith(suffix)) {
+      return false;
+    }
   }
   
   const deploymentId = cnameTarget.slice(0, -suffix.length);
-  
-  // Deployment ID must be non-empty
   if (!deploymentId) {
     return false;
   }
   
-  // Deployment ID should be a valid subdomain (alphanumeric and hyphens, not starting/ending with hyphen)
   const validSubdomainPattern = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
   return validSubdomainPattern.test(deploymentId);
 }

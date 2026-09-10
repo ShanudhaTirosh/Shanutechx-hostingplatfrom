@@ -491,6 +491,41 @@ managedDatabasesRouter.patch('/managed-databases/:id/config', async (req: Authed
 });
 
 /**
+ * POST /api/managed-databases/:id/master-password
+ * Rotates the database master password and updates stored encrypted credential.
+ */
+managedDatabasesRouter.post('/managed-databases/:id/master-password', async (req: AuthedRequest, res) => {
+  const schema = z.object({ newPassword: z.string().min(8) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+
+  const newCredentialRef = encryptSecret(parsed.data.newPassword, env.secretsEncryptionKey);
+
+  const updated = await prisma.managedDatabase.update({
+    where: { id: db.id },
+    data: { credentialRef: newCredentialRef },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      adminId: req.user!.id,
+      action: 'managed_database.rotate_master_password',
+      target: db.id,
+    },
+  });
+
+  res.json({
+    ok: true,
+    message: 'Master database password successfully updated in platform vault.',
+    databaseId: updated.id,
+  });
+});
+
+/**
  * POST /api/managed-databases/:id/migrate
  * Live on-demand database migration to another compute node or auto-selected target node.
  */

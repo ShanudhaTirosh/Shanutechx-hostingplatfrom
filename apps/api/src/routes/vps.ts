@@ -379,6 +379,46 @@ vpsRouter.post('/vps-provisions/:id/power', async (req: AuthedRequest, res: Resp
 });
 
 /**
+ * POST /api/vps-provisions/:id/upgrade-packages
+ * One-click OS package upgrade action: runs apt update & upgrade over SSH on the target VPS.
+ */
+vpsRouter.post('/vps-provisions/:id/upgrade-packages', async (req: AuthedRequest, res: Response) => {
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  try {
+    const result = await execVpsSsh(
+      provision,
+      'export DEBIAN_FRONTEND=noninteractive && apt-get update -qq && apt-get upgrade -y 2>&1'
+    );
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'vps.upgrade_packages',
+        target: provision.id,
+        actorRole: req.user!.role === 'customer' ? 'customer' : null,
+      },
+    });
+
+    res.json({
+      ok: result.code === 0,
+      exitCode: result.code,
+      output: result.stdout,
+      message: result.code === 0 ? 'OS packages upgraded successfully' : 'OS package upgrade failed or finished with warnings',
+    });
+  } catch (err: any) {
+    res.status(502).json({
+      error: `Package upgrade over SSH failed: ${err.message}`,
+      hint: CREDENTIAL_SYNC_NOTICE,
+    });
+  }
+});
+
+/**
  * GET /api/vps-provisions/:id/stats
  * Telemetry endpoint: retrieves live CPU, RAM, Disk, and Uptime over SSH without needing an installed agent.
  */

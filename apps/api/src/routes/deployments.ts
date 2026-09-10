@@ -179,6 +179,24 @@ deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
     const subUnique = (await import('crypto')).randomBytes(3).toString('hex');
     const subdomain = data.customSubdomain || `${subPrefix}-${subUnique}`;
 
+    // Enforce max 3 platform-issued subdomains per compute node for regular customers
+    if (!callerIsAdminOrDev) {
+      const existingSubdomainsOnNode = await prisma.deployment.count({
+        where: {
+          nodeId: node.id,
+          userId: req.user!.id,
+          subdomain: { not: null },
+          status: { not: 'deleted' },
+        },
+      });
+      if (existingSubdomainsOnNode >= 3) {
+        return res.status(403).json({
+          error: 'Platform subdomain limit reached',
+          message: 'Maximum limit of 3 platform-issued subdomains per server node reached. You can attach custom domains to your existing deployments without limit.',
+        });
+      }
+    }
+
     let envVarsEncrypted: string | undefined;
     if (data.envVars) {
       envVarsEncrypted = encryptSecret(JSON.stringify(data.envVars), env.secretsEncryptionKey);
@@ -737,7 +755,7 @@ deploymentsRouter.post('/deployments/:id/custom-domain', async (req: AuthedReque
   const parsed = attachDomainSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const cnameTarget = `${deployment.subdomain}.${env.rootDomain}`;
+  const cnameTarget = `${deployment.subdomain}.${env.deploymentsRootDomain}`;
   let cloudflareRecordId: string | null = null;
 
   if (parsed.data.cloudflareApiToken && parsed.data.cloudflareZoneId) {
@@ -790,7 +808,7 @@ deploymentsRouter.post('/deployments/:id/custom-domain/verify', async (req: Auth
     return res.status(409).json({ error: 'No custom domain pending verification for this deployment' });
   }
 
-  const cnameTarget = `${deployment.subdomain}.${env.rootDomain}`;
+  const cnameTarget = `${deployment.subdomain}.${env.deploymentsRootDomain}`;
   const result = await verifyCnameTarget(deployment.customDomain, cnameTarget);
 
   if (!result.verified) {
@@ -1349,5 +1367,73 @@ deploymentsRouter.patch('/deployments/:id/git-settings', async (req: AuthedReque
     branch: updated.branch,
     autoDeploy: updated.autoDeploy,
     hasGitToken: Boolean(updated.githubTokenEncrypted),
+  });
+});
+
+const botHostingSchema = z.object({
+  language: z.enum(['python', 'nodejs']),
+  preferredName: z.string().min(1),
+  repoUrl: z.string().url().optional(),
+  branch: z.string().optional().default('main'),
+  entryFile: z.string().optional(),
+  startCommand: z.string().optional(),
+  envVars: z.record(z.string()).optional(),
+  isPendingConfig: z.boolean().optional(),
+});
+
+/**
+ * POST /api/deployments/bot-hosting
+ * Guided bot hosting endpoint with first-class language selector (Python vs Node.js).
+ */
+deploymentsRouter.post('/deployments/bot-hosting', async (req: AuthedRequest, res) => {
+  const parsed = botHostingSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { language, preferredName, repoUrl, branch, entryFile, startCommand, envVars, isPendingConfig } = parsed.data;
+
+  const serviceType = language === 'python' ? 'discordbot_python' : 'discordbot_node';
+  const frameworkPreset = language === 'python' ? 'python_bot' : 'nodejs_bot';
+  const defaultEntry = entryFile || (language === 'python' ? 'bot.py' : 'index.js');
+  const defaultStart = startCommand || (language === 'python' ? `python ${defaultEntry}` : `node ${defaultEntry}`);
+
+  let node;
+  try {
+    node = await selectNodeForDeployment({
+      requiredTag: 'node-hosting',
+      isAdminDeployment: false,
+    });
+  } catch (err: any) {
+    return res.status(409).json({ error: err.message || 'No available compute node for bot deployment' });
+  }
+
+  let envVarsEncrypted: string | undefined;
+  if (envVars) {
+    envVarsEncrypted = encryptSecret(JSON.stringify(envVars), env.secretsEncryptionKey);
+  }
+
+  const dep = await prisma.deployment.create({
+    data: {
+      userId: req.user!.id,
+      nodeId: node.id,
+      repoUrl: repoUrl || null,
+      branch,
+      subdomain: null, // Bots do not consume public subdomains
+      internalPort: 3000,
+      status: isPendingConfig ? 'pending_configuration' : 'pending',
+      startCommand: defaultStart,
+      entryFile: defaultEntry,
+      frameworkPreset,
+      exposureMode: 'no_ssl',
+      envVarsEncrypted: envVarsEncrypted || null,
+      webHostingType: serviceType,
+    },
+  });
+
+  res.status(201).json({
+    ok: true,
+    botDeployment: dep,
+    language,
+    entryFile: defaultEntry,
+    startCommand: defaultStart,
   });
 });

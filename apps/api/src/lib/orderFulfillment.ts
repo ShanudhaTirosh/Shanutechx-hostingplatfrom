@@ -290,7 +290,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
               },
             });
 
-            fulfilledItems.push(`Hosting Instance (${subdomain}.app.${env.rootDomain})`);
+            fulfilledItems.push(`Hosting Instance (${subdomain}.${env.deploymentsRootDomain})`);
             logger.info({ orderId: order.id, deploymentId: dep.id, subdomain }, 'Auto-provisioned Deployment Slot');
           }
         } catch (err) {

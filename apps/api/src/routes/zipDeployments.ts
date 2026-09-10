@@ -62,15 +62,18 @@ uploadDeploymentsRouter.post(
       return res.status(400).json({ error: 'No ZIP archive file uploaded. Field name must be "zipFile".' });
     }
 
-    const filename = req.file.originalname;
-    if (!filename.toLowerCase().endsWith('.zip')) {
-      return res.status(400).json({ error: 'Invalid file format. Uploaded file must be a .zip archive.' });
+    const filename = req.file.originalname.toLowerCase();
+    const isZip = filename.endsWith('.zip');
+    const isTar = filename.endsWith('.tar') || filename.endsWith('.tar.gz') || filename.endsWith('.tgz');
+
+    if (!isZip && !isTar) {
+      return res.status(400).json({ error: 'Invalid file format. Uploaded file must be a .zip, .tar, .tar.gz, or .tgz archive.' });
     }
 
     res.setHeader('Content-Type', 'application/x-ndjson');
 
     try {
-      res.write(JSON.stringify({ phase: 'fetch', message: `Receiving source archive "${filename}" (${Math.round(req.file.size / 1024)} KB)...` }) + '\n');
+      res.write(JSON.stringify({ phase: 'fetch', message: `Receiving source archive "${req.file.originalname}" (${Math.round(req.file.size / 1024)} KB)...` }) + '\n');
 
       // Determine local workspace directory
       const workspacesDir = process.env.AGENT_WORKSPACES_DIR || '/var/lib/shanutechx/workspaces';
@@ -78,22 +81,26 @@ uploadDeploymentsRouter.post(
 
       await fs.mkdir(targetDir, { recursive: true });
 
-      // Save uploaded buffer to a temp zip file
-      const tempZipPath = path.join(targetDir, '__upload_source.zip');
-      await fs.writeFile(tempZipPath, req.file.buffer);
+      const ext = isZip ? '.zip' : filename.endsWith('.tar.gz') ? '.tar.gz' : filename.endsWith('.tgz') ? '.tgz' : '.tar';
+      const tempArchivePath = path.join(targetDir, `__upload_source${ext}`);
+      await fs.writeFile(tempArchivePath, req.file.buffer);
 
       res.write(JSON.stringify({ phase: 'fetch', message: 'Extracting source archive files into container workspace...' }) + '\n');
 
-      // Extract ZIP file depending on platform (PowerShell on Windows, unzip on Linux)
-      if (process.platform === 'win32') {
-        const psCommand = `Expand-Archive -Path "${tempZipPath}" -DestinationPath "${targetDir}" -Force`;
-        await execFileAsync('powershell', ['-NoProfile', '-Command', psCommand]);
+      // Extract archive depending on format and platform
+      if (isZip) {
+        if (process.platform === 'win32') {
+          const psCommand = `Expand-Archive -Path "${tempArchivePath}" -DestinationPath "${targetDir}" -Force`;
+          await execFileAsync('powershell', ['-NoProfile', '-Command', psCommand]);
+        } else {
+          await execFileAsync('unzip', ['-o', tempArchivePath, '-d', targetDir]);
+        }
       } else {
-        await execFileAsync('unzip', ['-o', tempZipPath, '-d', targetDir]);
+        await execFileAsync('tar', ['-xf', tempArchivePath, '-C', targetDir]);
       }
 
-      // Remove temp zip file after extraction
-      await fs.unlink(tempZipPath).catch(() => {});
+      // Remove temp archive file after extraction
+      await fs.unlink(tempArchivePath).catch(() => {});
 
       // Upload ZIP archive to R2 object storage for multi-node node-agent accessibility
       const { uploadDeploymentZip } = await import('../lib/r2Storage');
