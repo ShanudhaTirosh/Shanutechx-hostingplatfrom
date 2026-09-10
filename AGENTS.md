@@ -34,20 +34,22 @@ ShanuTechX is an autonomous enterprise cloud-hosting platform and container orch
 
 ## ⚡ Key Platform Capabilities
 
-1. **Unified Dev Studio & Databases Hub:** Single workspace ([`apps/dashboard/app/(protected)/dev/projects/page.tsx`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard/app/(protected)/dev/projects/page.tsx)) to manage Self-Hosted Supabase Stacks, Managed Databases, and Node Port Exposures. Features target VPS host node selection and direct Launch Studio UI (`http://<nodeIp>:<studioPort>`) opening in a new tab.
-2. **Global Node Registration & Auto-DNS:** Registering a host node automatically defaults to global capabilities without mandatory usage configuration and automatically creates a Cloudflare DNS A-record (`node-<label>.<rootDomain>`) pointing to the node IP.
-3. **Node Port Exposure Engine:** Expose any port on any registered compute node to a custom/auto platform subdomain with Cloudflare DNS record tracking.
-4. **Autonomous Provisioning:** Instant container creation, Git webhook registration (`deployWebhookSecret`), database provisioning (PostgreSQL, MySQL, Redis, MongoDB), LiveKit keys, and Webmail/SMTP credentials upon payment approval.
-5. **Interactive SSH Terminal:** Real-time WebSockets SSH terminal gateway ([`sshTerminalGateway.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/sshTerminalGateway.ts)) with xterm.js support.
-6. **App Catalog:** One-click deployment of 15+ Docker Compose app templates from [`templates/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/templates).
-7. **Encrypted Vault:** Secrets encrypted with AES-256-GCM ([`secretsVault.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/secretsVault.ts)).
-8. **Backups & Storage:** Cloudflare R2 backup integration ([`r2Storage.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/r2Storage.ts)).
-9. **Billing & Dunning:** Daily automated checks ([`billing.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/billing.ts)) for subscription renewals and container suspensions.
+1. **Google & GitHub OAuth SSO Standard:** Platform security enforces Single Sign-On (SSO) exclusively via Google and GitHub OAuth. Direct email/password input forms are disabled across all client apps (`apps/dashboard`, `apps/mobile-admin`, `apps/web`), and backend APIs auto-provision user accounts tied to OAuth identities.
+2. **Unified Dev Studio & Databases Hub:** Single workspace ([`apps/dashboard/app/(protected)/dev/projects/page.tsx`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard/app/(protected)/dev/projects/page.tsx)) to manage Self-Hosted Supabase Stacks, Managed Databases, and Node Port Exposures. Features target VPS host node selection and direct Launch Studio UI (`http://<nodeIp>:<studioPort>`) opening in a new tab.
+3. **Global Node Registration & Auto-DNS:** Registering a host node automatically defaults to global capabilities without mandatory usage configuration and automatically creates a Cloudflare DNS A-record (`node-<label>.<rootDomain>`) pointing to the node IP.
+4. **Node Port Exposure Engine:** Expose any port on any registered compute node to a custom/auto platform subdomain with Cloudflare DNS record tracking.
+5. **Autonomous Provisioning:** Instant container creation, Git webhook registration (`deployWebhookSecret`), database provisioning (PostgreSQL, MySQL, Redis, MongoDB), LiveKit keys, and Webmail/SMTP credentials upon payment approval.
+6. **Interactive SSH Terminal:** Real-time WebSockets SSH terminal gateway ([`sshTerminalGateway.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/sshTerminalGateway.ts)) with xterm.js support.
+7. **App Catalog:** One-click deployment of 15+ Docker Compose app templates from [`templates/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/templates).
+8. **Encrypted Vault:** Secrets encrypted with AES-256-GCM ([`secretsVault.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/secretsVault.ts)).
+9. **Backups & Storage:** Cloudflare R2 backup integration ([`r2Storage.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/r2Storage.ts)).
+10. **Billing & Dunning:** Daily automated checks ([`billing.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/billing.ts)) for subscription renewals and container suspensions.
 
 ---
 
 ## 🔒 Operational Guardrails
 
+- **OAuth Authentication:** All platform entrypoints use Firebase Google & GitHub OAuth tokens (`Authorization: Bearer <idToken>`).
 - **API Environment:** [`apps/api/src/env.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/env.ts) **throws at startup** if required env vars are missing.
 - **Deactivation over Deletion:** Set `isActive: false` on database entities with order history to prevent foreign key errors.
 - **Markdown Links:** Always reference workspace files using standard clickable links with `file:///` URLs.

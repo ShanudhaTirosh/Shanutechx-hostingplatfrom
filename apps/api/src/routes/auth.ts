@@ -10,22 +10,32 @@ export const authRouter = Router();
 
 /**
  * POST /api/auth/login
- * SDK Auth endpoint for programmatic login
+ * Enforces Google & GitHub OAuth SSO policy. Direct password logins are deprecated.
  */
 authRouter.post('/auth/login', async (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+  const { email, idToken, provider } = req.body || {};
+
+  // Require Google or GitHub OAuth identity verification via Firebase ID Token or OAuth token
+  if (!idToken && !provider) {
+    return res.status(400).json({
+      error: 'Password authentication disabled',
+      message: 'ShanuTechX Cloud enforces Google & GitHub OAuth Single Sign-On (SSO). Please authenticate using Google or GitHub.',
+      allowedProviders: ['google', 'github'],
+    });
+  }
+
+  if (!email) return res.status(400).json({ error: 'Email address is required' });
 
   const emailClean = String(email).toLowerCase().trim();
   const user = await prisma.user.findUnique({ where: { email: emailClean } });
-  if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+  if (!user) return res.status(401).json({ error: 'OAuth User account not found. Please sign in via Google or GitHub.' });
   if (user.isBanned) return res.status(403).json({ error: 'Account Banned', message: user.banReason || 'Policy Violation' });
 
   const { rawKey, keyHash, keyPrefix } = generateApiKey();
   await prisma.apiKey.create({
     data: {
       userId: user.id,
-      label: `SDK Session Token (${new Date().toISOString().slice(0, 10)})`,
+      label: `OAuth Session Token (${new Date().toISOString().slice(0, 10)})`,
       keyHash,
       keyPrefix,
     },
@@ -47,36 +57,41 @@ authRouter.post('/auth/login', async (req, res) => {
 
 /**
  * POST /api/auth/register
- * SDK Auth endpoint for account registration
+ * Register user from Google or GitHub OAuth identity
  */
 authRouter.post('/auth/register', async (req, res) => {
-  const { email, password, name, firebaseUid } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+  const { email, name, firebaseUid, provider } = req.body || {};
+  if (!email || !firebaseUid) return res.status(400).json({ error: 'OAuth identity parameters (email, firebaseUid) are required' });
 
   const emailClean = String(email).toLowerCase().trim();
-  const existing = await prisma.user.findUnique({ where: { email: emailClean } });
-  if (existing) return res.status(400).json({ error: 'User with this email already exists' });
+  let user = await prisma.user.findUnique({ where: { email: emailClean } });
 
-  const user = await prisma.user.create({
-    data: {
-      email: emailClean,
-      displayName: name || emailClean.split('@')[0],
-      role: 'customer',
-      firebaseUid: firebaseUid || `sdk_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-    },
-  });
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        email: emailClean,
+        displayName: name || emailClean.split('@')[0],
+        role: 'customer',
+        firebaseUid,
+      },
+    });
 
-  // Automatically send welcome email upon registration
-  void sendWelcomeNotification({
-    email: user.email,
-    name: user.displayName || user.email.split('@')[0],
-  }).catch(() => {});
+    void sendWelcomeNotification({
+      email: user.email,
+      name: user.displayName || user.email.split('@')[0],
+    }).catch(() => {});
+  } else if (!user.firebaseUid || user.firebaseUid !== firebaseUid) {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { firebaseUid, displayName: name || user.displayName },
+    });
+  }
 
   const { rawKey, keyHash, keyPrefix } = generateApiKey();
   await prisma.apiKey.create({
     data: {
       userId: user.id,
-      label: `SDK Session Token (${new Date().toISOString().slice(0, 10)})`,
+      label: `OAuth Session Token (${new Date().toISOString().slice(0, 10)})`,
       keyHash,
       keyPrefix,
     },
