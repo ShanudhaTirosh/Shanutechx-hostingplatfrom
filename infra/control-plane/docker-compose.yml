@@ -152,6 +152,8 @@ services:
       - POSTAL_API_URL=http://postal-web:5000
       - POSTAL_API_KEY=${POSTAL_API_KEY}
       - POSTAL_FROM_ADDRESS=${POSTAL_FROM_ADDRESS:-no-reply@${ROOT_DOMAIN}}
+      - WILDDUCK_API_URL=http://wildduck-api:8080
+      - WILDDUCK_API_KEY=${WILDDUCK_API_KEY:-secret-wildduck-api-token}
     depends_on:
       postgres:
         condition: service_healthy

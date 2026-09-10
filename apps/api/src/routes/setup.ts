@@ -1,0 +1,188 @@
+import { Router, Request, Response } from 'express';
+import { z } from 'zod';
+import { Client as SshClient } from 'ssh2';
+import { prisma } from '../lib/prisma';
+import { env } from '../env';
+import { encryptSecret } from '../lib/secretsVault';
+import { logger } from '../lib/logger';
+import { initWildDuckOnBoot } from '../lib/wildduckInitializer';
+
+export const setupRouter = Router();
+
+/**
+ * GET /api/setup/status
+ * Returns current platform initialization status (whether Main Node & Dev Admin exist).
+ */
+setupRouter.get('/setup/status', async (_req: Request, res: Response) => {
+  try {
+    const [mainNode, devAdminCount] = await Promise.all([
+      prisma.node.findFirst({
+        where: { roleTags: { has: 'main-node' } },
+      }),
+      prisma.user.count({ where: { role: 'dev' } }),
+    ]);
+
+    res.json({
+      isInitialized: !!mainNode && devAdminCount > 0,
+      mainNode: mainNode
+        ? {
+            id: mainNode.id,
+            label: mainNode.label,
+            ip: mainNode.ip,
+            roleTags: mainNode.roleTags,
+            isActive: mainNode.isActive,
+            createdAt: mainNode.createdAt,
+          }
+        : null,
+      devAdminCount,
+      rootDomain: env.rootDomain,
+    });
+  } catch (err: any) {
+    logger.error({ err: err.message }, 'Failed to query setup status');
+    res.status(500).json({ error: 'Setup status query failed' });
+  }
+});
+
+const initializeMainNodeSchema = z.object({
+  ip: z.string().min(1),
+  sshPort: z.number().int().min(1).max(65535).default(22),
+  sshUser: z.string().default('root'),
+  sshPassword: z.string().optional(),
+  privateKey: z.string().optional(),
+  rootDomain: z.string().optional(),
+  devAdminEmail: z.string().email(),
+  devAdminPassword: z.string().min(8),
+  cpuCores: z.number().int().positive().optional().default(4),
+  ramMb: z.number().int().positive().optional().default(8192),
+  diskGb: z.number().int().positive().optional().default(100),
+});
+
+/**
+ * POST /api/setup/initialize-main-node
+ * One-click automated setup & main node registration for Linux VPS host node.
+ */
+setupRouter.post('/setup/initialize-main-node', async (req: Request, res: Response) => {
+  const parsed = initializeMainNodeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const {
+    ip,
+    sshPort,
+    sshUser,
+    sshPassword,
+    privateKey,
+    devAdminEmail,
+    devAdminPassword,
+    cpuCores,
+    ramMb,
+    diskGb,
+  } = parsed.data;
+
+  // 1. Verify SSH or local loopback connection
+  if (ip !== '127.0.0.1' && ip !== 'localhost') {
+    const sshOk = await new Promise<boolean>((resolve) => {
+      const conn = new SshClient();
+      conn
+        .on('ready', () => {
+          conn.end();
+          resolve(true);
+        })
+        .on('error', (err) => {
+          logger.warn({ err: err.message, ip, sshPort }, 'SSH handshake check failed during setup');
+          resolve(false);
+        })
+        .connect({
+          host: ip,
+          port: sshPort,
+          username: sshUser,
+          password: sshPassword,
+          privateKey: privateKey,
+          readyTimeout: 10000,
+        });
+    });
+
+    if (!sshOk) {
+      return res.status(400).json({
+        error: `Could not connect to Linux VPS over SSH at ${sshUser}@${ip}:${sshPort}. Check IP, port, and password/key.`,
+      });
+    }
+  }
+
+  // 2. Encrypt & Store SSH Credentials in Secrets Vault
+  let sshKeyRef: string;
+  if (privateKey) {
+    sshKeyRef = encryptSecret(privateKey, env.secretsEncryptionKey);
+  } else if (sshPassword) {
+    sshKeyRef = encryptSecret(
+      JSON.stringify({ type: 'password', username: sshUser, password: sshPassword, port: sshPort }),
+      env.secretsEncryptionKey
+    );
+  } else {
+    sshKeyRef = `ssh://${sshUser}@${ip}:${sshPort}`;
+  }
+
+  // 3. Upsert Main Node in Database
+  const mainRoleTags = ['main-node', 'global', 'web-hosting', 'node-hosting', 'database-hosting', 'supabase-hosting', 'mail-hosting'];
+  const existingNode = await prisma.node.findFirst({
+    where: { OR: [{ roleTags: { has: 'main-node' } }, { ip }] },
+  });
+
+  const nodeData = {
+    label: 'main-node',
+    ip,
+    sshKeyRef,
+    cpuCores,
+    ramMb,
+    diskGb,
+    roleTags: mainRoleTags,
+    isActive: true,
+    lastSeenAt: new Date(),
+  };
+
+  const mainNode = existingNode
+    ? await prisma.node.update({ where: { id: existingNode.id }, data: nodeData })
+    : await prisma.node.create({ data: nodeData });
+
+  // 4. Create/Ensure Dev Admin User
+  let devAdmin = await prisma.user.findUnique({ where: { email: devAdminEmail.toLowerCase() } });
+  if (!devAdmin) {
+    devAdmin = await prisma.user.create({
+      data: {
+        email: devAdminEmail.toLowerCase(),
+        firebaseUid: `dev-${Date.now()}`,
+        role: 'dev',
+        displayName: 'Platform Owner (Dev)',
+      },
+    });
+  } else if (devAdmin.role !== 'dev') {
+    devAdmin = await prisma.user.update({
+      where: { id: devAdmin.id },
+      data: { role: 'dev' },
+    });
+  }
+
+  // 5. Auto-Initialize WildDuck Mail Server & DKIM
+  const wildduckStatus = await initWildDuckOnBoot();
+
+  logger.info({ nodeId: mainNode.id, devAdminEmail, ip }, 'Platform setup and Main Node auto-registration complete');
+
+  res.status(200).json({
+    success: true,
+    message: 'Linux VPS successfully registered as Main Node and platform bootstrapped!',
+    mainNode: {
+      id: mainNode.id,
+      label: mainNode.label,
+      ip: mainNode.ip,
+      roleTags: mainNode.roleTags,
+      isActive: mainNode.isActive,
+    },
+    devAdmin: {
+      id: devAdmin.id,
+      email: devAdmin.email,
+      role: devAdmin.role,
+    },
+    wildduck: wildduckStatus,
+  });
+});

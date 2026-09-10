@@ -62,6 +62,8 @@ import { prWebhooksRouter } from './routes/prWebhooks';
 import { dockerDeploymentsRouter } from './routes/dockerDeployments';
 import { uploadDeploymentsRouter } from './routes/zipDeployments';
 import { nodeEngineRouter } from './routes/nodeEngine';
+import { setupRouter } from './routes/setup';
+import { initWildDuckOnBoot } from './lib/wildduckInitializer';
 import { ensureDefaultProductsSeeded } from './lib/seedProducts';
 import { fullFirebaseDataMigration } from './lib/firebaseSync';
 
@@ -183,6 +185,7 @@ app.use('/api', prWebhooksRouter);
 app.use('/api', dockerDeploymentsRouter);
 app.use('/api', uploadDeploymentsRouter);
 app.use('/api', nodeEngineRouter);
+app.use('/api', setupRouter);
 app.use('/api', webmailRouter);
 app.use('/api', webmailAuthRouter);
 app.use('/api/settings', settingsRouter);
@@ -259,6 +262,7 @@ server.listen(env.port, () => {
   void ensureDefaultProductsSeeded();
   void ensureSeedReviews(); // BUG-M05 FIX: seed once at startup, not on every request
   void ensureDefaultMasterNodeRegistered();
+  void initWildDuckOnBoot();
   void fullFirebaseDataMigration().catch((err) => {
     logger.error({ err: err.message }, 'Initial startup Firebase data sync error');
   });

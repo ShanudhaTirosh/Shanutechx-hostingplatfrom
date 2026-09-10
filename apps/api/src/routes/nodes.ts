@@ -273,6 +273,14 @@ nodesRouter.get('/nodes', async (_req: AuthedRequest, res: Response) => {
   res.json({ nodes });
 });
 
+nodesRouter.get('/nodes/main-node', async (_req: AuthedRequest, res: Response) => {
+  const mainNode = await prisma.node.findFirst({
+    where: { roleTags: { has: 'main-node' }, isActive: true },
+  });
+  if (!mainNode) return res.status(404).json({ error: 'Main node not registered or inactive' });
+  res.json({ node: mainNode });
+});
+
 // BUG-01 FIX: Removed /nodes/cluster-secret endpoint.
 // The cluster secret must never be exposed via an API response.
 // Admins who need it should read it from the server's .env or secret manager directly.
