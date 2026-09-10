@@ -21,18 +21,12 @@ import {
 export const dynamic = 'force-dynamic';
 
 const CATEGORIES: ProductCategory[] = [
-  'smtp_hosting',
-  'web_hosting',
-  'node_app_hosting',
-  'python_app_hosting',
-  'discordbot_node',
-  'discordbot_python',
-  'whatsappbot_hosting',
-  'lavalink_hosting',
   'vps',
-  'ai_subscription',
-  'database_hosting',
+  'smtp',
+  'web_hosting',
+  'database',
   'app_catalog',
+  'bot_hosting',
 ];
 
 const BILLING_TYPES: PlanBillingType[] = ['monthly', 'yearly', 'one_time', 'quarterly', 'semiannual'];
@@ -49,7 +43,7 @@ export default function AdminProductsPage() {
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [pName, setPName] = useState('');
-  const [pCategory, setPCategory] = useState<ProductCategory>('smtp_hosting');
+  const [pCategory, setPCategory] = useState<ProductCategory>('smtp');
   const [pDescription, setPDescription] = useState('');
   
   // Initial plan fields (in Add Product modal)
@@ -79,7 +73,7 @@ export default function AdminProductsPage() {
   // Plan modal state
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [planProductId, setPlanProductId] = useState<string | null>(null);
-  const [planCategory, setPlanCategory] = useState<ProductCategory>('smtp_hosting');
+  const [planCategory, setPlanCategory] = useState<ProductCategory>('smtp');
   const [activePlan, setActivePlan] = useState<Plan | null>(null);
   const [plName, setPlName] = useState('');
   const [plPrice, setPlPrice] = useState('');
@@ -107,7 +101,7 @@ export default function AdminProductsPage() {
   function openCreateProduct() {
     setActiveProduct(null);
     setPName('');
-    setPCategory('smtp_hosting');
+    setPCategory('smtp');
     setPDescription('');
     setInitialPlanName('Starter Plan');
     setInitialPlanPrice('1500');
@@ -132,7 +126,7 @@ export default function AdminProductsPage() {
   }
 
   function buildSpecsJson(category: ProductCategory) {
-    if (category === 'smtp_hosting') {
+    if (category === 'smtp') {
       const mailboxesCount = parseInt(smtpMailboxesCount, 10) || 1;
       const storageLimitGb = parseInt(smtpStorageGb, 10);
       const storageQuotaMb = storageLimitGb === -1 ? -1 : ((isNaN(storageLimitGb) ? 1 : storageLimitGb) * 1024);
@@ -429,7 +423,7 @@ export default function AdminProductsPage() {
                             </p>
 
                             {/* Render Category Specifications */}
-                            {product.category === 'smtp_hosting' && (
+                            {product.category === 'smtp' && (
                               <div className="flex gap-2 flex-wrap pt-1 text-[11px] text-text-muted font-mono">
                                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white">
                                   <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -602,7 +596,7 @@ export default function AdminProductsPage() {
               </div>
 
               {/* SMTP Specific Resource Controls */}
-              {pCategory === 'smtp_hosting' && (
+              {pCategory === 'smtp' && (
                 <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10">
                   <div>
                     <label className="text-[11px] text-text-muted block mb-1">Storage (GB)</label>
@@ -719,7 +713,7 @@ export default function AdminProductsPage() {
           </div>
 
           {/* SMTP Specific Quota Inputs */}
-          {planCategory === 'smtp_hosting' && (
+          {planCategory === 'smtp' && (
             <div className="p-3 bg-black/60 border border-white/10 rounded-2xl space-y-3">
               <p className="text-xs font-bold text-accent-cyan font-mono flex items-center gap-1.5">
                 <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

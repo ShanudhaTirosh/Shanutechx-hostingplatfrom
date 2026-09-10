@@ -7,11 +7,11 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     logger.info('Checking product catalog and seeding any missing platform products & plans...');
 
     // 1. SMTP Mail Hosting Product & Plans (5 Configurable Tiers)
-    let smtpProduct = await prisma.product.findFirst({ where: { category: 'smtp_hosting' } });
+    let smtpProduct = await prisma.product.findFirst({ where: { category: 'smtp' } });
     if (!smtpProduct) {
       smtpProduct = await prisma.product.create({
         data: {
-          category: 'smtp_hosting',
+          category: 'smtp',
           name: 'Enterprise Outbound SMTP & Business Email Hosting',
           slug: 'smtp-mail-hosting',
           description: 'High-reputation SMTP mailer with webmail client, custom domain support, DKIM/SPF signatures, forwarding rules, and email aliases. Minimum 3-month commitment.',
@@ -171,11 +171,11 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     }
 
     // 3. Node.js & Web Application Hosting
-    let nodeProduct = await prisma.product.findFirst({ where: { category: 'node_app_hosting' } });
+    let nodeProduct = await prisma.product.findFirst({ where: { category: 'app_catalog' } });
     if (!nodeProduct) {
       await prisma.product.create({
         data: {
-          category: 'node_app_hosting',
+          category: 'app_catalog',
           name: 'Node.js & Next.js App Hosting',
           slug: 'nodejs-app-hosting',
           description: 'Nixpacks-powered container hosting with automatic SSL, custom domain routing, and environment secrets.',
@@ -268,11 +268,11 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     }
 
     // 5. Python Application Hosting (FastAPI / Django / Flask)
-    let pythonProduct = await prisma.product.findFirst({ where: { category: 'python_app_hosting' } });
+    let pythonProduct = await prisma.product.findFirst({ where: { slug: 'python-app-hosting' } });
     if (!pythonProduct) {
       await prisma.product.create({
         data: {
-          category: 'python_app_hosting',
+          category: 'app_catalog',
           name: 'Python Application Hosting (FastAPI / Django / Flask)',
           slug: 'python-app-hosting',
           description: 'High-performance Python hosting with Gunicorn/Uvicorn, custom domain SSL routing, and environment secrets.',
@@ -302,11 +302,11 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     }
 
     // 6. Discord Bot Hosting (Node.js & Python)
-    let discordNodeProduct = await prisma.product.findFirst({ where: { category: 'discordbot_node' } });
+    let discordNodeProduct = await prisma.product.findFirst({ where: { slug: 'discord-bot-node' } });
     if (!discordNodeProduct) {
       await prisma.product.create({
         data: {
-          category: 'discordbot_node',
+          category: 'bot_hosting',
           name: 'Discord Bot Hosting (Node.js)',
           slug: 'discord-bot-node',
           description: '24/7 continuous process runner for Node.js Discord bots (discord.js / erela.js) with live logs and auto-restart.',
@@ -335,11 +335,11 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
       });
     }
 
-    let discordPyProduct = await prisma.product.findFirst({ where: { category: 'discordbot_python' } });
+    let discordPyProduct = await prisma.product.findFirst({ where: { slug: 'discord-bot-python' } });
     if (!discordPyProduct) {
       await prisma.product.create({
         data: {
-          category: 'discordbot_python',
+          category: 'bot_hosting',
           name: 'Discord Bot Hosting (Python)',
           slug: 'discord-bot-python',
           description: '24/7 continuous process runner for Python Discord bots (discord.py / nextcord) with automatic dependency caching.',
@@ -361,11 +361,11 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     }
 
     // 7. WhatsApp Bot Hosting (Baileys / web.js)
-    let waProduct = await prisma.product.findFirst({ where: { category: 'whatsappbot_hosting' } });
+    let waProduct = await prisma.product.findFirst({ where: { slug: 'whatsapp-bot-hosting' } });
     if (!waProduct) {
       await prisma.product.create({
         data: {
-          category: 'whatsappbot_hosting',
+          category: 'bot_hosting',
           name: 'WhatsApp Bot Hosting (Baileys / web.js)',
           slug: 'whatsapp-bot-hosting',
           description: 'Dedicated persistent container hosting for WhatsApp automation bots with persistent QR session storage.',
@@ -387,11 +387,11 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     }
 
     // 8. Lavalink Audio Node Hosting
-    let lavalinkProduct = await prisma.product.findFirst({ where: { category: 'lavalink_hosting' } });
+    let lavalinkProduct = await prisma.product.findFirst({ where: { slug: 'lavalink-audio-node' } });
     if (!lavalinkProduct) {
       await prisma.product.create({
         data: {
-          category: 'lavalink_hosting',
+          category: 'app_catalog',
           name: 'Lavalink Audio Node Hosting (Java)',
           slug: 'lavalink-audio-node',
           description: 'High-performance audio routing node for Discord music bots running Java 17+ and application.yml config.',

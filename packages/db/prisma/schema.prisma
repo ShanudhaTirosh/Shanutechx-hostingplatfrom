@@ -267,26 +267,12 @@ model Service {
 }
 
 enum ProductCategory {
-  vps_hosting
-  managed_database
-  app_container
-  email_hosting
-  media_livekit
-  cloud_storage
-  custom_service
-  web_hosting
-  ai_subscription
-  app_catalog
-  // Legacy DB compatibility variants
   vps
-  database_hosting
-  smtp_hosting
-  node_app_hosting
-  python_app_hosting
-  discordbot_node
-  discordbot_python
-  whatsappbot_hosting
-  lavalink_hosting
+  smtp
+  web_hosting
+  database
+  app_catalog
+  bot_hosting
 }
 
 enum PlanBillingType {
@@ -377,26 +363,12 @@ model OrderItem {
   quantity   Int      @default(1)
   configJson Json? // e.g. { repoUrl, runtime, envVars }
 
-  deployment            Deployment?
-  smtpAccount           SmtpAccount?
-  liveKitProject        LiveKitProject?
-  vpsProvision          VpsProvision?
-  managedDatabase       ManagedDatabase?
-  subscription          Subscription?
-  aiSubscriptionRequest AiSubscriptionRequest?
-}
-
-// When a Plan whose Product.category == ai_subscription is checked out,
-// provisioning is skipped entirely: the customer sees a popup with a
-// single "Open Ticket" button that creates the linked Ticket below with a
-// pre-filled reason — no free text required from the customer.
-model AiSubscriptionRequest {
-  id          String    @id @default(cuid())
-  orderItemId String    @unique
-  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
-  ticketId    String?   @unique
-  ticket      Ticket?   @relation(fields: [ticketId], references: [id])
-  createdAt   DateTime  @default(now())
+  deployment      Deployment?
+  smtpAccount     SmtpAccount?
+  liveKitProject  LiveKitProject?
+  vpsProvision    VpsProvision?
+  managedDatabase ManagedDatabase?
+  subscription    Subscription?
 }
 
 model Payment {
@@ -871,28 +843,26 @@ enum VpsProvisionStatus {
 // proxied through the Leaseweb API (see routes/leaseweb.ts). Only
 // admin/dev can Terminate; customers can Stop/Shutdown but never Terminate.
 model VpsProvision {
-  id            String             @id @default(cuid())
-  userId        String
-  user          User               @relation(fields: [userId], references: [id])
-  orderItemId   String             @unique
-  orderItem     OrderItem          @relation(fields: [orderItemId], references: [id])
-  provider      String // e.g. "leaseweb", "contabo", "vultr", "ovh", "custom"
-  externalId    String? // the upstream provider's VPS/instance ID
-  panelUrl      String?
-  ip            String? // Public IP address for direct SSH & SFTP management
-  sshPort       Int                @default(22) // SSH port (default 22)
-  username      String? // root or primary login username
-  credentialRef String? // encrypted password or SSH private key — see lib/secretsVault.ts
-  status        VpsProvisionStatus @default(pending)
-  createdAt     DateTime           @default(now())
-  provisionedAt DateTime?
+  id              String             @id @default(cuid())
+  userId          String
+  user            User               @relation(fields: [userId], references: [id])
+  orderItemId     String             @unique
+  orderItem       OrderItem          @relation(fields: [orderItemId], references: [id])
+  provider        String // "leaseweb", "digitalocean", "breezehost", "linode", "hetzner", "custom"
+  externalId      String? // upstream provider's VPS/instance ID
+  panelUrl        String?
+  ip              String? // Public IP address for direct SSH & SFTP management
+  sshPort         Int                @default(22) // SSH port (default 22)
+  username        String? // root or primary login username
+  credentialRef   String? // encrypted password or SSH private key — see lib/secretsVault.ts
+  sshPrivateKey   String? // optional encrypted private key reference — see lib/secretsVault.ts
+  sshPublicKey    String? // optional SSH public key text
+  notes           String? // optional manual setup notes for customer
+  status          VpsProvisionStatus @default(pending)
+  createdAt       DateTime           @default(now())
+  provisionedAt   DateTime?
+  provisionedById String? // User ID of admin/dev who completed manual setup
 
-  // Set when this is a Leaseweb VPS the admin/dev bought manually and
-  // assigned to this customer's order via the "import" flow (see
-  // routes/leaseweb.ts) — enables real power/console/credentials/snapshot
-  // management proxied through the Leaseweb API, instead of only the
-  // static panelUrl/username/credentialRef handoff fields above (which
-  // still work as-is for any non-Leaseweb VPS provider).
   leasewebVpsId String?
 }
 
@@ -905,7 +875,6 @@ enum NotificationEvent {
   deployment_failed
   deployment_recovered
   vps_assigned
-  new_ai_subscription_request
 }
 
 // Infra-level Discord channel webhooks, configured from the Dev Dashboard —
@@ -1136,8 +1105,7 @@ model Ticket {
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
-  messages              TicketMessage[]
-  aiSubscriptionRequest AiSubscriptionRequest?
+  messages TicketMessage[]
 }
 
 model TicketMessage {

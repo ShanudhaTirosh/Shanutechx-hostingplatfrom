@@ -26,7 +26,6 @@ const NOTIFICATION_EVENTS = [
   'new_ticket',
   'deployment_failed',
   'vps_assigned',
-  'new_ai_subscription_request',
 ] as const;
 
 const createSchema = z.object({

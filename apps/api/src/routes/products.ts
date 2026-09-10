@@ -10,25 +10,12 @@ import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/aut
 export const productsRouter = Router();
 
 const CATEGORIES = [
-  'vps_hosting',
-  'managed_database',
-  'app_container',
-  'email_hosting',
-  'media_livekit',
-  'cloud_storage',
-  'custom_service',
-  'web_hosting',
-  'ai_subscription',
-  'app_catalog',
   'vps',
-  'database_hosting',
-  'smtp_hosting',
-  'node_app_hosting',
-  'python_app_hosting',
-  'discordbot_node',
-  'discordbot_python',
-  'whatsappbot_hosting',
-  'lavalink_hosting',
+  'smtp',
+  'web_hosting',
+  'database',
+  'app_catalog',
+  'bot_hosting',
 ] as const;
 
 const BILLING_TYPES = ['one_time', 'monthly', 'quarterly', 'semiannual', 'yearly'] as const;

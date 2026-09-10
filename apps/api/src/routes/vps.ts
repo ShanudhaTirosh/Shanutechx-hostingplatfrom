@@ -34,7 +34,7 @@ const upload = multer({ limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB max S
 vpsRouter.use(requireAuth);
 
 const CREDENTIAL_SYNC_NOTICE =
-  '⚠️ IMPORTANT NOTE: If you change your root password directly inside the SSH terminal or external provider console, you MUST update your stored credentials in the control panel using "Update Credentials". Otherwise, automated reboot, SFTP file management, and browser SSH terminal will fail to authenticate.';
+  'IMPORTANT NOTE: If you change your root password directly inside the SSH terminal or external provider console, you MUST update your stored credentials in the control panel using "Update Credentials". Otherwise, automated reboot, SFTP file management, and browser SSH terminal will fail to authenticate.';
 
 const provisionSchema = z.object({
   userId: z.string(),
@@ -45,7 +45,18 @@ const provisionSchema = z.object({
   ip: z.string().min(1).optional(),
   sshPort: z.number().int().positive().default(22),
   username: z.string().min(1).default('root'),
-  password: z.string().min(1),
+  password: z.string().optional(),
+});
+
+const manualProvisionSchema = z.object({
+  provider: z.string().min(1).default('leaseweb'),
+  ip: z.string().min(1),
+  sshPort: z.number().int().positive().default(22),
+  username: z.string().min(1).default('root'),
+  password: z.string().optional(),
+  sshPrivateKey: z.string().optional(),
+  sshPublicKey: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 const testConnectionSchema = z.object({
@@ -106,7 +117,7 @@ vpsRouter.post('/vps-provisions', requireAdminOrDev, async (req: AuthedRequest, 
   }
 
   const { password, ...rest } = parsed.data;
-  const credentialRef = encryptSecret(password, env.secretsEncryptionKey);
+  const credentialRef = encryptSecret(password || '', env.secretsEncryptionKey);
 
   const provision = await prisma.vpsProvision.create({
     data: {
@@ -132,6 +143,90 @@ vpsRouter.post('/vps-provisions', requireAdminOrDev, async (req: AuthedRequest, 
     provision: omitCredentialRef(provision),
     notice: CREDENTIAL_SYNC_NOTICE,
   });
+});
+
+/**
+ * POST /api/vps-provisions/:id/manual-provision
+ * Admin/Dev manual setup completion endpoint: fills IP, username, credentials, provider, and notes.
+ */
+vpsRouter.post('/vps-provisions/:id/manual-provision', requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id }, include: { user: true } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+
+  const parsed = manualProvisionSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { password, sshPrivateKey, sshPublicKey, notes, ...rest } = parsed.data;
+
+  let credentialRef = provision.credentialRef;
+  if (password) {
+    credentialRef = encryptSecret(password, env.secretsEncryptionKey);
+  }
+
+  let encSshPrivateKey = provision.sshPrivateKey;
+  if (sshPrivateKey) {
+    encSshPrivateKey = encryptSecret(sshPrivateKey, env.secretsEncryptionKey);
+  }
+
+  const updated = await prisma.vpsProvision.update({
+    where: { id: provision.id },
+    data: {
+      ...rest,
+      credentialRef,
+      sshPrivateKey: encSshPrivateKey,
+      sshPublicKey: sshPublicKey || undefined,
+      notes: notes || undefined,
+      status: 'provisioned',
+      provisionedAt: new Date(),
+      provisionedById: req.user!.id,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: { adminId: req.user!.id, action: 'vps.manual_provision_completed', target: provision.id },
+  });
+
+  void notifyCustomer(
+    provision.user,
+    `Your VPS server is provisioned and ready! Server IP: ${updated.ip}, Username: ${updated.username || 'root'}. Connect via SSH or manage directly in your dashboard.`
+  );
+
+  res.json({
+    ok: true,
+    provision: omitCredentialRef(updated),
+    notice: CREDENTIAL_SYNC_NOTICE,
+  });
+});
+
+/**
+ * GET /api/vps-provisions/:id/download-key
+ * Downloads the SSH Private Key (.pem file) for a provisioned VPS.
+ */
+vpsRouter.get('/vps-provisions/:id/download-key', async (req: AuthedRequest, res: Response) => {
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  let keyContent = '';
+  if (provision.sshPrivateKey) {
+    keyContent = decryptSecret(provision.sshPrivateKey, env.secretsEncryptionKey);
+  } else if (provision.credentialRef) {
+    const raw = decryptSecret(provision.credentialRef, env.secretsEncryptionKey);
+    if (raw.includes('PRIVATE KEY')) {
+      keyContent = raw;
+    }
+  }
+
+  if (!keyContent) {
+    return res.status(404).json({ error: 'No SSH Private Key attached to this VPS server provision' });
+  }
+
+  const filename = `vps-key-${provision.ip || provision.id}.pem`;
+  res.setHeader('Content-Type', 'application/x-pem-file');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(keyContent);
 });
 
 /**

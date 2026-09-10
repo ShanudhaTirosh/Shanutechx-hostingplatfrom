@@ -44,7 +44,7 @@ export default async function ManagedDatabasesPage() {
   const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
 
   // Fetch database products from API/DB
-  const products = await fetchProducts('database_hosting');
+  const products = await fetchProducts('database');
 
   const allPlans = products.flatMap((p) =>
     (p.plans || []).map((plan) => ({

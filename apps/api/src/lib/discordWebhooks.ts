@@ -16,8 +16,7 @@ export type NotificationEvent =
   | 'new_ticket'
   | 'deployment_failed'
   | 'deployment_recovered'
-  | 'vps_assigned'
-  | 'new_ai_subscription_request';
+  | 'vps_assigned';
 
 const EVENT_COLOR: Record<NotificationEvent, number> = {
   new_payment_submitted: 0xf5a623, // amber
@@ -28,19 +27,17 @@ const EVENT_COLOR: Record<NotificationEvent, number> = {
   deployment_failed: 0xe74c3c, // red
   deployment_recovered: 0x2ecc71, // green
   vps_assigned: 0x2ecc71, // green
-  new_ai_subscription_request: 0x9b59b6, // purple
 };
 
 const EVENT_TITLE: Record<NotificationEvent, string> = {
-  new_payment_submitted: '💰 New Payment Proof Submitted',
-  payment_approved: '✅ Payment Approved & Auto-Provisioned',
-  payment_rejected: '❌ Payment Rejected',
-  new_order: '🛒 New Order Created',
-  new_ticket: '🎫 New Support Ticket Opened',
-  deployment_failed: '🔥 Deployment Failed',
-  deployment_recovered: '✅ Deployment Recovered',
-  vps_assigned: '🖥️ VPS Instance Provisioned',
-  new_ai_subscription_request: '🤖 AI Subscription Requested',
+  new_payment_submitted: 'New Payment Proof Submitted',
+  payment_approved: 'Payment Approved & Auto-Provisioned',
+  payment_rejected: 'Payment Rejected',
+  new_order: 'New Order Created',
+  new_ticket: 'New Support Ticket Opened',
+  deployment_failed: 'Deployment Failed',
+  deployment_recovered: 'Deployment Recovered',
+  vps_assigned: 'VPS Instance Assigned',
 };
 
 function buildEmbed(event: NotificationEvent, payload: Record<string, unknown>) {

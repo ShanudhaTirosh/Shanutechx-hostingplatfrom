@@ -145,8 +145,8 @@ reviewsRouter.get('/reviews/purchased-items', requireAuth, async (req: AuthedReq
       items.push(
         { id: 'vps_std', name: 'Cloud VPS KVM - Standard 4GB', category: 'vps' },
         { id: 'app_node', name: 'Next.js & Node App Hosting', category: 'web_hosting' },
-        { id: 'bot_python', name: '24/7 Discord & WhatsApp Bot Hosting', category: 'discordbot_python' },
-        { id: 'db_postgres', name: 'Managed PostgreSQL & Redis Database', category: 'database_hosting' },
+        { id: 'bot_python', name: '24/7 Discord & WhatsApp Bot Hosting', category: 'bot_hosting' },
+        { id: 'db_postgres', name: 'Managed PostgreSQL & Redis Database', category: 'database' },
         { id: 'catalog_app', name: '1-Click App Catalog Deployment', category: 'app_catalog' }
       );
     }
@@ -291,7 +291,7 @@ reviewsRouter.post('/reviews', requireAuth, async (req: AuthedRequest, res: Resp
     const hasAnyPaidOrder = paidOrders.length > 0 || activeSubs.length > 0;
     if (!hasAnyPaidOrder) {
       return res.status(403).json({
-        error: '🚫 Access Denied: Only customers with paid orders or active cloud subscriptions can write a review.',
+        error: 'Access Denied: Only customers with paid orders or active cloud subscriptions can write a review.',
         code: 'NO_PURCHASES',
       });
     }
@@ -328,12 +328,9 @@ reviewsRouter.post('/reviews', requireAuth, async (req: AuthedRequest, res: Resp
       }
     }
 
-    // BUG-C02 FIX: Previous condition was `!matchingPurchase && !hasAnyPaidOrder`
-    // which is always false at this point (hasAnyPaidOrder is asserted true above).
-    // The item-level check must stand on its own.
     if (!matchingPurchase) {
       return res.status(403).json({
-        error: `🚫 Item Purchase Required: You can only post a review for an item or category you have actually purchased.`,
+        error: 'Item Purchase Required: You can only post a review for an item or category you have actually purchased.',
         code: 'UNMATCHED_PRODUCT_PURCHASE',
       });
     }

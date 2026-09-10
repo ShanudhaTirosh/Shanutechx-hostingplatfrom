@@ -20,15 +20,12 @@ import {
 
 const CATEGORY_TABS: Array<{ id: string; label: string }> = [
   { id: 'all', label: 'All Products & Plans' },
-  { id: 'vps_hosting', label: 'VPS Hosting' },
-  { id: 'managed_database', label: 'Managed Databases' },
-  { id: 'app_container', label: 'App Containers' },
-  { id: 'email_hosting', label: 'Email & Mailboxes' },
-  { id: 'media_livekit', label: 'Media & LiveKit' },
-  { id: 'cloud_storage', label: 'Cloud Storage' },
+  { id: 'vps', label: 'VPS Hosting' },
+  { id: 'smtp', label: 'SMTP & Email' },
   { id: 'web_hosting', label: 'Web Hosting' },
-  { id: 'ai_subscription', label: 'AI Subscriptions' },
-  { id: 'custom_service', label: 'Custom Services' },
+  { id: 'database', label: 'Managed Databases' },
+  { id: 'app_catalog', label: 'App Catalog' },
+  { id: 'bot_hosting', label: 'Bot Hosting' },
 ];
 
 export default function AdminProductsAndPlansPage() {
@@ -49,7 +46,7 @@ export default function AdminProductsAndPlansPage() {
   const [saving, setSaving] = useState(false);
 
   // Product Form state
-  const [prodCategory, setProdCategory] = useState<ProductCategory>('vps_hosting');
+  const [prodCategory, setProdCategory] = useState<ProductCategory>('vps');
   const [prodName, setProdName] = useState('');
   const [prodDesc, setProdDesc] = useState('');
   const [prodIconUrl, setProdIconUrl] = useState('');
@@ -86,7 +83,7 @@ export default function AdminProductsAndPlansPage() {
   // Product Modal Handlers
   function openAddProductModal() {
     setEditingProduct(null);
-    setProdCategory(activeTab === 'all' ? 'vps_hosting' : (activeTab as ProductCategory));
+    setProdCategory(activeTab === 'all' ? 'vps' : (activeTab as ProductCategory));
     setProdName('');
     setProdDesc('');
     setProdIconUrl('');
@@ -243,7 +240,7 @@ export default function AdminProductsAndPlansPage() {
 
   // Filtered list
   const filteredProducts = products.filter((prod) => {
-    const matchesTab = activeTab === 'all' || prod.category === activeTab || (activeTab === 'vps_hosting' && (prod.category === 'vps' || prod.category === 'vps_hosting'));
+    const matchesTab = activeTab === 'all' || prod.category === activeTab;
     const matchesSearch =
       searchQuery === '' ||
       prod.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -508,15 +505,12 @@ export default function AdminProductsAndPlansPage() {
                   onChange={(e: any) => setProdCategory(e.target.value)}
                   className="w-full bg-[#121324] border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
                 >
-                  <option value="vps_hosting">VPS Hosting</option>
-                  <option value="managed_database">Managed Databases (Postgres, MySQL, Redis, MongoDB)</option>
-                  <option value="app_container">App Containers (Node.js, Python, Docker)</option>
-                  <option value="email_hosting">Email & Mailboxes (SMTP & Webmail)</option>
-                  <option value="media_livekit">Media & LiveKit Audio/Video Streaming</option>
-                  <option value="cloud_storage">Cloud Storage & Backups (R2/S3)</option>
+                  <option value="vps">VPS Hosting</option>
+                  <option value="smtp">SMTP & Mailboxes</option>
                   <option value="web_hosting">Web Hosting</option>
-                  <option value="ai_subscription">AI Subscriptions</option>
-                  <option value="custom_service">Custom Managed Service</option>
+                  <option value="database">Managed Databases</option>
+                  <option value="app_catalog">App Catalog</option>
+                  <option value="bot_hosting">Bot Hosting</option>
                 </select>
               </div>
 

@@ -27,7 +27,6 @@ import {
 } from '@/components/ui';
 import { apiFetch } from '@/lib/useAuth';
 import InvoiceModal from '@/components/InvoiceModal';
-import { AiSubscriptionPopup } from '@/components/AiSubscriptionPopup';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 function CalendarIcon() {
@@ -219,12 +218,7 @@ function UnifiedOrdersPortalContent({ initialTab = 'subscriptions' }: { initialT
   async function handleCartCheckout() {
     setCheckingOut(true);
     try {
-      const result = await api.cart.checkout(idempotencyKeyRef.current);
-      if (result.aiSubscriptionItems?.length) {
-        setAiSubItems(result.aiSubscriptionItems);
-        toast('Order placed! A few items need a quick support ticket to activate.', 'info');
-        return;
-      }
+      await api.cart.checkout(idempotencyKeyRef.current);
       toast('Order placed! Upload your payment proof in the Orders tab.', 'success');
       loadAllData();
       setActiveTab('orders');
@@ -590,16 +584,7 @@ function UnifiedOrdersPortalContent({ initialTab = 'subscriptions' }: { initialT
         )}
       </Modal>
 
-      {/* AI Subscription Popup */}
-      {aiSubItems.length > 0 && (
-        <AiSubscriptionPopup
-          items={aiSubItems}
-          onDone={() => {
-            setAiSubItems([]);
-            setActiveTab('orders');
-          }}
-        />
-      )}
+
     </div>
   );
 }

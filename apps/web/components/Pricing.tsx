@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Globe, Zap, Code, Bot, MessageSquare, Music, Monitor, Brain, Mail, Database, Package, ShoppingCart } from 'lucide-react';
+import { Globe, Zap, Code, Bot, MessageSquare, Music, Monitor, Brain, Mail, Database, Package, ShoppingCart, ExternalLink } from 'lucide-react';
 
 import { useCart } from '../context/CartContext';
 import GradientMeshOrb from './GradientMeshOrb';
@@ -11,17 +11,11 @@ import TiltCard from './motion/TiltCard';
 function renderCategoryIcon(category: string) {
   const className = "h-5 w-5 text-accent-violet-light";
   switch (category) {
-    case 'web_hosting': return <Globe className={className} />;
-    case 'node_app_hosting': return <Zap className={className} />;
-    case 'python_app_hosting': return <Code className={className} />;
-    case 'discordbot_node':
-    case 'discordbot_python': return <Bot className={className} />;
-    case 'whatsappbot_hosting': return <MessageSquare className={className} />;
-    case 'lavalink_hosting': return <Music className={className} />;
     case 'vps': return <Monitor className={className} />;
-    case 'ai_subscription': return <Brain className={className} />;
-    case 'smtp_hosting': return <Mail className={className} />;
-    case 'database_hosting': return <Database className={className} />;
+    case 'smtp': return <Mail className={className} />;
+    case 'web_hosting': return <Globe className={className} />;
+    case 'database': return <Database className={className} />;
+    case 'bot_hosting': return <Bot className={className} />;
     case 'app_catalog': default: return <Package className={className} />;
   }
 }
@@ -215,6 +209,70 @@ export default function Pricing() {
           })}
         </div>
       )}
+
+      {/* AI Subscriptions External Storefront Card */}
+      <Reveal className="mt-10">
+        <div className="glass rounded-2xl p-6 border border-purple-500/30 bg-gradient-to-r from-purple-900/40 via-indigo-900/30 to-slate-900/60 flex flex-col md:flex-row items-center justify-between gap-6 shadow-glow-violet">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
+              <Brain className="h-6 w-6 text-purple-300" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">Looking for AI Subscriptions &amp; ChatGPT Plus?</h3>
+              <p className="text-text-muted text-xs mt-1">
+                We offer specialized AI subscriptions, ChatGPT, Claude, and premium AI tools on our dedicated storefront.
+              </p>
+            </div>
+          </div>
+          <a
+            href="https://store.shanutechx.com"
+            target="_blank"
+            rel="noreferrer"
+            className="px-6 py-3 rounded-full text-xs font-bold bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/30 hover:opacity-90 transition-all shrink-0 flex items-center gap-2"
+          >
+            <span>Visit AI Storefront</span>
+            <ExternalLink className="w-4 h-4" />
+          </a>
+        </div>
+      </Reveal>
+
+      {/* Empty state when database returned zero products */}
+      {products !== null && displayed.length === 0 && (
+        <div
+          style={{
+            background: 'rgba(13, 11, 26, 0.75)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '24px',
+            padding: '48px 32px',
+            textAlign: 'center',
+            backdropFilter: 'blur(16px)',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+            maxWidth: '820px',
+            margin: '0 auto',
+          }}
+        >
+          <p style={{ fontSize: '15px', color: '#94a3b8', margin: 0, fontWeight: 500 }}>
+            No products are currently listed. Check back soon or contact support.
+          </p>
+        </div>
+      )}
+
+      <div className="mt-14 text-center">
+        <a
+          href="/pricing"
+          className="inline-flex items-center gap-2 text-sm font-medium text-accent-teal-bright hover:underline"
+        >
+          <span>Explore all infrastructure specifications, build settings &amp; VPS features</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </a>
+      </div>
+    </section>
+  );
+}
+
 
       {/* Empty state when database returned zero products */}
       {products !== null && displayed.length === 0 && (

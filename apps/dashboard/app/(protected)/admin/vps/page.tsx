@@ -27,6 +27,7 @@ import {
   IconStop,
   IconKey,
   IconActivity,
+  IconEdit,
 } from '@/components/Icons';
 
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,15 @@ type AdminVpsItem = VpsProvision & {
   };
 };
 
+const VPS_PROVIDERS = [
+  'Leaseweb',
+  'DigitalOcean',
+  'BreezeHost',
+  'Linode',
+  'Hetzner',
+  'Custom',
+];
+
 export default function AdminVpsFleetPage() {
   const { apiUser } = useAppUser();
   const [provisions, setProvisions] = useState<AdminVpsItem[] | null>(null);
@@ -47,15 +57,19 @@ export default function AdminVpsFleetPage() {
   const [search, setSearch] = useState<string>('');
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Deliver VPS Modal State
+  // Modal State for New / Manual Provisioning
   const [addModal, setAddModal] = useState<boolean>(false);
+  const [selectedProvision, setSelectedProvision] = useState<AdminVpsItem | null>(null);
+
   const [customerOptions, setCustomerOptions] = useState<Array<{ id: string; email: string; displayName?: string | null }>>([]);
   const [targetUserId, setTargetUserId] = useState<string>('');
   const [manualIp, setManualIp] = useState<string>('');
   const [manualPort, setManualPort] = useState<number>(22);
   const [manualUsername, setManualUsername] = useState<string>('root');
   const [manualPassword, setManualPassword] = useState<string>('');
-  const [manualProvider, setManualProvider] = useState<string>('STX Enterprise');
+  const [manualSshPrivateKey, setManualSshPrivateKey] = useState<string>('');
+  const [manualProvider, setManualProvider] = useState<string>('Leaseweb');
+  const [manualNotes, setManualNotes] = useState<string>('');
 
   // Diagnostics state
   const [testingConnection, setTestingConnection] = useState<string | null>(null);
@@ -82,18 +96,42 @@ export default function AdminVpsFleetPage() {
         .customers(100)
         .then((res) => {
           setCustomerOptions(res.customers || []);
-          if (res.customers?.[0]?.id) setTargetUserId(res.customers[0].id);
+          if (res.customers?.[0]?.id && !targetUserId) setTargetUserId(res.customers[0].id);
         })
         .catch(() => {});
     }
-  }, [addModal, isStaff, customerOptions.length]);
+  }, [addModal, isStaff, customerOptions.length, targetUserId]);
+
+  function openFulfillModal(item?: AdminVpsItem) {
+    setSelectedProvision(item || null);
+    if (item) {
+      setTargetUserId(item.userId);
+      setManualIp(item.ip || '');
+      setManualPort(item.sshPort || 22);
+      setManualUsername(item.username || 'root');
+      setManualPassword('');
+      setManualSshPrivateKey('');
+      setManualProvider(item.provider || 'Leaseweb');
+      setManualNotes(item.notes || '');
+    } else {
+      setManualIp('');
+      setManualPort(22);
+      setManualUsername('root');
+      setManualPassword('');
+      setManualSshPrivateKey('');
+      setManualProvider('Leaseweb');
+      setManualNotes('');
+    }
+    setTestResults(null);
+    setAddModal(true);
+  }
 
   async function handleTestConnection(testType: 'ssh' | 'sftp' | 'both') {
     if (!manualIp) {
       toast('Please enter server IP address', 'error');
       return;
     }
-    if (!manualPassword) {
+    if (!manualPassword && !manualSshPrivateKey) {
       toast('Please enter root password or private key', 'error');
       return;
     }
@@ -104,7 +142,7 @@ export default function AdminVpsFleetPage() {
         ip: manualIp,
         sshPort: manualPort,
         username: manualUsername,
-        password: manualPassword,
+        password: manualPassword || manualSshPrivateKey,
         testType,
       });
       setTestResults({
@@ -123,38 +161,49 @@ export default function AdminVpsFleetPage() {
     }
   }
 
-  async function handleDeliverVps() {
+  async function handleSaveAndDeliver() {
     if (!manualIp) {
       toast('IP address is required', 'error');
       return;
     }
-    if (!targetUserId) {
-      toast('Target customer selection is required', 'error');
-      return;
-    }
-    if (!manualPassword) {
-      toast('Root password is required', 'error');
-      return;
-    }
 
-    setBusyId('new');
+    setBusyId('modal');
     try {
-      await api.vps.create({
-        userId: targetUserId,
-        orderItemId: `manual-${Date.now()}`,
-        provider: manualProvider,
-        ip: manualIp,
-        sshPort: manualPort,
-        username: manualUsername,
-        password: manualPassword,
-      });
-      toast('VPS provisioned over SSH and delivered to customer account.', 'success');
+      if (selectedProvision) {
+        // Fulfill existing provision
+        await api.vps.manualProvision(selectedProvision.id, {
+          ip: manualIp,
+          sshPort: manualPort,
+          username: manualUsername,
+          password: manualPassword || undefined,
+          sshPrivateKey: manualSshPrivateKey || undefined,
+          provider: manualProvider,
+          notes: manualNotes || undefined,
+        });
+        toast('VPS provision details updated and customer notified.', 'success');
+      } else {
+        // Create new manual VPS delivery
+        if (!targetUserId) {
+          toast('Target customer selection is required', 'error');
+          setBusyId(null);
+          return;
+        }
+        await api.vps.create({
+          userId: targetUserId,
+          orderItemId: `manual-${Date.now()}`,
+          provider: manualProvider,
+          ip: manualIp,
+          sshPort: manualPort,
+          username: manualUsername,
+          password: manualPassword || manualSshPrivateKey || 'STX-default-key',
+        });
+        toast('VPS provisioned and delivered to customer account.', 'success');
+      }
       setAddModal(false);
-      setManualIp('');
-      setManualPassword('');
+      setSelectedProvision(null);
       load();
     } catch (err: any) {
-      toast(`Delivery failed: ${err.message}`, 'error');
+      toast(`Action failed: ${err.message}`, 'error');
     } finally {
       setBusyId(null);
     }
@@ -185,6 +234,7 @@ export default function AdminVpsFleetPage() {
     );
   });
 
+  const pendingCount = provisions?.filter((p) => p.status === 'pending').length || 0;
   const activeCount = provisions?.filter((p) => p.status === 'provisioned').length || 0;
   const totalCount = provisions?.length || 0;
 
@@ -193,10 +243,10 @@ export default function AdminVpsFleetPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <PageHeader
           title="Global Customer VPS Fleet"
-          description="Administrative overview and management of all provisioned Virtual Private Servers across all platform customer accounts."
+          description="Administrative overview and manual provisioning management for Virtual Private Servers."
         />
         {isStaff && (
-          <Button variant="primary" size="sm" onClick={() => setAddModal(true)} className="flex items-center gap-1.5">
+          <Button variant="primary" size="sm" onClick={() => openFulfillModal()} className="flex items-center gap-1.5">
             <IconPlus size={14} /> Deliver New VPS to Customer
           </Button>
         )}
@@ -208,17 +258,17 @@ export default function AdminVpsFleetPage() {
           <span className="text-text-muted text-xs block">Total VPS Fleet</span>
           <span className="text-2xl font-bold text-white font-mono">{totalCount}</span>
         </Card>
+        <Card className="bg-amber-500/10 border border-amber-500/20 p-4 space-y-1">
+          <span className="text-amber-300 text-xs block">Pending Manual Setup</span>
+          <span className="text-2xl font-bold text-amber-400 font-mono">{pendingCount}</span>
+        </Card>
         <Card className="bg-emerald-500/10 border border-emerald-500/20 p-4 space-y-1">
           <span className="text-emerald-300 text-xs block">Active & Provisioned</span>
           <span className="text-2xl font-bold text-emerald-400 font-mono">{activeCount}</span>
         </Card>
         <Card className="bg-cyan-500/10 border border-cyan-500/20 p-4 space-y-1">
-          <span className="text-cyan-300 text-xs block">SSH Telemetry Daemon</span>
-          <span className="text-2xl font-bold text-cyan-400 font-mono">100% Agent</span>
-        </Card>
-        <Card className="bg-purple-500/10 border border-purple-500/20 p-4 space-y-1">
-          <span className="text-purple-300 text-xs block">Monthly Quota / Host</span>
-          <span className="text-2xl font-bold text-purple-400 font-mono">30 TB</span>
+          <span className="text-cyan-300 text-xs block">Supported Providers</span>
+          <span className="text-2xl font-bold text-cyan-400 font-mono">Leaseweb, DO, Linode</span>
         </Card>
       </div>
 
@@ -253,7 +303,7 @@ export default function AdminVpsFleetPage() {
                 <tr>
                   <th className="p-3">Customer Account</th>
                   <th className="p-3">Server IP & Port</th>
-                  <th className="p-3">Provider Tier</th>
+                  <th className="p-3">Provider</th>
                   <th className="p-3">Status</th>
                   <th className="p-3">Credentials</th>
                   <th className="p-3 text-right">Actions</th>
@@ -270,27 +320,47 @@ export default function AdminVpsFleetPage() {
                       <div className="text-accent-teal font-bold">{p.ip || 'Pending IP'}</div>
                       <span className="text-[10px] text-text-muted">Port: {p.sshPort || 22} ({p.username || 'root'})</span>
                     </td>
-                    <td className="p-3 text-text-muted">{p.provider || 'Custom'}</td>
+                    <td className="p-3 text-text-muted">{p.provider || 'Leaseweb'}</td>
                     <td className="p-3">
-                      <Badge status={p.status === 'provisioned' ? 'running' : 'pending'} />
+                      {p.status === 'provisioned' ? (
+                        <Badge status="running" />
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          Pending Setup
+                        </span>
+                      )}
                     </td>
                     <td className="p-3">
-                      <RevealSecret
-                        fetchSecret={() =>
-                          api.vps.revealPassword(p.id).then((r) => `${r.username || 'root'}:${r.password}`)
-                        }
-                      />
+                      {p.status === 'provisioned' ? (
+                        <RevealSecret
+                          fetchSecret={() =>
+                            api.vps.revealPassword(p.id).then((r) => `${r.username || 'root'}:${r.password}`)
+                          }
+                        />
+                      ) : (
+                        <span className="text-[10px] text-amber-400">Awaiting Admin Input</span>
+                      )}
                     </td>
                     <td className="p-3 text-right space-x-1">
                       <Button
                         size="sm"
-                        variant="secondary"
-                        loading={busyId === p.id}
-                        onClick={() => handlePowerAction(p.id, 'reboot')}
+                        variant={p.status === 'pending' ? 'primary' : 'secondary'}
+                        onClick={() => openFulfillModal(p)}
                         className="text-[10px] py-1 px-2"
                       >
-                        <IconRestart size={11} /> Reboot
+                        <IconEdit size={11} /> {p.status === 'pending' ? 'Setup VPS' : 'Edit Credentials'}
                       </Button>
+                      {p.status === 'provisioned' && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          loading={busyId === p.id}
+                          onClick={() => handlePowerAction(p.id, 'reboot')}
+                          className="text-[10px] py-1 px-2"
+                        >
+                          <IconRestart size={11} /> Reboot
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -300,39 +370,58 @@ export default function AdminVpsFleetPage() {
         </Card>
       )}
 
-      {/* Deliver VPS Modal */}
+      {/* Deliver / Setup VPS Modal */}
       {addModal && isStaff && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <Card className="max-w-lg w-full border border-white/20 bg-neutral-900 space-y-4 shadow-2xl">
+          <Card className="max-w-lg w-full border border-white/20 bg-neutral-900 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-2 border-b border-white/10">
-              <h3 className="text-base font-bold text-white">Deliver VPS (Assign to Customer)</h3>
+              <h3 className="text-base font-bold text-white">
+                {selectedProvision ? `Setup Customer VPS (${selectedProvision.user?.email || selectedProvision.id})` : 'Deliver New VPS to Customer'}
+              </h3>
               <button onClick={() => setAddModal(false)} className="text-text-muted hover:text-white text-sm">✕</button>
             </div>
 
             <div className="space-y-3 text-xs">
+              {!selectedProvision && (
+                <div>
+                  <label className="text-text-muted block mb-1">Target Customer Account *</label>
+                  {customerOptions.length > 0 ? (
+                    <select
+                      value={targetUserId}
+                      onChange={(e) => setTargetUserId(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                    >
+                      {customerOptions.map((c) => (
+                        <option key={c.id} value={c.id} className="bg-neutral-900 text-white">
+                          {c.email} ({c.displayName || c.id})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Enter Customer User ID"
+                      value={targetUserId}
+                      onChange={(e) => setTargetUserId(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white font-mono"
+                    />
+                  )}
+                </div>
+              )}
+
               <div>
-                <label className="text-text-muted block mb-1">Target Customer Account *</label>
-                {customerOptions.length > 0 ? (
-                  <select
-                    value={targetUserId}
-                    onChange={(e) => setTargetUserId(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
-                  >
-                    {customerOptions.map((c) => (
-                      <option key={c.id} value={c.id} className="bg-neutral-900 text-white">
-                        {c.email} ({c.displayName || c.id})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    placeholder="Enter Customer User ID"
-                    value={targetUserId}
-                    onChange={(e) => setTargetUserId(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white font-mono"
-                  />
-                )}
+                <label className="text-text-muted block mb-1">Infrastructure Provider *</label>
+                <select
+                  value={manualProvider}
+                  onChange={(e) => setManualProvider(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                >
+                  {VPS_PROVIDERS.map((prov) => (
+                    <option key={prov} value={prov} className="bg-neutral-900 text-white">
+                      {prov}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
@@ -340,7 +429,7 @@ export default function AdminVpsFleetPage() {
                   <label className="text-text-muted block mb-1">Server IP Address *</label>
                   <input
                     type="text"
-                    placeholder="192.168.1.100"
+                    placeholder="e.g. 192.168.1.100"
                     value={manualIp}
                     onChange={(e) => setManualIp(e.target.value)}
                     className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white font-mono"
@@ -368,15 +457,37 @@ export default function AdminVpsFleetPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-text-muted block mb-1">Root Password *</label>
+                  <label className="text-text-muted block mb-1">Root / SSH Password</label>
                   <input
                     type="password"
-                    placeholder="••••••••"
+                    placeholder="Password for SSH access"
                     value={manualPassword}
                     onChange={(e) => setManualPassword(e.target.value)}
                     className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white font-mono"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-text-muted block mb-1">SSH Private Key (Optional - .pem format)</label>
+                <textarea
+                  rows={3}
+                  placeholder="-----BEGIN RSA PRIVATE KEY-----..."
+                  value={manualSshPrivateKey}
+                  onChange={(e) => setManualSshPrivateKey(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white font-mono text-[11px]"
+                />
+              </div>
+
+              <div>
+                <label className="text-text-muted block mb-1">Notes / Internal Remarks</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Purchased via Leaseweb Order #1048"
+                  value={manualNotes}
+                  onChange={(e) => setManualNotes(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white font-mono"
+                />
               </div>
 
               {/* Pre-Delivery Connection Diagnostic Section */}
@@ -406,16 +517,6 @@ export default function AdminVpsFleetPage() {
                     >
                       <IconFolder size={12} /> Test SFTP
                     </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => handleTestConnection('both')}
-                      loading={testingConnection === 'both'}
-                      className="text-[11px] border-purple-500/30 text-purple-300"
-                    >
-                      Test Both
-                    </Button>
                   </div>
                 </div>
 
@@ -442,8 +543,8 @@ export default function AdminVpsFleetPage() {
               <Button size="sm" variant="secondary" onClick={() => setAddModal(false)}>
                 Cancel
               </Button>
-              <Button size="sm" variant="primary" onClick={handleDeliverVps} loading={busyId === 'new'}>
-                Save & Deliver to Customer
+              <Button size="sm" variant="primary" onClick={handleSaveAndDeliver} loading={busyId === 'modal'}>
+                {selectedProvision ? 'Save Credentials & Fulfill' : 'Deliver VPS'}
               </Button>
             </div>
           </Card>

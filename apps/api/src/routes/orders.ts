@@ -204,16 +204,6 @@ ordersRouter.post('/cart/checkout', idempotent, async (req: AuthedRequest, res) 
 
   const { total, totalLkr, currency } = await recalculateTotal(order.id);
 
-  // Items whose Plan.product.category is ai_subscription never get
-  // auto-provisioned — the frontend shows a popup for each of these with a
-  // single "Open Ticket" button (see routes/aiSubscription.ts). Reported
-  // here regardless of payment status since opening the ticket doesn't
-  // depend on payment being verified yet.
-  const aiSubscriptionItems = await prisma.orderItem.findMany({
-    where: { orderId: order.id, plan: { product: { category: 'ai_subscription' } } },
-    include: { plan: { include: { product: true } } },
-  });
-
   if (totalLkr === 0) {
     const updated = await prisma.order.update({
       where: { id: order.id },
@@ -250,13 +240,11 @@ ordersRouter.post('/cart/checkout', idempotent, async (req: AuthedRequest, res) 
       [{ name: 'Free Cloud Package', quantity: 1, price: 0 }]
     ).catch(() => {});
 
-
     return res.json({
       order: updated,
       total,
       currency: currency ?? 'LKR',
       free: true,
-      aiSubscriptionItems: aiSubscriptionItems.map((i: { id: string; plan: { name: string } | null }) => ({ id: i.id, planName: i.plan!.name })),
     });
   }
 
@@ -272,7 +260,6 @@ ordersRouter.post('/cart/checkout', idempotent, async (req: AuthedRequest, res) 
     total,
     currency,
     free: false,
-    aiSubscriptionItems: aiSubscriptionItems.map((i: { id: string; plan: { name: string } | null }) => ({ id: i.id, planName: i.plan!.name })),
   });
 });
 

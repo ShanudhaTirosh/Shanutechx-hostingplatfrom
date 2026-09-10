@@ -25,6 +25,8 @@ import {
   IconHardDrive,
   IconActivity,
   IconPlus,
+  IconDownload,
+  IconFileText,
 } from '@/components/Icons';
 import { VpsFileManager } from '@/components/VpsFileManager';
 import { VpsFirewallManager } from '@/components/VpsFirewallManager';
@@ -70,9 +72,11 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
 
   const { toast } = useToast();
   const isTerminated = p.status === 'terminated';
+  const isPending = p.status === 'pending';
+  const orderId = (p as any).orderItem?.orderId;
 
   function fetchTelemetry() {
-    if (!p.ip || isTerminated) {
+    if (!p.ip || isTerminated || isPending) {
       setLoadingStats(false);
       return;
     }
@@ -87,7 +91,7 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
   }
 
   function fetchContainers() {
-    if (!p.ip || isTerminated) return;
+    if (!p.ip || isTerminated || isPending) return;
     setLoadingContainers(true);
     // Fetch container list via nodeEngine/containers API endpoint
     api.nodeEngine
@@ -236,60 +240,89 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
             <span className="ml-2 font-mono text-text-muted">User: {p.username || 'root'}</span>
           </p>
         </div>
-        <Badge status={isTerminated ? 'terminated' : p.status || 'active'} />
+        <div className="flex items-center gap-2">
+          {orderId && (
+            <a
+              href={`${api.baseURL}/api/orders/${orderId}/invoice`}
+              target="_blank"
+              rel="noreferrer"
+              title="Download Order Invoice PDF"
+              className="px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[11px] text-text-muted hover:text-white flex items-center gap-1 transition-colors"
+            >
+              <IconFileText size={12} /> Invoice
+            </a>
+          )}
+          <Badge status={isTerminated ? 'terminated' : isPending ? 'pending' : p.status || 'active'} />
+        </div>
       </div>
 
-      {/* Telemetry Stats Grid */}
-      {loadingStats ? (
-        <div className="py-2 text-center text-xs text-text-muted">Loading live SSH telemetry...</div>
-      ) : stats ? (
-        <div className="grid grid-cols-3 gap-2 text-[11px] font-mono bg-white/5 rounded-xl p-3 border border-white/5">
-          <div className="flex items-center gap-2">
-            <IconCpu size={16} className="text-accent-teal shrink-0" />
-            <div>
-              <span className="text-text-muted block text-[9px]">CPU Cores</span>
-              <span className="text-white font-bold">{stats.cpuCores || 1} vCPU</span>
-            </div>
+      {/* Pending Setup Alert Banner */}
+      {isPending && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 text-xs animate-fade-in">
+          <div className="flex items-center gap-2 text-amber-300 font-semibold">
+            <IconActivity size={16} /> VPS Setup Pending Manual Provisioning
           </div>
-          <div className="flex items-center gap-2">
-            <IconActivity size={16} className="text-emerald-400 shrink-0" />
-            <div>
-              <span className="text-text-muted block text-[9px]">RAM Usage</span>
-              <span className="text-emerald-300 font-bold">{stats.ramUsedMb || 0} / {stats.ramTotalMb || 1024} MB</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <IconHardDrive size={16} className="text-cyan-400 shrink-0" />
-            <div>
-              <span className="text-text-muted block text-[9px]">Disk Storage</span>
-              <span className="text-cyan-300 font-bold">{stats.diskUsedGb || 0} / {stats.diskTotalGb || 20} GB</span>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="text-xs text-text-muted bg-white/5 rounded-xl p-2.5 font-mono text-center">
-          SSH Telemetry Agent connected ({p.ip}:{p.sshPort || 22})
+          <p className="text-text-muted leading-relaxed">
+            Your Virtual Private Server is queued for manual setup by our engineering team. Server IP address, SSH root credentials, and downloadable SSH private key (.pem) will be delivered here automatically upon completion.
+          </p>
         </div>
       )}
 
-      {/* Per-VPS 30 TB Bandwidth Quota Indicator */}
-      <div className="bg-black/30 rounded-xl p-3 border border-white/10 space-y-1.5 font-mono text-[11px]">
-        <div className="flex items-center justify-between">
-          <span className="text-text-muted text-[10px]">VPS Bandwidth Quota (Per-Instance)</span>
-          <span className="text-accent-cyan font-bold">
-            {stats?.bandwidthUsedGb ? (stats.bandwidthUsedGb / 1024).toFixed(2) : '0.14'} TB / 30.0 TB
-          </span>
-        </div>
-        <div className="w-full bg-black/50 h-2 rounded-full overflow-hidden border border-white/10">
-          <div
-            className="bg-gradient-to-r from-cyan-400 to-purple-500 h-full transition-all duration-500"
-            style={{ width: `${Math.min(100, Math.max(1, ((stats?.bandwidthUsedGb || 140) / 30000) * 100))}%` }}
-          />
-        </div>
-      </div>
+      {/* Telemetry Stats Grid (Provisioned Servers Only) */}
+      {!isPending && (
+        <>
+          {loadingStats ? (
+            <div className="py-2 text-center text-xs text-text-muted">Loading live SSH telemetry...</div>
+          ) : stats ? (
+            <div className="grid grid-cols-3 gap-2 text-[11px] font-mono bg-white/5 rounded-xl p-3 border border-white/5">
+              <div className="flex items-center gap-2">
+                <IconCpu size={16} className="text-accent-teal shrink-0" />
+                <div>
+                  <span className="text-text-muted block text-[9px]">CPU Cores</span>
+                  <span className="text-white font-bold">{stats.cpuCores || 1} vCPU</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <IconActivity size={16} className="text-emerald-400 shrink-0" />
+                <div>
+                  <span className="text-text-muted block text-[9px]">RAM Usage</span>
+                  <span className="text-emerald-300 font-bold">{stats.ramUsedMb || 0} / {stats.ramTotalMb || 1024} MB</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <IconHardDrive size={16} className="text-cyan-400 shrink-0" />
+                <div>
+                  <span className="text-text-muted block text-[9px]">Disk Storage</span>
+                  <span className="text-cyan-300 font-bold">{stats.diskUsedGb || 0} / {stats.diskTotalGb || 20} GB</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-text-muted bg-white/5 rounded-xl p-2.5 font-mono text-center">
+              SSH Telemetry Agent connected ({p.ip}:{p.sshPort || 22})
+            </div>
+          )}
+
+          {/* Per-VPS 30 TB Bandwidth Quota Indicator */}
+          <div className="bg-black/30 rounded-xl p-3 border border-white/10 space-y-1.5 font-mono text-[11px]">
+            <div className="flex items-center justify-between">
+              <span className="text-text-muted text-[10px]">VPS Bandwidth Quota (Per-Instance)</span>
+              <span className="text-accent-cyan font-bold">
+                {stats?.bandwidthUsedGb ? (stats.bandwidthUsedGb / 1024).toFixed(2) : '0.14'} TB / 30.0 TB
+              </span>
+            </div>
+            <div className="w-full bg-black/50 h-2 rounded-full overflow-hidden border border-white/10">
+              <div
+                className="bg-gradient-to-r from-cyan-400 to-purple-500 h-full transition-all duration-500"
+                style={{ width: `${Math.min(100, Math.max(1, ((stats?.bandwidthUsedGb || 140) / 30000) * 100))}%` }}
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Actions Toolbar */}
-      {!isTerminated && (
+      {!isTerminated && !isPending && (
         <div className="space-y-3 pt-1">
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="primary" onClick={() => setShowTerminal(true)} className="flex items-center gap-1.5">
@@ -323,6 +356,14 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
             >
               <IconRestart size={14} /> Restart
             </Button>
+
+            <a
+              href={`${api.baseURL}${api.vps.downloadKeyUrl(p.id)}`}
+              download
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-medium transition-colors"
+            >
+              <IconDownload size={13} /> Download SSH Key (.pem)
+            </a>
           </div>
 
           {/* Secondary Utilities */}
@@ -383,6 +424,7 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
           </div>
         </div>
       )}
+
 
       {/* SFTP File Manager Drawer */}
       {showSftp && (

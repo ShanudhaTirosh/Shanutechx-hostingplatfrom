@@ -177,9 +177,9 @@ export default function RedesignedMailboxStudioPage() {
       .then((res) => setContacts(res.contacts || []))
       .catch(() => {});
 
-    api.products.list('smtp_hosting')
+    api.products.list('smtp')
       .then((res) => {
-        const prod = res.products?.find((p) => p.category === 'smtp_hosting') || res.products?.[0];
+        const prod = res.products?.find((p) => p.category === 'smtp') || res.products?.[0];
         if (prod?.plans) setAvailablePlans(prod.plans);
       })
       .catch(() => {});

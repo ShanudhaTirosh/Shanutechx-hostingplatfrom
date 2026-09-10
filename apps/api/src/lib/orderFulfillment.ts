@@ -50,132 +50,59 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
     const productName = (item.plan?.product?.name || item.plan?.name || item.service?.name || '').toLowerCase();
     const productCategory = (item.plan?.product?.category || '').toLowerCase();
 
-    // BUG-H01 FIX: productCategory is the sole canonical type discriminator.
-    // Name substring matching is kept only as an explicit legacy fallback for
-    // old Service records that predate the category field being populated.
-    const isVps =
-      productCategory === 'vps' ||
-      productCategory === 'vps_plans' ||
-      productCategory === 'leaseweb' ||
-      // Legacy fallback — only for Service rows without a category
-      (!productCategory && (
-        productName.includes('vps') ||
-        productName.includes('cloud server') ||
-        productName.includes('kvm')
-      ));
+    // Canonical product category discriminators
+    const isVps = productCategory === 'vps';
+    const isSmtp = productCategory === 'smtp';
+    const isManagedDb = productCategory === 'database';
+    const isAppCatalog = productCategory === 'app_catalog';
+    const isBotHosting = productCategory === 'bot_hosting';
+    const isWebHosting = productCategory === 'web_hosting';
+    const isLiveKit = isAppCatalog && (productName.includes('livekit') || productName.includes('webrtc'));
 
-    const isSmtp =
-      productCategory === 'smtp_hosting' ||
-      productCategory === 'smtp' ||
-      (!productCategory && (
-        productName.includes('smtp') ||
-        productName.includes('mail')
-      ));
-
-    const isLiveKit =
-      productCategory === 'livekit' ||
-      (!productCategory && productName.includes('livekit'));
-
-    const isManagedDb =
-      productCategory === 'managed_database' ||
-      (!productCategory && productName.includes('database'));
-
-    const isAppHosting =
-      productCategory === 'web_hosting' ||
-      productCategory === 'node_app_hosting' ||
-      productCategory === 'python_app_hosting' ||
-      productCategory === 'discordbot_node' ||
-      productCategory === 'discordbot_python' ||
-      productCategory === 'whatsappbot_hosting' ||
-      productCategory === 'lavalink_hosting' ||
-      productCategory === 'app_catalog' ||
-      (!productCategory && (
-        productName.includes('bot') ||
-        productName.includes('hosting') ||
-        productName.includes('app')
-      ));
-
-    const isAiSub =
-      productCategory === 'ai_subscription' ||
-      (!productCategory && (/\bai\b/i.test(productName) || productName.includes('gemini') || productName.includes('gpt')));
-
+    // 1. VPS Servers — Manual Setup Flow by Admins/Devs upon Payment Approval
     if (isVps) {
       try {
-        const existingVps = await prisma.vpsProvision.findFirst({
+        let vps = await prisma.vpsProvision.findFirst({
           where: { orderItemId: item.id },
         });
 
-        if (!existingVps) {
-          const autoRootPassword = `Vps_${crypto.randomBytes(12).toString('base64url')}`;
-          const credentialRef = encryptSecret(autoRootPassword, env.secretsEncryptionKey);
+        if (!vps) {
+          const configObj = item.configJson as Record<string, any> | null;
+          const provider = configObj?.provider || 'leaseweb';
 
-          // Find an available compute node. If none available, halt and notify ops.
-          const targetNode = await selectNodeForDeployment({ requiredTag: 'vps', isAdminDeployment: true })
-            .catch(() => prisma.node.findFirst({ where: { isActive: true } }));
-
-          // BUG-H06 FIX: Never provision a VPS with a fake RFC-1918 IP.
-          // If no node is available, skip provisioning and alert the ops team.
-          if (!targetNode) {
-            logger.error({ orderId: order.id, itemId: item.id }, 'VPS provisioning skipped: no active node available. Manual intervention required.');
-            void notifyAdmins(
-              `⚠️ VPS provisioning FAILED for order ${order.id}: no active compute node available. Manual setup required.`
-            );
-            void notifyDiscordChannel('vps_assigned', {
-              Alert: '⚠️ VPS PROVISIONING FAILED — NO NODE',
-              Order: order.id,
-              Customer: order.user.email,
-              Plan: item.plan?.name || item.service?.name || 'VPS Server',
-              Reason: 'No active compute node available',
-              Action: 'Manual provisioning required',
-            });
-            manualVpsItems.push(item.plan?.name || item.service?.name || 'VPS Plan');
-            continue;
-          }
-
-          const vps = await prisma.vpsProvision.create({
+          vps = await prisma.vpsProvision.create({
             data: {
               userId: order.userId,
               orderItemId: item.id,
-              provider: 'shanutechx_cloud',
-              ip: targetNode.ip,
+              provider,
+              status: 'pending',
               sshPort: 22,
-              username: 'root',
-              credentialRef,
-              status: 'provisioned',
-              provisionedAt: new Date(),
             },
           });
 
-          fulfilledItems.push(`VPS Server (${targetNode.ip})`);
-          logger.info({ orderId: order.id, vpsId: vps.id, ip: targetNode.ip }, 'Auto-provisioned VPS instance');
+          logger.info({ orderId: order.id, vpsId: vps.id }, 'VPS item registered for manual admin provisioning');
 
-          // Send automated credential delivery email to customer
           void notifyCustomer(
             order.user,
-            `Your VPS server is provisioned and ready!\n\n` +
-            `Server IP: ${targetNode.ip}\n` +
-            `Username: root\n` +
-            `Password: ${autoRootPassword}\n` +
-            `SSH Port: 22\n\n` +
-            `You can connect via SSH or manage your server directly in the dashboard under VPS Management.`
+            `Payment approved for order ${order.id}. Your VPS server setup request is queued for manual provisioning by our admin team. You will be notified once server credentials and IP are configured.`
           );
-        } else {
-          manualVpsItems.push(item.plan?.name || item.service?.name || 'VPS Plan');
         }
-      } catch (err) {
-        logger.error({ orderId: order.id, err }, 'Automated VPS provisioning failed, falling back to manual review notification');
-        manualVpsItems.push(item.plan?.name || item.service?.name || 'VPS Plan');
-      }
 
-      // Dispatch notification to team channel
-      void notifyDiscordChannel('vps_assigned', {
-        Alert: '⚡ VPS PROVISIONED',
-        Order: order.id,
-        Customer: order.user.email,
-        Plan: item.plan?.name || item.service?.name || 'VPS Server',
-        Amount: `LKR ${order.totalLkr}`,
-        Status: 'Auto-Provisioned & Delivered',
-      });
+        manualVpsItems.push(item.plan?.name || item.service?.name || 'VPS Server');
+
+        void notifyAdmins(`VPS Order Approved - Manual Provisioning Required for order ${order.id}`);
+        void notifyDiscordChannel('vps_assigned', {
+          Alert: 'VPS ORDER APPROVED - MANUAL SETUP REQUIRED',
+          Order: order.id,
+          Customer: order.user.email,
+          Plan: item.plan?.name || item.service?.name || 'VPS Server',
+          Amount: `LKR ${order.totalLkr}`,
+          Status: 'Pending Admin Manual Setup',
+        });
+      } catch (err) {
+        logger.error({ orderId: order.id, err }, 'Failed to initialize VPS manual provision record');
+        manualVpsItems.push(item.plan?.name || item.service?.name || 'VPS Server');
+      }
       continue;
     }
 
@@ -330,8 +257,8 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
       }
     }
 
-    // 4. Application & Bot Hosting (using canonical category — BUG-H01 FIX above)
-    if (isAppHosting && !isSmtp && !isVps && !isLiveKit && !isManagedDb) {
+    // 4. Application, Bot Hosting & Container Catalog
+    if ((isWebHosting || isBotHosting || isAppCatalog) && !isSmtp && !isVps && !isManagedDb) {
       const existingDep = await prisma.deployment.findFirst({
         where: { orderItemId: item.id },
       });
@@ -348,14 +275,6 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
             const subdomain = `${subPrefix}-${crypto.randomBytes(3).toString('hex')}`;
             const specs: any = item.plan?.specsJson || {};
 
-            let serviceType = 'web_hosting';
-            if (productCategory === 'discordbot_node') serviceType = 'discordbot_node';
-            else if (productCategory === 'discordbot_python') serviceType = 'discordbot_python';
-            else if (productCategory === 'whatsappbot_hosting') serviceType = 'whatsapp_baileys';
-            else if (productCategory === 'lavalink_hosting') serviceType = 'lavalink';
-            else if (productCategory === 'python_app_hosting') serviceType = 'python_hosting';
-            else if (productCategory === 'node_app_hosting') serviceType = 'node_hosting';
-
             const dep = await prisma.deployment.create({
               data: {
                 userId: order.userId,
@@ -367,7 +286,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
                 cpuLimit: specs.cpuCores ?? undefined,
                 memoryLimit: specs.memoryMB ?? specs.ramMB ?? undefined,
                 storageLimit: specs.storageGB ?? undefined,
-                exposureMode: serviceType.includes('bot') || serviceType === 'lavalink' ? 'no_ssl' : 'ssl_with_proxy',
+                exposureMode: isBotHosting ? 'no_ssl' : 'ssl_with_proxy',
               },
             });
 
@@ -378,15 +297,6 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
           logger.error({ orderId: order.id, err }, 'Failed to auto-provision Deployment slot');
         }
       }
-    }
-
-    // 5. AI Subscriptions (using canonical category — BUG-H01 FIX above)
-    if (isAiSub) {
-      fulfilledItems.push(`AI Subscription (${item.plan?.name || 'AI Access'})`);
-      void notifyCustomer(
-        order.user,
-        `Your AI Subscription for order ${order.id} is active! Please visit Support Tickets to access your AI environment credentials.`
-      );
     }
   }
 

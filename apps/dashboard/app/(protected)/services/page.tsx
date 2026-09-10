@@ -33,47 +33,21 @@ import {
 export const dynamic = 'force-dynamic';
 
 const CATEGORY_LABEL: Record<ProductCategory, string> = {
+  vps: 'VPS Hosting',
+  smtp: 'SMTP & Email',
   web_hosting: 'Web Hosting',
-  node_app_hosting: 'Node.js App Hosting',
-  python_app_hosting: 'Python App Hosting',
-  discordbot_node: 'Discord Bot (Node.js)',
-  discordbot_python: 'Discord Bot (Python)',
-  whatsappbot_hosting: 'WhatsApp Bot Hosting',
-  lavalink_hosting: 'Lavalink Hosting',
-  vps: 'VPS',
-  vps_hosting: 'VPS Hosting',
-  ai_subscription: 'AI Subscriptions',
-  smtp_hosting: 'SMTP / Mail Hosting',
-  email_hosting: 'Email Hosting',
-  database_hosting: 'Databases',
-  managed_database: 'Managed Database',
-  app_container: 'App Container',
-  media_livekit: 'LiveKit Media Engine',
-  cloud_storage: 'Cloud Storage S3',
-  custom_service: 'Custom Service',
+  database: 'Managed Databases',
   app_catalog: 'App Catalog',
+  bot_hosting: 'Bot Hosting',
 };
 
 const CATEGORY_COLOR: Record<ProductCategory, string> = {
-  web_hosting: 'bg-accent-violet/10 text-accent-violet-light border border-accent-violet/20',
-  node_app_hosting: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
-  python_app_hosting: 'bg-blue-500/10 text-blue-300 border border-blue-500/20',
-  discordbot_node: 'bg-purple-500/10 text-purple-300 border border-purple-500/20',
-  discordbot_python: 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20',
-  whatsappbot_hosting: 'bg-green-500/10 text-green-400 border border-green-500/20',
-  lavalink_hosting: 'bg-pink-500/10 text-pink-300 border border-pink-500/20',
   vps: 'bg-orange-500/10 text-orange-300 border border-orange-500/20',
-  vps_hosting: 'bg-orange-500/10 text-orange-300 border border-orange-500/20',
-  ai_subscription: 'bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-500/20',
-  smtp_hosting: 'bg-teal-500/10 text-teal-300 border border-teal-500/20',
-  email_hosting: 'bg-teal-500/10 text-teal-300 border border-teal-500/20',
-  database_hosting: 'bg-sky-500/10 text-sky-400 border border-sky-500/20',
-  managed_database: 'bg-sky-500/10 text-sky-400 border border-sky-500/20',
-  app_container: 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20',
-  media_livekit: 'bg-rose-500/10 text-rose-300 border border-rose-500/20',
-  cloud_storage: 'bg-amber-500/10 text-amber-300 border border-amber-500/20',
-  custom_service: 'bg-slate-500/10 text-slate-300 border border-slate-500/20',
+  smtp: 'bg-teal-500/10 text-teal-300 border border-teal-500/20',
+  web_hosting: 'bg-accent-violet/10 text-accent-violet-light border border-accent-violet/20',
+  database: 'bg-sky-500/10 text-sky-400 border border-sky-500/20',
   app_catalog: 'bg-rose-500/10 text-rose-300 border border-rose-500/20',
+  bot_hosting: 'bg-purple-500/10 text-purple-300 border border-purple-500/20',
 };
 
 const BILLING_LABEL: Record<string, string> = {
@@ -375,7 +349,7 @@ export default function ServicesPage() {
                     {/* Specs Section with Clean SVG Icons */}
                     <div className="space-y-2 font-mono text-xs pt-1">
                       {/* SMTP / Mail Hosting Specs */}
-                      {product.category === 'smtp_hosting' && (
+                      {product.category === 'smtp' && (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 text-slate-200">
                             <Mail className="h-4 w-4 text-indigo-400 shrink-0" />
@@ -459,7 +433,7 @@ export default function ServicesPage() {
                       )}
 
                       {/* App & Bot Hosting Specs */}
-                      {['node_app_hosting', 'python_app_hosting', 'discordbot_node', 'discordbot_python', 'whatsappbot_hosting', 'lavalink_hosting'].includes(product.category) && (
+                      {['app_catalog', 'bot_hosting'].includes(product.category) && (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 text-emerald-300">
                             <Cpu className="h-4 w-4 text-emerald-400 shrink-0" />

@@ -32,25 +32,12 @@ export interface Service {
 }
 
 export type ProductCategory =
-  | 'web_hosting'
-  | 'node_app_hosting'
-  | 'python_app_hosting'
-  | 'discordbot_node'
-  | 'discordbot_python'
-  | 'whatsappbot_hosting'
-  | 'lavalink_hosting'
   | 'vps'
-  | 'vps_hosting'
-  | 'ai_subscription'
-  | 'smtp_hosting'
-  | 'email_hosting'
-  | 'database_hosting'
-  | 'managed_database'
-  | 'app_container'
-  | 'media_livekit'
-  | 'cloud_storage'
-  | 'custom_service'
-  | 'app_catalog';
+  | 'smtp'
+  | 'web_hosting'
+  | 'database'
+  | 'app_catalog'
+  | 'bot_hosting';
 
 export type PlanBillingType = 'one_time' | 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
 
@@ -208,6 +195,9 @@ export interface VpsProvision {
   sshPort: number | null;
   username: string | null;
   credentialRef: string | null;
+  sshPrivateKey?: string | null;
+  sshPublicKey?: string | null;
+  notes?: string | null;
   status: VpsProvisionStatus;
   createdAt: string;
   leasewebVpsId: string | null;

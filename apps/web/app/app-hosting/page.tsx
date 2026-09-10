@@ -27,10 +27,9 @@ export default async function AppHostingPage() {
 
   // Fetch web app hosting products across categories
   const webProducts = await fetchProducts('web_hosting');
-  const nodeProducts = await fetchProducts('node_app_hosting');
-  const pythonProducts = await fetchProducts('python_app_hosting');
+  const catalogProducts = await fetchProducts('app_catalog');
 
-  const products = [...webProducts, ...nodeProducts, ...pythonProducts];
+  const products = [...webProducts, ...catalogProducts];
 
   const allPlans = products.flatMap((p) =>
     (p.plans || []).map((plan) => ({

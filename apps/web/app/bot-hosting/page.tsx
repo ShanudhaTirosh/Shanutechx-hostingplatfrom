@@ -34,13 +34,8 @@ const BOT_TYPES = [
 export default async function BotHostingPage() {
   const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001';
 
-  // Fetch bot hosting products across categories
-  const discordNode = await fetchProducts('discordbot_node');
-  const discordPython = await fetchProducts('discordbot_python');
-  const whatsapp = await fetchProducts('whatsappbot_hosting');
-  const lavalink = await fetchProducts('lavalink_hosting');
-
-  const products = [...discordNode, ...discordPython, ...whatsapp, ...lavalink];
+  // Fetch bot hosting products from API/DB
+  const products = await fetchProducts('bot_hosting');
 
   const allPlans = products.flatMap((p) =>
     (p.plans || []).map((plan) => ({

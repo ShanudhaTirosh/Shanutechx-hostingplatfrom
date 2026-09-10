@@ -448,17 +448,7 @@ export const api = {
       ),
   },
 
-  aiSubscription: {
 
-    getTicket: (orderItemId: string) =>
-      apiFetch(`/api/order-items/${orderItemId}/ai-subscription-ticket`).then((r) =>
-        asJson<{ ticket: Ticket | null }>(r)
-      ),
-    openTicket: (orderItemId: string) =>
-      apiFetch(`/api/order-items/${orderItemId}/ai-subscription-ticket`, { method: 'POST' }).then((r) =>
-        asJson<{ ticket: Ticket; alreadyExisted: boolean }>(r)
-      ),
-  },
 
   discordWebhooks: {
     list: () =>
@@ -506,7 +496,6 @@ export const api = {
           total: number;
           currency: string;
           free: boolean;
-          aiSubscriptionItems: Array<{ id: string; planName: string }>;
         }>(r)
       ),
   },
@@ -939,6 +928,23 @@ export const api = {
       apiFetch(`/api/vps-provisions/${id}/update-credentials`, { method: 'PATCH', body: JSON.stringify(data) }).then(
         (r) => asJson<{ ok: boolean; provision: VpsProvision; notice?: string }>(r)
       ),
+    manualProvision: (
+      id: string,
+      data: {
+        ip: string;
+        sshPort?: number;
+        username?: string;
+        password?: string;
+        sshPrivateKey?: string;
+        provider?: string;
+        notes?: string;
+      }
+    ) =>
+      apiFetch(`/api/vps-provisions/${id}/manual-provision`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) => asJson<{ ok: boolean; provision: VpsProvision; notice?: string }>(r)),
+    downloadKeyUrl: (id: string) => `/api/vps-provisions/${id}/download-key`,
     sftpList: (id: string, path = '/root') =>
       apiFetch(`/api/vps-provisions/${id}/sftp/list?path=${encodeURIComponent(path)}`).then((r) =>
         asJson<{
