@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { env } from '../env';
+// BUG-L01 FIX: moved import to top of file (was placed mid-file after route handlers)
+import { removeStaffFromRealtimeDb } from '../lib/chatAdminSync';
 
 export const meRouter = Router();
 
@@ -68,7 +70,6 @@ meRouter.patch('/me', requireAuth, async (req: AuthedRequest, res) => {
   });
 });
 
-import { removeStaffFromRealtimeDb } from '../lib/chatAdminSync';
 
 const updateRoleSchema = z.object({
   role: z.enum(['customer', 'support', 'dev', 'admin']),
@@ -78,12 +79,26 @@ meRouter.patch('/me/role', requireAuth, async (req: AuthedRequest, res) => {
   const parsed = updateRoleSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  if (!['admin', 'dev'].includes(req.user!.role)) {
-    return res.status(403).json({ error: 'Only administrative staff accounts can switch roles.' });
+  // BUG-M03 FIX: Admins must not be able to assign themselves the admin or dev role
+  // via this endpoint — that would let a demoted admin re-promote themselves.
+  // This endpoint is only for lateral/downward role switching (e.g. admin → support
+  // while acting as a support agent for a session). Role upgrades must go through
+  // PATCH /admin/staff/:userId/role performed by a different admin.
+  const currentRole = req.user!.role;
+  const targetRole = parsed.data.role;
+
+  if (currentRole === 'dev') {
+    // Dev accounts cannot be changed via this endpoint at all
+    return res.status(403).json({ error: 'Developer accounts cannot change roles via this endpoint. Use the admin panel.' });
   }
 
-  if (req.user!.role === 'dev' && parsed.data.role !== 'dev') {
-    return res.status(403).json({ error: 'Developer accounts cannot be demoted.' });
+  if (currentRole === 'admin' && targetRole === 'admin') {
+    return res.status(400).json({ error: 'You are already an admin.' });
+  }
+
+  // Prevent self-promotion to admin from support role
+  if (currentRole === 'support' && targetRole === 'admin') {
+    return res.status(403).json({ error: 'Role promotion must be performed by another admin via the staff panel.' });
   }
 
   const updatedUser = await prisma.user.update({

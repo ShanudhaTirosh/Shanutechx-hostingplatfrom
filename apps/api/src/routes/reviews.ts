@@ -77,12 +77,16 @@ async function ensureSeedReviews() {
   }
 }
 
+// BUG-M05 FIX: Exported so it can be called once at startup from index.ts
+// instead of running a DB COUNT query on every public GET /api/reviews request.
+export { ensureSeedReviews };
+
 /**
  * GET /api/reviews
  * Public paginated review list with category filter
  */
 reviewsRouter.get('/reviews', async (req: Request, res: Response) => {
-  await ensureSeedReviews();
+  // BUG-M05 FIX: Seed check removed from hot path — now called once at startup.
 
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 6));
@@ -324,8 +328,10 @@ reviewsRouter.post('/reviews', requireAuth, async (req: AuthedRequest, res: Resp
       }
     }
 
-    // Allow review if customer has completed orders
-    if (!matchingPurchase && !hasAnyPaidOrder) {
+    // BUG-C02 FIX: Previous condition was `!matchingPurchase && !hasAnyPaidOrder`
+    // which is always false at this point (hasAnyPaidOrder is asserted true above).
+    // The item-level check must stand on its own.
+    if (!matchingPurchase) {
       return res.status(403).json({
         error: `🚫 Item Purchase Required: You can only post a review for an item or category you have actually purchased.`,
         code: 'UNMATCHED_PRODUCT_PURCHASE',

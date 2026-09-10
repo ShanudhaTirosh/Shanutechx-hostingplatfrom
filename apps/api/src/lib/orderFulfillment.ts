@@ -45,17 +45,59 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
   const fulfilledItems: string[] = [];
   const manualVpsItems: string[] = [];
 
+
   for (const item of order.items) {
     const productName = (item.plan?.product?.name || item.plan?.name || item.service?.name || '').toLowerCase();
     const productCategory = (item.plan?.product?.category || '').toLowerCase();
 
+    // BUG-H01 FIX: productCategory is the sole canonical type discriminator.
+    // Name substring matching is kept only as an explicit legacy fallback for
+    // old Service records that predate the category field being populated.
     const isVps =
       productCategory === 'vps' ||
       productCategory === 'vps_plans' ||
       productCategory === 'leaseweb' ||
-      productName.includes('vps') ||
-      productName.includes('cloud server') ||
-      productName.includes('kvm');
+      // Legacy fallback — only for Service rows without a category
+      (!productCategory && (
+        productName.includes('vps') ||
+        productName.includes('cloud server') ||
+        productName.includes('kvm')
+      ));
+
+    const isSmtp =
+      productCategory === 'smtp_hosting' ||
+      productCategory === 'smtp' ||
+      (!productCategory && (
+        productName.includes('smtp') ||
+        productName.includes('mail')
+      ));
+
+    const isLiveKit =
+      productCategory === 'livekit' ||
+      (!productCategory && productName.includes('livekit'));
+
+    const isManagedDb =
+      productCategory === 'managed_database' ||
+      (!productCategory && productName.includes('database'));
+
+    const isAppHosting =
+      productCategory === 'web_hosting' ||
+      productCategory === 'node_app_hosting' ||
+      productCategory === 'python_app_hosting' ||
+      productCategory === 'discordbot_node' ||
+      productCategory === 'discordbot_python' ||
+      productCategory === 'whatsappbot_hosting' ||
+      productCategory === 'lavalink_hosting' ||
+      productCategory === 'app_catalog' ||
+      (!productCategory && (
+        productName.includes('bot') ||
+        productName.includes('hosting') ||
+        productName.includes('app')
+      ));
+
+    const isAiSub =
+      productCategory === 'ai_subscription' ||
+      (!productCategory && (/\bai\b/i.test(productName) || productName.includes('gemini') || productName.includes('gpt')));
 
     if (isVps) {
       try {
@@ -67,16 +109,35 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
           const autoRootPassword = `Vps_${crypto.randomBytes(12).toString('base64url')}`;
           const credentialRef = encryptSecret(autoRootPassword, env.secretsEncryptionKey);
 
-          // Find an available compute node or fallback
-          const targetNode = await selectNodeForDeployment({ requiredTag: 'vps', isAdminDeployment: true }).catch(() => prisma.node.findFirst({ where: { isActive: true } }));
-          const ipAddress = targetNode ? targetNode.ip : `192.168.1.${Math.floor(Math.random() * 200) + 10}`;
+          // Find an available compute node. If none available, halt and notify ops.
+          const targetNode = await selectNodeForDeployment({ requiredTag: 'vps', isAdminDeployment: true })
+            .catch(() => prisma.node.findFirst({ where: { isActive: true } }));
+
+          // BUG-H06 FIX: Never provision a VPS with a fake RFC-1918 IP.
+          // If no node is available, skip provisioning and alert the ops team.
+          if (!targetNode) {
+            logger.error({ orderId: order.id, itemId: item.id }, 'VPS provisioning skipped: no active node available. Manual intervention required.');
+            void notifyAdmins(
+              `⚠️ VPS provisioning FAILED for order ${order.id}: no active compute node available. Manual setup required.`
+            );
+            void notifyDiscordChannel('vps_assigned', {
+              Alert: '⚠️ VPS PROVISIONING FAILED — NO NODE',
+              Order: order.id,
+              Customer: order.user.email,
+              Plan: item.plan?.name || item.service?.name || 'VPS Server',
+              Reason: 'No active compute node available',
+              Action: 'Manual provisioning required',
+            });
+            manualVpsItems.push(item.plan?.name || item.service?.name || 'VPS Plan');
+            continue;
+          }
 
           const vps = await prisma.vpsProvision.create({
             data: {
               userId: order.userId,
               orderItemId: item.id,
               provider: 'shanutechx_cloud',
-              ip: ipAddress,
+              ip: targetNode.ip,
               sshPort: 22,
               username: 'root',
               credentialRef,
@@ -85,14 +146,14 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
             },
           });
 
-          fulfilledItems.push(`VPS Server (${ipAddress})`);
-          logger.info({ orderId: order.id, vpsId: vps.id, ip: ipAddress }, 'Auto-provisioned VPS instance');
+          fulfilledItems.push(`VPS Server (${targetNode.ip})`);
+          logger.info({ orderId: order.id, vpsId: vps.id, ip: targetNode.ip }, 'Auto-provisioned VPS instance');
 
           // Send automated credential delivery email to customer
           void notifyCustomer(
             order.user,
             `Your VPS server is provisioned and ready!\n\n` +
-            `Server IP: ${ipAddress}\n` +
+            `Server IP: ${targetNode.ip}\n` +
             `Username: root\n` +
             `Password: ${autoRootPassword}\n` +
             `SSH Port: 22\n\n` +
@@ -118,12 +179,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
       continue;
     }
 
-    // 1. Business Email & Mailbox Hosting
-    const isSmtp =
-      productCategory === 'smtp_hosting' ||
-      productCategory === 'smtp' ||
-      productName.includes('smtp') ||
-      productName.includes('mail');
+    // 1. Business Email & Mailbox Hosting (using canonical category — BUG-H01 FIX above)
 
     if (isSmtp) {
       const existingAccount = await prisma.smtpAccount.findFirst({
@@ -192,8 +248,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
       }
     }
 
-    // 2. LiveKit WebRTC
-    const isLiveKit = productCategory === 'livekit' || productName.includes('livekit');
+    // 2. LiveKit WebRTC (using canonical category — BUG-H01 FIX above)
     if (isLiveKit) {
       const existingLk = await prisma.liveKitProject.findFirst({ where: { orderItemId: item.id } });
       if (!existingLk) {
@@ -229,8 +284,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
       }
     }
 
-    // 3. Managed Database (Postgres / MySQL / Redis / MongoDB)
-    const isManagedDb = productCategory === 'managed_database' || productName.includes('database');
+    // 3. Managed Database (using canonical category — BUG-H01 FIX above)
     if (isManagedDb) {
       try {
         let dbType: 'postgres' | 'mysql' | 'redis' | 'mongodb' = 'postgres';
@@ -276,20 +330,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
       }
     }
 
-    // 4. Application & Bot Hosting Deployment Instance Provisioning
-    const isAppHosting =
-      productCategory === 'web_hosting' ||
-      productCategory === 'node_app_hosting' ||
-      productCategory === 'python_app_hosting' ||
-      productCategory === 'discordbot_node' ||
-      productCategory === 'discordbot_python' ||
-      productCategory === 'whatsappbot_hosting' ||
-      productCategory === 'lavalink_hosting' ||
-      productCategory === 'app_catalog' ||
-      productName.includes('bot') ||
-      productName.includes('hosting') ||
-      productName.includes('app');
-
+    // 4. Application & Bot Hosting (using canonical category — BUG-H01 FIX above)
     if (isAppHosting && !isSmtp && !isVps && !isLiveKit && !isManagedDb) {
       const existingDep = await prisma.deployment.findFirst({
         where: { orderItemId: item.id },
@@ -339,8 +380,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
       }
     }
 
-    // 5. AI Subscriptions
-    const isAiSub = productCategory === 'ai_subscription' || /\bai\b/i.test(productName) || productName.includes('gemini') || productName.includes('gpt');
+    // 5. AI Subscriptions (using canonical category — BUG-H01 FIX above)
     if (isAiSub) {
       fulfilledItems.push(`AI Subscription (${item.plan?.name || 'AI Access'})`);
       void notifyCustomer(

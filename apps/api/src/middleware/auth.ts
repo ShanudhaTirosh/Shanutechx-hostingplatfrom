@@ -81,6 +81,8 @@ export async function requireAuth(
       });
 
       if (!user && decoded.email) {
+        // Check if a user already exists with this email (e.g. manually created)
+        // and link the Firebase UID to them.
         const existingByEmail = await prisma.user.findUnique({
           where: { email: decoded.email },
         });
@@ -96,45 +98,23 @@ export async function requireAuth(
         }
       }
 
-      const emailLower = (decoded.email ?? '').toLowerCase();
-      const isDevEmail =
-        emailLower === 'tiroshbrot123@gmail.com' ||
-        emailLower.includes('tirosh') ||
-        emailLower.includes('tiros') ||
-        emailLower.includes('shanu') ||
-        emailLower.startsWith('dev@') ||
-        emailLower.includes('dev');
-      const isAdminEmail =
-        emailLower.startsWith('admin@') ||
-        emailLower.includes('admin');
-
       if (!user) {
-        const initialRole: 'dev' | 'admin' | 'customer' = isDevEmail ? 'dev' : isAdminEmail ? 'admin' : 'customer';
+        // New user: always start as 'customer'. Role elevation must go through
+        // PATCH /admin/staff/:userId/role — never via email address matching.
         user = await prisma.user.create({
           data: {
             firebaseUid: decoded.uid,
             email: decoded.email ?? '',
             displayName: decoded.name ?? null,
-            role: initialRole,
+            role: 'customer',
           },
         });
-      } else {
-        if (isDevEmail && user.role !== 'dev') {
-          user = await prisma.user.update({
-            where: { id: user.id },
-            data: { role: 'dev' },
-          });
-        } else if (isAdminEmail && user.role === 'customer') {
-          user = await prisma.user.update({
-            where: { id: user.id },
-            data: { role: 'admin' },
-          });
-        } else if (decoded.email && user.email !== decoded.email) {
-          user = await prisma.user.update({
-            where: { id: user.id },
-            data: { email: decoded.email },
-          });
-        }
+      } else if (decoded.email && user.email !== decoded.email) {
+        // Keep the stored email in sync if Firebase reports a change.
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { email: decoded.email },
+        });
       }
     } catch (dbErr: any) {
       return res.status(503).json({ error: 'Database unavailable — cannot authenticate. Please try again shortly.', detail: dbErr.message });
@@ -188,7 +168,8 @@ export function requireFullAdmin(
   res: Response,
   next: NextFunction
 ) {
-  if (req.user?.role !== 'admin' && req.user?.role !== 'dev') {
+  // BUG-H03 FIX: 'dev' must NOT pass here — full admin is strictly the admin role.
+  if (req.user?.role !== 'admin') {
     return res.status(403).json({ error: 'Full admin access required' });
   }
   next();

@@ -10,6 +10,7 @@ import { verifySharedSecret } from '../lib/gateAuth';
 import { logger } from '../lib/logger';
 import { createSubdomainRecord, deleteSubdomainRecord } from '../lib/cloudflare';
 import { evacuateNodeWorkloads } from '../lib/failoverEngine';
+import { notifyDiscordChannel } from '../lib/discordWebhooks';
 
 export const nodesRouter = Router();
 
@@ -176,43 +177,49 @@ nodesRouter.post('/nodes/register', async (req: Request, res: Response) => {
     logger.warn({ dnsErr, nodeSubdomain, ip }, 'Cloudflare DNS auto-record registration skipped or failed');
   }
 
-  // Upsert node by IP or Label
-  const existing = await prisma.node.findFirst({
-    where: { OR: [{ ip }, { label }] },
-  });
+  // BUG-L05 FIX: Wrap findFirst+update/create in a serializable transaction to
+  // eliminate the TOCTOU race. Both `ip` and `label` are not @unique in the
+  // Prisma schema (they're just plain String fields), so Prisma upsert() cannot
+  // be used directly. A $transaction with isolation level SERIALIZABLE ensures
+  // only one registration wins when two requests arrive simultaneously.
+  const nodeData = {
+    label,
+    ip,
+    cpuCores,
+    ramMb,
+    diskGb,
+    roleTags,
+    isActive: true,
+    lastSeenAt: new Date(),
+  };
 
   let node;
-  if (existing) {
-    if (existing.ip !== ip || existing.label !== label) {
-      return res.status(409).json({ error: 'Node IP or label conflicts with an existing registered node' });
+  try {
+    node = await prisma.$transaction(async (tx) => {
+      const existing = await tx.node.findFirst({
+        where: { OR: [{ ip }, { label }] },
+      });
+
+      if (existing) {
+        if (existing.ip !== ip || existing.label !== label) {
+          // A different node already claims this IP or label — caller should receive 409.
+          // Throw a typed error so the route handler can turn it into an HTTP response.
+          const err: any = new Error('Node IP or label conflicts with an existing registered node');
+          err.statusCode = 409;
+          throw err;
+        }
+        return tx.node.update({ where: { id: existing.id }, data: nodeData });
+      }
+
+      return tx.node.create({
+        data: { ...nodeData, sshKeyRef: `vault:${label}` },
+      });
+    }, { isolationLevel: 'Serializable' });
+  } catch (txErr: any) {
+    if (txErr?.statusCode === 409) {
+      return res.status(409).json({ error: txErr.message });
     }
-    node = await prisma.node.update({
-      where: { id: existing.id },
-      data: {
-        label,
-        ip,
-        cpuCores,
-        ramMb,
-        diskGb,
-        roleTags,
-        isActive: true,
-        lastSeenAt: new Date(),
-      },
-    });
-  } else {
-    node = await prisma.node.create({
-      data: {
-        label,
-        ip,
-        sshKeyRef: `vault:${label}`,
-        cpuCores,
-        ramMb,
-        diskGb,
-        roleTags,
-        isActive: true,
-        lastSeenAt: new Date(),
-      },
-    });
+    throw txErr;
   }
 
   res.status(200).json({
@@ -591,10 +598,19 @@ nodesRouter.post('/nodes/connect', async (req: AuthedRequest, res: Response) => 
     log('🎉 All setup steps completed successfully!');
     ssh.end();
 
-    // Encrypt and store the SSH key/password reference in the vault
-    let sshKeyRef = `ssh://${username}@${ip}:${port}`;
+    // BUG-C03 FIX: Store the credential regardless of type.
+    // Private key → encrypted PEM. Password → encrypted JSON bundle.
+    // Previously only private keys were stored; passwords were silently discarded.
+    let sshKeyRef: string;
     if (privateKey) {
       sshKeyRef = encryptSecret(privateKey, env.secretsEncryptionKey);
+    } else if (password) {
+      sshKeyRef = encryptSecret(
+        JSON.stringify({ type: 'password', username, password }),
+        env.secretsEncryptionKey
+      );
+    } else {
+      sshKeyRef = `ssh://${username}@${ip}:${port}`;
     }
 
     // Upsert the node record
@@ -743,8 +759,18 @@ nodesRouter.post('/nodes/connect/stream', async (req: AuthedRequest, res: Respon
     log('🎉 All 6 setup steps completed successfully!');
     ssh.end();
 
-    let sshKeyRef = `ssh://${username}@${ip}:${port}`;
-    if (privateKey) sshKeyRef = encryptSecret(privateKey, env.secretsEncryptionKey);
+    // BUG-C03 FIX: Store the credential regardless of type (same logic as /nodes/connect).
+    let sshKeyRef: string;
+    if (privateKey) {
+      sshKeyRef = encryptSecret(privateKey, env.secretsEncryptionKey);
+    } else if (password) {
+      sshKeyRef = encryptSecret(
+        JSON.stringify({ type: 'password', username, password }),
+        env.secretsEncryptionKey
+      );
+    } else {
+      sshKeyRef = `ssh://${username}@${ip}:${port}`;
+    }
 
     const existing = await prisma.node.findFirst({ where: { OR: [{ ip: detectedIp }, { label }] } });
     const node = existing
@@ -772,11 +798,34 @@ nodesRouter.patch('/nodes/:id', async (req: AuthedRequest, res: Response) => {
   const parsed = updateNodeSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const node = await prisma.node.update({ where: { id: req.params.id }, data: parsed.data });
+  let node;
+  try {
+    node = await prisma.node.update({ where: { id: req.params.id }, data: parsed.data });
+  } catch (err: any) {
+    // BUG-H02 FIX: Prisma throws P2025 when the record to update does not exist.
+    if (err?.code === 'P2025') return res.status(404).json({ error: 'Node not found' });
+    throw err;
+  }
 
   await prisma.auditLog.create({
     data: { adminId: req.user!.id, action: 'node.set_active', target: `${node.id} -> ${parsed.data.isActive}` },
   });
+
+  // BUG-H05 FIX: When deactivating a node, notify that any active SSH sessions
+  // on this node will be silently dropped. Clients that are connected will not
+  // receive a friendly disconnect message — a proper fix would involve tracking
+  // active WebSocket connections per node and sending close frames. As an interim
+  // measure we log a prominent warning and notify via Discord so ops staff know.
+  if (!parsed.data.isActive) {
+    logger.warn({ nodeId: node.id, nodeLabel: node.label }, 'Node deactivated — any active SSH terminal sessions on this node will be silently dropped');
+    notifyDiscordChannel('deployment_failed', {
+      event: 'Node Deactivated',
+      nodeLabel: node.label,
+      nodeIp: node.ip,
+      deactivatedBy: req.user!.id,
+      warning: 'Any active SSH terminal sessions on this node have been silently dropped.'
+    }).catch(() => { /* best-effort notification */ });
+  }
 
   res.json({ node });
 });
@@ -819,9 +868,12 @@ nodesRouter.post('/nodes/:id/failover', async (req: AuthedRequest, res: Response
  * Fetch recent failover audit logs for a compute node.
  */
 nodesRouter.get('/nodes/:id/failover-status', async (req: AuthedRequest, res: Response) => {
+  // BUG-M02 FIX: Use `contains` filter because failover audit log entries store
+  // the node ID embedded in a JSON string: "<nodeId>: {...}"
+  // The previous exact `target: req.params.id` match never found any entries.
   const logs = await prisma.auditLog.findMany({
     where: {
-      target: req.params.id,
+      target: { contains: req.params.id },
       action: { in: ['node.auto_failover', 'node.manual_failover'] },
     },
     orderBy: { createdAt: 'desc' },
@@ -832,7 +884,18 @@ nodesRouter.get('/nodes/:id/failover-status', async (req: AuthedRequest, res: Re
 });
 
 // ── BUG-10 FIX: Sanitize provisioning logs to remove cluster secret values ──
+// ── BUG-M01 FIX: Also redact URL-encoded and base64 variants of the secret ──
 
 function sanitizeLogs(logs: string[]): string[] {
-  return logs.map(line => line.replaceAll(CLUSTER_SECRET, '[REDACTED]'));
+  if (!CLUSTER_SECRET) return logs;
+  // Build a set of encoded representations to catch indirect leakage
+  const variants = [
+    CLUSTER_SECRET,
+    encodeURIComponent(CLUSTER_SECRET),
+    Buffer.from(CLUSTER_SECRET).toString('base64'),
+    Buffer.from(CLUSTER_SECRET).toString('base64url'),
+  ];
+  return logs.map(line =>
+    variants.reduce((l, v) => (v ? l.replaceAll(v, '[REDACTED]') : l), line)
+  );
 }

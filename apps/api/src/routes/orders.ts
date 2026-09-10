@@ -11,6 +11,7 @@ import { fireWebhook } from '../lib/webhooks';
 import { notifyDiscordChannel } from '../lib/discordWebhooks';
 import { fulfillOrder } from '../lib/orderFulfillment';
 import { sendInvoiceDeliveryNotification } from '../lib/notifications';
+import { logger } from '../lib/logger';
 
 
 export const ordersRouter = Router();
@@ -44,8 +45,18 @@ async function recalculateTotal(orderId: string) {
   });
   type ItemWithPricing = (typeof items)[number];
 
-  function priceOf(item: ItemWithPricing) {
-    return item.plan ? { price: item.plan.price, currency: item.plan.currency as Currency } : { price: item.service!.price, currency: item.service!.currency as Currency };
+  function priceOf(item: ItemWithPricing): { price: number; currency: Currency } {
+    if (item.plan) {
+      return { price: item.plan.price, currency: item.plan.currency as Currency };
+    }
+    if (item.service) {
+      return { price: item.service.price, currency: item.service.currency as Currency };
+    }
+    // BUG-M04 FIX: Guard against data-corruption where an OrderItem has neither
+    // a plan nor a service (e.g. after a hard-delete). Return zero-price to avoid
+    // a runtime crash and let the order proceed; log for investigation.
+    logger.error({ orderItemId: item.id, orderId }, 'OrderItem has neither plan nor service \u2014 using zero price. Data may be corrupted.');
+    return { price: 0, currency: 'LKR' as Currency };
   }
 
   const currency: Currency = items[0] ? priceOf(items[0]).currency : 'LKR';

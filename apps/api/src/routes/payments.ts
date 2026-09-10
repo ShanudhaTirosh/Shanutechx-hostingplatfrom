@@ -159,12 +159,37 @@ paymentsRouter.post('/payments/:id/review', requireAdmin, async (req: AuthedRequ
     return res.status(409).json({ error: `Payment already reviewed (status: ${latest?.status ?? 'unknown'})` });
   }
 
+  // BUG-H04 FIX: activateSubscriptionsForOrder now runs inside the transaction
+  // so both the order status update AND subscription activation are atomic.
+  // If subscription activation fails, the order will NOT be marked as paid.
+  // fulfillOrder still runs outside (external service calls need retry semantics).
   await prisma.$transaction(async (tx) => {
     if (parsed.data.approve) {
       await tx.order.updateMany({
         where: { id: payment.orderId, status: { not: 'paid' } },
         data: { status: 'paid' },
       });
+
+      // Check if renewal
+      const orderWithItems = await tx.order.findUnique({
+        where: { id: payment.orderId },
+        include: { items: { include: { plan: true } } },
+      });
+
+      let isRenewal = false;
+      if (orderWithItems?.items) {
+        for (const item of orderWithItems.items) {
+          const config = item.configJson as { renewalSubscriptionId?: string } | null;
+          if (config?.renewalSubscriptionId) {
+            isRenewal = true;
+            await extendSubscription(config.renewalSubscriptionId);
+          }
+        }
+      }
+
+      if (!isRenewal) {
+        await activateSubscriptionsForOrder(payment.orderId, tx);
+      }
     }
   });
 
@@ -177,33 +202,20 @@ paymentsRouter.post('/payments/:id/review', requireAdmin, async (req: AuthedRequ
   };
 
   if (parsed.data.approve) {
-    // Check if renewal
+    // Re-fetch the order for invoice/notification data (needed outside the tx)
     const orderWithItems = await prisma.order.findUnique({
       where: { id: payment.orderId },
       include: { items: { include: { plan: true } } },
     });
 
-    let isRenewal = false;
-    if (orderWithItems?.items) {
-      for (const item of orderWithItems.items) {
-        const config = item.configJson as { renewalSubscriptionId?: string } | null;
-        if (config?.renewalSubscriptionId) {
-          isRenewal = true;
-          await extendSubscription(config.renewalSubscriptionId);
-        }
-      }
-    }
-
-    if (!isRenewal) {
-      await activateSubscriptionsForOrder(payment.orderId);
-    }
-
-    // Run automated fulfillment pipeline safely
+    // Run automated fulfillment pipeline safely outside transaction
+    // (external service calls; failures are retried by the ops team)
     try {
       await fulfillOrder(payment.orderId);
     } catch (fulfillErr: any) {
-      logger.error({ fulfillErr, orderId: payment.orderId }, 'Order fulfillment error after approval');
+      logger.error({ fulfillErr, orderId: payment.orderId }, 'Order fulfillment error after approval — manual retry required');
     }
+
 
     void notifyCustomer(
       payment.order.user,

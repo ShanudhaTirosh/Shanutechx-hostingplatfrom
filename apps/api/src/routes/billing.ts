@@ -44,8 +44,14 @@ billingRouter.post('/billing/run-checks', async (req, res) => {
     });
   }
 
-  const result = await runBillingChecks();
-  res.json(result);
+  // BUG-L04 FIX: Wrap runBillingChecks() in try/catch so failures return a
+  // proper HTTP 500 instead of an unhandled rejection with no response body.
+  try {
+    const result = await runBillingChecks();
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Billing check failed', detail: err?.message });
+  }
 });
 
 /**

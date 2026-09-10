@@ -184,17 +184,20 @@ export async function evacuateNodeWorkloads(failedNodeId: string): Promise<Failo
         throw new Error(`No healthy target database node available for database ${db.id}`);
       }
 
-      let password = crypto.randomBytes(16).toString('hex');
-      if (db.credentialRef) {
-        try {
-          password = decryptSecret(db.credentialRef, env.secretsEncryptionKey);
-        } catch {
-          const newEnc = encryptSecret(password, env.secretsEncryptionKey);
-          await prisma.managedDatabase.update({
-            where: { id: db.id },
-            data: { credentialRef: newEnc },
-          }).catch(() => {});
-        }
+      // BUG-H05 FIX: Never silently rotate the database password.
+      // If decryption fails, halt the failover for this DB and surface the error
+      // so ops can intervene rather than breaking all client connections silently.
+      if (!db.credentialRef) {
+        throw new Error(`Database ${db.id} has no stored credential reference — cannot failover without credentials`);
+      }
+      let password: string;
+      try {
+        password = decryptSecret(db.credentialRef, env.secretsEncryptionKey);
+      } catch (decryptErr) {
+        throw new Error(
+          `Database ${db.id}: credential decryption failed — failover aborted to preserve existing client connections. ` +
+          `Manual credential recovery required before failover can proceed.`
+        );
       }
 
       const containerInfo = await provisionDatabaseContainer(targetDbNode, {
@@ -236,16 +239,22 @@ export async function evacuateNodeWorkloads(failedNodeId: string): Promise<Failo
       );
 
       if (targetLkNode && targetLkNode.id !== failedNodeId) {
-        let apiSecret = '';
-        if (lk.apiSecretRef) {
-          try {
-            apiSecret = decryptSecret(lk.apiSecretRef, env.secretsEncryptionKey);
-          } catch { /* skip */ }
+        // BUG-L03 FIX: If apiSecret decryption fails, record a failure rather than
+        // silently updating the node pointer without registering the key.
+        if (!lk.apiSecretRef) {
+          throw new Error(`LiveKit project ${lk.id} has no stored API secret — cannot register on target node`);
         }
 
-        if (apiSecret) {
-          await registerLiveKitKey(targetLkNode, { apiKey: lk.apiKey, apiSecret });
+        let apiSecret: string;
+        try {
+          apiSecret = decryptSecret(lk.apiSecretRef, env.secretsEncryptionKey);
+        } catch {
+          throw new Error(
+            `LiveKit project ${lk.id}: API secret decryption failed — node pointer not updated to prevent broken state`
+          );
         }
+
+        await registerLiveKitKey(targetLkNode, { apiKey: lk.apiKey, apiSecret });
 
         await prisma.liveKitProject.update({
           where: { id: lk.id },
@@ -256,6 +265,7 @@ export async function evacuateNodeWorkloads(failedNodeId: string): Promise<Failo
       }
     } catch (err: any) {
       logger.error({ err, liveKitId: lk.id }, 'LiveKit failover failed');
+      result.errors.push(`LiveKit ${lk.id}: ${err.message}`);
     }
   }
 

@@ -57,6 +57,7 @@ import { emailRouter } from './routes/email';
 import { teamsRouter } from './routes/teams';
 import { internalBotRouter } from './routes/internalBot';
 import { reviewsRouter } from './routes/reviews';
+import { ensureSeedReviews } from './routes/reviews';
 import { openapiRouter } from './routes/openapi';
 import { prWebhooksRouter } from './routes/prWebhooks';
 import { dockerDeploymentsRouter } from './routes/dockerDeployments';
@@ -258,6 +259,7 @@ server.listen(env.port, () => {
   logger.info({ port: env.port }, 'SHANUTECHX API listening (HTTP + /ws/vps-ssh)');
   logger.info('Initializing all-in-one platform telemetry engine: Loki Log Collector, Prometheus Metrics, and Status Health Checkers active.');
   void ensureDefaultProductsSeeded();
+  void ensureSeedReviews(); // BUG-M05 FIX: seed once at startup, not on every request
   void ensureDefaultMasterNodeRegistered();
   void fullFirebaseDataMigration().catch((err) => {
     logger.error({ err: err.message }, 'Initial startup Firebase data sync error');

@@ -4,10 +4,17 @@ import { notifyCustomer, notifyAdmins } from './notifications';
 import { stopDeployment } from './nodeAgentClient';
 import { logger } from './logger';
 
-/** Activates/extends subscriptions for every item in a newly-paid order. */
-export async function activateSubscriptionsForOrder(orderId: string): Promise<void> {
-  const items = await prisma.orderItem.findMany({ where: { orderId }, select: { id: true } });
-  await Promise.all(items.map((item: { id: string }) => activateOrExtendSubscription(item.id)));
+import type { PrismaClient } from '@prisma/client';
+
+type TxClient = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
+
+/** Activates/extends subscriptions for every item in a newly-paid order.
+ *  Accepts an optional transaction client so it can participate in an atomic
+ *  payment-approval transaction (BUG-H04 fix). */
+export async function activateSubscriptionsForOrder(orderId: string, tx?: TxClient): Promise<void> {
+  const db = (tx ?? prisma) as PrismaClient;
+  const items = await db.orderItem.findMany({ where: { orderId }, select: { id: true } });
+  await Promise.all(items.map((item: { id: string }) => activateOrExtendSubscription(item.id, db)));
 }
 
 /**
@@ -18,8 +25,8 @@ export async function activateSubscriptionsForOrder(orderId: string): Promise<vo
  * "renew by buying it again" model — see billingRules.computeRenewedPeriodEnd
  * for why renewing early stacks remaining time instead of wasting it).
  */
-export async function activateOrExtendSubscription(orderItemId: string): Promise<void> {
-  const orderItem = await prisma.orderItem.findUnique({
+export async function activateOrExtendSubscription(orderItemId: string, db: PrismaClient = prisma): Promise<void> {
+  const orderItem = await db.orderItem.findUnique({
     where: { id: orderItemId },
     include: { service: true, plan: true, order: true },
   });
@@ -34,7 +41,7 @@ export async function activateOrExtendSubscription(orderItemId: string): Promise
   const billingPeriod = (orderItem.service
     ? orderItem.service.billingPeriod
     : orderItem.plan?.billingType) as 'monthly' | 'yearly';
-  const existing = await prisma.subscription.findUnique({ where: { orderItemId } });
+  const existing = await db.subscription.findUnique({ where: { orderItemId } });
 
   if (existing) {
     const newPeriodEnd = computeRenewedPeriodEnd(existing.currentPeriodEnd, billingPeriod);
