@@ -190,6 +190,12 @@ paymentsRouter.post('/payments/:id/review', requireAdmin, async (req: AuthedRequ
       if (!isRenewal) {
         await activateSubscriptionsForOrder(payment.orderId, tx);
       }
+
+      await tx.invoice.upsert({
+        where: { orderId: payment.orderId },
+        create: { orderId: payment.orderId, pdfUrl: null },
+        update: {},
+      });
     }
   });
 

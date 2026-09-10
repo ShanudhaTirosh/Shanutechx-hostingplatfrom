@@ -857,13 +857,6 @@ emailRouter.post('/email/send', async (req: AuthedRequest, res) => {
   }
 });
 
-// In-memory per-user store for tasks and calendar events (per-account isolate)
-interface EmailUserTodo { id: string; title: string; completed: boolean; createdAt: string; }
-interface EmailUserEvent { id: string; title: string; dateStr: string; timeStr: string; participants: string[]; createdAt: string; }
-
-const userTodosStore = new Map<string, EmailUserTodo[]>();
-const userEventsStore = new Map<string, EmailUserEvent[]>();
-
 /**
  * GET /api/email/todos
  * Fetch user's to-do checklist items dynamically.
@@ -871,7 +864,10 @@ const userEventsStore = new Map<string, EmailUserEvent[]>();
 emailRouter.get('/email/todos', async (req: AuthedRequest, res) => {
   try {
     const userId = req.user!.id;
-    const todos = userTodosStore.get(userId) || [];
+    const todos = await prisma.webmailTodo.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+    });
     res.json({ todos });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch todos' });
@@ -883,24 +879,25 @@ emailRouter.get('/email/todos', async (req: AuthedRequest, res) => {
  * Create a new to-do task item.
  */
 emailRouter.post('/email/todos', async (req: AuthedRequest, res) => {
-  const { title } = req.body || {};
-  if (!title || typeof title !== 'string' || !title.trim()) {
-    return res.status(400).json({ error: 'Valid title string is required' });
+  try {
+    const { title } = req.body || {};
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ error: 'Valid title string is required' });
+    }
+
+    const userId = req.user!.id;
+    const newTodo = await prisma.webmailTodo.create({
+      data: {
+        userId,
+        title: title.trim(),
+        completed: false,
+      },
+    });
+
+    res.status(201).json({ todo: newTodo });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to create todo' });
   }
-
-  const userId = req.user!.id;
-  const userList = userTodosStore.get(userId) || [];
-  const newTodo: EmailUserTodo = {
-    id: `t-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-    title: title.trim(),
-    completed: false,
-    createdAt: new Date().toISOString(),
-  };
-
-  userList.push(newTodo);
-  userTodosStore.set(userId, userList);
-
-  res.status(201).json({ todo: newTodo });
 });
 
 /**
@@ -908,20 +905,30 @@ emailRouter.post('/email/todos', async (req: AuthedRequest, res) => {
  * Toggle or update a to-do item.
  */
 emailRouter.patch('/email/todos/:id', async (req: AuthedRequest, res) => {
-  const userId = req.user!.id;
-  const { completed, title } = req.body || {};
-  const userList = userTodosStore.get(userId) || [];
-  const targetIndex = userList.findIndex((t) => t.id === req.params.id);
+  try {
+    const userId = req.user!.id;
+    const { completed, title } = req.body || {};
 
-  if (targetIndex === -1) {
-    return res.status(404).json({ error: 'Todo item not found' });
+    const existing = await prisma.webmailTodo.findFirst({
+      where: { id: req.params.id, userId },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Todo item not found' });
+    }
+
+    const updated = await prisma.webmailTodo.update({
+      where: { id: req.params.id },
+      data: {
+        completed: completed !== undefined ? !!completed : existing.completed,
+        title: typeof title === 'string' && title.trim() ? title.trim() : existing.title,
+      },
+    });
+
+    res.json({ todo: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to update todo' });
   }
-
-  if (completed !== undefined) userList[targetIndex].completed = !!completed;
-  if (title && typeof title === 'string') userList[targetIndex].title = title.trim();
-
-  userTodosStore.set(userId, userList);
-  res.json({ todo: userList[targetIndex] });
 });
 
 /**
@@ -929,11 +936,24 @@ emailRouter.patch('/email/todos/:id', async (req: AuthedRequest, res) => {
  * Delete a to-do item.
  */
 emailRouter.delete('/email/todos/:id', async (req: AuthedRequest, res) => {
-  const userId = req.user!.id;
-  const userList = userTodosStore.get(userId) || [];
-  const filtered = userList.filter((t) => t.id !== req.params.id);
-  userTodosStore.set(userId, filtered);
-  res.json({ ok: true, id: req.params.id });
+  try {
+    const userId = req.user!.id;
+    const existing = await prisma.webmailTodo.findFirst({
+      where: { id: req.params.id, userId },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Todo item not found' });
+    }
+
+    await prisma.webmailTodo.delete({
+      where: { id: req.params.id },
+    });
+
+    res.json({ ok: true, id: req.params.id });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete todo' });
+  }
 });
 
 /**
@@ -943,7 +963,10 @@ emailRouter.delete('/email/todos/:id', async (req: AuthedRequest, res) => {
 emailRouter.get('/email/events', async (req: AuthedRequest, res) => {
   try {
     const userId = req.user!.id;
-    const events = userEventsStore.get(userId) || [];
+    const events = await prisma.webmailEvent.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+    });
     res.json({ events });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch events' });
@@ -955,24 +978,25 @@ emailRouter.get('/email/events', async (req: AuthedRequest, res) => {
  * Create a new calendar event.
  */
 emailRouter.post('/email/events', async (req: AuthedRequest, res) => {
-  const { title, dateStr, timeStr, participants } = req.body || {};
-  if (!title) return res.status(400).json({ error: 'Event title is required' });
+  try {
+    const { title, dateStr, timeStr, participants } = req.body || {};
+    if (!title) return res.status(400).json({ error: 'Event title is required' });
 
-  const userId = req.user!.id;
-  const userList = userEventsStore.get(userId) || [];
-  const newEvent: EmailUserEvent = {
-    id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-    title: String(title).trim(),
-    dateStr: dateStr || new Date().toLocaleDateString(),
-    timeStr: timeStr || '10:00 AM',
-    participants: Array.isArray(participants) ? participants : [],
-    createdAt: new Date().toISOString(),
-  };
+    const userId = req.user!.id;
+    const newEvent = await prisma.webmailEvent.create({
+      data: {
+        userId,
+        title: String(title).trim(),
+        dateStr: dateStr || new Date().toLocaleDateString(),
+        timeStr: timeStr || '10:00 AM',
+        participants: Array.isArray(participants) ? participants.map(String) : [],
+      },
+    });
 
-  userList.push(newEvent);
-  userEventsStore.set(userId, userList);
-
-  res.status(201).json({ event: newEvent });
+    res.status(201).json({ event: newEvent });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to create event' });
+  }
 });
 
 /**

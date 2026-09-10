@@ -374,8 +374,8 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
           teamId: selectedScope === "personal" ? null : selectedScope,
         },
         (event: BuildEvent) => {
-          if (event.log) setLog((prev) => [...prev, event.log!]);
-          else if (event.message) setLog((prev) => [...prev, event.message!]);
+          if (event.log) setLog((prev) => [...prev, event.log!].slice(-1000));
+          else if (event.message) setLog((prev) => [...prev, event.message!].slice(-1000));
           if (event.phase === "error")
             setError(event.message ?? "Deployment failed");
         },
@@ -814,9 +814,9 @@ function DeploymentRow({
     try {
       toast("Redeployment started...", "info");
       await api.deployments.redeploy(deployment.id, (event) => {
-        if (event.log) setRedeployLog((prev) => [...prev, event.log!]);
+        if (event.log) setRedeployLog((prev) => [...prev, event.log!].slice(-1000));
         else if (event.message)
-          setRedeployLog((prev) => [...prev, event.message!]);
+          setRedeployLog((prev) => [...prev, event.message!].slice(-1000));
       });
       toast("Redeployment finished", "success");
       onChanged();

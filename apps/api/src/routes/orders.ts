@@ -221,11 +221,13 @@ ordersRouter.post('/cart/checkout', idempotent, async (req: AuthedRequest, res) 
     });
     
     // Create invoice for free orders (pdfUrl can be null)
-    await prisma.invoice.create({
-      data: {
+    await prisma.invoice.upsert({
+      where: { orderId: order.id },
+      create: {
         orderId: order.id,
         pdfUrl: null, // No PDF generation needed for $0 orders
       },
+      update: {},
     });
 
     await activateSubscriptionsForOrder(order.id);

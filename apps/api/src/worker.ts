@@ -182,6 +182,12 @@ nodeFailoverWorker.on('failed', (job, err) => {
   logger.error({ jobId: job?.id, err }, 'Node failover watchdog job failed');
 });
 
+[sslRenewalWorker, workspaceCleanupWorker, billingSweepWorker, uptimeSweepWorker, nodeFailoverWorker].forEach((w) => {
+  w.on('error', (err) => {
+    logger.warn({ err: err.message, worker: w.name }, 'Worker Redis connection error caught');
+  });
+});
+
 (async () => {
   try {
     await nodeFailoverQueue.add(

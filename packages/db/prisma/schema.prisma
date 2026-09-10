@@ -191,6 +191,8 @@ model User {
   webmailScheduledSends WebmailScheduledSend[]
   webmailAuditLogs      WebmailAuditLog[]
   webmailSessions       WebmailSession[]
+  webmailTodos          WebmailTodo[]
+  webmailEvents         WebmailEvent[]
   reviews               Review[]
 }
 
@@ -745,6 +747,32 @@ model WebmailSession {
   isCurrent  Boolean  @default(false)
   lastActive DateTime @default(now())
   createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+// User-created checklist tasks for Webmail
+model WebmailTodo {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// User-created calendar events for Webmail
+model WebmailEvent {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  dateStr      String
+  timeStr      String
+  participants String[] @default([])
+  createdAt    DateTime @default(now())
 
   @@index([userId])
 }
