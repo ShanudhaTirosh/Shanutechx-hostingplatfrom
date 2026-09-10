@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { ownedResourceWhere, canAccessResource } from '../middleware/rbac';
 import { deployService } from '../lib/deployPipeline';
-import { NodeSelectionError } from '../lib/nodeSelector';
+import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
 import { fetchLogs, stopDeployment, cancelBuild, stopComposeProject, startDeployment, restartDeployment, buildAndRun, addCustomDomainRoute, removeCustomDomainRoute, getResourceUsage, ResourceMetrics } from '../lib/nodeAgentClient';
 import { parsePagination } from '../lib/pagination';
 import { verifyCnameTarget } from '../lib/customDomain';
@@ -74,8 +74,10 @@ const createDeploymentSchema = z.object({
   exposureMode: z.enum(['ssl_with_proxy', 'ssl_direct', 'no_ssl', 'internal_only', 'raw_tcp']).optional(),
   publishedPort: z.number().int().min(1).max(65535).optional(),
   teamId: z.string().nullable().optional(),
-}).refine((data) => data.templateId || (data.repoUrl && data.internalPort), {
-  message: 'Either templateId, or both repoUrl and internalPort, are required',
+  isPendingConfig: z.boolean().optional(),
+  status: z.enum(['pending', 'pending_configuration']).optional(),
+}).refine((data) => data.templateId || data.isPendingConfig || (data.repoUrl && data.internalPort), {
+  message: 'Either templateId, isPendingConfig, or both repoUrl and internalPort are required',
 });
 
 deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
@@ -160,6 +162,56 @@ deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
     return res.status(403).json({ error: 'Resource limits can only be set by admin or dev users' });
   }
 
+  // If creating a deployment in pending configuration state (e.g. Vercel-style draft creation)
+  if (data.isPendingConfig || data.status === 'pending_configuration') {
+    let node;
+    try {
+      node = await selectNodeForDeployment({
+        requiredTag: 'node-hosting',
+        isAdminDeployment: effectiveIsAdminDeployment,
+        explicitNodeId: effectiveNodeId,
+      });
+    } catch (err: any) {
+      return res.status(409).json({ error: err.message || 'No available compute node for deployment' });
+    }
+
+    const subPrefix = (data.preferredName || 'app').toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 20);
+    const subUnique = (await import('crypto')).randomBytes(3).toString('hex');
+    const subdomain = data.customSubdomain || `${subPrefix}-${subUnique}`;
+
+    let envVarsEncrypted: string | undefined;
+    if (data.envVars) {
+      envVarsEncrypted = encryptSecret(JSON.stringify(data.envVars), env.secretsEncryptionKey);
+    }
+
+    const dep = await prisma.deployment.create({
+      data: {
+        userId: req.user!.id,
+        nodeId: node.id,
+        repoUrl: data.repoUrl || null,
+        branch: data.branch || 'main',
+        subdomain,
+        internalPort: data.internalPort || 3000,
+        status: 'pending_configuration',
+        startCommand: data.startCommand || null,
+        entryFile: data.entryFile || null,
+        frameworkPreset: data.frameworkPreset || 'auto',
+        exposureMode: data.exposureMode || 'ssl_with_proxy',
+        cpuLimit: data.cpuLimit || null,
+        memoryLimit: data.memoryLimit || null,
+        storageLimit: data.storageLimit || null,
+        envVarsEncrypted: envVarsEncrypted || null,
+        webHostingType: data.serviceType,
+      },
+    });
+
+    return res.status(201).json({ ok: true, deployment: dep });
+  }
+
+  if (!data.repoUrl || !data.internalPort) {
+    return res.status(400).json({ error: 'repoUrl and internalPort could not be resolved' });
+  }
+
   // Build progress is streamed back as newline-delimited JSON so the client
   // dashboard can show live build logs instead of a blank spinner.
   res.setHeader('Content-Type', 'application/x-ndjson');
@@ -196,6 +248,102 @@ deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
     res.end();
   }
 });
+
+deploymentsRouter.post('/deployments/:id/launch', async (req: AuthedRequest, res) => {
+  const deployment = await loadOwnedDeployment(req, req.params.id);
+  if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
+
+  const repoUrl = req.body.repoUrl || deployment.repoUrl;
+  const internalPort = req.body.internalPort || deployment.internalPort || 3000;
+
+  if (!repoUrl) {
+    return res.status(400).json({ error: 'repoUrl is required to launch deployment' });
+  }
+
+  let envVarsEncrypted = deployment.envVarsEncrypted;
+  if (req.body.envVars) {
+    envVarsEncrypted = encryptSecret(JSON.stringify(req.body.envVars), env.secretsEncryptionKey);
+  }
+
+  const updatedDeployment = await prisma.deployment.update({
+    where: { id: deployment.id },
+    data: {
+      repoUrl,
+      branch: req.body.branch || deployment.branch || 'main',
+      startCommand: req.body.startCommand !== undefined ? req.body.startCommand : deployment.startCommand,
+      entryFile: req.body.entryFile !== undefined ? req.body.entryFile : deployment.entryFile,
+      frameworkPreset: req.body.frameworkPreset !== undefined ? req.body.frameworkPreset : deployment.frameworkPreset,
+      internalPort,
+      exposureMode: req.body.exposureMode !== undefined ? req.body.exposureMode : deployment.exposureMode,
+      subdomain: req.body.subdomain !== undefined ? req.body.subdomain : deployment.subdomain,
+      envVarsEncrypted,
+      status: 'building',
+    },
+  });
+
+  res.setHeader('Content-Type', 'application/x-ndjson');
+
+  try {
+    const isPublic = updatedDeployment.exposureMode !== 'internal_only';
+    if (isPublic && updatedDeployment.subdomain) {
+      const isProxied = updatedDeployment.exposureMode === 'ssl_with_proxy';
+      await createSubdomainRecord(updatedDeployment.subdomain, deployment.node.ip, isProxied).catch((err) => {
+        logger.warn({ err, subdomain: updatedDeployment.subdomain }, 'Cloudflare DNS record setup warning');
+      });
+    }
+
+    const envVars = req.body.envVars || getDecryptedEnvVars(updatedDeployment);
+
+    const result = await buildAndRun(
+      deployment.node,
+      {
+        deploymentId: updatedDeployment.id,
+        repoUrl,
+        branch: updatedDeployment.branch || 'main',
+        subdomain: updatedDeployment.subdomain || undefined,
+        internalPort,
+        envVars,
+        cpuLimit: updatedDeployment.cpuLimit || undefined,
+        memoryLimit: updatedDeployment.memoryLimit || undefined,
+        storageLimit: updatedDeployment.storageLimit || undefined,
+        startCommand: updatedDeployment.startCommand || undefined,
+        entryFile: updatedDeployment.entryFile || undefined,
+        frameworkPreset: updatedDeployment.frameworkPreset || undefined,
+        exposureMode: updatedDeployment.exposureMode || undefined,
+      },
+      (event) => res.write(JSON.stringify(event) + '\n')
+    );
+
+    if (result.phase === 'error') {
+      await prisma.deployment.update({
+        where: { id: updatedDeployment.id },
+        data: { status: 'failed' },
+      });
+      res.write(JSON.stringify({ phase: 'error', message: result.message || 'Deployment launch failed' }) + '\n');
+      return res.end();
+    }
+
+    await prisma.deployment.update({
+      where: { id: updatedDeployment.id },
+      data: {
+        status: 'running',
+        containerId: result.containerId,
+        lastDeployAt: new Date(),
+      },
+    });
+
+    res.write(JSON.stringify({ phase: 'complete', deploymentId: updatedDeployment.id, subdomain: updatedDeployment.subdomain }) + '\n');
+    res.end();
+  } catch (err: any) {
+    await prisma.deployment.update({
+      where: { id: updatedDeployment.id },
+      data: { status: 'failed' },
+    });
+    res.write(JSON.stringify({ phase: 'error', message: err?.message || 'Deployment launch failed' }) + '\n');
+    res.end();
+  }
+});
+
 
 deploymentsRouter.get('/deployments', async (req: AuthedRequest, res) => {
   // Admin scoped to assigned customers' deployments.

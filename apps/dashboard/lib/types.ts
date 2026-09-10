@@ -101,7 +101,9 @@ export interface Payment {
   order?: Order & { user?: ApiUser };
 }
 
-export type DeploymentStatus = 'pending' | 'building' | 'running' | 'failed' | 'stopped';
+export type DeploymentStatus = 'pending' | 'pending_configuration' | 'building' | 'running' | 'failed' | 'stopped';
+
+export type ManagedDatabaseStatus = 'pending' | 'pending_configuration' | 'running' | 'stopped' | 'failed' | 'terminated';
 
 export type CustomDomainStatus = 'pending' | 'verified' | 'failed' | 'ssl_provisioning' | 'active';
 
@@ -512,7 +514,7 @@ export interface ManagedDatabase {
   userId: string;
   nodeId: string;
   type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
-  status: 'pending' | 'running' | 'stopped' | 'failed' | 'terminated';
+  status: ManagedDatabaseStatus;
   containerId?: string | null;
   internalHost?: string | null;
   internalPort?: number | null;
@@ -522,6 +524,7 @@ export interface ManagedDatabase {
   dbVersion?: string | null;
   user?: ApiUser;
   createdAt: string;
+  connectionString?: string;
 }
 
 export interface SupabaseClientProject {

@@ -34,6 +34,7 @@ enum ServiceType {
 
 enum DeploymentStatus {
   pending
+  pending_configuration
   building
   running
   failed
@@ -114,6 +115,7 @@ enum ManagedDatabaseType {
 
 enum ManagedDatabaseStatus {
   pending
+  pending_configuration
   running
   stopped
   failed

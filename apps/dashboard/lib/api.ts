@@ -631,6 +631,29 @@ export const api = {
         }
       }
     },
+    launch: async (id: string, data?: Record<string, any>, onEvent?: (event: BuildEvent) => void): Promise<void> => {
+      const res = await apiFetch(`/api/deployments/${id}/launch`, { method: 'POST', body: JSON.stringify(data || {}) });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}: ${res.statusText}` }));
+        throw new Error(errData.error || errData.message || `HTTP ${res.status}`);
+      }
+      if (!res.body) throw new Error('No response stream from server');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffered = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffered += decoder.decode(value, { stream: true });
+        const lines = buffered.split('\n');
+        buffered = lines.pop() ?? '';
+        for (const line of lines) {
+          if (line.trim() && onEvent) onEvent(JSON.parse(line));
+        }
+      }
+    },
     enableDeployWebhook: (id: string) =>
       apiFetch(`/api/deployments/${id}/webhook-secret`, { method: 'POST' }).then((r) =>
         asJson<{ secret: string; webhookUrl: string; instructions: { github: string; gitlab: string } }>(r)
