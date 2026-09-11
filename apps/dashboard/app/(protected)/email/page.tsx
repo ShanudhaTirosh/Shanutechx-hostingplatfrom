@@ -755,10 +755,10 @@ export default function RedesignedMailboxStudioPage() {
                     <tr>
                       <td className="py-2.5 font-bold text-indigo-700">TXT (SPF)</td>
                       <td>@</td>
-                      <td className="truncate max-w-xs">{dom.spfRecord || 'v=spf1 mx ip4:154.53.56.88 ~all'}</td>
+                      <td className="truncate max-w-xs">{dom.spfRecord || 'v=spf1 include:mail.shanutechx.com ~all'}</td>
                       <td>-</td>
                       <td className="text-right">
-                        <button onClick={() => copyToClipboard(dom.spfRecord || 'v=spf1 mx ip4:154.53.56.88 ~all', 'SPF Record')} className="text-indigo-600 font-bold text-[11px]">Copy</button>
+                        <button onClick={() => copyToClipboard(dom.spfRecord || 'v=spf1 include:mail.shanutechx.com ~all', 'SPF Record')} className="text-indigo-600 font-bold text-[11px]">Copy</button>
                       </td>
                     </tr>
                     <tr>

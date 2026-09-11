@@ -81,20 +81,25 @@ export async function requireAuth(
       });
 
       if (!user && decoded.email) {
-        // Check if a user already exists with this email (e.g. manually created)
-        // and link the Firebase UID to them.
-        const existingByEmail = await prisma.user.findUnique({
-          where: { email: decoded.email },
-        });
-
-        if (existingByEmail) {
-          user = await prisma.user.update({
-            where: { id: existingByEmail.id },
-            data: {
-              firebaseUid: decoded.uid,
-              displayName: existingByEmail.displayName || decoded.name || null,
-            },
+        // Only link an existing account when Firebase has verified the email.
+        // An unverified email claim must never be enough to take over an
+        // existing account — this prevents the account-takeover vector where
+        // an attacker registers with an unverified address matching an
+        // existing customer and gets their Firebase UID silently merged in.
+        if (decoded.email_verified) {
+          const existingByEmail = await prisma.user.findUnique({
+            where: { email: decoded.email },
           });
+
+          if (existingByEmail) {
+            user = await prisma.user.update({
+              where: { id: existingByEmail.id },
+              data: {
+                firebaseUid: decoded.uid,
+                displayName: existingByEmail.displayName || decoded.name || null,
+              },
+            });
+          }
         }
       }
 

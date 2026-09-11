@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui';
 import {
@@ -322,7 +323,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
                   <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-2">Preview</p>
                   <div
                     className="bg-white/5 rounded-xl px-4 py-3 text-sm text-slate-300"
-                    dangerouslySetInnerHTML={{ __html: signatureContent }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(signatureContent) }}
                   />
                 </div>
               )}

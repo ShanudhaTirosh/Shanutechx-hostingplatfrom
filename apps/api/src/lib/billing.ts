@@ -45,12 +45,12 @@ export async function activateOrExtendSubscription(orderItemId: string, db: Pris
 
   if (existing) {
     const newPeriodEnd = computeRenewedPeriodEnd(existing.currentPeriodEnd, billingPeriod);
-    await prisma.subscription.update({
+    await db.subscription.update({
       where: { id: existing.id },
       data: { currentPeriodEnd: newPeriodEnd, status: 'active', pastDueAt: null },
     });
   } else {
-    await prisma.subscription.create({
+    await db.subscription.create({
       data: {
         userId: orderItem.order.userId,
         orderItemId,

@@ -48,8 +48,11 @@ app.get('/agent/health', (_req, res) => {
 // deployment docs for enforcing that at the network level too.
 app.use((req, res, next) => {
   if (ALLOWED_IPS.length > 0) {
-    const remoteIp = (req.headers['x-forwarded-for']?.toString().split(',')[0].trim()) || req.socket.remoteAddress;
-    if (!ALLOWED_IPS.includes(remoteIp)) {
+    // Use only the real TCP peer address — never x-forwarded-for, which is
+    // trivially spoofable by the client and must not be used for access control
+    // unless there is a trusted reverse proxy stripping/overwriting it first.
+    const remoteIp = req.socket.remoteAddress;
+    if (!remoteIp || !ALLOWED_IPS.includes(remoteIp)) {
       logger.warn({ remoteIp }, 'node-agent: rejected request from IP not in AGENT_ALLOWED_IPS');
       return res.status(403).json({ error: 'Forbidden' });
     }

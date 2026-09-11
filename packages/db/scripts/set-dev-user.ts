@@ -1,8 +1,16 @@
 import { prisma } from '../index';
 
 async function main() {
-  const firebaseUid = 'mrTThasIt7RXPk7QgbplnDK0FkR2';
-  const email = 'tiroshbrot123@gmail.com';
+  // Read credentials from environment variables to avoid committing personal
+  // identifiers to version control. Set DEV_FIREBASE_UID and DEV_EMAIL before
+  // running: DEV_FIREBASE_UID=xxx DEV_EMAIL=you@example.com npx tsx set-dev-user.ts
+  const firebaseUid = process.env.DEV_FIREBASE_UID;
+  const email = process.env.DEV_EMAIL;
+
+  if (!firebaseUid && !email) {
+    console.error('❌  Must supply DEV_FIREBASE_UID and/or DEV_EMAIL as environment variables.');
+    process.exit(1);
+  }
 
   const updated = await prisma.user.updateMany({
     where: {
