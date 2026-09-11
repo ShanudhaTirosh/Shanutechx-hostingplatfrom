@@ -96,6 +96,7 @@ filesystemRouter.post('/fs/:deploymentId/mkdir', async (req: AuthedRequest, res)
   const data = await r.json();
 
   if (r.ok) {
+    void pushWorkspaceToShadowRepo(req.params.deploymentId);
     await prisma.auditLog.create({
       data: {
         adminId: req.user!.id,
@@ -119,13 +120,16 @@ filesystemRouter.delete('/fs/:deploymentId/delete', async (req: AuthedRequest, r
   const r = await fetch(url, { method: 'DELETE', headers: agentHeaders(), body: JSON.stringify(req.body) });
   const data = await r.json();
 
-  await prisma.auditLog.create({
-    data: {
-      adminId: req.user!.id,
-      action: 'fs.delete',
-      target: `${req.params.deploymentId}:${req.body.path ?? 'unknown'}`,
-    },
-  });
+  if (r.ok) {
+    void pushWorkspaceToShadowRepo(req.params.deploymentId);
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'fs.delete',
+        target: `${req.params.deploymentId}:${req.body.path ?? 'unknown'}`,
+      },
+    });
+  }
 
   res.status(r.ok ? 200 : r.status).json(data);
 });
@@ -142,6 +146,7 @@ filesystemRouter.post('/fs/:deploymentId/rename', async (req: AuthedRequest, res
   const data = await r.json();
 
   if (r.ok) {
+    void pushWorkspaceToShadowRepo(req.params.deploymentId);
     await prisma.auditLog.create({
       data: {
         adminId: req.user!.id,
@@ -166,6 +171,7 @@ filesystemRouter.post('/fs/:deploymentId/upload-binary', async (req: AuthedReque
   const data = await r.json();
 
   if (r.ok) {
+    void pushWorkspaceToShadowRepo(req.params.deploymentId);
     await prisma.auditLog.create({
       data: {
         adminId: req.user!.id,
@@ -190,6 +196,7 @@ filesystemRouter.post('/fs/:deploymentId/extract', async (req: AuthedRequest, re
   const data = await r.json();
 
   if (r.ok) {
+    void pushWorkspaceToShadowRepo(req.params.deploymentId);
     await prisma.auditLog.create({
       data: {
         adminId: req.user!.id,
