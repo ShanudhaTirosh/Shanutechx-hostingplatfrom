@@ -28,7 +28,11 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
 
   let verified = false;
   if (githubSignature) {
-    const rawBody = (req as any).rawBody || JSON.stringify(payload);
+    const rawBody = (req as any).rawBody;
+    if (!rawBody) {
+      logger.warn({ eventType }, 'PR webhook rawBody unavailable for signature verification');
+      return res.status(400).json({ error: 'Raw body required for HMAC signature verification' });
+    }
     const expected = 'sha256=' + crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
     try {
       verified =

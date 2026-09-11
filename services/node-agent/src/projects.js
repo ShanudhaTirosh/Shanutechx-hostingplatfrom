@@ -11,9 +11,10 @@
  *   • Docker available via the docker socket.
  */
 const { execFile } = require('child_process');
-const { promisify } = require('util');
+const util = require('util');
+const net = require('net');
 
-const execFileAsync = promisify(execFile);
+const execFileAsync = util.promisify(execFile);
 const POSTGRES_CONTAINER = process.env.POSTGRES_CONTAINER || 'shanutechx-postgres';
 const POSTGRES_SUPERUSER = process.env.POSTGRES_SUPERUSER || 'postgres';
 
@@ -58,7 +59,7 @@ async function provisionProject({ projectId, dbName, dbUsername, password }) {
   const containerName = `project-api-${projectId}`;
   await execFileAsync('docker', ['rm', '-f', containerName]).catch(() => {});
 
-  const apiPort = 18000 + (Math.abs(hashCode(projectId)) % 1000);
+  const apiPort = await findAvailableApiPort(projectId);
   const postgresHost = process.env.POSTGRES_HOST || 'shanutechx-postgres';
   const encodedUser = encodeURIComponent(dbUsername);
   const encodedPass = encodeURIComponent(password);
@@ -95,10 +96,14 @@ async function deprovisionProject({ projectId, dbName, dbUsername }) {
   await execFileAsync('docker', ['rm', '-f', containerName]).catch(() => {});
 
   if (dbName) {
-    await pgExec(`DROP DATABASE IF EXISTS "${dbName}";`).catch(() => {});
+    await pgExec(`DROP DATABASE IF EXISTS "${dbName}";`).catch((err) => {
+      console.warn(`[projects] Warning dropping database ${dbName}:`, err?.message || err);
+    });
   }
   if (dbUsername) {
-    await pgExec(`DROP ROLE IF EXISTS "${dbUsername}";`).catch(() => {});
+    await pgExec(`DROP ROLE IF EXISTS "${dbUsername}";`).catch((err) => {
+      console.warn(`[projects] Warning dropping role ${dbUsername}:`, err?.message || err);
+    });
   }
 }
 
@@ -200,6 +205,28 @@ function hashCode(str) {
     hash |= 0;
   }
   return hash;
+}
+
+async function isPortAvailable(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, '0.0.0.0');
+  });
+}
+
+async function findAvailableApiPort(projectId) {
+  const basePort = 18000 + (Math.abs(hashCode(projectId)) % 1000);
+  if (await isPortAvailable(basePort)) return basePort;
+
+  for (let offset = 1; offset < 1000; offset++) {
+    const candidate = 18000 + ((Math.abs(hashCode(projectId)) + offset) % 1000);
+    if (await isPortAvailable(candidate)) return candidate;
+  }
+  throw new Error('No available API ports found in range 18000-18999');
 }
 
 function parseCsvLine(line) {

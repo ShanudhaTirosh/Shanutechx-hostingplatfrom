@@ -55,14 +55,19 @@ const ALLOWED_DISCORD_ROLES = process.env.ALLOWED_DISCORD_ROLES ? process.env.AL
 const ALLOWED_DISCORD_USERS = process.env.ALLOWED_DISCORD_USERS ? process.env.ALLOWED_DISCORD_USERS.split(',').map(s => s.trim()) : [];
 
 function isStaffAuthorized(member, user) {
-  if (ALLOWED_DISCORD_USERS.length > 0 && ALLOWED_DISCORD_USERS.includes(user.id)) {
+  const hasUserList = ALLOWED_DISCORD_USERS.length > 0;
+  const hasRoleList = ALLOWED_DISCORD_ROLES.length > 0;
+
+  if (hasUserList && ALLOWED_DISCORD_USERS.includes(user.id)) {
     return true;
   }
-  if (ALLOWED_DISCORD_ROLES.length > 0 && member?.roles?.cache) {
+  if (hasRoleList && member?.roles?.cache) {
     return member.roles.cache.some((role) => ALLOWED_DISCORD_ROLES.includes(role.id) || ALLOWED_DISCORD_ROLES.includes(role.name));
   }
-  if (member?.permissions?.has && (member.permissions.has('Administrator') || member.permissions.has('ManageGuild'))) {
-    return true;
+
+  // Fail closed if allowlists are not satisfied or unconfigured
+  if (!hasUserList && !hasRoleList) {
+    console.warn('[discord-bot] ALLOWED_DISCORD_USERS and ALLOWED_DISCORD_ROLES are unconfigured. Access denied.');
   }
   return false;
 }

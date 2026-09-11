@@ -99,7 +99,7 @@ async function installSystemPackage(packageName) {
     throw new Error('Invalid package name format');
   }
 
-  // Detect package manager (debian/ubuntu apt-get, alpine apk, centos yum)
+  // Detect package manager (debian/ubuntu apt-get, alpine apk, centos/rhel yum/dnf)
   try {
     const { stdout } = await execFileAsync('apt-get', ['update', '-y'], { timeout: 60000 });
     const installRes = await execFileAsync('apt-get', ['install', '-y', packageName], { timeout: 180000 });
@@ -109,7 +109,12 @@ async function installSystemPackage(packageName) {
       const { stdout } = await execFileAsync('apk', ['add', '--no-cache', packageName], { timeout: 60000 });
       return { ok: true, package: packageName, output: stdout };
     } catch (apkErr) {
-      throw new Error(`Package installation failed: ${aptErr.message || apkErr.message}`);
+      try {
+        const { stdout } = await execFileAsync('yum', ['install', '-y', packageName], { timeout: 180000 });
+        return { ok: true, package: packageName, output: stdout };
+      } catch (yumErr) {
+        throw new Error(`Package installation failed: ${aptErr.message || apkErr.message || yumErr.message}`);
+      }
     }
   }
 }
@@ -124,7 +129,12 @@ async function upgradeSystemPackages() {
       const upgradeRes = await execFileAsync('apk', ['upgrade', '-U'], { timeout: 180000 });
       return { ok: true, output: upgradeRes.stdout };
     } catch (apkErr) {
-      throw new Error(`Package upgrade failed: ${aptErr.message || apkErr.message}`);
+      try {
+        const upgradeRes = await execFileAsync('yum', ['update', '-y'], { timeout: 300000 });
+        return { ok: true, output: upgradeRes.stdout };
+      } catch (yumErr) {
+        throw new Error(`Package upgrade failed: ${aptErr.message || apkErr.message || yumErr.message}`);
+      }
     }
   }
 }
@@ -160,6 +170,7 @@ async function getListeningPorts() {
 
     return ports;
   } catch (err) {
+    console.error('[nodeEngine] getListeningPorts failed:', err?.message || err);
     return [];
   }
 }
@@ -202,6 +213,7 @@ async function listSystemdServices() {
 
     return services;
   } catch (err) {
+    console.error('[nodeEngine] listSystemdServices failed:', err?.message || err);
     return [];
   }
 }
@@ -267,6 +279,7 @@ async function listLinuxUsers() {
 
     return users;
   } catch (err) {
+    console.error('[nodeEngine] listLinuxUsers failed:', err?.message || err);
     return [];
   }
 }
@@ -352,6 +365,7 @@ async function listDockerContainers() {
       })),
     }));
   } catch (err) {
+    console.error('[nodeEngine] listDockerContainers failed:', err?.message || err);
     return [];
   }
 }
@@ -405,7 +419,9 @@ async function createDockerContainer({ name, image, env = [], ports = [], volume
   // Pull image if not local
   try {
     await docker.pull(image);
-  } catch (e) {}
+  } catch (e) {
+    console.warn(`[nodeEngine] docker.pull for image ${image} encountered notice: ${e?.message || e}. Continuing with local image if available.`);
+  }
 
   const portBindings = {};
   const exposedPorts = {};
@@ -450,6 +466,7 @@ async function listDockerNetworks() {
       scope: n.Scope,
     }));
   } catch (err) {
+    console.error('[nodeEngine] listDockerNetworks failed:', err?.message || err);
     return [];
   }
 }

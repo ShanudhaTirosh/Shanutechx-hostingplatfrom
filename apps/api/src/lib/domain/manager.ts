@@ -660,8 +660,8 @@ export class DomainManager {
         );
       }
 
-      // Remove Traefik route if domain is active
-      if (customDomain.status === 'active') {
+      // Attempt Traefik route removal unconditionally if node exists, preventing orphaned routes
+      if (customDomain.deployment?.node) {
         try {
           await this.traefik.removeRoute(
             {
@@ -672,9 +672,8 @@ export class DomainManager {
             customDomain.domain
           );
         } catch (routeError) {
-          // Log error but continue with deletion
-          logger.error({
-            msg: 'Failed to remove Traefik route (continuing with deletion)',
+          logger.warn({
+            msg: 'Failed to remove Traefik route (continuing with database record deletion)',
             customDomainId,
             domain: customDomain.domain,
             error: routeError instanceof Error ? routeError.message : String(routeError),

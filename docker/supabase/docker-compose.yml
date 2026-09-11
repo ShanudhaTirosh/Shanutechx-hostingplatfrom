@@ -25,9 +25,9 @@ services:
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       POSTGRES_HOST: ${POSTGRES_HOST:-db}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_USER_READ_WRITE: postgres
-      PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY:-shanutechx_pg_meta_crypto_key_32_chars_min}
+      PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS:-public,graphql_public}
       PGRST_DB_MAX_ROWS: ${PGRST_DB_MAX_ROWS:-1000}
       PGRST_DB_EXTRA_SEARCH_PATH: ${PGRST_DB_EXTRA_SEARCH_PATH:-public}
@@ -37,9 +37,9 @@ services:
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8001}
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
-      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-sb_publishable_v1_live_key_shanutechx_001}
-      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-sb_secret_v1_live_key_shanutechx_admin_001}
-      AUTH_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
       ENABLED_FEATURES_LOGS_ALL: "false"
 
 
@@ -106,14 +106,14 @@ services:
       GOTRUE_API_PORT: 9999
       API_EXTERNAL_URL: ${API_EXTERNAL_URL:-http://localhost:8001/auth/v1}
       GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
       GOTRUE_SITE_URL: ${SITE_URL:-http://localhost:3000}
       GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
       GOTRUE_JWT_ADMIN_ROLES: service_role
       GOTRUE_JWT_AUD: authenticated
       GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
       GOTRUE_JWT_EXP: ${JWT_EXPIRY:-3600}
-      GOTRUE_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
       GOTRUE_EXTERNAL_EMAIL_ENABLED: ${ENABLE_EMAIL_SIGNUP:-true}
       GOTRUE_MAILER_AUTOCONFIRM: ${ENABLE_EMAIL_AUTOCONFIRM:-true}
 
@@ -130,11 +130,11 @@ services:
       timeout: 5s
       retries: 3
     environment:
-      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS:-public,graphql_public}
       PGRST_DB_MAX_ROWS: ${PGRST_DB_MAX_ROWS:-1000}
       PGRST_DB_ANON_ROLE: anon
-      PGRST_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      PGRST_JWT_SECRET: ${JWT_SECRET}
       PGRST_DB_USE_LEGACY_GUCS: "false"
 
   realtime:
@@ -149,13 +149,13 @@ services:
       DB_HOST: ${POSTGRES_HOST:-db}
       DB_PORT: 5432
       DB_USER: supabase_admin
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB:-postgres}
       DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
       DB_ENC_KEY: ${REALTIME_DB_ENC_KEY:-supabaserealtime}
-      API_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
-      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-shanutechx_secret_key_base_64chars_long_key_string}
-      METRICS_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      METRICS_JWT_SECRET: ${JWT_SECRET}
       APP_NAME: realtime
       SEED_SELF_HOST: "true"
       RUN_JANITOR: "true"
@@ -173,8 +173,8 @@ services:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
       POSTGREST_URL: http://rest:3000
-      AUTH_JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
-      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
       STORAGE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8001}
       FILE_SIZE_LIMIT: 52428800
       STORAGE_BACKEND: s3
@@ -205,8 +205,8 @@ services:
       PG_META_DB_PORT: 5432
       PG_META_DB_NAME: ${POSTGRES_DB:-postgres}
       PG_META_DB_USER: postgres
-      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}
-      CRYPTO_KEY: ${PG_META_CRYPTO_KEY:-shanutechx_pg_meta_crypto_key_32_chars_min}
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
 
   functions:
     container_name: supabase-edge-functions
@@ -216,12 +216,12 @@ services:
       kong:
         condition: service_healthy
     environment:
-      JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      JWT_SECRET: ${JWT_SECRET}
       SUPABASE_URL: http://kong:8000
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8001}
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
-      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
       VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT:-false}"
 
   db:
@@ -241,11 +241,11 @@ services:
       POSTGRES_HOST: /var/run/postgresql
       PGPORT: 5432
       POSTGRES_PORT: 5432
-      PGPASSWORD: ${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shanutechx_super_secret_postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       PGDATABASE: ${POSTGRES_DB:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
-      JWT_SECRET: ${JWT_SECRET:-shanutechx_super_secret_jwt_token_32chars}
+      JWT_SECRET: ${JWT_SECRET}
       JWT_EXP: ${JWT_EXPIRY:-3600}
 
 volumes:

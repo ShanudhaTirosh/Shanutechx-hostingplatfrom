@@ -94,6 +94,17 @@ filesystemRouter.post('/fs/:deploymentId/mkdir', async (req: AuthedRequest, res)
   const url = agentUrl(result.node.ip, `/agent/fs/${req.params.deploymentId}/mkdir`);
   const r = await fetch(url, { method: 'POST', headers: agentHeaders(), body: JSON.stringify(req.body) });
   const data = await r.json();
+
+  if (r.ok) {
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'fs.mkdir',
+        target: `${req.params.deploymentId}:${req.body.path ?? 'unknown'}`,
+      },
+    });
+  }
+
   res.status(r.ok ? 200 : r.status).json(data);
 });
 
@@ -129,6 +140,17 @@ filesystemRouter.post('/fs/:deploymentId/rename', async (req: AuthedRequest, res
   const url = agentUrl(result.node.ip, `/agent/fs/${req.params.deploymentId}/rename`);
   const r = await fetch(url, { method: 'POST', headers: agentHeaders(), body: JSON.stringify(req.body) });
   const data = await r.json();
+
+  if (r.ok) {
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'fs.rename',
+        target: `${req.params.deploymentId}:${req.body.oldPath ?? ''} -> ${req.body.newPath ?? ''}`,
+      },
+    });
+  }
+
   res.status(r.ok ? 200 : r.status).json(data);
 });
 
@@ -142,6 +164,17 @@ filesystemRouter.post('/fs/:deploymentId/upload-binary', async (req: AuthedReque
   const url = agentUrl(result.node.ip, `/agent/fs/${req.params.deploymentId}/upload-binary`);
   const r = await fetch(url, { method: 'POST', headers: agentHeaders(), body: JSON.stringify(req.body) });
   const data = await r.json();
+
+  if (r.ok) {
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'fs.upload',
+        target: `${req.params.deploymentId}:${req.body.path ?? 'unknown'}`,
+      },
+    });
+  }
+
   res.status(r.ok ? 200 : r.status).json(data);
 });
 
@@ -155,6 +188,17 @@ filesystemRouter.post('/fs/:deploymentId/extract', async (req: AuthedRequest, re
   const url = agentUrl(result.node.ip, `/agent/fs/${req.params.deploymentId}/extract`);
   const r = await fetch(url, { method: 'POST', headers: agentHeaders(), body: JSON.stringify(req.body) });
   const data = await r.json();
+
+  if (r.ok) {
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'fs.extract',
+        target: `${req.params.deploymentId}:${req.body.archivePath ?? 'unknown'}`,
+      },
+    });
+  }
+
   res.status(r.ok ? 200 : r.status).json(data);
 });
 
@@ -281,6 +325,13 @@ filesystemRouter.post('/fs/:deploymentId/git-commit-push', async (req: AuthedReq
       }
 
       const pushData: any = await putRes.json();
+      await prisma.auditLog.create({
+        data: {
+          adminId: req.user!.id,
+          action: 'fs.git_push',
+          target: `github:${owner}/${cleanRepo}:${branch}/${filePath} (sha: ${pushData.commit?.sha})`,
+        },
+      });
       return res.json({ ok: true, provider: 'github', commitSha: pushData.commit?.sha, commitUrl: pushData.commit?.html_url });
     }
 
