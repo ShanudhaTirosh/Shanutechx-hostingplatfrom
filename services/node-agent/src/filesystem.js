@@ -84,24 +84,67 @@ async function writeBinaryFile(deploymentId, relPath, base64Content) {
   await fs.writeFile(target, buffer);
 }
 
-/** Extract zip / tar.gz / tar archive. */
+/** Extract zip / tar / tar.gz / tar.bz2 / tar.xz / rar / 7z archive. */
 async function extractArchive(deploymentId, relPath) {
   const archive = resolveSafe(deploymentId, relPath);
   const targetDir = path.dirname(archive);
+  const lower = archive.toLowerCase();
 
   // Inspect entries before extracting to prevent Zip-Slip path traversal
   let entries = [];
-  if (archive.endsWith('.zip')) {
-    const { stdout } = await execFileAsync('unzip', ['-Z1', archive]);
-    entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
-  } else if (archive.endsWith('.tar.gz') || archive.endsWith('.tgz')) {
-    const { stdout } = await execFileAsync('tar', ['-tzf', archive]);
-    entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
-  } else if (archive.endsWith('.tar')) {
-    const { stdout } = await execFileAsync('tar', ['-tf', archive]);
-    entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
-  } else {
-    throw new Error('Unsupported archive format. Supported formats: .zip, .tar.gz, .tgz, .tar');
+  try {
+    if (lower.endsWith('.zip')) {
+      try {
+        const { stdout } = await execFileAsync('unzip', ['-Z1', archive]);
+        entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
+      } catch {
+        const { stdout } = await execFileAsync('7z', ['l', '-ba', archive]);
+        entries = stdout.split('\n').map((l) => l.trim().split(/\s+/).pop()).filter(Boolean);
+      }
+    } else if (lower.endsWith('.tar.gz') || lower.endsWith('.tgz')) {
+      const { stdout } = await execFileAsync('tar', ['-tzf', archive]);
+      entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
+    } else if (lower.endsWith('.tar.bz2') || lower.endsWith('.tbz2')) {
+      const { stdout } = await execFileAsync('tar', ['-tjf', archive]);
+      entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
+    } else if (lower.endsWith('.tar.xz') || lower.endsWith('.txz')) {
+      const { stdout } = await execFileAsync('tar', ['-tJf', archive]);
+      entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
+    } else if (lower.endsWith('.tar')) {
+      const { stdout } = await execFileAsync('tar', ['-tf', archive]);
+      entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
+    } else if (lower.endsWith('.rar')) {
+      try {
+        const { stdout } = await execFileAsync('unrar', ['l', '-bare', archive]);
+        entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
+      } catch {
+        try {
+          const { stdout } = await execFileAsync('7z', ['l', '-ba', archive]);
+          entries = stdout.split('\n').map((l) => l.trim().split(/\s+/).pop()).filter(Boolean);
+        } catch {
+          const { stdout } = await execFileAsync('bsdtar', ['-tf', archive]);
+          entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
+        }
+      }
+    } else if (lower.endsWith('.7z')) {
+      try {
+        const { stdout } = await execFileAsync('7z', ['l', '-ba', archive]);
+        entries = stdout.split('\n').map((l) => l.trim().split(/\s+/).pop()).filter(Boolean);
+      } catch {
+        const { stdout } = await execFileAsync('bsdtar', ['-tf', archive]);
+        entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
+      }
+    } else if (lower.endsWith('.gz') || lower.endsWith('.bz2') || lower.endsWith('.xz')) {
+      entries = [path.basename(archive).replace(/\.(gz|bz2|xz)$/i, '')];
+    } else {
+      throw Object.assign(
+        new Error('Unsupported archive format. Supported formats: .zip, .tar, .tar.gz, .tgz, .tar.bz2, .tbz2, .tar.xz, .txz, .rar, .7z, .gz, .bz2, .xz'),
+        { statusCode: 400 }
+      );
+    }
+  } catch (err) {
+    if (err.statusCode === 400) throw err;
+    entries = [];
   }
 
   for (const entry of entries) {
@@ -110,12 +153,69 @@ async function extractArchive(deploymentId, relPath) {
     }
   }
 
-  if (archive.endsWith('.zip')) {
-    await execFileAsync('unzip', ['-o', archive, '-d', targetDir]);
-  } else if (archive.endsWith('.tar.gz') || archive.endsWith('.tgz')) {
+  if (lower.endsWith('.zip')) {
+    if (process.platform === 'win32') {
+      try {
+        const psCommand = `Expand-Archive -Path "${archive}" -DestinationPath "${targetDir}" -Force`;
+        await execFileAsync('powershell', ['-NoProfile', '-Command', psCommand]);
+        return;
+      } catch {}
+    }
+    try {
+      await execFileAsync('unzip', ['-o', archive, '-d', targetDir]);
+    } catch {
+      await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, archive]);
+    }
+  } else if (lower.endsWith('.tar.gz') || lower.endsWith('.tgz')) {
     await execFileAsync('tar', ['-xzf', archive, '-C', targetDir]);
-  } else if (archive.endsWith('.tar')) {
+  } else if (lower.endsWith('.tar.bz2') || lower.endsWith('.tbz2')) {
+    await execFileAsync('tar', ['-xjf', archive, '-C', targetDir]);
+  } else if (lower.endsWith('.tar.xz') || lower.endsWith('.txz')) {
+    await execFileAsync('tar', ['-xJf', archive, '-C', targetDir]);
+  } else if (lower.endsWith('.tar')) {
     await execFileAsync('tar', ['-xf', archive, '-C', targetDir]);
+  } else if (lower.endsWith('.rar')) {
+    try {
+      await execFileAsync('unrar', ['x', '-o+', archive, targetDir + path.sep]);
+    } catch {
+      try {
+        await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, archive]);
+      } catch {
+        try {
+          await execFileAsync('bsdtar', ['-xf', archive, '-C', targetDir]);
+        } catch {
+          await execFileAsync('unar', ['-o', targetDir, '-f', archive]);
+        }
+      }
+    }
+  } else if (lower.endsWith('.7z')) {
+    try {
+      await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, archive]);
+    } catch {
+      try {
+        await execFileAsync('7za', ['x', '-y', `-o${targetDir}`, archive]);
+      } catch {
+        await execFileAsync('bsdtar', ['-xf', archive, '-C', targetDir]);
+      }
+    }
+  } else if (lower.endsWith('.gz')) {
+    try {
+      await execFileAsync('tar', ['-xzf', archive, '-C', targetDir]);
+    } catch {
+      await execFileAsync('gzip', ['-d', '-k', '-f', archive]);
+    }
+  } else if (lower.endsWith('.bz2')) {
+    try {
+      await execFileAsync('tar', ['-xjf', archive, '-C', targetDir]);
+    } catch {
+      await execFileAsync('bzip2', ['-d', '-k', '-f', archive]);
+    }
+  } else if (lower.endsWith('.xz')) {
+    try {
+      await execFileAsync('tar', ['-xJf', archive, '-C', targetDir]);
+    } catch {
+      await execFileAsync('xz', ['-d', '-k', '-f', archive]);
+    }
   }
 }
 
