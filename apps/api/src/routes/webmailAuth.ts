@@ -6,6 +6,7 @@ import { env } from '../env';
 import { decryptSecret } from '../lib/secretsVault';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { logger } from '../lib/logger';
+import { storeState, consumeState } from '../lib/redis';
 
 import crypto from 'crypto';
 
@@ -122,8 +123,10 @@ webmailAuthRouter.post('/webmail/auth/sso-ticket', requireAuth, async (req: Auth
     return res.status(403).json({ error: 'Access denied to this mailbox account' });
   }
 
+  const ticketId = crypto.randomUUID();
   const ssoToken = jwt.sign(
     {
+      jti: ticketId,
       accountId: account.id,
       userId: account.userId,
       email: account.smtpUsername,
@@ -132,6 +135,8 @@ webmailAuthRouter.post('/webmail/auth/sso-ticket', requireAuth, async (req: Auth
     env.projectAuthJwtSecret,
     { expiresIn: '60s', algorithm: 'HS256' }
   );
+
+  await storeState('webmail_sso', ticketId, { accountId: account.id, userId: account.userId }, 60);
 
   res.json({ ssoToken, webmailUrl: `/webmail?ssoToken=${ssoToken}` });
 });
@@ -146,8 +151,13 @@ webmailAuthRouter.post('/webmail/auth/sso-exchange', async (req: Request, res: R
 
   try {
     const payload = jwt.verify(parsed.data.ssoToken, env.projectAuthJwtSecret, { algorithms: ['HS256'] }) as any;
-    if (payload.type !== 'sso_ticket' || !payload.accountId) {
+    if (payload.type !== 'sso_ticket' || !payload.accountId || !payload.jti) {
       return res.status(401).json({ error: 'Invalid or expired SSO token' });
+    }
+
+    const state = await consumeState<{ accountId: string; userId: string }>('webmail_sso', payload.jti);
+    if (!state || state.accountId !== payload.accountId) {
+      return res.status(401).json({ error: 'SSO ticket has already been used or expired' });
     }
 
     const account = await prisma.smtpAccount.findUnique({
