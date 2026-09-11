@@ -123,6 +123,82 @@ async function rotateDatabasePassword({ containerId, type, oldPassword, newPassw
   return { ok: true, containerId };
 }
 
-module.exports = { provisionDatabase, scaleDatabase, rotateDatabasePassword };
+/**
+ * Manages database engine user accounts live on a running container.
+ */
+async function manageDatabaseUser({ containerId, type, action, username, password, role, masterPassword }) {
+  const container = docker.getContainer(containerId);
+  let cmd = [];
+
+  if (type === 'postgres') {
+    const pgAdmin = 'postgres';
+    if (action === 'create') {
+      const superuserFlag = role === 'admin' ? 'SUPERUSER' : 'NOSUPERUSER';
+      cmd = ['psql', '-U', pgAdmin, '-c', `CREATE USER "${username}" WITH PASSWORD '${password}' ${superuserFlag};` ];
+    } else if (action === 'delete') {
+      cmd = ['psql', '-U', pgAdmin, '-c', `DROP USER IF EXISTS "${username}";` ];
+    } else if (action === 'update') {
+      const parts = [];
+      if (password) parts.push(`PASSWORD '${password}'`);
+      if (role) parts.push(role === 'admin' ? 'SUPERUSER' : 'NOSUPERUSER');
+      cmd = ['psql', '-U', pgAdmin, '-c', `ALTER USER "${username}" WITH ${parts.join(' ')};` ];
+    }
+  } else if (type === 'mysql') {
+    const mysqlPass = masterPassword ? `-p${masterPassword}` : '-proot';
+    if (action === 'create') {
+      const grant = role === 'read_only' ? 'SELECT' : 'ALL PRIVILEGES';
+      cmd = ['mysql', '-uroot', mysqlPass, '-e', `CREATE USER '${username}'@'%' IDENTIFIED BY '${password}'; GRANT ${grant} ON *.* TO '${username}'@'%'; FLUSH PRIVILEGES;` ];
+    } else if (action === 'delete') {
+      cmd = ['mysql', '-uroot', mysqlPass, '-e', `DROP USER IF EXISTS '${username}'@'%'; FLUSH PRIVILEGES;` ];
+    } else if (action === 'update') {
+      const sqlParts = [];
+      if (password) sqlParts.push(`ALTER USER '${username}'@'%' IDENTIFIED BY '${password}';`);
+      if (role) {
+        const grant = role === 'read_only' ? 'SELECT' : 'ALL PRIVILEGES';
+        sqlParts.push(`REVOKE ALL PRIVILEGES, GRANT OPTION FROM '${username}'@'%'; GRANT ${grant} ON *.* TO '${username}'@'%'`);
+      }
+      sqlParts.push('FLUSH PRIVILEGES;');
+      cmd = ['mysql', '-uroot', mysqlPass, '-e', sqlParts.join(' ') ];
+    }
+  } else if (type === 'redis') {
+    if (action === 'create' || action === 'update') {
+      const aclRule = role === 'read_only' ? '+@read -@write' : '+@all';
+      cmd = ['redis-cli', 'ACL', 'SETUSER', username, 'on', `>${password}`, aclRule];
+    } else if (action === 'delete') {
+      cmd = ['redis-cli', 'ACL', 'DELUSER', username];
+    }
+  } else if (type === 'mongodb') {
+    const mongoAuth = masterPassword ? ['-u', 'app', '-p', masterPassword] : [];
+    if (action === 'create') {
+      const rolesStr = role === 'read_only' ? "['read']" : role === 'admin' ? "['root']" : "['readWrite']";
+      cmd = ['mongosh', ...mongoAuth, '--eval', `db.createUser({user: '${username}', pwd: '${password}', roles: ${rolesStr}})` ];
+    } else if (action === 'delete') {
+      cmd = ['mongosh', ...mongoAuth, '--eval', `db.dropUser('${username}')` ];
+    } else if (action === 'update') {
+      const evalScript = password ? `db.changeUserPassword('${username}', '${password}')` : 'true';
+      cmd = ['mongosh', ...mongoAuth, '--eval', evalScript ];
+    }
+  } else {
+    throw new Error(`Unsupported database type: ${type}`);
+  }
+
+  const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
+  const stream = await exec.start();
+  let output = '';
+  await new Promise((resolve, reject) => {
+    stream.on('data', (chunk) => { output += chunk.toString(); });
+    stream.on('end', resolve);
+    stream.on('error', reject);
+  });
+
+  const inspect = await exec.inspect();
+  if (inspect.ExitCode !== 0) {
+    throw new Error(`Managed database user management failed (exit ${inspect.ExitCode}): ${output || 'exec error'}`);
+  }
+
+  return { ok: true, containerId, username, action };
+}
+
+module.exports = { provisionDatabase, scaleDatabase, rotateDatabasePassword, manageDatabaseUser };
 
 

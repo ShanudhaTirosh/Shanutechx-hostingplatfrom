@@ -299,14 +299,12 @@ reviewsRouter.post('/reviews', requireAuth, async (req: AuthedRequest, res: Resp
     // Check if customer purchased the specific item/category
     let matchingPurchase = false;
     const targetId = parsed.data.productId;
-    const targetCategory = parsed.data.productCategory;
 
     for (const order of paidOrders) {
       for (const item of order.items) {
         if (
           (targetId && (item.planId === targetId || item.serviceId === targetId)) ||
-          (targetCategory && item.plan?.product?.category === targetCategory) ||
-          (parsed.data.productName && item.plan?.name.toLowerCase().includes(parsed.data.productName.toLowerCase()))
+          (parsed.data.productName && item.plan?.name.toLowerCase() === parsed.data.productName.toLowerCase())
         ) {
           matchingPurchase = true;
           break;
@@ -318,10 +316,7 @@ reviewsRouter.post('/reviews', requireAuth, async (req: AuthedRequest, res: Resp
     if (!matchingPurchase) {
       for (const sub of activeSubs) {
         const item = sub.orderItem;
-        if (
-          (targetId && (item?.planId === targetId || item?.serviceId === targetId)) ||
-          (targetCategory && item?.plan?.product?.category === targetCategory)
-        ) {
+        if (targetId && (item?.planId === targetId || item?.serviceId === targetId)) {
           matchingPurchase = true;
           break;
         }
@@ -330,9 +325,19 @@ reviewsRouter.post('/reviews', requireAuth, async (req: AuthedRequest, res: Resp
 
     if (!matchingPurchase) {
       return res.status(403).json({
-        error: 'Item Purchase Required: You can only post a review for an item or category you have actually purchased.',
+        error: 'Item Purchase Required: You can only post a review for an exact item you have actually purchased.',
         code: 'UNMATCHED_PRODUCT_PURCHASE',
       });
+    }
+  }
+
+  // Prevent duplicate reviews by the same customer for the same product/item
+  if (parsed.data.productId) {
+    const existingReview = await prisma.review.findFirst({
+      where: { userId, productId: parsed.data.productId },
+    });
+    if (existingReview) {
+      return res.status(409).json({ error: 'You have already submitted a review for this product.' });
     }
   }
 

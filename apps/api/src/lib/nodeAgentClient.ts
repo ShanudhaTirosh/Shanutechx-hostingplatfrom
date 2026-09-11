@@ -286,6 +286,31 @@ export async function rotateDatabasePasswordOnNode(
   return (await res.json()) as { ok: boolean };
 }
 
+/** Manages database engine users (create, delete, update) live on a running database container via node-agent. */
+export async function manageDatabaseUserOnNode(
+  node: Node,
+  containerId: string,
+  params: {
+    type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+    action: 'create' | 'delete' | 'update';
+    username: string;
+    password?: string;
+    role?: 'admin' | 'read_write' | 'read_only';
+    masterPassword?: string;
+  }
+): Promise<{ ok: boolean }> {
+  const res = await fetch(agentUrl(node, `/agent/managed-databases/${containerId}/manage-user`), {
+    method: 'POST',
+    headers: agentHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => '');
+    throw new Error(`Failed to manage database user on live engine (${res.status}): ${errorText}`);
+  }
+  return (await res.json()) as { ok: boolean };
+}
+
 
 /** Orchestrates live database migration from source node to target node. */
 export async function migrateDatabaseContainer(

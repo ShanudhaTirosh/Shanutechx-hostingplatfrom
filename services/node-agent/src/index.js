@@ -9,7 +9,7 @@ const { runContainer, stopAndRemove, stopContainer, getLogs, streamLogs, startCo
 const { collectStats } = require('./stats');
 const { addKey } = require('./livekit');
 const { addDomainRoute, removeDomainRoute } = require('./customDomain');
-const { provisionDatabase, scaleDatabase, rotateDatabasePassword } = require('./managedDb');
+const { provisionDatabase, scaleDatabase, rotateDatabasePassword, manageDatabaseUser } = require('./managedDb');
 const { listDir, readFile, writeFile, writeBinaryFile, extractArchive, makeDir, remove: fsRemove, rename } = require('./filesystem');
 const { provisionProject, deprovisionProject, execSql, listTables, validateIdentifier, insertRow, updateRow, deleteRow } = require('./projects');
 
@@ -463,6 +463,23 @@ app.post('/agent/managed-databases/:containerId/rotate-password', async (req, re
   } catch (err) {
     logger.error({ containerId, err: err.message }, 'Failed to rotate managed database password');
     res.status(500).json({ error: err.message || 'Failed to rotate managed database password' });
+  }
+});
+
+app.post('/agent/managed-databases/:containerId/manage-user', async (req, res) => {
+  const { containerId } = req.params;
+  const { type, action, username, password, role, masterPassword } = req.body || {};
+  if (!type || !action || !username) {
+    return res.status(400).json({ error: 'type, action, and username are required' });
+  }
+
+  try {
+    const result = await manageDatabaseUser({ containerId, type, action, username, password, role, masterPassword });
+    logger.info({ containerId, type, action, username }, 'Managed database user operation executed live');
+    res.json(result);
+  } catch (err) {
+    logger.error({ containerId, username, err: err.message }, 'Failed to manage database user');
+    res.status(500).json({ error: err.message || 'Failed to manage database user' });
   }
 });
 

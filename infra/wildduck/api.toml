@@ -2,7 +2,8 @@
 [api]
 port = 8080
 host = "0.0.0.0"
-accessToken = "secret-wildduck-api-token"
+# NOTE: Replace with matching WILDDUCK_API_KEY environment secret in production
+accessToken = "${WILDDUCK_API_KEY}"
 
 [mongo]
 host = "mongodb"

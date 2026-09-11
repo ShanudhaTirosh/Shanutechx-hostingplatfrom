@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 import { ownedResourceWhere, canAccessResource } from '../middleware/rbac';
 import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
-import { provisionDatabaseContainer } from '../lib/nodeAgentClient';
+import { provisionDatabaseContainer, manageDatabaseUserOnNode } from '../lib/nodeAgentClient';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { env } from '../env';
 
@@ -366,13 +366,37 @@ managedDatabasesRouter.post('/managed-databases/:id/users', async (req: AuthedRe
   const parsed = userSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  const db = await prisma.managedDatabase.findUnique({
+    where: { id: req.params.id },
+    include: { node: true },
+  });
   if (!db) return res.status(404).json({ error: 'Database not found' });
   if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
 
   const rawPassword = parsed.data.password || crypto.randomBytes(16).toString('hex');
   const passwordEnc = encryptSecret(rawPassword, env.secretsEncryptionKey);
 
+  // 1. Create DB user live on container database engine if running
+  if (db.containerId && db.node && db.status === 'running') {
+    try {
+      let masterPassword: string | undefined;
+      if (db.credentialRef) {
+        masterPassword = decryptSecret(db.credentialRef, env.secretsEncryptionKey);
+      }
+      await manageDatabaseUserOnNode(db.node, db.containerId, {
+        type: db.type as any,
+        action: 'create',
+        username: parsed.data.username,
+        password: rawPassword,
+        role: parsed.data.role,
+        masterPassword,
+      });
+    } catch (err: any) {
+      return res.status(502).json({ error: `Failed to create database user on live engine: ${err.message}` });
+    }
+  }
+
+  // 2. Save metadata in platform database
   const newUser = await prisma.managedDatabaseUser.create({
     data: {
       databaseId: db.id,
@@ -406,9 +430,30 @@ managedDatabasesRouter.post('/managed-databases/:id/users', async (req: AuthedRe
  * Deletes a DB user account from this database engine instance.
  */
 managedDatabasesRouter.delete('/managed-databases/:id/users/:username', async (req: AuthedRequest, res) => {
-  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  const db = await prisma.managedDatabase.findUnique({
+    where: { id: req.params.id },
+    include: { node: true },
+  });
   if (!db) return res.status(404).json({ error: 'Database not found' });
   if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+
+  // Delete live user from container database engine if running
+  if (db.containerId && db.node && db.status === 'running') {
+    try {
+      let masterPassword: string | undefined;
+      if (db.credentialRef) {
+        masterPassword = decryptSecret(db.credentialRef, env.secretsEncryptionKey);
+      }
+      await manageDatabaseUserOnNode(db.node, db.containerId, {
+        type: db.type as any,
+        action: 'delete',
+        username: req.params.username,
+        masterPassword,
+      });
+    } catch (err: any) {
+      return res.status(502).json({ error: `Failed to delete user on live engine: ${err.message}` });
+    }
+  }
 
   await prisma.managedDatabaseUser.deleteMany({
     where: { databaseId: db.id, username: req.params.username },
@@ -429,7 +474,10 @@ managedDatabasesRouter.patch('/managed-databases/:id/users/:username', async (re
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  const db = await prisma.managedDatabase.findUnique({
+    where: { id: req.params.id },
+    include: { node: true },
+  });
   if (!db) return res.status(404).json({ error: 'Database not found' });
   if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
 
@@ -446,6 +494,26 @@ managedDatabasesRouter.patch('/managed-databases/:id/users/:username', async (re
   }
   if (parsed.data.role) {
     dataToUpdate.role = parsed.data.role;
+  }
+
+  // Update user live on container database engine if running
+  if (db.containerId && db.node && db.status === 'running') {
+    try {
+      let masterPassword: string | undefined;
+      if (db.credentialRef) {
+        masterPassword = decryptSecret(db.credentialRef, env.secretsEncryptionKey);
+      }
+      await manageDatabaseUserOnNode(db.node, db.containerId, {
+        type: db.type as any,
+        action: 'update',
+        username: req.params.username,
+        password: generatedPass,
+        role: parsed.data.role,
+        masterPassword,
+      });
+    } catch (err: any) {
+      return res.status(502).json({ error: `Failed to update user on live engine: ${err.message}` });
+    }
   }
 
   const updated = await prisma.managedDatabaseUser.update({

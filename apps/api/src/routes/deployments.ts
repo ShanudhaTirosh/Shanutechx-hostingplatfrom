@@ -936,17 +936,6 @@ deploymentsRouter.patch('/deployments/:id/subdomain', async (req: AuthedRequest,
     throw err;
   }
 
-function getDecryptedEnvVars(deployment: { envVarsEncrypted?: string | null }): Record<string, string> | undefined {
-  if (!deployment.envVarsEncrypted) return undefined;
-  try {
-    const rawJson = decryptSecret(deployment.envVarsEncrypted, env.secretsEncryptionKey);
-    return JSON.parse(rawJson);
-  } catch (err) {
-    logger.error({ err }, 'Failed to decrypt deployment envVarsEncrypted');
-    return undefined;
-  }
-}
-
   // Re-apply container Traefik labels on node if running
   if (deployment.status === 'running' && deployment.containerId && deployment.repoUrl && deployment.internalPort) {
     try {
@@ -1207,9 +1196,8 @@ deploymentsRouter.patch('/deployments/:id/limits', async (req: AuthedRequest, re
 
 
 const updateEnvVarsSchema = z.object({
-  envVars: z.record(z.string()).refine((data) => Object.keys(data).length > 0, {
-    message: 'At least one environment variable must be provided',
-  }),
+  envVars: z.record(z.string()),
+  mode: z.enum(['merge', 'replace']).optional().default('merge'),
 });
 
 /**
@@ -1219,10 +1207,10 @@ const updateEnvVarsSchema = z.object({
  * 
  * RBAC: Deployment owner (customer) or admin/dev can update environment variables.
  * 
- * Process:
- * 1. Validate request and check ownership
- * 2. Encrypt and store new environment variables in database
- * 3. Restart deployment to apply new environment variables
+ * Flow:
+ * 1. Verify access permissions (owner, admin, or dev)
+ * 2. Validate input schema (envVars record)
+ * 3. Encrypt envVars using secretsVault AES-256-GCM
  * 4. Return updated deployment with success confirmation
  */
 /**
@@ -1244,9 +1232,14 @@ deploymentsRouter.patch('/deployments/:id/env', async (req: AuthedRequest, res) 
   const parsed = updateEnvVarsSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
+  const currentEnvVars = getDecryptedEnvVars(deployment) || {};
+  const finalEnvVars = parsed.data.mode === 'replace'
+    ? parsed.data.envVars
+    : { ...currentEnvVars, ...parsed.data.envVars };
+
   // Encrypt the new environment variables
   const envVarsEncrypted = encryptSecret(
-    JSON.stringify(parsed.data.envVars),
+    JSON.stringify(finalEnvVars),
     env.secretsEncryptionKey
   );
 

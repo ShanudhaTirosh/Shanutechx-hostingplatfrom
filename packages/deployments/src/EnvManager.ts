@@ -16,10 +16,8 @@ export class EnvManager {
 
   /** Update/merge environment variables */
   async set(newVars: Record<string, string>): Promise<Record<string, string>> {
-    const current = await this.load();
-    const merged = { ...current, ...newVars };
-    await this.client.deployments.updateEnvVars(this.deploymentId, merged);
-    return merged;
+    await (this.client.deployments as any).updateEnvVars(this.deploymentId, newVars, 'merge');
+    return this.load();
   }
 
   /** Delete specific keys */
@@ -28,7 +26,7 @@ export class EnvManager {
     for (const key of keys) {
       delete current[key];
     }
-    await this.client.deployments.updateEnvVars(this.deploymentId, current);
+    await (this.client.deployments as any).updateEnvVars(this.deploymentId, current, 'replace');
     return current;
   }
 

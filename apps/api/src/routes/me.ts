@@ -87,18 +87,19 @@ meRouter.patch('/me/role', requireAuth, async (req: AuthedRequest, res) => {
   const currentRole = req.user!.role;
   const targetRole = parsed.data.role;
 
+  // Customers cannot change their role via this endpoint
+  if (currentRole === 'customer') {
+    return res.status(403).json({ error: 'Customer role cannot be modified via this endpoint.' });
+  }
+
+  // Developer accounts cannot change roles via this endpoint
   if (currentRole === 'dev') {
-    // Dev accounts cannot be changed via this endpoint at all
     return res.status(403).json({ error: 'Developer accounts cannot change roles via this endpoint. Use the admin panel.' });
   }
 
-  if (currentRole === 'admin' && targetRole === 'admin') {
-    return res.status(400).json({ error: 'You are already an admin.' });
-  }
-
-  // Prevent self-promotion to admin from support role
-  if (currentRole === 'support' && targetRole === 'admin') {
-    return res.status(403).json({ error: 'Role promotion must be performed by another admin via the staff panel.' });
+  // Nobody can self-promote to dev or admin via this endpoint
+  if (targetRole === 'dev' || targetRole === 'admin') {
+    return res.status(403).json({ error: 'Role promotion to admin or dev must be performed by a developer via the staff panel.' });
   }
 
   const updatedUser = await prisma.user.update({
