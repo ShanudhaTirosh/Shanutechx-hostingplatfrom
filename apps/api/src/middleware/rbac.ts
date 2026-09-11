@@ -128,15 +128,15 @@ export async function canAccessResource(
   resourceId?: string
 ): Promise<boolean> {
   if (req.user?.role === 'dev') return true;
+  if (req.user?.id === resourceOwnerId) return true;
   if (req.user?.role === 'admin') {
     const owner = await prisma.user?.findUnique({
       where: { id: resourceOwnerId },
       select: { assignedAdminId: true },
     });
-    if (!owner) return true;
-    return owner.assignedAdminId === req.user.id || owner.assignedAdminId == null;
+    if (!owner) return false;
+    return owner.assignedAdminId === req.user.id;
   }
-  if (req.user?.id === resourceOwnerId) return true;
 
   if (req.user?.id) {
     const membership = await prisma.teamMember.findFirst({
@@ -281,7 +281,7 @@ export async function ownedResourceWhere(
   }
   if (req.user?.role === 'admin') {
     const assigned = await prisma.user?.findMany({
-      where: { OR: [{ assignedAdminId: req.user.id }, { assignedAdminId: null }] },
+      where: { OR: [{ assignedAdminId: req.user.id }, { id: req.user.id }] },
       select: { id: true },
     });
     return { [userIdField]: { in: assigned ? assigned.map((u: { id: string }) => u.id) : [] } };

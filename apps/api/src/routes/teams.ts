@@ -216,6 +216,14 @@ teamsRouter.post('/teams/:id/invites', async (req: AuthedRequest, res) => {
 
   if (!canInvite) return res.status(403).json({ error: 'Only team owners or admins can invite members' });
 
+  // Validate that any specified resource permissions target valid resources owned by the team owner
+  if (parsed.data.resourcePermissions && parsed.data.resourcePermissions.length > 0) {
+    const check = await validateTeamResourcePermissions(team.ownerId, parsed.data.resourcePermissions);
+    if (!check.valid) {
+      return res.status(400).json({ error: check.error });
+    }
+  }
+
   // Generate secure invite token (expires in 7 days)
   const token = crypto.randomBytes(24).toString('hex');
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -452,6 +460,12 @@ teamsRouter.patch('/teams/:id/members/:memberId', async (req: AuthedRequest, res
 
   // Update granular resource permissions if passed
   if (parsed.data.permissions) {
+    if (parsed.data.permissions.length > 0) {
+      const check = await validateTeamResourcePermissions(team.ownerId, parsed.data.permissions);
+      if (!check.valid) {
+        return res.status(400).json({ error: check.error });
+      }
+    }
     await prisma.resourcePermission.deleteMany({ where: { teamMemberId: memberId } });
     await prisma.resourcePermission.createMany({
       data: parsed.data.permissions.map((p: any) => ({
@@ -465,6 +479,49 @@ teamsRouter.patch('/teams/:id/members/:memberId', async (req: AuthedRequest, res
 
   res.json({ member: updatedMember });
 });
+
+async function validateTeamResourcePermissions(
+  ownerId: string,
+  permissions: Array<{ resourceType: string; resourceId: string; permission: string }>
+): Promise<{ valid: boolean; error?: string }> {
+  for (const perm of permissions) {
+    let exists = false;
+    switch (perm.resourceType) {
+      case 'deployment': {
+        const item = await prisma.deployment.findUnique({ where: { id: perm.resourceId }, select: { userId: true } });
+        exists = !!item && item.userId === ownerId;
+        break;
+      }
+      case 'managed_database': {
+        const item = await prisma.managedDatabase.findUnique({ where: { id: perm.resourceId }, select: { userId: true } });
+        exists = !!item && item.userId === ownerId;
+        break;
+      }
+      case 'vps': {
+        const item = await prisma.vpsProvision.findUnique({ where: { id: perm.resourceId }, select: { userId: true } });
+        exists = !!item && item.userId === ownerId;
+        break;
+      }
+      case 'smtp': {
+        const item = await prisma.smtpAccount.findUnique({ where: { id: perm.resourceId }, select: { userId: true } });
+        exists = !!item && item.userId === ownerId;
+        break;
+      }
+      case 'livekit': {
+        const item = await prisma.liveKitProject.findUnique({ where: { id: perm.resourceId }, select: { userId: true } });
+        exists = !!item && item.userId === ownerId;
+        break;
+      }
+    }
+    if (!exists) {
+      return {
+        valid: false,
+        error: `Resource permission target "${perm.resourceId}" (${perm.resourceType}) does not exist or does not belong to the team owner.`,
+      };
+    }
+  }
+  return { valid: true };
+}
 
 /**
  * DELETE /api/teams/:id/members/:memberId

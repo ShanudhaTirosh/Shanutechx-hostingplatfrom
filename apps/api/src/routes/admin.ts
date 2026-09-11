@@ -77,8 +77,8 @@ adminRouter.post('/admin/users', async (req: AuthedRequest, res) => {
   const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
   if (existing) return res.status(400).json({ error: 'User with this email already exists' });
 
-  if (parsed.data.role === 'dev' && req.user!.role !== 'dev') {
-    return res.status(403).json({ error: 'Only the platform dev account can create a dev user account.' });
+  if (['dev', 'admin'].includes(parsed.data.role) && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'Only the platform dev account can assign admin or dev roles.' });
   }
 
   const user = await prisma.user.create({
@@ -163,6 +163,7 @@ const setRoleSchema = z.object({ role: z.enum(['customer', 'support', 'dev', 'ad
  *  - You cannot change your own role.
  *  - Only the 'dev' user can change another 'dev' user's role (prevents
  *    admins from silently demoting the platform owner).
+ *  - Only the 'dev' user can assign 'admin' or 'dev' roles.
  */
 adminRouter.patch('/admin/staff/:userId/role', async (req: AuthedRequest, res) => {
   const parsed = setRoleSchema.safeParse(req.body);
@@ -184,9 +185,9 @@ adminRouter.patch('/admin/staff/:userId/role', async (req: AuthedRequest, res) =
     });
   }
 
-  if (parsed.data.role === 'dev' && req.user!.role !== 'dev') {
+  if (['dev', 'admin'].includes(parsed.data.role) && req.user!.role !== 'dev') {
     return res.status(403).json({
-      error: 'Only the platform dev account can assign the dev user role.',
+      error: 'Only the platform dev account can assign administrative roles (admin or dev).',
     });
   }
 
@@ -293,6 +294,11 @@ adminRouter.post('/admin/users/:userId/ban', async (req: AuthedRequest, res) => 
     return res.status(400).json({ error: 'Cannot ban your own user account.' });
   }
 
+  const { canAccessResource } = await import('../middleware/rbac');
+  if (!(await canAccessResource(targetUser.id, req))) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
   if ((targetUser.role === 'dev' || targetUser.role === 'admin') && req.user!.role !== 'dev') {
     return res.status(403).json({ error: 'Only the platform dev account can ban administrative staff.' });
   }
@@ -318,6 +324,11 @@ adminRouter.post('/admin/users/:userId/ban', async (req: AuthedRequest, res) => 
 adminRouter.post('/admin/users/:userId/unban', async (req: AuthedRequest, res) => {
   const targetUser = await prisma.user.findUnique({ where: { id: req.params.userId } });
   if (!targetUser) return res.status(404).json({ error: 'User not found' });
+
+  const { canAccessResource } = await import('../middleware/rbac');
+  if (!(await canAccessResource(targetUser.id, req))) {
+    return res.status(404).json({ error: 'User not found' });
+  }
 
   await unbanUser({
     userId: targetUser.id,

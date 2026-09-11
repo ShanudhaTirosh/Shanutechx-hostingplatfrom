@@ -89,6 +89,18 @@ gitConnectRouter.get('/git/github/callback', async (req, res: Response) => {
   if (!installation_id) return res.status(400).send('Missing installation_id.');
 
   try {
+    const existingInstallation = await prisma.gitHubInstallation.findUnique({
+      where: { installationId: installation_id },
+    });
+
+    if (existingInstallation && existingInstallation.userId !== verified.userId) {
+      logger.warn(
+        { installationId: installation_id, existingUserId: existingInstallation.userId, newUserId: verified.userId },
+        'GitHub installation link rejected: installation already linked to another platform user'
+      );
+      return res.redirect(`${dashboardUrl()}/deployments?git_connect=error&reason=already_linked&provider=github`);
+    }
+
     const details = await fetchInstallationDetails(installation_id);
     await prisma.gitHubInstallation.upsert({
       where: { installationId: installation_id },
@@ -100,7 +112,6 @@ gitConnectRouter.get('/git/github/callback', async (req, res: Response) => {
         avatarUrl: details.avatarUrl,
       },
       update: {
-        userId: verified.userId,
         accountLogin: details.accountLogin,
         accountType: details.accountType,
         avatarUrl: details.avatarUrl,

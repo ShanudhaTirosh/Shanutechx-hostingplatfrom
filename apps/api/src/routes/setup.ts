@@ -82,7 +82,15 @@ setupRouter.post('/setup/initialize-main-node', async (req: Request, res: Respon
       });
     }
 
-    // First run bootstrap — proceed directly
+    // First run bootstrap — verify token if SETUP_TOKEN is set in environment
+    const requiredToken = process.env.SETUP_TOKEN || process.env.BOOTSTRAP_TOKEN;
+    if (requiredToken) {
+      const providedToken = (req.headers['x-setup-token'] as string) || (req.body && req.body.setupToken);
+      if (providedToken !== requiredToken) {
+        return res.status(401).json({ error: 'Invalid or missing setup authorization token (X-Setup-Token).' });
+      }
+    }
+
     return proceedWithInitialization(req, res);
   } catch (err: any) {
     logger.error({ err: err.message }, 'Setup initialization check failed');
@@ -174,7 +182,7 @@ async function proceedWithInitialization(req: Request, res: Response) {
     ? await prisma.node.update({ where: { id: existingNode.id }, data: nodeData })
     : await prisma.node.create({ data: nodeData });
 
-  // 4. Create/Ensure Dev Admin User
+  // 4. Create/Ensure Dev Admin User (refuse hijacking pre-existing non-dev user accounts)
   let devAdmin = await prisma.user.findUnique({ where: { email: devAdminEmail.toLowerCase() } });
   if (!devAdmin) {
     devAdmin = await prisma.user.create({
@@ -186,9 +194,8 @@ async function proceedWithInitialization(req: Request, res: Response) {
       },
     });
   } else if (devAdmin.role !== 'dev') {
-    devAdmin = await prisma.user.update({
-      where: { id: devAdmin.id },
-      data: { role: 'dev' },
+    return res.status(400).json({
+      error: `User account with email ${devAdminEmail} already exists as a non-dev user. Please specify a fresh email address for the platform owner account.`,
     });
   }
 
