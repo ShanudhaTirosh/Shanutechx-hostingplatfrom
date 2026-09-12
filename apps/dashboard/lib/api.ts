@@ -42,6 +42,12 @@ async function asJson<T>(res: Response): Promise<T> {
 
 export const api = {
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || '',
+  get: <T = any>(path: string) => apiFetch(path).then((r) => asJson<T>(r)),
+  post: <T = any>(path: string, body?: any) =>
+    apiFetch(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }).then((r) => asJson<T>(r)),
+  delete: <T = any>(path: string) => apiFetch(path, { method: 'DELETE' }).then((r) => asJson<T>(r)),
+  patch: <T = any>(path: string, body?: any) =>
+    apiFetch(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }).then((r) => asJson<T>(r)),
   me: () => apiFetch('/api/me').then((r) => asJson<{ user: ApiUser; rootDomain: string }>(r)),
 
 

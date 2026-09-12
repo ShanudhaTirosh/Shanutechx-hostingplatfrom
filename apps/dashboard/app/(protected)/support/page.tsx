@@ -1,287 +1,244 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import React, { useState } from 'react';
 import { api } from '@/lib/api';
-import { Ticket, TicketStatus } from '@/lib/types';
-import { useAppUser } from '@/lib/AppUserContext';
-import {
-  Card,
-  Button,
-  Badge,
-  Spinner,
-  EmptyState,
-  ErrorBanner,
-  PageHeader,
-  useToast,
-} from '@/components/ui';
-import {
-  IconServer,
-  IconRefresh,
-  IconAlert,
-  IconPlus,
-} from '@/components/Icons';
-import { Search, Headphones } from 'lucide-react';
+import { useToast } from '@/components/ui';
+import { Search, ShieldAlert, Lock, Unlock, HardDrive, KeyRound, AlertTriangle, CheckCircle2, User, RefreshCw } from 'lucide-react';
 
-export const dynamic = 'force-dynamic';
+interface SupportUser {
+  id: string;
+  email: string;
+  displayName?: string;
+  role: string;
+  isBanned: boolean;
+  bannedAt?: string;
+  banReason?: string;
+  createdAt: string;
+  smtpAccounts: {
+    id: string;
+    smtpUsername: string;
+    smtpHost: string;
+    customDomain?: string;
+    storageQuotaMb: number;
+    storageUsedMb: number;
+    isSuspended: boolean;
+    aliases: string[];
+  }[];
+}
 
-export default function SupportPortalPage() {
-  const { apiUser } = useAppUser();
-  const [tickets, setTickets] = useState<Ticket[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<TicketStatus | 'ALL'>('ALL');
-  const [searchCustomer, setSearchCustomer] = useState<string>('');
-  const [customerResult, setCustomerResult] = useState<any | null>(null);
-  const [searching, setSearching] = useState<boolean>(false);
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  const [replyText, setReplyText] = useState<string>('');
-  const [replyStatus, setReplyStatus] = useState<TicketStatus>('pending');
-  const [submitting, setSubmitting] = useState<boolean>(false);
+export default function SupportHelpdeskConsolePage() {
+  const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [results, setResults] = useState<SupportUser[]>([]);
+  const [selectedUser, setSelectedUser] = useState<SupportUser | null>(null);
+
+  // Support Action Modal Inputs
+  const [bumpAccountId, setBumpAccountId] = useState('');
+  const [bumpMb, setBumpMb] = useState(1024);
+  const [actionReason, setActionReason] = useState('');
+  const [executingAction, setExecutingAction] = useState(false);
 
   const { toast } = useToast();
 
-  function loadTickets() {
-    api.tickets
-      .list(filterStatus === 'ALL' ? undefined : filterStatus)
-      .then((data) => setTickets(data.tickets))
-      .catch((err) => setError(err.message));
-  }
-
-  useEffect(loadTickets, [filterStatus]);
-
-  async function handleCustomerSearch() {
-    if (!searchCustomer.trim()) return;
+  const handleLookup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
     setSearching(true);
-    setCustomerResult(null);
     try {
-      const res = await api.admin.customers(50);
-      const matched = res.customers.find(
-        (c) =>
-          c.email.toLowerCase().includes(searchCustomer.toLowerCase()) ||
-          c.id.toLowerCase() === searchCustomer.trim().toLowerCase()
-      );
-      if (matched) {
-        setCustomerResult(matched);
-        toast(`Customer found: ${matched.email}`, 'success');
+      const res = await api.get(`/webmail/support/lookup?q=${encodeURIComponent(query.trim())}`);
+      setResults(res.data?.results || []);
+      if (res.data?.results?.length > 0) {
+        setSelectedUser(res.data.results[0]);
       } else {
-        toast('No matching customer found', 'error');
+        setSelectedUser(null);
+        toast('No accounts found matching query', 'info');
       }
     } catch (err: any) {
-      toast(`Search error: ${err.message}`, 'error');
+      toast('Support lookup failed', 'error');
     } finally {
       setSearching(false);
     }
-  }
+  };
 
-  async function handleReplySubmit() {
-    if (!selectedTicket || !replyText.trim()) return;
-    setSubmitting(true);
+  const handleUnlockAccount = async (targetUserId: string) => {
+    setExecutingAction(true);
     try {
-      await api.tickets.reply(selectedTicket.id, replyText);
-      await api.tickets.update(selectedTicket.id, { status: replyStatus });
-      toast('Ticket response and status updated successfully.', 'success');
-      setReplyText('');
-      setSelectedTicket(null);
-      loadTickets();
+      await api.post('/webmail/support/unlock-account', {
+        targetUserId,
+        reason: actionReason || 'Customer support request',
+      });
+      toast('Account unlocked successfully and logged to audit trail!', 'success');
+      setActionReason('');
+      handleLookup({ preventDefault: () => {} } as any);
     } catch (err: any) {
-      toast(`Failed to update ticket: ${err.message}`, 'error');
+      toast('Failed to unlock account', 'error');
     } finally {
-      setSubmitting(false);
+      setExecutingAction(false);
     }
-  }
+  };
+
+  const handleQuotaBump = async (smtpAccountId: string) => {
+    if (!actionReason.trim()) {
+      toast('Justification reason is required for quota bumps', 'error');
+      return;
+    }
+    setExecutingAction(true);
+    try {
+      const res = await api.post('/webmail/support/quota-bump', {
+        smtpAccountId,
+        additionalMb: bumpMb,
+        reason: actionReason,
+      });
+      toast(`Granted +${bumpMb}MB quota bump! New total: ${res.data.newQuotaMb}MB`, 'success');
+      setActionReason('');
+      handleLookup({ preventDefault: () => {} } as any);
+    } catch (err: any) {
+      toast('Failed to bump quota', 'error');
+    } finally {
+      setExecutingAction(false);
+    }
+  };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <PageHeader
-        title="Support Operations Center"
-        description="Unified portal for support staff: live ticket triage queue, customer account lookup, service diagnostics, and real-time support gateway."
-      />
-
-      {/* Top Metrics & Gateway Quick Links */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-cyan-500/10 border border-cyan-500/20 p-4 space-y-1">
-          <span className="text-cyan-300 text-xs block">Active Ticket Queue</span>
-          <span className="text-2xl font-bold text-cyan-400 font-mono">
-            {tickets?.filter((t) => t.status === 'open' || t.status === 'pending').length || 0}
-          </span>
-        </Card>
-        <Card className="bg-emerald-500/10 border border-emerald-500/20 p-4 space-y-1">
-          <span className="text-emerald-300 text-xs block">Resolved Tickets</span>
-          <span className="text-2xl font-bold text-emerald-400 font-mono">
-            {tickets?.filter((t) => t.status === 'closed').length || 0}
-          </span>
-        </Card>
-        <Link href="/admin/chat" className="block">
-          <Card className="bg-purple-500/10 border border-purple-500/20 hover:border-purple-500/40 p-4 space-y-1 transition-all cursor-pointer">
-            <span className="text-purple-300 text-xs block">Live Chat Gateway</span>
-            <span className="text-sm font-bold text-purple-400">Open Live Chat Console →</span>
-          </Card>
-        </Link>
-        <Link href="/knowledgebase" className="block">
-          <Card className="bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 p-4 space-y-1 transition-all cursor-pointer">
-            <span className="text-amber-300 text-xs block">Knowledge Base</span>
-            <span className="text-sm font-bold text-amber-400">Manage Articles →</span>
-          </Card>
-        </Link>
+    <div className="mx-auto max-w-7xl space-y-8 p-6">
+      {/* Header with Privacy Notice */}
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <ShieldAlert className="h-7 w-7 text-indigo-500" />
+            Support & Helpdesk Console
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Account provisioning lookup, password reset, unlock, and audited quota bump actions.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+          <Lock className="h-4 w-4" />
+          Strict Privacy Bound: Zero Email Content Reading Access
+        </div>
       </div>
 
-      {/* Customer Quick Lookup Card */}
-      <Card className="bg-white/5 border border-white/10 p-4 space-y-3">
-        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-          <Search className="w-4 h-4 text-accent-teal" /> Customer Account Quick Lookup
-        </h3>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Enter customer email address or User ID..."
-            value={searchCustomer}
-            onChange={(e) => setSearchCustomer(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder:text-text-muted focus:outline-none focus:border-accent-teal font-mono"
-          />
-          <Button size="sm" variant="primary" onClick={handleCustomerSearch} loading={searching}>
-            Search Customer
-          </Button>
-        </div>
+      {/* Account Lookup Search Bar */}
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <form onSubmit={handleLookup} className="flex max-w-2xl gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search user email, display name, or domain..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 pl-10 pr-4 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={searching}
+            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {searching ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            Lookup Account
+          </button>
+        </form>
 
-        {customerResult && (
-          <div className="bg-black/40 border border-white/10 rounded-xl p-3 text-xs space-y-2 font-mono">
-            <div className="flex items-center justify-between">
-              <span className="text-accent-teal font-bold">{customerResult.email}</span>
-              <span className="text-xs bg-cyan-500/20 text-cyan-300 rounded px-2 py-0.5 font-bold uppercase">{customerResult.role}</span>
-            </div>
-            <div className="text-text-muted text-[11px]">
-              User ID: {customerResult.id} | Joined: {new Date(customerResult.createdAt).toLocaleDateString()}
+        {/* Search Results Grid */}
+        {results.length > 0 && (
+          <div className="mt-6 border-t border-slate-100 pt-6 dark:border-slate-800">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Search Matches</h2>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {results.map((u) => (
+                <button
+                  key={u.id}
+                  onClick={() => setSelectedUser(u)}
+                  className={`rounded-lg border px-4 py-2 text-left text-xs font-medium ${
+                    selectedUser?.id === u.id
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-900 dark:bg-indigo-950 dark:text-indigo-200'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300'
+                  }`}
+                >
+                  <div className="font-bold">{u.displayName || u.email}</div>
+                  <div className="text-slate-500">{u.email} ({u.role})</div>
+                </button>
+              ))}
             </div>
           </div>
         )}
-      </Card>
-
-      {/* Ticket Queue Controls */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-text-muted">Filter Queue:</span>
-          {(['ALL', 'open', 'pending', 'closed'] as const).map((st) => (
-            <button
-              key={st}
-              onClick={() => setFilterStatus(st)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                filterStatus === st
-                  ? 'bg-accent-teal text-black'
-                  : 'bg-white/5 text-text-muted hover:text-white'
-              }`}
-            >
-              {st.toUpperCase()}
-            </button>
-          ))}
-        </div>
-        <Button size="sm" variant="secondary" onClick={loadTickets} className="flex items-center gap-1.5">
-          <IconRefresh size={14} /> Refresh Queue
-        </Button>
       </div>
 
-      {error && <ErrorBanner message={error} />}
-      {tickets === null && <Spinner label="Loading support ticket queue..." />}
-      {tickets?.length === 0 && (
-        <EmptyState message="No tickets found matching current filter." />
-      )}
-
-      {/* Ticket List & Triage Drawer */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="space-y-3">
-          {tickets?.map((t) => (
-            <Card
-              key={t.id}
-              onClick={() => setSelectedTicket(t)}
-              className={`p-4 space-y-2 cursor-pointer transition-all border ${
-                selectedTicket?.id === t.id
-                  ? 'border-accent-teal bg-white/10'
-                  : 'border-white/10 bg-neutral-900/60 hover:border-white/20'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-white text-xs">{t.subject}</span>
-                <Badge status={t.status === 'open' ? 'failed' : t.status === 'pending' ? 'pending' : 'running'} />
+      {/* Account Support Management Panel */}
+      {selectedUser && (
+        <div className="space-y-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <User className="h-5 w-5 text-indigo-500" />
+                  {selectedUser.displayName || selectedUser.email}
+                </h2>
+                <p className="text-xs text-slate-500">User ID: {selectedUser.id} • Created {new Date(selectedUser.createdAt).toLocaleDateString()}</p>
               </div>
-              <p className="text-text-muted text-xs line-clamp-2 leading-relaxed">{t.messages?.[0]?.body || 'No message content'}</p>
-              <div className="flex items-center justify-between text-[10px] text-text-muted pt-1 border-t border-white/5 font-mono">
-                <span>User: {t.userId.slice(0, 8)}...</span>
-                <span>Updated: {new Date(t.updatedAt).toLocaleString()}</span>
-              </div>
-            </Card>
-          ))}
-        </div>
 
-        {/* Reply & Triage Workspace */}
-        {selectedTicket ? (
-          <Card className="border border-white/10 bg-neutral-900 p-5 space-y-4 h-fit sticky top-24">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <h3 className="font-bold text-white text-sm">Ticket Response Workspace</h3>
-              <Badge status={selectedTicket.status === 'open' ? 'failed' : selectedTicket.status === 'pending' ? 'pending' : 'running'} />
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <div className="font-semibold text-accent-teal">{selectedTicket.subject}</div>
-              <div className="bg-black/40 border border-white/10 rounded-xl p-3 text-text-muted leading-relaxed font-mono">
-                {selectedTicket.messages?.[0]?.body || 'No content provided.'}
+              <div className="flex items-center gap-2">
+                {selectedUser.isBanned ? (
+                  <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                    Account Banned: {selectedUser.banReason || 'Policy violation'}
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    Account Active
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Conversation Thread */}
-            {selectedTicket.messages && selectedTicket.messages.length > 0 && (
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                {selectedTicket.messages.map((m, idx) => (
-                  <div key={idx} className="bg-white/5 border border-white/10 rounded-lg p-2 text-xs space-y-1">
-                    <div className="text-[10px] text-accent-teal font-semibold font-mono">
-                      {m.senderId} ({m.senderRole})
-                    </div>
-                    <div className="text-white text-xs leading-normal">{m.body}</div>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Support Actions Toolbar */}
+            <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-6 dark:border-slate-800">
+              <input
+                type="text"
+                placeholder="Required Action Justification Reason / Ticket ID..."
+                value={actionReason}
+                onChange={(e) => setActionReason(e.target.value)}
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              />
 
-            <div className="space-y-3 pt-2 border-t border-white/10 text-xs">
-              <div>
-                <label className="text-text-muted block mb-1">Staff Response Note *</label>
-                <textarea
-                  rows={4}
-                  placeholder="Type your response to the customer..."
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white placeholder:text-text-muted focus:outline-none focus:border-accent-teal font-mono text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="text-text-muted block mb-1">Update Ticket Status</label>
-                <select
-                  value={replyStatus}
-                  onChange={(e) => setReplyStatus(e.target.value as TicketStatus)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-2 text-white focus:outline-none focus:border-accent-teal font-mono text-xs"
+              {selectedUser.isBanned && (
+                <button
+                  onClick={() => handleUnlockAccount(selectedUser.id)}
+                  disabled={executingAction}
+                  className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
-                  <option value="pending" className="bg-neutral-900 text-white">PENDING (Awaiting Customer Response)</option>
-                  <option value="open" className="bg-neutral-900 text-white">OPEN (In Progress)</option>
-                  <option value="closed" className="bg-neutral-900 text-white">CLOSED (Resolved)</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button size="sm" variant="secondary" onClick={() => setSelectedTicket(null)}>
-                  Close Drawer
-                </Button>
-                <Button size="sm" variant="primary" onClick={handleReplySubmit} loading={submitting}>
-                  Send Response & Update Status
-                </Button>
-              </div>
+                  <Unlock className="h-4 w-4" /> Unlock Account
+                </button>
+              )}
             </div>
-          </Card>
-        ) : (
-          <Card className="border border-dashed border-white/10 p-8 flex flex-col items-center justify-center text-center text-text-muted space-y-2">
-            <Headphones className="w-8 h-8 text-slate-400 stroke-1" />
-            <p className="text-xs">Select any ticket from the queue on the left to review details and send a staff response.</p>
-          </Card>
-        )}
-      </div>
+
+            {/* Associated SmtpAccounts */}
+            <div className="mt-6 space-y-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Customer Mailboxes ({selectedUser.smtpAccounts.length})</h3>
+              {selectedUser.smtpAccounts.map((acc) => (
+                <div key={acc.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs dark:border-slate-800 dark:bg-slate-950">
+                  <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                    <div>
+                      <span className="font-bold text-slate-900 dark:text-white">{acc.smtpUsername}@{acc.customDomain || 'shanutechx.com'}</span>
+                      <p className="text-slate-500">Storage: {acc.storageUsedMb} MB / {acc.storageQuotaMb} MB • Aliases: {acc.aliases?.length || 0}</p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleQuotaBump(acc.id)}
+                        disabled={executingAction}
+                        className="flex items-center gap-1 rounded bg-indigo-600 px-3 py-1 text-white hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        <HardDrive className="h-3.5 w-3.5" /> Bump Quotas (+1GB)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

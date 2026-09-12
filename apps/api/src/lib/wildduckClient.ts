@@ -322,4 +322,164 @@ export const wildduckClient = {
       txtRecord: `v=DKIM1; k=rsa; p=${pubKey}`,
     };
   },
+
+  async listDomains(): Promise<any[]> {
+    const res = await wildDuckRequest<{ results?: any[] }>('/domains').catch(() => ({ results: [] }));
+    return res.results || [];
+  },
+
+  async createDomain(domain: string): Promise<boolean> {
+    const res = await wildDuckRequest<{ success?: boolean }>('/domains', {
+      method: 'POST',
+      body: { domain: domain.toLowerCase() },
+    }).catch(() => ({ success: false }));
+    return !!res.success;
+  },
+
+  async deleteDomain(domain: string): Promise<boolean> {
+    const res = await wildDuckRequest<{ success?: boolean }>(`/domains/${encodeURIComponent(domain)}`, {
+      method: 'DELETE',
+    }).catch(() => ({ success: false }));
+    return !!res.success;
+  },
+
+  // ── HEALTH, QUEUES & SYSTEM SYSTEM ──────────────────────────────────
+  async getHealth(): Promise<any> {
+    return wildDuckRequest<any>('/health').catch(() => ({ status: 'yellow', services: {} }));
+  },
+
+  async getMetrics(): Promise<string> {
+    const baseUrl = (env.wildduckApiUrl || 'http://localhost:8080').replace(/\/$/, '');
+    const apiKey = env.wildduckApiKey;
+    if (!apiKey) return '';
+    try {
+      const res = await fetch(`${baseUrl}/metrics`, { headers: { 'X-Access-Token': apiKey } });
+      return await res.text();
+    } catch {
+      return '';
+    }
+  },
+
+  async listTasks(): Promise<any[]> {
+    const res = await wildDuckRequest<{ results?: any[] }>('/tasks').catch(() => ({ results: [] }));
+    return res.results || [];
+  },
+
+  async getTask(taskId: string): Promise<any> {
+    return wildDuckRequest<any>(`/tasks/${encodeURIComponent(taskId)}`).catch(() => null);
+  },
+
+  async requeueTask(taskId: string): Promise<boolean> {
+    const res = await wildDuckRequest<{ success?: boolean }>(`/tasks/${encodeURIComponent(taskId)}/requeue`, {
+      method: 'POST',
+    }).catch(() => ({ success: false }));
+    return !!res.success;
+  },
+
+  async getAuditLog(query: Record<string, string | number> = {}): Promise<any[]> {
+    const res = await wildDuckRequest<{ results?: any[] }>('/audit', { query }).catch(() => ({ results: [] }));
+    return res.results || [];
+  },
+
+  // ── MAILBOXES, FILTERS, AUTOREPLIES & SECURITY ─────────────────────
+  async createMailbox(userId: string, path: string, name?: string): Promise<WildDuckMailbox> {
+    const res = await wildDuckRequest<any>(`/users/${encodeURIComponent(userId)}/mailboxes`, {
+      method: 'POST',
+      body: { path, name: name || path },
+    });
+    return { id: res.id || path, path, name: name || path, total: 0, unread: 0 };
+  },
+
+  async deleteMailbox(userId: string, mailboxId: string): Promise<boolean> {
+    const res = await wildDuckRequest<{ success?: boolean }>(
+      `/users/${encodeURIComponent(userId)}/mailboxes/${encodeURIComponent(mailboxId)}`,
+      { method: 'DELETE' }
+    );
+    return !!res.success;
+  },
+
+  async listFilters(userId: string): Promise<any[]> {
+    const res = await wildDuckRequest<{ results?: any[] }>(`/users/${encodeURIComponent(userId)}/filters`).catch(() => ({ results: [] }));
+    return res.results || [];
+  },
+
+  async createFilter(userId: string, filter: any): Promise<any> {
+    return wildDuckRequest<any>(`/users/${encodeURIComponent(userId)}/filters`, {
+      method: 'POST',
+      body: filter,
+    });
+  },
+
+  async deleteFilter(userId: string, filterId: string): Promise<boolean> {
+    const res = await wildDuckRequest<{ success?: boolean }>(
+      `/users/${encodeURIComponent(userId)}/filters/${encodeURIComponent(filterId)}`,
+      { method: 'DELETE' }
+    ).catch(() => ({ success: false }));
+    return !!res.success;
+  },
+
+  async getAutoreply(userId: string): Promise<any> {
+    return wildDuckRequest<any>(`/users/${encodeURIComponent(userId)}/autoreplies`).catch(() => null);
+  },
+
+  async setAutoreply(userId: string, options: { enabled: boolean; name?: string; subject?: string; message?: string }): Promise<boolean> {
+    const res = await wildDuckRequest<{ success?: boolean }>(`/users/${encodeURIComponent(userId)}/autoreplies`, {
+      method: 'POST',
+      body: options,
+    }).catch(() => ({ success: false }));
+    return !!res.success;
+  },
+
+  async listApplicationPasswords(userId: string): Promise<any[]> {
+    const res = await wildDuckRequest<{ results?: any[] }>(`/users/${encodeURIComponent(userId)}/application-passwords`).catch(() => ({ results: [] }));
+    return res.results || [];
+  },
+
+  async createApplicationPassword(userId: string, name: string): Promise<any> {
+    return wildDuckRequest<any>(`/users/${encodeURIComponent(userId)}/application-passwords`, {
+      method: 'POST',
+      body: { name },
+    });
+  },
+
+  async deleteApplicationPassword(userId: string, id: string): Promise<boolean> {
+    const res = await wildDuckRequest<{ success?: boolean }>(
+      `/users/${encodeURIComponent(userId)}/application-passwords/${encodeURIComponent(id)}`,
+      { method: 'DELETE' }
+    ).catch(() => ({ success: false }));
+    return !!res.success;
+  },
+
+  async listMcpTokens(userId: string): Promise<any[]> {
+    const res = await wildDuckRequest<{ results?: any[] }>(`/users/${encodeURIComponent(userId)}/mcp-tokens`).catch(() => ({ results: [] }));
+    return res.results || [];
+  },
+
+  async createMcpToken(userId: string, name: string, scopes: string[]): Promise<any> {
+    return wildDuckRequest<any>(`/users/${encodeURIComponent(userId)}/mcp-tokens`, {
+      method: 'POST',
+      body: { name, scopes },
+    });
+  },
+
+  async deleteMcpToken(userId: string, id: string): Promise<boolean> {
+    const res = await wildDuckRequest<{ success?: boolean }>(
+      `/users/${encodeURIComponent(userId)}/mcp-tokens/${encodeURIComponent(id)}`,
+      { method: 'DELETE' }
+    ).catch(() => ({ success: false }));
+    return !!res.success;
+  },
+
+  async get2faStatus(userId: string): Promise<any> {
+    return wildDuckRequest<any>(`/users/${encodeURIComponent(userId)}/two-factor-auth`).catch(() => ({ enabled: false }));
+  },
+
+  async disable2fa(userId: string, reason?: string): Promise<boolean> {
+    const res = await wildDuckRequest<{ success?: boolean }>(`/users/${encodeURIComponent(userId)}/two-factor-auth`, {
+      method: 'DELETE',
+      body: { reason },
+    }).catch(() => ({ success: false }));
+    return !!res.success;
+  },
 };
+
