@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, GithubAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, GithubAuthProvider, OAuthProvider } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -19,3 +19,8 @@ export const githubProvider = new GithubAuthProvider();
 githubProvider.addScope('repo');
 githubProvider.addScope('read:user');
 githubProvider.addScope('user:email');
+
+export const discordProvider = new OAuthProvider('discord.com');
+discordProvider.addScope('identify');
+discordProvider.addScope('email');
+

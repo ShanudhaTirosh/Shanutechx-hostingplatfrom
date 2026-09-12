@@ -36,8 +36,8 @@ export function requireRole(...roles: UserRole[]) {
       });
     }
 
-    // Check if user's role is in the allowed roles list
-    if (!roles.includes(req.user.role)) {
+    // Check if user's role is in the allowed roles list (dev user is platform superuser and passes all role checks)
+    if (req.user.role !== 'dev' && !roles.includes(req.user.role)) {
       return res.status(403).json({ 
         error: 'Insufficient permissions',
         message: `This action requires one of the following roles: ${roles.join(', ')}. Your role: ${req.user.role}`,
@@ -46,7 +46,7 @@ export function requireRole(...roles: UserRole[]) {
       });
     }
 
-    // User has required role, proceed to next middleware
+    // User has required role or dev superuser status, proceed to next middleware
     next();
   };
 }

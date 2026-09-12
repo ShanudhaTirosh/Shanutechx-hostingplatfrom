@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { GoogleAuthProvider, GithubAuthProvider, OAuthProvider, signInWithPopup } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/api';
 import { Button } from '@/components/Button';
@@ -12,21 +14,26 @@ import type { RootStackParamList } from '@/navigation/types';
 
 export function LoginScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { signIn } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const { refreshApiUser } = useAuth();
+  const [loadingProvider, setLoadingProvider] = useState<'google' | 'github' | 'discord' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleLogin() {
+  async function handleOAuthSignIn(providerType: 'google' | 'github' | 'discord') {
     setError(null);
-    if (!email.trim() || !password) {
-      setError('Enter both email and password.');
-      return;
-    }
-    setLoading(true);
+    setLoadingProvider(providerType);
     try {
-      await signIn(email.trim(), password);
+      let provider: GoogleAuthProvider | GithubAuthProvider | OAuthProvider;
+      if (providerType === 'google') {
+        provider = new GoogleAuthProvider();
+      } else if (providerType === 'github') {
+        provider = new GithubAuthProvider();
+      } else {
+        provider = new OAuthProvider('discord.com');
+      }
+
+      await signInWithPopup(auth, provider);
+      await refreshApiUser();
+
       const { user } = await api.auth.me();
       if (user.role === 'customer') {
         setError('Staff access only. Customers please log in via the web dashboard.');
@@ -34,9 +41,9 @@ export function LoginScreen() {
       }
       navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (err: any) {
-      setError(mapFirebaseError(err.code) ?? err.message ?? 'Failed to sign in.');
+      setError(err.message ?? 'OAuth sign-in failed. Please try again.');
     } finally {
-      setLoading(false);
+      setLoadingProvider(null);
     }
   }
 
@@ -48,40 +55,41 @@ export function LoginScreen() {
             <LinearGradient colors={[colors.primary, colors.cyan]} style={styles.logo}>
               <Text style={styles.logoText}>S</Text>
             </LinearGradient>
-            <Text style={styles.title}>Welcome back</Text>
-            <Text style={styles.subtitle}>Sign in to the ShanuTechX admin console</Text>
+            <Text style={styles.title}>ShanuTechX Admin</Text>
+            <Text style={styles.subtitle}>Google, GitHub & Discord OAuth SSO Standard</Text>
           </View>
 
           <GlassCard style={styles.card}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@shanutechx.com"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              style={styles.input}
-            />
+            <View style={styles.ssoBadge}>
+              <Text style={styles.ssoBadgeText}>OAUTH SSO ONLY</Text>
+            </View>
 
-            <Text style={[styles.label, { marginTop: 16 }]}>Password</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="••••••••"
-              placeholderTextColor={colors.muted}
-              secureTextEntry
-              style={styles.input}
-            />
+            <Text style={styles.infoText}>
+              Direct password logins are disabled. Please authenticate using your verified Google, GitHub, or Discord account.
+            </Text>
 
             {error && <Text style={styles.error}>{error}</Text>}
 
-            <Button label="Sign In" onPress={handleLogin} loading={loading} style={{ marginTop: 20 }} />
+            <Button
+              label="Continue with Google"
+              onPress={() => handleOAuthSignIn('google')}
+              loading={loadingProvider === 'google'}
+              style={{ marginTop: 16 }}
+            />
 
-            <Pressable onPress={() => navigation.navigate('ForgotPassword')} style={{ marginTop: 16, alignItems: 'center' }}>
-              <Text style={styles.link}>Forgot password?</Text>
-            </Pressable>
+            <Button
+              label="Continue with GitHub"
+              onPress={() => handleOAuthSignIn('github')}
+              loading={loadingProvider === 'github'}
+              style={{ marginTop: 12 }}
+            />
+
+            <Button
+              label="Continue with Discord"
+              onPress={() => handleOAuthSignIn('discord')}
+              loading={loadingProvider === 'discord'}
+              style={{ marginTop: 12 }}
+            />
           </GlassCard>
 
           <Text style={styles.footer}>Staff access only — customers use the ShanuTechX web dashboard.</Text>
@@ -91,44 +99,27 @@ export function LoginScreen() {
   );
 }
 
-function mapFirebaseError(code?: string): string | null {
-  switch (code) {
-    case 'auth/invalid-email':
-      return 'That email address looks invalid.';
-    case 'auth/user-not-found':
-    case 'auth/wrong-password':
-    case 'auth/invalid-credential':
-      return 'Incorrect email or password.';
-    case 'auth/too-many-requests':
-      return 'Too many attempts. Try again in a few minutes.';
-    case 'auth/network-request-failed':
-      return 'Network error — check your connection.';
-    default:
-      return null;
-  }
-}
-
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  header: { alignItems: 'center', marginBottom: 32 },
+  header: { alignItems: 'center', marginBottom: 28 },
   logo: { width: 64, height: 64, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   logoText: { fontFamily: fontFamily.headExtrabold, fontSize: 30, color: '#1a0f33' },
   title: { fontFamily: fontFamily.head, fontSize: 22, color: colors.onSurface },
   subtitle: { fontFamily: fontFamily.body, fontSize: 13, color: colors.muted, marginTop: 6, textAlign: 'center' },
-  card: {},
-  label: { fontFamily: fontFamily.bodyMedium, fontSize: 12, color: colors.muted, marginBottom: 6 },
-  input: {
-    height: 48,
-    borderRadius: radius.sm,
+  card: { padding: 20 },
+  ssoBadge: {
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    paddingHorizontal: 14,
-    color: colors.onSurface,
-    fontFamily: fontFamily.body,
-    fontSize: 15,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    marginBottom: 12,
   },
-  error: { color: colors.error, fontFamily: fontFamily.bodyMedium, fontSize: 12, marginTop: 12 },
-  link: { color: colors.primary, fontFamily: fontFamily.bodyMedium, fontSize: 13 },
+  ssoBadgeText: { color: colors.primary, fontFamily: fontFamily.bodySemibold, fontSize: 10, fontWeight: '700' },
+  infoText: { fontFamily: fontFamily.body, fontSize: 12, color: colors.muted, textAlign: 'center', lineHeight: 18 },
+  error: { color: colors.error, fontFamily: fontFamily.bodyMedium, fontSize: 12, marginTop: 12, textAlign: 'center' },
   footer: { textAlign: 'center', color: colors.muted, fontFamily: fontFamily.body, fontSize: 11, marginTop: 24 },
 });
+

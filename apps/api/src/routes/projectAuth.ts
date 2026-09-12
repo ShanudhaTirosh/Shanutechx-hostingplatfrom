@@ -356,7 +356,7 @@ projectAuthRouter.get('/projects/:id/auth/oauth/:provider/callback', async (req,
 
     const jwtToken = signProjectAuthToken({ sub: authUser.id, projectId: req.params.id, email: authUser.email });
     const finalUrl = new URL(stateEntry.redirectUrl);
-    finalUrl.searchParams.set('token', jwtToken);
+    finalUrl.hash = `token=${jwtToken}`;
     res.redirect(finalUrl.toString());
   } catch (err: any) {
     res.status(502).json({ error: `OAuth exchange with ${provider} failed: ${err.message}` });

@@ -34,7 +34,7 @@ ShanuTechX is an autonomous enterprise cloud-hosting platform and container orch
 
 ## ⚡ Key Platform Capabilities
 
-1. **Google & GitHub OAuth SSO Standard:** Platform security enforces Single Sign-On (SSO) exclusively via Google and GitHub OAuth. Direct email/password input forms are disabled across all client apps (`apps/dashboard`, `apps/mobile-admin`, `apps/web`), and backend APIs auto-provision user accounts tied to OAuth identities.
+1. **Google, GitHub & Discord OAuth SSO Standard:** Platform security enforces Single Sign-On (SSO) exclusively via Google, GitHub, and Discord OAuth. Direct email/password input forms are disabled across all client apps (`apps/dashboard`, `apps/mobile-admin`, `apps/web`), and backend APIs auto-provision and sync user accounts tied to OAuth identities on every login.
 2. **Unified Dev Studio & Databases Hub:** Single workspace ([`apps/dashboard/app/(protected)/dev/projects/page.tsx`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard/app/(protected)/dev/projects/page.tsx)) to manage Self-Hosted Supabase Stacks, Managed Databases, and Node Port Exposures. Features target VPS host node selection and direct Launch Studio UI (`http://<nodeIp>:<studioPort>`) opening in a new tab.
 3. **Global Node Registration & Auto-DNS:** Registering a host node automatically defaults to global capabilities without mandatory usage configuration and automatically creates a Cloudflare DNS A-record (`node-<label>.<rootDomain>`) pointing to the node IP.
 4. **Node Port Exposure Engine:** Expose any port on any registered compute node to a custom/auto platform subdomain with Cloudflare DNS record tracking.
@@ -49,7 +49,8 @@ ShanuTechX is an autonomous enterprise cloud-hosting platform and container orch
 
 ## 🔒 Operational Guardrails
 
-- **OAuth Authentication:** All platform entrypoints use Firebase Google & GitHub OAuth tokens (`Authorization: Bearer <idToken>`).
+- **OAuth Authentication:** All platform entrypoints use Firebase Google, GitHub & Discord OAuth tokens (`Authorization: Bearer <idToken>`). Direct password logins are disabled across client applications.
+- **Dev Superuser Access:** The `dev` user role (`role: 'dev'`) possesses complete, unrestricted superuser access to every part of the platform, bypassing resource ownership limits while non-dev users (`customer`, `support`, `admin`) remain strictly restricted.
 - **API Environment:** [`apps/api/src/env.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/env.ts) **throws at startup** if required env vars are missing.
 - **Deactivation over Deletion:** Set `isActive: false` on database entities with order history to prevent foreign key errors.
 - **Markdown Links:** Always reference workspace files using standard clickable links with `file:///` URLs.

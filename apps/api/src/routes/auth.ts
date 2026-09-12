@@ -10,26 +10,37 @@ export const authRouter = Router();
 
 /**
  * POST /api/auth/login
- * Enforces Google & GitHub OAuth SSO policy. Direct password logins are deprecated.
+ * Enforces Google, GitHub & Discord OAuth SSO policy. Direct password logins are deprecated.
  */
 authRouter.post('/auth/login', async (req, res) => {
-  const { email, idToken, provider } = req.body || {};
+  const { email, idToken, provider, name, firebaseUid } = req.body || {};
 
-  // Require Google or GitHub OAuth identity verification via Firebase ID Token or OAuth token
+  // Require Google, GitHub, or Discord OAuth identity verification via Firebase ID Token or OAuth token
   if (!idToken && !provider) {
     return res.status(400).json({
       error: 'Password authentication disabled',
-      message: 'ShanuTechX Cloud enforces Google & GitHub OAuth Single Sign-On (SSO). Please authenticate using Google or GitHub.',
-      allowedProviders: ['google', 'github'],
+      message: 'ShanuTechX Cloud enforces Google, GitHub & Discord OAuth Single Sign-On (SSO). Please authenticate using Google, GitHub, or Discord.',
+      allowedProviders: ['google', 'github', 'discord'],
     });
   }
 
   if (!email) return res.status(400).json({ error: 'Email address is required' });
 
   const emailClean = String(email).toLowerCase().trim();
-  const user = await prisma.user.findUnique({ where: { email: emailClean } });
-  if (!user) return res.status(401).json({ error: 'OAuth User account not found. Please sign in via Google or GitHub.' });
+  let user = await prisma.user.findUnique({ where: { email: emailClean } });
+  if (!user) return res.status(401).json({ error: 'OAuth User account not found. Please sign in via Google, GitHub, or Discord.' });
   if (user.isBanned) return res.status(403).json({ error: 'Account Banned', message: user.banReason || 'Policy Violation' });
+
+  // Update user profile metadata on every login
+  if ((name && name !== user.displayName) || (firebaseUid && firebaseUid !== user.firebaseUid)) {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        ...(name ? { displayName: name } : {}),
+        ...(firebaseUid ? { firebaseUid } : {}),
+      },
+    });
+  }
 
   const { rawKey, keyHash, keyPrefix } = generateApiKey();
   await prisma.apiKey.create({
@@ -57,7 +68,7 @@ authRouter.post('/auth/login', async (req, res) => {
 
 /**
  * POST /api/auth/register
- * Register user from Google or GitHub OAuth identity
+ * Register user from Google, GitHub, or Discord OAuth identity
  */
 authRouter.post('/auth/register', async (req, res) => {
   const { email, name, firebaseUid, provider } = req.body || {};
