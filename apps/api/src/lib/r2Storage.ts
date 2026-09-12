@@ -61,7 +61,7 @@ export async function provisionProjectBucket(projectId: string): Promise<{ bucke
   return { bucketName, endpoint: env.r2Endpoint };
 }
 
-export async function uploadDeploymentZip(deploymentId: string, buffer: Buffer, filename: string): Promise<string> {
+export async function uploadDeploymentZip(deploymentId: string, buffer: Buffer, filename: string): Promise<string | null> {
   const client = getR2Client();
   const bucketName = env.r2BucketName || 'shanutechx-deployments';
   const objectKey = `zips/${deploymentId}/${Date.now()}-${filename}`;
@@ -80,9 +80,9 @@ export async function uploadDeploymentZip(deploymentId: string, buffer: Buffer, 
       logger.info({ deploymentId, objectKey, bucketName }, 'ZIP archive uploaded to R2 object storage successfully');
       return `${env.r2Endpoint}/${bucketName}/${objectKey}`;
     } catch (err) {
-      logger.warn({ err, deploymentId }, 'Failed to upload ZIP to R2, fallback to local storage reference');
+      logger.warn({ err, deploymentId }, 'Failed to upload ZIP to R2');
     }
   }
-  return objectKey;
+  return null;
 }
 

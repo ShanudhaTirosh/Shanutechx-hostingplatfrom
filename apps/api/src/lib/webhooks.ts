@@ -5,7 +5,15 @@ import { logger } from './logger';
 import { decryptSecret } from './secretsVault';
 import { env } from '../env';
 
-export function isSafeWebhookUrl(urlStr: string): { safe: boolean; reason?: string } {
+export function isPrivateOrLoopbackIp(ip: string): boolean {
+  if (ip === '::1' || ip === '0.0.0.0' || ip === '::') return true;
+  if (ip.startsWith('127.') || ip.startsWith('10.') || ip.startsWith('169.254.')) return true;
+  if (ip.startsWith('192.168.')) return true;
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) return true;
+  return false;
+}
+
+export async function isSafeWebhookUrl(urlStr: string): Promise<{ safe: boolean; reason?: string }> {
   try {
     const url = new URL(urlStr);
     if (url.protocol !== 'http:' && url.protocol !== 'https:') {
@@ -24,23 +32,21 @@ export function isSafeWebhookUrl(urlStr: string): { safe: boolean; reason?: stri
       return { safe: false, reason: 'Loopback and internal hostnames are prohibited' };
     }
 
-    if (net.isIP(hostname)) {
-      if (
-        hostname.startsWith('127.') ||
-        hostname.startsWith('10.') ||
-        hostname.startsWith('169.254.') ||
-        hostname === '::1' ||
-        hostname === '0.0.0.0'
-      ) {
-        return { safe: false, reason: 'Private/Loopback/Link-local IP addresses are prohibited' };
-      }
-      if (hostname.startsWith('192.168.')) {
-        return { safe: false, reason: 'Private IP addresses (192.168.x.x) are prohibited' };
-      }
-      if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) {
-        return { safe: false, reason: 'Private IP addresses (172.16-31.x.x) are prohibited' };
+    let ipToCheck = hostname;
+    if (!net.isIP(hostname)) {
+      try {
+        const dns = await import('dns');
+        const resolved = await dns.promises.lookup(hostname);
+        ipToCheck = resolved.address;
+      } catch {
+        return { safe: false, reason: 'Failed to resolve domain hostname' };
       }
     }
+
+    if (isPrivateOrLoopbackIp(ipToCheck)) {
+      return { safe: false, reason: 'Private/Loopback/Link-local IP addresses are prohibited' };
+    }
+
     return { safe: true };
   } catch {
     return { safe: false, reason: 'Invalid URL format' };
@@ -163,7 +169,7 @@ export async function fireWebhook(
   await Promise.all(
     webhooks.map(async (webhook: { id: string; url: string; secret: string }) => {
       // SSRF security check
-      const safeCheck = isSafeWebhookUrl(webhook.url);
+      const safeCheck = await isSafeWebhookUrl(webhook.url);
       if (!safeCheck.safe) {
         const errorMessage = `Blocked unsafe webhook URL: ${safeCheck.reason}`;
         logger.warn({ webhookId: webhook.id, url: webhook.url }, errorMessage);

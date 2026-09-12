@@ -109,8 +109,17 @@ emailRouter.get('/email/mailboxes/:id/credentials', async (req: AuthedRequest, r
     if (!account) return res.status(404).json({ error: 'Mailbox not found' });
 
     const isOwner = account.userId === req.user!.id;
-    const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
-    if (!isOwner && !isStaff) return res.status(403).json({ error: 'Access denied' });
+    const isDev = req.user!.role === 'dev';
+    if (!isOwner && !isDev) {
+      if (req.user!.role !== 'admin') return res.status(403).json({ error: 'Access denied' });
+      const isExplicitlyDelegated = (account.allowedAdminIds || []).includes(req.user!.id);
+      if (!isExplicitlyDelegated) {
+        const owner = await prisma.user.findUnique({ where: { id: account.userId }, select: { assignedAdminId: true } });
+        if (owner?.assignedAdminId !== req.user!.id) {
+          return res.status(403).json({ error: 'Access denied: You are not assigned to this account' });
+        }
+      }
+    }
 
     const password = decryptSecret(account.credentialRef, env.secretsEncryptionKey);
     res.json({

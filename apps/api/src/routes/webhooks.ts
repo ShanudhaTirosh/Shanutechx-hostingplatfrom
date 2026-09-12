@@ -21,7 +21,7 @@ webhooksRouter.post('/webhooks', async (req: AuthedRequest, res) => {
   const parsed = createWebhookSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const safeCheck = isSafeWebhookUrl(parsed.data.url);
+  const safeCheck = await isSafeWebhookUrl(parsed.data.url);
   if (!safeCheck.safe) {
     return res.status(400).json({ error: 'Invalid webhook URL', reason: safeCheck.reason });
   }

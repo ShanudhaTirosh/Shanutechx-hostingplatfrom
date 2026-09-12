@@ -162,7 +162,8 @@ const handleArchiveUpload = async (req: AuthedRequest, res: any) => {
     const r2ObjectUrl = await uploadDeploymentZip(deployment.id, file.buffer, filename);
 
     const archiveType = isZip ? 'zip' : isRar ? 'rar' : is7z ? '7z' : 'tar';
-    res.write(JSON.stringify({ phase: 'fetch', message: `${archiveType.toUpperCase()} archive extracted successfully and saved. Creating automated platform shadow Git backup repository...` }) + '\n');
+    const storageMsg = r2ObjectUrl ? 'saved to object storage' : 'saved locally';
+    res.write(JSON.stringify({ phase: 'fetch', message: `${archiveType.toUpperCase()} archive extracted successfully and ${storageMsg}. Creating automated platform shadow Git backup repository...` }) + '\n');
 
     const archiveScheme = `${archiveType}://${filename}`;
 
