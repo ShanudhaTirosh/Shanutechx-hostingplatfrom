@@ -545,3 +545,145 @@ statusRouter.get('/deployments/:id/uptime', requireAuth, async (req: AuthedReque
   res.json({ checks, uptimePct });
 });
 
+/**
+ * Public — GET /status/history
+ * Returns historical incident log filterable by severity and status, grouped by year-month.
+ */
+statusRouter.get('/status/history', async (req, res) => {
+  try {
+    const { severity, status, month } = req.query;
+
+    const where: any = {};
+    if (severity && typeof severity === 'string' && severity !== 'all') {
+      where.severity = severity;
+    }
+    if (status === 'resolved') {
+      where.resolvedAt = { not: null };
+    } else if (status === 'unresolved') {
+      where.resolvedAt = null;
+    }
+
+    const incidents = await prisma.statusIncident.findMany({
+      where,
+      orderBy: { startedAt: 'desc' },
+      take: 100,
+    });
+
+    // Group incidents by YYYY-MM
+    const groupedByMonth: Record<string, typeof incidents> = {};
+    for (const inc of incidents) {
+      const d = new Date(inc.startedAt);
+      const key = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+      if (!groupedByMonth[key]) groupedByMonth[key] = [];
+      groupedByMonth[key].push(inc);
+    }
+
+    res.json({
+      totalCount: incidents.length,
+      groupedByMonth,
+      incidents,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch incident history' });
+  }
+});
+
+/**
+ * Public — GET /status/incidents/:id
+ * Returns details for a single incident including status updates.
+ */
+statusRouter.get('/status/incidents/:id', async (req, res) => {
+  try {
+    const incident = await prisma.statusIncident.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!incident) {
+      return res.status(404).json({ error: 'Incident not found' });
+    }
+
+    res.json({ incident });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch incident detail' });
+  }
+});
+
+/**
+ * Public — GET /status/rss & GET /status/atom
+ * Returns RSS 2.0 XML feed for platform status events and incidents.
+ */
+statusRouter.get('/status/rss', async (_req, res) => {
+  try {
+    const incidents = await prisma.statusIncident.findMany({
+      orderBy: { startedAt: 'desc' },
+      take: 20,
+    });
+
+    const itemsXml = incidents
+      .map(
+        (inc) => `
+    <item>
+      <title><![CDATA[${inc.severity.toUpperCase()}: ${inc.title}]]></title>
+      <description><![CDATA[${inc.body}]]></description>
+      <pubDate>${new Date(inc.startedAt).toUTCString()}</pubDate>
+      <guid isPermaLink="false">shanutechx-incident-${inc.id}</guid>
+    </item>`
+      )
+      .join('');
+
+    const rssXml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>ShanuTechX Cloud Platform Status</title>
+    <link>https://shanutechx.com/status</link>
+    <description>Live system status, incident reports, and infrastructure telemetry from ShanuTechX Cloud.</description>
+    <language>en-us</language>
+    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+    ${itemsXml}
+  </channel>
+</rss>`;
+
+    res.header('Content-Type', 'application/xml');
+    res.send(rssXml);
+  } catch (err: any) {
+    res.status(500).send('<?xml version="1.0"?><error>Failed to generate RSS feed</error>');
+  }
+});
+
+statusRouter.get('/status/atom', async (_req, res) => {
+  try {
+    const incidents = await prisma.statusIncident.findMany({
+      orderBy: { startedAt: 'desc' },
+      take: 20,
+    });
+
+    const entriesXml = incidents
+      .map(
+        (inc) => `
+  <entry>
+    <title><![CDATA[${inc.severity.toUpperCase()}: ${inc.title}]]></title>
+    <id>urn:uuid:${inc.id}</id>
+    <updated>${new Date(inc.startedAt).toISOString()}</updated>
+    <content type="html"><![CDATA[${inc.body}]]></content>
+  </entry>`
+      )
+      .join('');
+
+    const atomXml = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>ShanuTechX Cloud Status Feed</title>
+  <link href="https://shanutechx.com/status/atom" rel="self"/>
+  <link href="https://shanutechx.com/status"/>
+  <updated>${new Date().toISOString()}</updated>
+  <id>urn:uuid:shanutechx-status-feed</id>
+  ${entriesXml}
+</feed>`;
+
+    res.header('Content-Type', 'application/atom+xml');
+    res.send(atomXml);
+  } catch (err: any) {
+    res.status(500).send('<?xml version="1.0"?><error>Failed to generate Atom feed</error>');
+  }
+});
+
+

@@ -122,7 +122,40 @@ export async function checkDnsResolution(hostname: string, expectedIp?: string):
 }
 
 /**
- * Synthetic monitor execution runner for all running deployments and custom domains.
+ * Check Postgres Database connectivity
+ */
+export async function checkPostgresHealth(): Promise<CheckResult> {
+  const start = Date.now();
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    const responseTimeMs = Date.now() - start;
+    return { isUp: true, responseTimeMs };
+  } catch (err: any) {
+    return { isUp: false, responseTimeMs: Date.now() - start, errorMessage: err.message };
+  }
+}
+
+/**
+ * Check HTTP endpoint reachability and latency
+ */
+export async function checkHttpEndpoint(url: string, timeoutMs = 8000): Promise<CheckResult> {
+  const start = Date.now();
+  try {
+    const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(timeoutMs) });
+    const responseTimeMs = Date.now() - start;
+    return {
+      isUp: res.status < 500,
+      statusCode: res.status,
+      responseTimeMs,
+      errorMessage: res.status >= 400 ? `HTTP ${res.status}` : undefined,
+    };
+  } catch (err: any) {
+    return { isUp: false, responseTimeMs: Date.now() - start, errorMessage: err.message || 'HTTP timeout' };
+  }
+}
+
+/**
+ * Synthetic monitor execution runner for platform infrastructure and customer deployments.
  * Fires notifications to Discord & user on state transition UP -> DOWN or DOWN -> UP.
  */
 export async function runUptimeChecks(): Promise<{ checked: number; up: number; down: number }> {
@@ -209,3 +242,4 @@ export async function runUptimeChecks(): Promise<{ checked: number; up: number; 
 
   return { checked: deployments.length, up, down };
 }
+
