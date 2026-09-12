@@ -124,6 +124,12 @@ export const api = {
       discordStatus: () => apiFetch('/api/admin/bots/discord/status').then((r) => asJson<{ status: string; botTag?: string; guildsCount?: number; guilds?: any[]; activeTicketChannels?: number; staffRoleId?: string | null }>(r)),
       discordSendTest: (message: string, channelId?: string, discordUserId?: string) => apiFetch('/api/admin/bots/discord/send-test', { method: 'POST', body: JSON.stringify({ message, channelId, discordUserId }) }).then((r) => asJson<{ ok: boolean }>(r)),
     },
+    monitoring: {
+      getStatus: () => apiFetch('/api/admin/monitoring/status').then((r) => asJson<{ config: any; uptimeKuma: any; grafana: any }>(r)),
+      saveConfig: (data: { uptimeKumaUrl?: string; uptimeKumaSlug?: string; uptimeKumaApiKey?: string; grafanaUrl?: string; grafanaApiKey?: string; grafanaDashboardUid?: string }) =>
+        apiFetch('/api/admin/monitoring/config', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ ok: boolean; config: any }>(r)),
+      triggerSync: () => apiFetch('/api/admin/monitoring/sync', { method: 'POST' }).then((r) => asJson<{ ok: boolean; syncedCount: number; monitors: any[] }>(r)),
+    },
   },
 
   email: {

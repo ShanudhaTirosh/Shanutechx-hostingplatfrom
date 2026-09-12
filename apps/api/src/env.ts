@@ -84,4 +84,12 @@ export const env = {
   // Dedicated Platform Shadow Backup GitHub Account/Token
   backupGithubToken: process.env.BACKUP_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN ?? '',
   backupGithubOrg: process.env.BACKUP_GITHUB_ORG ?? 'shanutechx-deploy-backups',
+
+  // Uptime Kuma & Grafana Monitoring Integrations
+  uptimeKumaUrl: process.env.UPTIME_KUMA_URL ?? '',
+  uptimeKumaSlug: process.env.UPTIME_KUMA_SLUG ?? 'default',
+  uptimeKumaApiKey: process.env.UPTIME_KUMA_API_KEY ?? '',
+  grafanaUrl: process.env.GRAFANA_URL ?? '',
+  grafanaApiKey: process.env.GRAFANA_API_KEY ?? '',
+  grafanaDashboardUid: process.env.GRAFANA_DASHBOARD_UID ?? '',
 };

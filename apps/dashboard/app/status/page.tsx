@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { API_BASE, apiFetch } from '@/lib/useAuth';
+import { api } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,6 +62,55 @@ export default function AdminStatusStudioPage() {
   const [postingMaintenance, setPostingMaintenance] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
+  // Uptime Kuma & Grafana Monitoring state
+  const [monitoringConfig, setMonitoringConfig] = useState({
+    uptimeKumaUrl: '',
+    uptimeKumaSlug: 'default',
+    grafanaUrl: '',
+  });
+  const [monitoringStatus, setMonitoringStatus] = useState<any>(null);
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  function loadMonitoring() {
+    api.admin.monitoring.getStatus()
+      .then((res) => {
+        setMonitoringStatus(res);
+        if (res.config) {
+          setMonitoringConfig({
+            uptimeKumaUrl: res.config.uptimeKumaUrl || '',
+            uptimeKumaSlug: res.config.uptimeKumaSlug || 'default',
+            grafanaUrl: res.config.grafanaUrl || '',
+          });
+        }
+      })
+      .catch(() => {});
+  }
+
+  async function handleSaveMonitoringConfig(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingConfig(true);
+    try {
+      await api.admin.monitoring.saveConfig(monitoringConfig);
+      setActionMessage('Uptime Kuma & Grafana monitoring configuration saved!');
+      loadMonitoring();
+      loadStatus();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSavingConfig(false);
+    }
+  }
+
+  async function handleTriggerSync() {
+    try {
+      const res = await api.admin.monitoring.triggerSync();
+      setActionMessage(`Uptime Kuma synchronized successfully! (${res.syncedCount} monitors retrieved)`);
+      loadStatus();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }
+
   function loadStatus() {
     setLoading(true);
     fetch(`${API_BASE}/api/status/public`)
@@ -75,6 +125,7 @@ export default function AdminStatusStudioPage() {
 
   useEffect(() => {
     loadStatus();
+    loadMonitoring();
   }, []);
 
   async function handleComponentStatusChange(componentId: string, newStatus: string) {
@@ -201,6 +252,77 @@ export default function AdminStatusStudioPage() {
           </button>
         </div>
       )}
+
+      {/* Uptime Kuma & Grafana Dynamic Monitoring Control */}
+      <div className="bg-[#0b0e22] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div>
+            <h2 className="text-base font-extrabold text-white tracking-tight flex items-center gap-2">
+              <span>⚡ Uptime Kuma &amp; Grafana Dynamic Auto-Sync</span>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${monitoringStatus?.uptimeKuma?.isConfigured ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
+                {monitoringStatus?.uptimeKuma?.isConfigured ? 'Connected' : 'Standalone Mode'}
+              </span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Monitors added in Uptime Kuma automatically reflect on the public status page with Grafana cluster metrics.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleTriggerSync}
+              className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-bold text-white transition-all shadow-lg shadow-purple-600/30 flex items-center gap-2"
+            >
+              <span>Sync Monitors Now</span>
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSaveMonitoringConfig} className="grid md:grid-cols-3 gap-4 text-xs">
+          <div>
+            <label className="font-bold text-slate-300 block mb-1">Uptime Kuma Instance Base URL</label>
+            <input
+              type="url"
+              placeholder="e.g. http://localhost:3001 or https://status.kuma.io"
+              value={monitoringConfig.uptimeKumaUrl}
+              onChange={(e) => setMonitoringConfig({ ...monitoringConfig, uptimeKumaUrl: e.target.value })}
+              className="w-full bg-black/40 border border-white/15 rounded-xl px-3.5 py-2 text-white font-mono focus:outline-none focus:border-purple-500"
+            />
+          </div>
+
+          <div>
+            <label className="font-bold text-slate-300 block mb-1">Status Page Slug</label>
+            <input
+              type="text"
+              placeholder="default"
+              value={monitoringConfig.uptimeKumaSlug}
+              onChange={(e) => setMonitoringConfig({ ...monitoringConfig, uptimeKumaSlug: e.target.value })}
+              className="w-full bg-black/40 border border-white/15 rounded-xl px-3.5 py-2 text-white font-mono focus:outline-none focus:border-purple-500"
+            />
+          </div>
+
+          <div>
+            <label className="font-bold text-slate-300 block mb-1">Grafana API Endpoint (Optional)</label>
+            <input
+              type="url"
+              placeholder="e.g. http://localhost:3000"
+              value={monitoringConfig.grafanaUrl}
+              onChange={(e) => setMonitoringConfig({ ...monitoringConfig, grafanaUrl: e.target.value })}
+              className="w-full bg-black/40 border border-white/15 rounded-xl px-3.5 py-2 text-white font-mono focus:outline-none focus:border-purple-500"
+            />
+          </div>
+
+          <div className="md:col-span-3 flex justify-end">
+            <button
+              type="submit"
+              disabled={savingConfig}
+              className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 font-bold text-white transition-all text-xs"
+            >
+              {savingConfig ? 'Saving...' : 'Save Monitoring Config'}
+            </button>
+          </div>
+        </form>
+      </div>
 
       {/* System Components Override Matrix */}
       <div className="bg-[#0b0e22] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">

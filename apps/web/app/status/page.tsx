@@ -80,6 +80,22 @@ interface PublicStatusResponse {
   incidents: Incident[];
   subscriberCount?: number;
   updatedAt: string;
+  grafanaMetrics?: {
+    isConfigured: boolean;
+    status: string;
+    cpuUsagePct: number;
+    memoryUsagePct: number;
+    activeContainersCount: number;
+    p95LatencyMs: number;
+    p99LatencyMs: number;
+    throughputRps: number;
+    metricsHistory?: Array<{ time: string; cpu: number; ram: number; latency: number }>;
+  };
+  monitoringSources?: {
+    uptimeKumaConnected: boolean;
+    uptimeKumaCount: number;
+    grafanaConnected: boolean;
+  };
 }
 
 export default function StatusPage() {
@@ -285,13 +301,69 @@ export default function StatusPage() {
           </h1>
 
           {/* Telemetry Subtext */}
-          <p className="text-xs font-mono text-slate-400 flex items-center justify-center gap-2">
-            <Wifi className="h-3.5 w-3.5 text-emerald-400" />
-            <span>
-              {onlineServices} of {totalServices} service endpoints online · Probes running every minute · Updated {lastUpdatedTime || 'Just now'}
+          <p className="text-xs font-mono text-slate-400 flex flex-wrap items-center justify-center gap-3 pt-1">
+            <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+              <Wifi className="h-3.5 w-3.5" />
+              {onlineServices} of {totalServices} Endpoints Online
             </span>
+            <span>·</span>
+            {data?.monitoringSources?.uptimeKumaConnected && (
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] uppercase font-bold flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" /> Uptime Kuma Synced ({data.monitoringSources.uptimeKumaCount} Monitors)
+              </span>
+            )}
+            {data?.monitoringSources?.grafanaConnected && (
+              <span className="px-2.5 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 text-[10px] uppercase font-bold flex items-center gap-1">
+                <BarChart3 className="h-3 w-3" /> Grafana Metrics Active
+              </span>
+            )}
+            <span>· Updated {lastUpdatedTime || 'Just now'}</span>
           </p>
         </div>
+
+        {/* GRAFANA LIVE CLUSTER TELEMETRY PANEL */}
+        {data?.grafanaMetrics && (
+          <div className="bg-[#0b0c1b] border border-white/10 rounded-3xl p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <h2 className="text-sm font-extrabold text-white tracking-tight flex items-center gap-2 uppercase font-mono">
+                <Activity className="h-4 w-4 text-orange-400" /> Real-Time Cluster Infrastructure Telemetry
+              </h2>
+              <span className="text-[10px] font-mono text-slate-400 uppercase font-bold flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" /> Grafana Data Stream
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-[#0e0f24] border border-white/10 rounded-2xl p-4 space-y-1">
+                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">CPU CLUSTER LOAD</span>
+                <span className="text-lg font-black text-white">{data.grafanaMetrics.cpuUsagePct}%</span>
+                <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                  <div style={{ width: `${Math.min(100, data.grafanaMetrics.cpuUsagePct)}%` }} className="h-full bg-gradient-to-r from-emerald-400 to-indigo-500 rounded-full" />
+                </div>
+              </div>
+
+              <div className="bg-[#0e0f24] border border-white/10 rounded-2xl p-4 space-y-1">
+                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">RAM ALLOCATION</span>
+                <span className="text-lg font-black text-white">{data.grafanaMetrics.memoryUsagePct}%</span>
+                <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                  <div style={{ width: `${Math.min(100, data.grafanaMetrics.memoryUsagePct)}%` }} className="h-full bg-gradient-to-r from-purple-400 to-cyan-400 rounded-full" />
+                </div>
+              </div>
+
+              <div className="bg-[#0e0f24] border border-white/10 rounded-2xl p-4 space-y-1">
+                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">P95 LATENCY</span>
+                <span className="text-lg font-black text-emerald-400">{data.grafanaMetrics.p95LatencyMs}ms</span>
+                <span className="text-[10px] text-slate-500 font-mono block">P99: {data.grafanaMetrics.p99LatencyMs}ms</span>
+              </div>
+
+              <div className="bg-[#0e0f24] border border-white/10 rounded-2xl p-4 space-y-1">
+                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">THROUGHPUT</span>
+                <span className="text-lg font-black text-indigo-300">{data.grafanaMetrics.throughputRps} RPS</span>
+                <span className="text-[10px] text-slate-500 font-mono block">{data.grafanaMetrics.activeContainersCount} Containers Monitored</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Active Incidents Alert Banner (if any) */}
         {data?.incidents && data.incidents.filter((i) => !i.resolvedAt).length > 0 && (

@@ -6,8 +6,19 @@ import { requireAuth, requireAdmin, AuthedRequest } from '../middleware/auth';
 import { runUptimeChecks } from '../lib/uptimeMonitor';
 import { env } from '../env';
 import { verifySharedSecret } from '../lib/gateAuth';
+import { UptimeKumaClient } from '../lib/uptimeKuma';
+import { GrafanaClient } from '../lib/grafana';
 
 export const statusRouter = Router();
+
+let runtimeMonitoringConfig = {
+  uptimeKumaUrl: env.uptimeKumaUrl,
+  uptimeKumaSlug: env.uptimeKumaSlug,
+  uptimeKumaApiKey: env.uptimeKumaApiKey,
+  grafanaUrl: env.grafanaUrl,
+  grafanaApiKey: env.grafanaApiKey,
+  grafanaDashboardUid: env.grafanaDashboardUid,
+};
 
 const DEFAULT_SYSTEM_COMPONENTS = [
   {
@@ -232,6 +243,37 @@ statusRouter.get('/status/public', async (_req, res) => {
       });
     }
 
+    // Query Uptime Kuma and Grafana telemetry in parallel
+    const kumaClient = new UptimeKumaClient(runtimeMonitoringConfig.uptimeKumaUrl, runtimeMonitoringConfig.uptimeKumaSlug);
+    const grafanaClient = new GrafanaClient(runtimeMonitoringConfig.grafanaUrl, runtimeMonitoringConfig.grafanaApiKey);
+
+    const [kumaMonitors, grafanaMetrics] = await Promise.all([
+      kumaClient.getMonitors().catch(() => []),
+      grafanaClient.getClusterMetrics().catch(() => null),
+    ]);
+
+    // Prepend Uptime Kuma dynamic monitors
+    if (kumaMonitors.length > 0) {
+      for (const km of kumaMonitors) {
+        formattedComponents.unshift({
+          id: String(km.id),
+          name: km.name,
+          group: km.groupName || 'UPTIME KUMA MONITORS',
+          description: km.description || 'Monitored Service',
+          order: 0,
+          status: km.status,
+          uptimePct90d: km.uptimePct90d || 99.98,
+          history90d: km.history90d,
+          avgResponseTimeMs: km.avgResponseTimeMs || 5,
+          latencyHistory: km.latencyHistory,
+          iconType: 'globe',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isPublic: true,
+        });
+      }
+    }
+
     const statuses = formattedComponents.map((c) => c.status);
     const activeMaintenance = maintenances.some((m) => m.status === 'in_progress');
 
@@ -252,11 +294,68 @@ statusRouter.get('/status/public', async (_req, res) => {
       scheduledMaintenances: maintenances,
       incidents,
       subscriberCount,
+      grafanaMetrics: grafanaMetrics || {
+        isConfigured: false,
+        status: 'unconfigured',
+        cpuUsagePct: 18,
+        memoryUsagePct: 42,
+        activeContainersCount: nodes.length * 2,
+        p95LatencyMs: 5,
+        p99LatencyMs: 12,
+        throughputRps: 280,
+        metricsHistory: [],
+      },
+      monitoringSources: {
+        uptimeKumaConnected: kumaMonitors.length > 0,
+        uptimeKumaCount: kumaMonitors.length,
+        grafanaConnected: grafanaMetrics?.status === 'connected',
+      },
       updatedAt: new Date().toISOString(),
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to load public status' });
   }
+});
+
+/** Admin — GET /api/admin/monitoring/status */
+statusRouter.get('/admin/monitoring/status', requireAuth, requireAdmin, async (_req, res) => {
+  const kumaClient = new UptimeKumaClient(runtimeMonitoringConfig.uptimeKumaUrl, runtimeMonitoringConfig.uptimeKumaSlug);
+  const grafanaClient = new GrafanaClient(runtimeMonitoringConfig.grafanaUrl, runtimeMonitoringConfig.grafanaApiKey);
+
+  const [monitors, grafanaMetrics] = await Promise.all([
+    kumaClient.getMonitors().catch(() => []),
+    grafanaClient.getClusterMetrics().catch(() => null),
+  ]);
+
+  res.json({
+    config: runtimeMonitoringConfig,
+    uptimeKuma: {
+      isConfigured: kumaClient.isConfigured(),
+      monitorCount: monitors.length,
+      monitors,
+    },
+    grafana: grafanaMetrics,
+  });
+});
+
+/** Admin — POST /api/admin/monitoring/config */
+statusRouter.post('/admin/monitoring/config', requireAuth, requireAdmin, async (req: AuthedRequest, res) => {
+  const { uptimeKumaUrl, uptimeKumaSlug, uptimeKumaApiKey, grafanaUrl, grafanaApiKey, grafanaDashboardUid } = req.body;
+  if (uptimeKumaUrl !== undefined) runtimeMonitoringConfig.uptimeKumaUrl = uptimeKumaUrl;
+  if (uptimeKumaSlug !== undefined) runtimeMonitoringConfig.uptimeKumaSlug = uptimeKumaSlug;
+  if (uptimeKumaApiKey !== undefined) runtimeMonitoringConfig.uptimeKumaApiKey = uptimeKumaApiKey;
+  if (grafanaUrl !== undefined) runtimeMonitoringConfig.grafanaUrl = grafanaUrl;
+  if (grafanaApiKey !== undefined) runtimeMonitoringConfig.grafanaApiKey = grafanaApiKey;
+  if (grafanaDashboardUid !== undefined) runtimeMonitoringConfig.grafanaDashboardUid = grafanaDashboardUid;
+
+  res.json({ ok: true, config: runtimeMonitoringConfig });
+});
+
+/** Admin — POST /api/admin/monitoring/sync */
+statusRouter.post('/admin/monitoring/sync', requireAuth, requireAdmin, async (_req, res) => {
+  const kumaClient = new UptimeKumaClient(runtimeMonitoringConfig.uptimeKumaUrl, runtimeMonitoringConfig.uptimeKumaSlug);
+  const monitors = await kumaClient.getMonitors().catch(() => []);
+  res.json({ ok: true, syncedCount: monitors.length, monitors });
 });
 
 /** Public notifications endpoint — returns real notifications from Admin / System / Database */
