@@ -137,18 +137,18 @@ export class UptimeKumaClient {
           else if (latestHb.status === 3) status = 'maintenance';
         }
 
-        const uptime24h = uptimeList[`${m.id}_24`] ? Math.round(uptimeList[`${m.id}_24`] * 10000) / 100 : 99.9;
-        const uptime30d = uptimeList[`${m.id}_720`] ? Math.round(uptimeList[`${m.id}_720`] * 10000) / 100 : 99.95;
-        const uptime90d = uptimeList[`${m.id}_2160`] ? Math.round(uptimeList[`${m.id}_2160`] * 10000) / 100 : 99.98;
+        const uptime24h = uptimeList[`${m.id}_24`] !== undefined ? Math.round(uptimeList[`${m.id}_24`] * 10000) / 100 : 100;
+        const uptime30d = uptimeList[`${m.id}_720`] !== undefined ? Math.round(uptimeList[`${m.id}_720`] * 10000) / 100 : 100;
+        const uptime90d = uptimeList[`${m.id}_2160`] !== undefined ? Math.round(uptimeList[`${m.id}_2160`] * 10000) / 100 : 100;
 
         const pings = hList.filter((h) => typeof h.ping === 'number').map((h) => h.ping);
-        const avgPing = pings.length > 0 ? Math.round(pings.reduce((a, b) => a + b, 0) / pings.length) : 5;
+        const avgPing = pings.length > 0 ? Math.round(pings.reduce((a, b) => a + b, 0) / pings.length) : 0;
 
         // Generate 90-day history array from heartbeat data
         const history90d = this.generate90DayHistory(status, uptime90d);
         const latencyHistory = hList.slice(-20).map((h) => ({
           time: new Date(h.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          latencyMs: h.ping || 4,
+          latencyMs: h.ping || 0,
         }));
 
         monitors.push({
@@ -164,7 +164,7 @@ export class UptimeKumaClient {
           uptimePct90d: uptime90d,
           avgResponseTimeMs: avgPing,
           history90d,
-          latencyHistory: latencyHistory.length > 0 ? latencyHistory : this.generateFallbackLatency(avgPing),
+          latencyHistory,
         });
       }
     }
@@ -186,19 +186,6 @@ export class UptimeKumaClient {
     return days;
   }
 
-  private generateFallbackLatency(baseMs: number) {
-    const history = [];
-    const now = Date.now();
-    for (let i = 19; i >= 0; i--) {
-      const t = new Date(now - i * 3 * 60 * 1000);
-      const jitter = Math.floor(Math.random() * 3) - 1;
-      history.push({
-        time: t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        latencyMs: Math.max(1, baseMs + jitter),
-      });
-    }
-    return history;
-  }
 
   public async pushHeartbeat(pushToken: string, status = 'up', msg = 'OK', pingMs = 5): Promise<boolean> {
     if (!this.baseUrl || !pushToken) return false;

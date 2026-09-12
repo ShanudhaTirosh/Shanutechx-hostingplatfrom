@@ -92,4 +92,8 @@ export const env = {
   grafanaUrl: process.env.GRAFANA_URL ?? '',
   grafanaApiKey: process.env.GRAFANA_API_KEY ?? '',
   grafanaDashboardUid: process.env.GRAFANA_DASHBOARD_UID ?? '',
+
+  // Grafana Loki Log Aggregation
+  lokiUrl: process.env.LOKI_URL ?? '',
+  lokiOrgId: process.env.LOKI_ORG_ID ?? '',
 };

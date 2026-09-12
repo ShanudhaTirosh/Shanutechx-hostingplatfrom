@@ -130,6 +130,15 @@ export const api = {
         apiFetch('/api/admin/monitoring/config', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ ok: boolean; config: any }>(r)),
       triggerSync: () => apiFetch('/api/admin/monitoring/sync', { method: 'POST' }).then((r) => asJson<{ ok: boolean; syncedCount: number; monitors: any[] }>(r)),
     },
+    observability: {
+      queryLogs: (q?: string, limit = 50) => {
+        const params = new URLSearchParams({ limit: String(limit) });
+        if (q) params.append('q', q);
+        return apiFetch(`/api/admin/observability/loki/logs?${params.toString()}`).then((r) => asJson<{ isConfigured: boolean; status: string; totalLines: number; entries: any[] }>(r));
+      },
+      getDashboards: () => apiFetch('/api/admin/observability/grafana/dashboards').then((r) => asJson<{ isConfigured: boolean; dashboards: any[] }>(r)),
+      getNodeTelemetry: (nodeId: string) => apiFetch(`/api/admin/observability/nodes/${nodeId}/telemetry`).then((r) => asJson<{ nodeId: string; label: string; ip: string; telemetry: any }>(r)),
+    },
   },
 
   email: {

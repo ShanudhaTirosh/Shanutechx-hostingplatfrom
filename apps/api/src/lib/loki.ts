@@ -58,7 +58,12 @@ export class LokiClient {
 
   public async queryLogs(queryLogQL = '{app=~".+"}', limit = 50): Promise<LokiQueryResult> {
     if (!this.baseUrl) {
-      return this.generateFallbackLogs('unconfigured', limit);
+      return {
+        isConfigured: false,
+        status: 'unconfigured',
+        totalLines: 0,
+        entries: [],
+      };
     }
 
     try {
@@ -106,51 +111,13 @@ export class LokiClient {
         entries: entries.slice(0, limit),
       };
     } catch (err) {
-      return this.generateFallbackLogs('disconnected', limit);
+      return {
+        isConfigured: true,
+        status: 'disconnected',
+        totalLines: 0,
+        entries: [],
+      };
     }
   }
-
-  private generateFallbackLogs(status: 'disconnected' | 'unconfigured', limit: number): LokiQueryResult {
-    const fallbackLogs: LokiLogEntry[] = [
-      {
-        id: 'fb-1',
-        timestamp: new Date(Date.now() - 120000).toISOString(),
-        level: 'info',
-        source: 'express-rest-api',
-        message: 'GET /api/status/public 200 OK - 4ms (Grafana & Loki telemetry synchronized)',
-        metadata: { app: 'api', env: 'production' },
-      },
-      {
-        id: 'fb-2',
-        timestamp: new Date(Date.now() - 340000).toISOString(),
-        level: 'info',
-        source: 'node-agent-vps-1',
-        message: 'Docker Container Engine metrics synchronized. 12 active containers monitored.',
-        metadata: { host: 'node-singapore-01', service: 'node-agent' },
-      },
-      {
-        id: 'fb-3',
-        timestamp: new Date(Date.now() - 600000).toISOString(),
-        level: 'warn',
-        source: 'whatsapp-bot-daemon',
-        message: 'Baileys WS connection state updated: CONNECTED. Telemetry heartbeat ok.',
-        metadata: { service: 'whatsapp-bot' },
-      },
-      {
-        id: 'fb-4',
-        timestamp: new Date(Date.now() - 950000).toISOString(),
-        level: 'info',
-        source: 'discord-bot-daemon',
-        message: 'Gateway Intents GuildMessages & MessageContent active. Ticket channel listener online.',
-        metadata: { service: 'discord-bot' },
-      },
-    ];
-
-    return {
-      isConfigured: status === 'disconnected',
-      status,
-      totalLines: fallbackLogs.length,
-      entries: fallbackLogs.slice(0, limit),
-    };
-  }
 }
+

@@ -80,21 +80,6 @@ function generate90DayHistory(status: string = 'operational') {
   return days;
 }
 
-function generateLatencyHistory(baseMs: number = 4) {
-  const history: Array<{ time: string; latencyMs: number }> = [];
-  const now = Date.now();
-  for (let i = 20; i >= 0; i--) {
-    const t = new Date(now - i * 3 * 60 * 1000);
-    const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const jitter = Math.floor(Math.random() * 4) - 1;
-    history.push({
-      time: timeStr,
-      latencyMs: Math.max(1, baseMs + jitter),
-    });
-  }
-  return history;
-}
-
 /**
  * Public — no auth. Returns comprehensive status data for the public status page:
  * - Overall status rollup
@@ -119,7 +104,7 @@ statusRouter.get('/status/public', async (_req, res) => {
               description: item.description,
               order: item.order,
               status: 'operational',
-              uptimePct90d: 99.98,
+              uptimePct90d: 100,
               history90d: generate90DayHistory('operational'),
             },
           })
@@ -169,11 +154,11 @@ statusRouter.get('/status/public', async (_req, res) => {
       createdAt: Date;
       updatedAt: Date;
       isPublic: boolean;
-    }> = components.map((c, idx) => ({
+    }> = components.map((c) => ({
       ...c,
       history90d: Array.isArray(c.history90d) ? (c.history90d as any) : generate90DayHistory(c.status),
-      avgResponseTimeMs: 3 + (idx % 4),
-      latencyHistory: generateLatencyHistory(3 + (idx % 4)),
+      avgResponseTimeMs: 0,
+      latencyHistory: [],
       iconType: c.group.includes('Databases') ? 'database' : c.group.includes('Bot') ? 'bot' : c.name.includes('API') ? 'code' : 'globe',
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
@@ -190,10 +175,10 @@ statusRouter.get('/status/public', async (_req, res) => {
         description: `CPU: ${node.cpuCores} Cores | RAM: ${node.ramMb} MB | Disk: ${node.diskGb} GB`,
         order: 10,
         status: nodeStatus,
-        uptimePct90d: node.isActive ? 99.99 : 98.2,
+        uptimePct90d: node.isActive ? 100 : 0,
         history90d: generate90DayHistory(nodeStatus),
-        avgResponseTimeMs: node.isActive ? 12 : 145,
-        latencyHistory: generateLatencyHistory(node.isActive ? 12 : 145),
+        avgResponseTimeMs: 0,
+        latencyHistory: [],
         iconType: 'server',
         createdAt: node.createdAt,
         updatedAt: new Date(),
@@ -211,10 +196,10 @@ statusRouter.get('/status/public', async (_req, res) => {
           description: `Container Runtime: ${d.runtime || 'Docker Container'}`,
           order: 20,
           status: 'operational',
-          uptimePct90d: 99.95,
+          uptimePct90d: 100,
           history90d: generate90DayHistory('operational'),
-          avgResponseTimeMs: 8,
-          latencyHistory: generateLatencyHistory(8),
+          avgResponseTimeMs: 0,
+          latencyHistory: [],
           iconType: 'globe',
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -234,8 +219,8 @@ statusRouter.get('/status/public', async (_req, res) => {
         status: 'operational',
         uptimePct90d: 100,
         history90d: generate90DayHistory('operational'),
-        avgResponseTimeMs: 2,
-        latencyHistory: generateLatencyHistory(2),
+        avgResponseTimeMs: 0,
+        latencyHistory: [],
         iconType: 'database',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -262,10 +247,10 @@ statusRouter.get('/status/public', async (_req, res) => {
           description: km.description || 'Monitored Service',
           order: 0,
           status: km.status,
-          uptimePct90d: km.uptimePct90d || 99.98,
+          uptimePct90d: km.uptimePct90d || 100,
           history90d: km.history90d,
-          avgResponseTimeMs: km.avgResponseTimeMs || 5,
-          latencyHistory: km.latencyHistory,
+          avgResponseTimeMs: km.avgResponseTimeMs || 0,
+          latencyHistory: km.latencyHistory || [],
           iconType: 'globe',
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -297,12 +282,12 @@ statusRouter.get('/status/public', async (_req, res) => {
       grafanaMetrics: grafanaMetrics || {
         isConfigured: false,
         status: 'unconfigured',
-        cpuUsagePct: 18,
-        memoryUsagePct: 42,
-        activeContainersCount: nodes.length * 2,
-        p95LatencyMs: 5,
-        p99LatencyMs: 12,
-        throughputRps: 280,
+        cpuUsagePct: 0,
+        memoryUsagePct: 0,
+        activeContainersCount: 0,
+        p95LatencyMs: 0,
+        p99LatencyMs: 0,
+        throughputRps: 0,
         metricsHistory: [],
       },
       monitoringSources: {

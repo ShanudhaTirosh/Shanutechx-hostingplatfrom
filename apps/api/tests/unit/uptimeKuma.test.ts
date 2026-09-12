@@ -22,13 +22,14 @@ test('UptimeKumaClient - handles invalid endpoint fallback', async () => {
   assert.deepStrictEqual(monitors, []);
 });
 
-test('GrafanaClient - handles unconfigured instance fallback', async () => {
+test('GrafanaClient - handles unconfigured instance gracefully', async () => {
   const client = new GrafanaClient();
   assert.strictEqual(client.isConfigured(), false);
 
   const metrics = await client.getClusterMetrics();
   assert.strictEqual(metrics.isConfigured, false);
   assert.strictEqual(metrics.status, 'unconfigured');
-  assert.ok(typeof metrics.cpuUsagePct === 'number');
-  assert.ok(typeof metrics.memoryUsagePct === 'number');
+  assert.strictEqual(metrics.cpuUsagePct, 0);
+  assert.strictEqual(metrics.memoryUsagePct, 0);
 });
+

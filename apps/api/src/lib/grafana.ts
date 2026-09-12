@@ -84,24 +84,36 @@ export class GrafanaClient {
 
   public async getClusterMetrics(): Promise<GrafanaClusterMetrics> {
     if (!this.baseUrl) {
-      return this.generateFallbackMetrics(false, 'unconfigured');
+      return {
+        isConfigured: false,
+        status: 'unconfigured',
+        version: 'N/A',
+        databaseStatus: 'N/A',
+        cpuUsagePct: 0,
+        memoryUsagePct: 0,
+        activeContainersCount: 0,
+        p95LatencyMs: 0,
+        p99LatencyMs: 0,
+        throughputRps: 0,
+        metricsHistory: [],
+      };
     }
 
     const health = await this.fetchHealth();
     if (!health) {
-      return this.generateFallbackMetrics(true, 'disconnected');
-    }
-
-    const metricsHistory = [];
-    const now = Date.now();
-    for (let i = 11; i >= 0; i--) {
-      const t = new Date(now - i * 5 * 60 * 1000);
-      metricsHistory.push({
-        time: t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        cpu: Math.round(15 + Math.random() * 20),
-        ram: Math.round(42 + Math.random() * 10),
-        latency: Math.round(3 + Math.random() * 4),
-      });
+      return {
+        isConfigured: true,
+        status: 'disconnected',
+        version: 'N/A',
+        databaseStatus: 'disconnected',
+        cpuUsagePct: 0,
+        memoryUsagePct: 0,
+        activeContainersCount: 0,
+        p95LatencyMs: 0,
+        p99LatencyMs: 0,
+        throughputRps: 0,
+        metricsHistory: [],
+      };
     }
 
     return {
@@ -109,41 +121,34 @@ export class GrafanaClient {
       status: 'connected',
       version: health.version || 'v10.4.0',
       databaseStatus: health.database || 'ok',
-      cpuUsagePct: 24.5,
-      memoryUsagePct: 48.2,
-      activeContainersCount: 16,
-      p95LatencyMs: 6,
-      p99LatencyMs: 14,
-      throughputRps: 340,
-      metricsHistory,
+      cpuUsagePct: 0,
+      memoryUsagePct: 0,
+      activeContainersCount: 0,
+      p95LatencyMs: 0,
+      p99LatencyMs: 0,
+      throughputRps: 0,
+      metricsHistory: [],
     };
   }
 
-  private generateFallbackMetrics(isConfigured: boolean, status: 'disconnected' | 'unconfigured'): GrafanaClusterMetrics {
-    const metricsHistory = [];
-    const now = Date.now();
-    for (let i = 11; i >= 0; i--) {
-      const t = new Date(now - i * 5 * 60 * 1000);
-      metricsHistory.push({
-        time: t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        cpu: 18,
-        ram: 45,
-        latency: 4,
-      });
+  public async fetchDashboards(): Promise<Array<{ id: number; uid: string; title: string; url: string; tags: string[] }>> {
+    if (!this.baseUrl) return [];
+    try {
+      const res = await makeGrafanaRequest(`${this.baseUrl}/api/search?type=dash-db`, this.apiKey);
+      return Array.isArray(res) ? res : [];
+    } catch (err) {
+      return [];
     }
+  }
 
+  public async getNodeTelemetry(_nodeIp: string): Promise<{ cpuUsagePct: number; memoryUsedMb: number; diskUsagePct: number; networkRxKbps: number; networkTxKbps: number }> {
     return {
-      isConfigured,
-      status,
-      version: 'N/A',
-      databaseStatus: 'N/A',
-      cpuUsagePct: 18.0,
-      memoryUsagePct: 45.0,
-      activeContainersCount: 12,
-      p95LatencyMs: 5,
-      p99LatencyMs: 12,
-      throughputRps: 280,
-      metricsHistory,
+      cpuUsagePct: 0,
+      memoryUsedMb: 0,
+      diskUsagePct: 0,
+      networkRxKbps: 0,
+      networkTxKbps: 0,
     };
   }
 }
+
