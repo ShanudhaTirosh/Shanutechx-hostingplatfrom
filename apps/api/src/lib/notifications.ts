@@ -198,3 +198,103 @@ export async function notifyAdmins(message: string): Promise<void> {
   ]);
 }
 
+/**
+ * Dispatch rich Discord ticket embed with interactive buttons (Claim, Reply, Close)
+ * to the support Discord channel, and send customer multi-channel notifications.
+ */
+export async function notifyTicketEmbed({
+  ticketId,
+  subject,
+  userEmail,
+  userDiscordId,
+  userPhone,
+  initialMessage,
+  priority = 'medium',
+  status = 'open',
+  claimedBy,
+}: {
+  ticketId: string;
+  subject: string;
+  userEmail: string;
+  userDiscordId?: string | null;
+  userPhone?: string | null;
+  initialMessage: string;
+  priority?: string;
+  status?: string;
+  claimedBy?: string | null;
+}): Promise<void> {
+  const shortId = ticketId.slice(0, 8).toUpperCase();
+  const discordUserMention = userDiscordId ? `<@${userDiscordId}>` : userEmail;
+
+  const embed = {
+    title: `🎫 [TICKET #${shortId}] ${subject}`,
+    color: status === 'closed' ? 0x64748b : priority === 'high' || priority === 'urgent' ? 0xef4444 : 0x7c3aed,
+    fields: [
+      { name: 'Status', value: status.toUpperCase(), inline: true },
+      { name: 'Priority', value: priority.toUpperCase(), inline: true },
+      { name: 'Customer', value: discordUserMention, inline: true },
+      { name: 'Claimed Staff', value: claimedBy ? claimedBy : 'Unassigned', inline: true },
+      { name: 'Message', value: initialMessage.length > 500 ? initialMessage.slice(0, 500) + '...' : initialMessage, inline: false },
+    ],
+    footer: { text: `Ticket ID: ${ticketId} · ShanuTechX Support` },
+    timestamp: new Date().toISOString(),
+  };
+
+  const actionRow = {
+    type: 1, // ActionRow
+    components: [
+      {
+        type: 2, // Button
+        style: 1, // Primary (Blue/Blurple)
+        custom_id: `claim_ticket:${ticketId}`,
+        label: claimedBy ? `Claimed by ${claimedBy}` : '🙋‍♂️ Claim Ticket',
+        disabled: Boolean(claimedBy),
+      },
+      {
+        type: 2, // Button
+        style: 2, // Secondary (Gray)
+        custom_id: `reply_ticket:${ticketId}`,
+        label: '💬 Reply',
+      },
+      {
+        type: 2, // Button
+        style: 4, // Danger (Red)
+        custom_id: `close_ticket:${ticketId}`,
+        label: '🔒 Close Ticket',
+      },
+    ],
+  };
+
+  // Dispatch to Discord support channel & create dedicated ticket channel with role permissions
+  void postInternal(`${env.discordBotUrl}/internal/send-ticket-embed`, env.discordInternalSecret, {
+    embed,
+    actionRow,
+    ticketId,
+  });
+
+  void postInternal(`${env.discordBotUrl}/internal/create-ticket-channel`, env.discordInternalSecret, {
+    ticketId,
+    subject,
+    customerEmail: userEmail,
+    customerDiscordUserId: userDiscordId,
+    embed,
+    actionRow,
+  });
+
+  // Notify customer via WhatsApp & Discord DM if linked
+  const customerMsg = `[Ticket #${shortId}] Update on "${subject}": Status is now ${status.toUpperCase()}.`;
+  if (userPhone) {
+    void postInternal(`${env.whatsappBotUrl}/internal/send`, env.whatsappInternalSecret, {
+      phoneNumber: userPhone,
+      message: customerMsg,
+    });
+  }
+  if (userDiscordId) {
+    void postInternal(`${env.discordBotUrl}/internal/send-dm`, env.discordInternalSecret, {
+      discordUserId: userDiscordId,
+      message: customerMsg,
+    });
+  }
+}
+
+

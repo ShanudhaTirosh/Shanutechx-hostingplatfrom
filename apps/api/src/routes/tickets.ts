@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireStaff, AuthedRequest } from '../middleware/auth';
 import { ticketVisibilityWhere, canSeeTicket } from '../middleware/rbac';
-import { notifyCustomer, notifyAdmins } from '../lib/notifications';
+import { notifyCustomer, notifyAdmins, notifyTicketEmbed } from '../lib/notifications';
 import { parsePagination } from '../lib/pagination';
 import { fireWebhook } from '../lib/webhooks';
 
@@ -15,6 +15,7 @@ const createTicketSchema = z.object({
   subject: z.string().min(1).max(200),
   message: z.string().min(1),
   orderId: z.string().optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
 });
 
 ticketsRouter.post('/tickets', async (req: AuthedRequest, res) => {
@@ -26,6 +27,7 @@ ticketsRouter.post('/tickets', async (req: AuthedRequest, res) => {
       userId: req.user!.id,
       subject: parsed.data.subject,
       orderId: parsed.data.orderId,
+      priority: parsed.data.priority || 'medium',
       messages: {
         create: {
           senderId: req.user!.id,
@@ -38,6 +40,19 @@ ticketsRouter.post('/tickets', async (req: AuthedRequest, res) => {
   });
 
   void notifyAdmins(`New support ticket from ${req.user!.email}: "${ticket.subject}"`);
+
+  const fullUser = await prisma.user.findUnique({ where: { id: req.user!.id } });
+
+  void notifyTicketEmbed({
+    ticketId: ticket.id,
+    subject: ticket.subject,
+    userEmail: req.user!.email,
+    userDiscordId: fullUser?.discordUserId,
+    userPhone: fullUser?.phoneNumber,
+    initialMessage: parsed.data.message,
+    priority: ticket.priority,
+    status: ticket.status,
+  });
 
   res.status(201).json({ ticket });
 });

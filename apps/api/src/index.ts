@@ -55,6 +55,7 @@ import { knowledgebaseRouter } from './routes/knowledgebase';
 import { emailRouter } from './routes/email';
 import { teamsRouter } from './routes/teams';
 import { internalBotRouter } from './routes/internalBot';
+import { botAdminRouter } from './routes/botAdmin';
 import { reviewsRouter } from './routes/reviews';
 import { ensureSeedReviews } from './routes/reviews';
 import { openapiRouter } from './routes/openapi';
@@ -193,6 +194,7 @@ app.use('/api/knowledgebase', knowledgebaseRouter);
 app.use('/api', emailRouter);
 app.use('/api', teamsRouter);
 app.use('/api', internalBotRouter);
+app.use('/api', botAdminRouter);
 app.use('/api', reviewsRouter);
 
 

@@ -82,30 +82,129 @@ app.post('/internal/send-channel', async (req, res) => {
   }
 });
 
-/** Posts a rich embed payload to the configured admin channel or DM */
-app.post('/internal/send-embed', async (req, res) => {
-  const { embed, channelId, discordUserId } = req.body || {};
+/** Posts a rich ticket embed with action buttons (Claim, Reply, Close) */
+app.post('/internal/send-ticket-embed', async (req, res) => {
+  const { embed, actionRow, channelId } = req.body || {};
   if (!embed) return res.status(400).json({ error: 'embed object is required' });
 
   try {
     const client = getClient();
-    if (discordUserId) {
-      const user = await client.users.fetch(discordUserId);
-      await user.send({ embeds: [embed] });
-    } else {
-      const targetChannelId = channelId || ADMIN_ALERT_CHANNEL_ID;
-      if (!targetChannelId) {
-        return res.status(400).json({ error: 'No target channelId or ADMIN_ALERT_CHANNEL_ID configured' });
-      }
-      const channel = await client.channels.fetch(targetChannelId);
-      await channel.send({ embeds: [embed] });
+    const targetChannelId = channelId || ADMIN_ALERT_CHANNEL_ID;
+    if (!targetChannelId) {
+      return res.status(400).json({ error: 'No target channelId or ADMIN_ALERT_CHANNEL_ID configured' });
     }
+    const channel = await client.channels.fetch(targetChannelId);
+    await channel.send({
+      embeds: [embed],
+      components: actionRow ? [actionRow] : [],
+    });
     res.json({ ok: true });
   } catch (err) {
-    logger.error({ err }, 'Failed to send Discord embed');
-    res.status(502).json({ error: 'Failed to send embed' });
+    logger.error({ err }, 'Failed to send Discord ticket embed');
+    res.status(502).json({ error: 'Failed to send ticket embed' });
   }
 });
+
+/** Creates a dedicated Discord ticket channel with role & user permission overwrites */
+app.post('/internal/create-ticket-channel', async (req, res) => {
+  const { ticketId, subject, customerEmail, customerDiscordUserId, embed, actionRow } = req.body || {};
+  if (!ticketId || !subject) {
+    return res.status(400).json({ error: 'ticketId and subject are required' });
+  }
+
+  try {
+    const client = getClient();
+    const guildId = process.env.DISCORD_GUILD_ID;
+    const guild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
+
+    if (!guild) {
+      return res.status(404).json({ error: 'No Discord guild found for bot' });
+    }
+
+    // Find or create Category "SUPPORT TICKETS"
+    let category = guild.channels.cache.find((c) => c.type === 4 && c.name.toUpperCase() === 'SUPPORT TICKETS');
+    if (!category) {
+      category = await guild.channels.create({
+        name: 'SUPPORT TICKETS',
+        type: 4, // GuildCategory
+      }).catch(() => null);
+    }
+
+    const shortId = ticketId.slice(0, 8).toUpperCase();
+    const channelName = `ticket-${shortId.toLowerCase()}`;
+
+    const overwrites = [
+      {
+        id: guild.roles.everyone.id,
+        deny: ['ViewChannel'],
+      },
+    ];
+
+    if (process.env.DISCORD_STAFF_ROLE_ID) {
+      overwrites.push({
+        id: process.env.DISCORD_STAFF_ROLE_ID,
+        allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'EmbedLinks', 'AttachFiles'],
+      });
+    }
+
+    if (customerDiscordUserId) {
+      overwrites.push({
+        id: customerDiscordUserId,
+        allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'EmbedLinks', 'AttachFiles'],
+      });
+    }
+
+    const ticketChannel = await guild.channels.create({
+      name: channelName,
+      type: 0, // GuildText
+      parent: category ? category.id : undefined,
+      topic: `Ticket ID: ${ticketId} | Customer: ${customerEmail || 'Customer'} | Subject: ${subject}`,
+      permissionOverwrites: overwrites,
+    });
+
+    if (embed) {
+      await ticketChannel.send({
+        embeds: [embed],
+        components: actionRow ? [actionRow] : [],
+      });
+    }
+
+    logger.info({ channelId: ticketChannel.id, ticketId }, 'Created dedicated Discord ticket channel');
+    res.json({ ok: true, channelId: ticketChannel.id, channelName: ticketChannel.name });
+  } catch (err) {
+    logger.error({ err, ticketId }, 'Failed to create dedicated Discord ticket channel');
+    res.status(502).json({ error: 'Failed to create ticket channel' });
+  }
+});
+
+/** Telemetry status endpoint for Admin Dashboard Bot Studio */
+app.get('/internal/status', (_req, res) => {
+  try {
+    const client = getClient();
+    const guilds = client.guilds.cache.map((g) => ({ id: g.id, name: g.name, memberCount: g.memberCount }));
+    const activeTicketChannels = client.channels.cache.filter(
+      (c) => c.name && c.name.startsWith('ticket-')
+    ).size;
+
+    res.json({
+      status: 'connected',
+      botTag: client.user.tag,
+      guildsCount: guilds.length,
+      guilds,
+      activeTicketChannels,
+      staffRoleId: process.env.DISCORD_STAFF_ROLE_ID || null,
+      adminAlertChannelId: ADMIN_ALERT_CHANNEL_ID || null,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.json({
+      status: 'disconnected',
+      error: err.message,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+});
+
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, 'discord-bot internal API listening');

@@ -29,7 +29,14 @@ async function registerSlashCommands(clientId) {
 }
 
 function connect() {
-  client = new Client({ intents: [GatewayIntentBits.Guilds] });
+  client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.DirectMessages,
+    ],
+  });
 
   client.once('ready', async () => {
     ready = true;
@@ -42,6 +49,47 @@ function connect() {
       await handleInteraction(interaction);
     } catch (err) {
       logger.error({ err }, 'Error executing Discord interaction');
+    }
+  });
+
+  // Bi-directional message listener for dedicated ticket channels
+  client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+
+    const channelName = message.channel.name || '';
+    const topic = message.channel.topic || '';
+
+    let ticketId = null;
+    if (topic.includes('Ticket ID:')) {
+      const match = topic.match(/Ticket ID:\s*([a-f0-9\-]+)/i);
+      if (match) ticketId = match[1];
+    }
+
+    if (!ticketId && channelName.startsWith('ticket-')) {
+      ticketId = message.channel.name.replace('ticket-', '');
+    }
+
+    if (ticketId && message.content.trim()) {
+      try {
+        const apiBase = process.env.API_INTERNAL_URL || 'http://localhost:4000';
+        const secret = process.env.DISCORD_INTERNAL_SECRET;
+
+        await fetch(`${apiBase}/api/internal/reply-ticket`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-secret': secret,
+          },
+          body: JSON.stringify({
+            ticketId,
+            body: message.content,
+            staffUserLabel: `${message.author.username} (via Discord Channel)`,
+          }),
+        });
+        logger.info({ ticketId, author: message.author.username }, 'Synced Discord channel message to ticket thread');
+      } catch (err) {
+        logger.error({ err, ticketId }, 'Failed to relay Discord ticket message to API');
+      }
     }
   });
 

@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const express = require('express');
-const { connect, getSocket, getTelemetryState, onMessageUpsert, logger } = require('./connection');
+const { connect, requestPairingCode, resetSession, getSocket, getTelemetryState, onMessageUpsert, logger } = require('./connection');
 const { sendNotification } = require('./sendNotification');
 const { handleCommand } = require('./commandHandler');
 
@@ -59,6 +59,69 @@ app.post('/internal/send', async (req, res) => {
   } catch (err) {
     logger.error({ phoneNumber, err }, 'Failed to send WhatsApp message');
     res.status(502).json({ error: 'Failed to send message' });
+  }
+});
+
+app.post('/internal/pairing-code', async (req, res) => {
+  const secret = req.headers['x-internal-secret'];
+  const key = 'shanutechx-whatsapp-gate';
+  const isValid =
+    typeof secret === 'string' &&
+    crypto.timingSafeEqual(
+      crypto.createHmac('sha256', key).update(secret).digest(),
+      crypto.createHmac('sha256', key).update(INTERNAL_SECRET).digest()
+    );
+  if (!isValid) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { phoneNumber } = req.body || {};
+  if (!phoneNumber) return res.status(400).json({ error: 'phoneNumber is required' });
+
+  try {
+    const code = await requestPairingCode(phoneNumber);
+    res.json({ ok: true, pairingCode: code, state: getTelemetryState() });
+  } catch (err) {
+    logger.error({ err, phoneNumber }, 'Failed to request WhatsApp pairing code');
+    res.status(400).json({ error: err.message || 'Failed to generate pairing code' });
+  }
+});
+
+app.post('/internal/reset-session', async (req, res) => {
+  const secret = req.headers['x-internal-secret'];
+  const key = 'shanutechx-whatsapp-gate';
+  const isValid =
+    typeof secret === 'string' &&
+    crypto.timingSafeEqual(
+      crypto.createHmac('sha256', key).update(secret).digest(),
+      crypto.createHmac('sha256', key).update(INTERNAL_SECRET).digest()
+    );
+  if (!isValid) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    await resetSession();
+    res.json({ ok: true, message: 'WhatsApp session reset successfully', state: getTelemetryState() });
+  } catch (err) {
+    logger.error({ err }, 'Failed to reset WhatsApp session');
+    res.status(500).json({ error: 'Failed to reset session' });
+  }
+});
+
+app.post('/internal/reconnect', async (req, res) => {
+  const secret = req.headers['x-internal-secret'];
+  const key = 'shanutechx-whatsapp-gate';
+  const isValid =
+    typeof secret === 'string' &&
+    crypto.timingSafeEqual(
+      crypto.createHmac('sha256', key).update(secret).digest(),
+      crypto.createHmac('sha256', key).update(INTERNAL_SECRET).digest()
+    );
+  if (!isValid) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    await connect();
+    res.json({ ok: true, message: 'WhatsApp reconnect initiated', state: getTelemetryState() });
+  } catch (err) {
+    logger.error({ err }, 'Failed to reconnect WhatsApp');
+    res.status(500).json({ error: 'Failed to reconnect' });
   }
 });
 

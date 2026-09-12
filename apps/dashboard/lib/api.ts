@@ -115,6 +115,15 @@ export const api = {
       apiFetch(`/api/admin/all-users${search ? `?search=${encodeURIComponent(search)}` : ''}`).then((r) =>
         asJson<{ users: Array<{ id: string; email: string; displayName: string | null; role: string }> }>(r)
       ),
+    bots: {
+      whatsappStatus: () => apiFetch('/api/admin/bots/whatsapp/status').then((r) => asJson<{ state: string; qr?: string | null; qrDataUrl?: string | null; pairingCode?: string | null; updatedAt: string }>(r)),
+      whatsappPairingCode: (phoneNumber: string) => apiFetch('/api/admin/bots/whatsapp/pairing-code', { method: 'POST', body: JSON.stringify({ phoneNumber }) }).then((r) => asJson<{ ok: boolean; pairingCode: string }>(r)),
+      whatsappResetSession: () => apiFetch('/api/admin/bots/whatsapp/reset-session', { method: 'POST' }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
+      whatsappReconnect: () => apiFetch('/api/admin/bots/whatsapp/reconnect', { method: 'POST' }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
+      whatsappSendTest: (phoneNumber: string, message: string) => apiFetch('/api/admin/bots/whatsapp/send-test', { method: 'POST', body: JSON.stringify({ phoneNumber, message }) }).then((r) => asJson<{ ok: boolean }>(r)),
+      discordStatus: () => apiFetch('/api/admin/bots/discord/status').then((r) => asJson<{ status: string; botTag?: string; guildsCount?: number; guilds?: any[]; activeTicketChannels?: number; staffRoleId?: string | null }>(r)),
+      discordSendTest: (message: string, channelId?: string, discordUserId?: string) => apiFetch('/api/admin/bots/discord/send-test', { method: 'POST', body: JSON.stringify({ message, channelId, discordUserId }) }).then((r) => asJson<{ ok: boolean }>(r)),
+    },
   },
 
   email: {
@@ -1095,7 +1104,7 @@ export const api = {
         asJson<{ tickets: Ticket[] }>(r)
       ),
     get: (id: string) => apiFetch(`/api/tickets/${id}`).then((r) => asJson<{ ticket: Ticket }>(r)),
-    create: (data: { subject: string; message: string; orderId?: string }) =>
+    create: (data: { subject: string; message: string; orderId?: string; priority?: TicketPriority }) =>
       apiFetch('/api/tickets', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<{ ticket: Ticket }>(r)
       ),

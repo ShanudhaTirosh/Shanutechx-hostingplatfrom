@@ -3,8 +3,8 @@ import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { env } from '../env';
 import { fulfillOrder } from '../lib/orderFulfillment';
-import { notifyCustomer } from '../lib/notifications';
-import { renderPaymentReviewEmail } from '../lib/emailTemplates';
+import { notifyCustomer, notifyTicketEmbed } from '../lib/notifications';
+import { renderPaymentReviewEmail, renderTicketReplyEmail } from '../lib/emailTemplates';
 
 export const internalBotRouter = Router();
 
@@ -228,3 +228,165 @@ internalBotRouter.post('/internal/review-payment', async (req: Request, res: Res
     reviewedBy: reviewedBy || 'Discord Bot',
   });
 });
+
+/**
+ * POST /api/internal/open-ticket
+ * Open support ticket from Discord/WhatsApp bot. Matches customer by discordUserId, phone, or email.
+ */
+internalBotRouter.post('/internal/open-ticket', async (req: Request, res: Response) => {
+  const { discordUserId, userEmail, phone, subject, message, priority } = req.body || {};
+
+  if (!subject || !message) {
+    return res.status(400).json({ error: 'subject and message are required' });
+  }
+
+  // Find user by discordUserId, email, or phone
+  let user: any = null;
+  if (discordUserId) {
+    user = await prisma.user.findFirst({ where: { discordUserId } });
+  }
+  if (!user && userEmail) {
+    user = await prisma.user.findUnique({ where: { email: userEmail.trim().toLowerCase() } });
+  }
+  if (!user && phone) {
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    user = await prisma.user.findFirst({
+      where: { OR: [{ phoneNumber: cleanPhone }, { phoneNumber: `+${cleanPhone}` }] },
+    });
+  }
+
+  // If no registered user, find or default to system/guest dev account
+  if (!user) {
+    user = await prisma.user.findFirst({ where: { role: { in: ['admin', 'dev'] } } });
+  }
+
+  if (!user) {
+    return res.status(404).json({ error: 'Could not resolve a user account for this ticket' });
+  }
+
+  const validPriority = ['low', 'medium', 'high', 'urgent'].includes(priority) ? priority : 'medium';
+
+  const ticket = await prisma.ticket.create({
+    data: {
+      userId: user.id,
+      subject,
+      priority: validPriority as any,
+      messages: {
+        create: {
+          senderId: user.id,
+          senderRole: 'customer',
+          body: message,
+        },
+      },
+    },
+    include: { messages: true, user: true },
+  });
+
+  // Emit Discord embed & customer DMs
+  void notifyTicketEmbed({
+    ticketId: ticket.id,
+    subject: ticket.subject,
+    userEmail: user.email,
+    userDiscordId: user.discordUserId || discordUserId,
+    userPhone: user.phoneNumber || phone,
+    initialMessage: message,
+    priority: ticket.priority,
+    status: ticket.status,
+  });
+
+  res.status(201).json({ ok: true, ticket });
+});
+
+/**
+ * POST /api/internal/reply-ticket
+ * Allows Discord/WhatsApp bots or staff to reply to a ticket from Discord
+ */
+internalBotRouter.post('/internal/reply-ticket', async (req: Request, res: Response) => {
+  const { ticketId, body, staffUserLabel } = req.body || {};
+
+  if (!ticketId || !body) {
+    return res.status(400).json({ error: 'ticketId and body are required' });
+  }
+
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    include: { user: true },
+  });
+
+  if (!ticket) {
+    return res.status(404).json({ error: 'Ticket not found' });
+  }
+
+  // Find staff user or use ticket user for recording
+  const staffUser =
+    (await prisma.user.findFirst({ where: { role: { in: ['admin', 'dev', 'support'] } } })) || ticket.user;
+
+  const msg = await prisma.ticketMessage.create({
+    data: {
+      ticketId: ticket.id,
+      senderId: staffUser.id,
+      senderRole: 'admin',
+      body: body,
+    },
+  });
+
+  await prisma.ticket.update({
+    where: { id: ticket.id },
+    data: { status: 'pending', updatedAt: new Date() },
+  });
+
+  // Render ticket reply email & notify customer
+  const rendered = renderTicketReplyEmail({
+    ticketSubject: ticket.subject,
+    senderName: staffUserLabel || staffUser.displayName || 'ShanuTechX Support Staff',
+    messageBody: body,
+    ticketId: ticket.id,
+  });
+
+  void notifyCustomer(ticket.user, rendered.text, rendered.html, rendered.subject);
+
+  res.json({ ok: true, message: msg });
+});
+
+/**
+ * POST /api/internal/claim-ticket
+ * Staff claims ticket in Discord
+ */
+internalBotRouter.post('/internal/claim-ticket', async (req: Request, res: Response) => {
+  const { ticketId, staffUserLabel } = req.body || {};
+
+  if (!ticketId) return res.status(400).json({ error: 'ticketId is required' });
+
+  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId }, include: { user: true } });
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+  const updated = await prisma.ticket.update({
+    where: { id: ticket.id },
+    data: { status: 'open', updatedAt: new Date() },
+  });
+
+  res.json({ ok: true, ticket: updated, claimedBy: staffUserLabel || 'Staff Member' });
+});
+
+/**
+ * POST /api/internal/close-ticket
+ * Staff or customer closes ticket from Discord or Dashboard
+ */
+internalBotRouter.post('/internal/close-ticket', async (req: Request, res: Response) => {
+  const { ticketId, staffUserLabel } = req.body || {};
+
+  if (!ticketId) return res.status(400).json({ error: 'ticketId is required' });
+
+  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId }, include: { user: true } });
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+  const updated = await prisma.ticket.update({
+    where: { id: ticket.id },
+    data: { status: 'closed', updatedAt: new Date() },
+  });
+
+  void notifyCustomer(ticket.user, `Your support ticket "${ticket.subject}" has been closed by ${staffUserLabel || 'Support'}.`);
+
+  res.json({ ok: true, ticket: updated });
+});
+

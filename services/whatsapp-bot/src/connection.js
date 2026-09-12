@@ -1,23 +1,25 @@
+const fs = require('fs');
+const path = require('path');
 const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
 } = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode-terminal');
+const qrcodeTerminal = require('qrcode-terminal');
+const QRCode = require('qrcode');
 const pino = require('pino');
 
-const AUTH_DIR = require('path').join(__dirname, '..', 'auth');
+const AUTH_DIR = path.join(__dirname, '..', 'auth');
 
 let sock = null;
 let currentQr = null;
+let currentQrDataUrl = null;
+let currentPairingCode = null;
 let connectionState = 'disconnected';
 
-// Baileys' own internal logger — kept quiet at 'warn' so its verbose
-// protocol-level logging doesn't drown out our own connection events.
 const baileysLogger = pino({ level: 'warn' });
 
-// App-level logger for connection lifecycle (connect/disconnect/QR).
 const appLogger = pino({
   level: process.env.LOG_LEVEL || 'info',
   ...(process.env.NODE_ENV !== 'production'
@@ -25,14 +27,6 @@ const appLogger = pino({
     : {}),
 });
 
-/**
- * Connects to WhatsApp using a persisted multi-file auth session.
- * First run: scan the printed QR code with the dedicated business number.
- * Subsequent runs: reconnects silently using the saved session in /auth.
- *
- * Reconnect-with-backoff is intentionally simple here — this is a low-volume
- * notification bot, not a high-availability messaging system.
- */
 async function connect() {
   if (sock) {
     try {
@@ -59,14 +53,19 @@ async function connect() {
     sock.ev.on('messages.upsert', listener);
   }
 
-  sock.ev.on('connection.update', (update) => {
+  sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
       currentQr = qr;
       connectionState = 'qr_ready';
+      try {
+        currentQrDataUrl = await QRCode.toDataURL(qr);
+      } catch (e) {
+        currentQrDataUrl = null;
+      }
       appLogger.info('Scan this QR code with the SHANUTECHX WhatsApp number:');
-      qrcode.generate(qr, { small: true });
+      qrcodeTerminal.generate(qr, { small: true });
     }
 
     if (connection === 'close') {
@@ -74,9 +73,11 @@ async function connect() {
       const loggedOut = statusCode === DisconnectReason.loggedOut;
       connectionState = loggedOut ? 'logged_out' : 'reconnecting';
       currentQr = null;
+      currentQrDataUrl = null;
 
       if (loggedOut) {
-        appLogger.error('WhatsApp session logged out. Delete the auth/ folder and re-pair with a QR scan.');
+        appLogger.error('WhatsApp session logged out. Resetting auth folder.');
+        await resetSession();
       } else {
         appLogger.warn({ statusCode }, 'WhatsApp connection closed, reconnecting in 5s...');
         setTimeout(connect, 5000);
@@ -86,11 +87,54 @@ async function connect() {
     if (connection === 'open') {
       connectionState = 'connected';
       currentQr = null;
+      currentQrDataUrl = null;
+      currentPairingCode = null;
       appLogger.info('WhatsApp connected.');
     }
   });
 
   return sock;
+}
+
+async function requestPairingCode(phoneNumber) {
+  if (!sock) {
+    await connect();
+  }
+  const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
+  if (!cleanPhone) throw new Error('Valid phone number with country code is required');
+
+  if (sock.authState?.creds?.me?.id) {
+    throw new Error('WhatsApp is already authenticated and connected');
+  }
+
+  const code = await sock.requestPairingCode(cleanPhone);
+  currentPairingCode = code;
+  connectionState = 'pairing_ready';
+  return code;
+}
+
+async function resetSession() {
+  if (sock) {
+    try {
+      sock.ev.removeAllListeners('connection.update');
+      sock.ev.removeAllListeners('creds.update');
+      sock.ev.removeAllListeners('messages.upsert');
+      sock.end(new Error('Resetting session'));
+    } catch (_) {}
+    sock = null;
+  }
+
+  currentQr = null;
+  currentQrDataUrl = null;
+  currentPairingCode = null;
+  connectionState = 'disconnected';
+
+  if (fs.existsSync(AUTH_DIR)) {
+    fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+    appLogger.info('Cleared WhatsApp session auth directory');
+  }
+
+  await connect();
 }
 
 let messageListeners = [];
@@ -113,8 +157,18 @@ function getTelemetryState() {
   return {
     state: connectionState,
     qr: currentQr,
+    qrDataUrl: currentQrDataUrl,
+    pairingCode: currentPairingCode,
     updatedAt: new Date().toISOString(),
   };
 }
 
-module.exports = { connect, getSocket, getTelemetryState, onMessageUpsert, logger: appLogger };
+module.exports = {
+  connect,
+  requestPairingCode,
+  resetSession,
+  getSocket,
+  getTelemetryState,
+  onMessageUpsert,
+  logger: appLogger,
+};

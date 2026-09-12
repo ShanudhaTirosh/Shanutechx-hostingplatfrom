@@ -116,6 +116,7 @@ export default function TicketsPage() {
 function NewTicketForm({ onCreated }: { onCreated: (ticket: Ticket) => void }) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [priority, setPriority] = useState<import('@/lib/types').TicketPriority>('medium');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -125,10 +126,10 @@ function NewTicketForm({ onCreated }: { onCreated: (ticket: Ticket) => void }) {
     setBusy(true);
     setError(null);
     try {
-      const { ticket } = await api.tickets.create({ subject, message });
+      const { ticket } = await api.tickets.create({ subject, message, priority });
       setSubject('');
       setMessage('');
-      toast('Ticket created successfully', 'success');
+      toast('Ticket created & dispatched to Support Hub!', 'success');
       onCreated(ticket);
     } catch (err: any) {
       setError(err.message);
@@ -142,6 +143,10 @@ function NewTicketForm({ onCreated }: { onCreated: (ticket: Ticket) => void }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && <ErrorBanner message={error} />}
 
+      <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3 text-xs text-indigo-300 flex items-center justify-between">
+        <span>⚡ Submitting this ticket immediately notifies our 24/7 Support Team via Discord & WhatsApp.</span>
+      </div>
+
       <Input
         required
         label="Subject / Topic"
@@ -149,6 +154,19 @@ function NewTicketForm({ onCreated }: { onCreated: (ticket: Ticket) => void }) {
         value={subject}
         onChange={(e) => setSubject(e.target.value)}
       />
+
+      <div>
+        <label className="block text-xs font-semibold text-text-muted mb-1">Ticket Priority</label>
+        <select
+          value={priority}
+          onChange={(e) => setPriority(e.target.value as any)}
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-violet/50 capitalize"
+        >
+          <option value="low" className="bg-[#0a0a14]">🟢 Low Priority (General Question)</option>
+          <option value="medium" className="bg-[#0a0a14]">🟡 Medium Priority (Deployment / Service Issue)</option>
+          <option value="high" className="bg-[#0a0a14]">🔴 High Priority (Production Down / Urgent)</option>
+        </select>
+      </div>
 
       <Textarea
         required
