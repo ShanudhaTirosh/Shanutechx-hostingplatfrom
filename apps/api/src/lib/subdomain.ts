@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { prisma } from './prisma';
 
 const RESERVED = new Set([
@@ -94,14 +95,14 @@ export async function generateSubdomain(
   const cleanBase = /[a-z]/.test(baseSlug) ? baseSlug : `app-${baseSlug}`;
   
   // Generate unique candidate with random hash suffix based on app ID / random string
-  let candidate = `${cleanBase}-${Math.random().toString(36).substring(2, 8)}`;
+  let candidate = `${cleanBase}-${crypto.randomBytes(3).toString('hex')}`;
   if (RESERVED.has(candidate)) {
     candidate = `app-${candidate}`;
   }
 
   let suffix = 1;
   while (await isTaken(candidate)) {
-    candidate = `${cleanBase}-${Math.random().toString(36).substring(2, 8)}`;
+    candidate = `${cleanBase}-${crypto.randomBytes(3).toString('hex')}`;
     suffix += 1;
     if (suffix > 20) {
       candidate = `app-${Date.now().toString(36)}`;

@@ -156,8 +156,14 @@ async function extractArchive(deploymentId, relPath) {
   if (lower.endsWith('.zip')) {
     if (process.platform === 'win32') {
       try {
-        const psCommand = `Expand-Archive -Path "${archive}" -DestinationPath "${targetDir}" -Force`;
-        await execFileAsync('powershell', ['-NoProfile', '-Command', psCommand]);
+        await execFileAsync('powershell', [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          'param($src, $dst) Expand-Archive -LiteralPath $src -DestinationPath $dst -Force',
+          archive,
+          targetDir,
+        ]);
         return;
       } catch {}
     }

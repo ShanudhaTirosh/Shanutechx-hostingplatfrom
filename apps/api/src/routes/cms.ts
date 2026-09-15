@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
@@ -165,7 +166,7 @@ cmsRouter.post('/cms/contact', async (req, res) => {
   }
 
   const { name, email, department, subject, message } = parsed.data;
-  const submissionKey = `submission_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const submissionKey = `submission_${Date.now()}_${randomBytes(4).toString('hex')}`;
 
   try {
     await prisma.contentBlock.create({

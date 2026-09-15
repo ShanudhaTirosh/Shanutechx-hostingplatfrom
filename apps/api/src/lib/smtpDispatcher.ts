@@ -1,5 +1,6 @@
 import net from 'net';
 import tls from 'tls';
+import crypto from 'crypto';
 import { logger } from './logger';
 
 export interface SmtpServerOptions {
@@ -115,7 +116,7 @@ export async function sendSmtpEmail(
   return new Promise((resolve, reject) => {
     const isImplicitTls = options.port === 465 || options.secure === true;
     let socket: net.Socket;
-    const messageId = `<msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}@${options.host}>`;
+    const messageId = `<msg_${Date.now()}_${crypto.randomBytes(6).toString('hex')}@${options.host}>`;
 
     const timeout = setTimeout(() => {
       if (socket) socket.destroy();
@@ -166,8 +167,8 @@ export async function sendSmtpEmail(
             step = 6;
             const plainText = mail.text || mail.html.replace(/<[^>]+>/g, '').trim();
             const hasAttachments = Array.isArray(mail.attachments) && mail.attachments.length > 0;
-            const mixedBoundary = `----=_Mixed_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-            const altBoundary = `----=_Alt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const mixedBoundary = `----=_Mixed_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+            const altBoundary = `----=_Alt_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
 
             let rawLines: string[] = [
               `From: ${mail.from}`,

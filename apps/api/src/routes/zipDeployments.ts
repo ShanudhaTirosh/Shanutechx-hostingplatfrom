@@ -101,8 +101,14 @@ const handleArchiveUpload = async (req: AuthedRequest, res: any) => {
       if (isZip) {
         if (process.platform === 'win32') {
           try {
-            const psCommand = `Expand-Archive -Path "${tempArchivePath}" -DestinationPath "${targetDir}" -Force`;
-            await execFileAsync('powershell', ['-NoProfile', '-Command', psCommand], execOpts);
+            await execFileAsync('powershell', [
+              '-NoProfile',
+              '-NonInteractive',
+              '-Command',
+              'param($src, $dst) Expand-Archive -LiteralPath $src -DestinationPath $dst -Force',
+              tempArchivePath,
+              targetDir,
+            ], execOpts);
           } catch {
             await execFileAsync('unzip', ['-o', tempArchivePath, '-d', targetDir], execOpts).catch(() =>
               execFileAsync('7z', ['x', '-y', `-o${targetDir}`, tempArchivePath], execOpts)

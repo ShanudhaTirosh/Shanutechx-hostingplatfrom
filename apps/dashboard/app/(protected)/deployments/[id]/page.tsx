@@ -88,18 +88,7 @@ export default function DeploymentDetailPage() {
     try {
       const data = await api.deployments.get(deploymentId);
       setDeployment(data.deployment);
-      setResourceUsage(data.resourceUsage || {
-        cpuUsagePercent: Math.floor(Math.random() * 25) + 5,
-        memoryUsedMb: 245,
-        memoryLimitMb: 1024,
-        memoryUsagePercent: 24,
-        storageUsedGb: 1.2,
-        storageLimitGb: 10,
-        storageUsagePercent: 12,
-        networkRxKb: 1420,
-        networkTxKb: 890,
-        timestamp: new Date().toISOString(),
-      });
+      setResourceUsage(data.resourceUsage || null);
       setDesiredSubdomain(data.deployment.subdomain || '');
       setError(null);
     } catch (err: any) {
