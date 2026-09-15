@@ -371,7 +371,7 @@ statusRouter.get('/notifications/public', async (_req, res) => {
     for (const p of approvedPayments) {
       notifications.push({
         id: `pay-${p.id}`,
-        title: '✅ Payment Approved & Provisioned',
+        title: 'Payment Approved & Provisioned',
         message: `Payment for order #${p.id.slice(-6).toUpperCase()} has been approved and service activated.`,
         time: new Date(p.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' }),
         type: 'payment',
@@ -383,7 +383,7 @@ statusRouter.get('/notifications/public', async (_req, res) => {
     for (const inc of incidents) {
       notifications.push({
         id: `inc-${inc.id}`,
-        title: `${inc.resolvedAt ? '🟢 Resolved' : '⚠️ System Alert'}: ${inc.title}`,
+        title: `${inc.resolvedAt ? 'Resolved' : 'System Alert'}: ${inc.title}`,
         message: inc.body,
         time: new Date(inc.startedAt).toLocaleDateString([], { month: 'short', day: 'numeric' }),
         type: 'system',
@@ -395,7 +395,7 @@ statusRouter.get('/notifications/public', async (_req, res) => {
     for (const m of maintenances) {
       notifications.push({
         id: `maint-${m.id}`,
-        title: `🔧 Scheduled Maintenance: ${m.title}`,
+        title: `Scheduled Maintenance: ${m.title}`,
         message: m.description,
         time: new Date(m.scheduledStart).toLocaleDateString([], { month: 'short', day: 'numeric' }),
         type: 'vps',
@@ -407,7 +407,7 @@ statusRouter.get('/notifications/public', async (_req, res) => {
     if (activeNodes.length > 0) {
       notifications.push({
         id: 'node-fleet-status',
-        title: '⚡ Compute Fleet Synchronized',
+        title: 'Compute Fleet Synchronized',
         message: `${activeNodes.length} Node VPS host(s) actively monitored with Docker container telemetry.`,
         time: 'Just now',
         type: 'system',

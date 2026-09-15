@@ -101,7 +101,17 @@ export default function IncidentDetailPage() {
                       : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                   }`}
                 >
-                  {incident.resolvedAt ? '🟢 Incident Resolved' : '🔴 Active Outage'}
+                  {incident.resolvedAt ? (
+                    <span className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      Incident Resolved
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                      Active Outage
+                    </span>
+                  )}
                 </span>
                 <span className="text-xs font-mono text-slate-400">
                   Incident ID: {incident.id.slice(0, 12)}

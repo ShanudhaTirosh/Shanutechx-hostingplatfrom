@@ -258,7 +258,7 @@ export default function AdminStatusStudioPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
           <div>
             <h2 className="text-base font-extrabold text-white tracking-tight flex items-center gap-2">
-              <span>⚡ Uptime Kuma &amp; Grafana Dynamic Auto-Sync</span>
+              <span>Uptime Kuma &amp; Grafana Dynamic Auto-Sync</span>
               <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${monitoringStatus?.uptimeKuma?.isConfigured ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
                 {monitoringStatus?.uptimeKuma?.isConfigured ? 'Connected' : 'Standalone Mode'}
               </span>

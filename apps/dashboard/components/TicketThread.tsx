@@ -5,7 +5,9 @@ import { api } from '@/lib/api';
 import { Ticket } from '@/lib/types';
 import { Card, Button, Badge, Spinner, ErrorBanner, useToast } from '@/components/ui';
 import { useAppUser } from '@/lib/AppUserContext';
+import { MessageSquare, Smartphone } from 'lucide-react';
 import { IconShield } from '@/components/Icons';
+
 
 export function TicketThread({
   ticketId,
@@ -60,13 +62,13 @@ export function TicketThread({
           <div className="flex items-center gap-3 text-text-muted text-xs mt-1 font-mono flex-wrap">
             <span>{ticket.user?.email}</span>
             {ticket.user?.discordUserId && (
-              <span className="inline-flex items-center gap-1 rounded bg-indigo-500/10 px-2 py-0.5 text-[10px] text-indigo-400 border border-indigo-500/20 font-sans">
-                💬 Discord Linked ({ticket.user.discordUserId})
+              <span className="inline-flex items-center gap-1.5 rounded bg-indigo-500/10 px-2 py-0.5 text-[10px] text-indigo-400 border border-indigo-500/20 font-sans">
+                <MessageSquare className="h-3 w-3" /> Discord Linked ({ticket.user.discordUserId})
               </span>
             )}
             {ticket.user?.phoneNumber && (
-              <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400 border border-emerald-500/20 font-sans">
-                📱 WhatsApp ({ticket.user.phoneNumber})
+              <span className="inline-flex items-center gap-1.5 rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400 border border-emerald-500/20 font-sans">
+                <Smartphone className="h-3 w-3" /> WhatsApp ({ticket.user.phoneNumber})
               </span>
             )}
           </div>

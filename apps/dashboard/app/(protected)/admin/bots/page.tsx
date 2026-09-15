@@ -193,16 +193,16 @@ export default function AdminBotStudioPage() {
                   <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
                     Baileys WhatsApp Bot Gateway
                     {waState?.state === 'connected' ? (
-                      <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-500/30">
-                        🟢 Connected
+                      <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Connected
                       </span>
                     ) : waState?.state === 'qr_ready' ? (
-                      <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold text-amber-400 border border-amber-500/30">
-                        🟡 QR Ready to Scan
+                      <span className="flex items-center gap-1.5 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold text-amber-400 border border-amber-500/30">
+                        <span className="w-2 h-2 rounded-full bg-amber-400" /> QR Ready to Scan
                       </span>
                     ) : (
-                      <span className="rounded-full bg-rose-500/20 px-2.5 py-0.5 text-xs font-bold text-rose-400 border border-rose-500/30">
-                        🔴 Disconnected
+                      <span className="flex items-center gap-1.5 rounded-full bg-rose-500/20 px-2.5 py-0.5 text-xs font-bold text-rose-400 border border-rose-500/30">
+                        <span className="w-2 h-2 rounded-full bg-rose-400" /> Disconnected
                       </span>
                     )}
                   </h2>
@@ -329,12 +329,12 @@ export default function AdminBotStudioPage() {
                   <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
                     Discord Support Bot Daemon
                     {discordState?.status === 'connected' ? (
-                      <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-500/30">
-                        🟢 Online ({discordState?.botTag})
+                      <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Online ({discordState?.botTag})
                       </span>
                     ) : (
-                      <span className="rounded-full bg-rose-500/20 px-2.5 py-0.5 text-xs font-bold text-rose-400 border border-rose-500/30">
-                        🔴 Offline / Check DISCORD_BOT_TOKEN
+                      <span className="flex items-center gap-1.5 rounded-full bg-rose-500/20 px-2.5 py-0.5 text-xs font-bold text-rose-400 border border-rose-500/30">
+                        <span className="w-2 h-2 rounded-full bg-rose-400" /> Offline / Check DISCORD_BOT_TOKEN
                       </span>
                     )}
                   </h2>
@@ -428,9 +428,9 @@ export default function AdminBotStudioPage() {
                 onChange={(e) => setTestTarget(e.target.value as any)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-violet/50"
               >
-                <option value="whatsapp" className="bg-[#0a0a14]">📱 WhatsApp DM (via Phone Number)</option>
-                <option value="discord_channel" className="bg-[#0a0a14]">💬 Discord Channel (Support / Dedicated Ticket)</option>
-                <option value="discord_dm" className="bg-[#0a0a14]">✉️ Discord User DM (via Discord User ID)</option>
+                <option value="whatsapp" className="bg-[#0a0a14]">WhatsApp DM (via Phone Number)</option>
+                <option value="discord_channel" className="bg-[#0a0a14]">Discord Channel (Support / Dedicated Ticket)</option>
+                <option value="discord_dm" className="bg-[#0a0a14]">Discord User DM (via Discord User ID)</option>
               </select>
             </div>
 

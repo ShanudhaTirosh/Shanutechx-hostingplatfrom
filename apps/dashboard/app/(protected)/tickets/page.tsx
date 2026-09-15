@@ -144,7 +144,7 @@ function NewTicketForm({ onCreated }: { onCreated: (ticket: Ticket) => void }) {
       {error && <ErrorBanner message={error} />}
 
       <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3 text-xs text-indigo-300 flex items-center justify-between">
-        <span>⚡ Submitting this ticket immediately notifies our 24/7 Support Team via Discord & WhatsApp.</span>
+        <span>Submitting this ticket immediately notifies our 24/7 Support Team via Discord &amp; WhatsApp.</span>
       </div>
 
       <Input
@@ -162,9 +162,9 @@ function NewTicketForm({ onCreated }: { onCreated: (ticket: Ticket) => void }) {
           onChange={(e) => setPriority(e.target.value as any)}
           className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-violet/50 capitalize"
         >
-          <option value="low" className="bg-[#0a0a14]">🟢 Low Priority (General Question)</option>
-          <option value="medium" className="bg-[#0a0a14]">🟡 Medium Priority (Deployment / Service Issue)</option>
-          <option value="high" className="bg-[#0a0a14]">🔴 High Priority (Production Down / Urgent)</option>
+          <option value="low" className="bg-[#0a0a14]">Low Priority (General Question)</option>
+          <option value="medium" className="bg-[#0a0a14]">Medium Priority (Deployment / Service Issue)</option>
+          <option value="high" className="bg-[#0a0a14]">High Priority (Production Down / Urgent)</option>
         </select>
       </div>
 
