@@ -144,7 +144,7 @@ Expected response:
 ## 👤 Create Your First Admin User
 
 1. Go to https://app.shanutechx.com
-2. Sign up with email/password (Firebase will create the account)
+2. Sign in with Google, GitHub, or Discord OAuth (SSO auto-provisions user account)
 3. SSH into server and promote to admin:
 
 ```bash
@@ -255,7 +255,7 @@ After your platform is live:
 - ✅ Next.js Dashboard
 - ✅ User Authentication (Firebase)
 - ✅ Role-based Access Control (Customer/Admin/Dev)
-- ✅ 500+ App Templates
+- ✅ 15+ App Templates
 - ✅ One-click Deployments
 - ✅ Database Provisioning
 - ✅ Payment Processing

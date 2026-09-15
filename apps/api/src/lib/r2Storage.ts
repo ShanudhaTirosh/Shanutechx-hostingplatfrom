@@ -80,7 +80,8 @@ export async function uploadDeploymentZip(deploymentId: string, buffer: Buffer, 
       logger.info({ deploymentId, objectKey, bucketName }, 'ZIP archive uploaded to R2 object storage successfully');
       return `${env.r2Endpoint}/${bucketName}/${objectKey}`;
     } catch (err) {
-      logger.warn({ err, deploymentId }, 'Failed to upload ZIP to R2');
+      logger.error({ err, deploymentId }, 'Failed to upload ZIP archive to R2 object storage');
+      throw err;
     }
   }
   return null;

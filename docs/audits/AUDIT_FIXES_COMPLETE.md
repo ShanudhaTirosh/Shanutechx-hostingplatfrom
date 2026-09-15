@@ -1,4 +1,7 @@
-# Audit Fixes Completed — 2026-07-23
+# Audit Fixes Completed — 2026-07-23 & 2026-09-15 Audit Remediation
+
+> [!NOTE]
+> Update (September 15, 2026): A comprehensive forensic code audit (93 findings across 1,184 in-scope files) has been completed and remediated. Key security updates include mandatory SECRETS_ENCRYPTION_KEY initialization, base64 shell argument escaping in Node Agent SSH routines, mailbox ownership enforcement in Webmail delegations, AI configuration validation (501 status responses when keys are unconfigured), R2 storage error propagation, and complete environment variable synchronization across all `.env.example` templates.
 
 All critical and high-priority issues from the full system audit have been fixed. Below is a summary of what was changed.
 

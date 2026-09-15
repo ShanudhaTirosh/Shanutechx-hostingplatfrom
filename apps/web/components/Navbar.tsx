@@ -224,7 +224,9 @@ export default function Navbar() {
     if (cached) {
       try {
         setUserSession(JSON.parse(cached));
-      } catch (_) {}
+      } catch (err) {
+        console.warn('Failed to parse cached user session from localStorage:', err);
+      }
     }
   }, []);
 

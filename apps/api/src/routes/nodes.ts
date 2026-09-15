@@ -540,9 +540,9 @@ nodesRouter.post('/nodes/connect', async (req: AuthedRequest, res: Response) => 
       'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/passwd *',
       'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/ufw *',
     ].join('\n');
-    const escapedSudoers = sudoersContent.replace(/'/g, "'\\''" );
+    const base64Sudoers = Buffer.from(sudoersContent).toString('base64');
     await sshExec(ssh, [
-      `echo '${escapedSudoers}' > /etc/sudoers.d/shanutechx-agent`,
+      `printf '%s' '${base64Sudoers}' | base64 -d > /etc/sudoers.d/shanutechx-agent`,
       'chmod 0440 /etc/sudoers.d/shanutechx-agent',
       'visudo -cf /etc/sudoers.d/shanutechx-agent',
     ].join(' && '), log);
@@ -727,7 +727,7 @@ nodesRouter.post('/nodes/connect/stream', async (req: AuthedRequest, res: Respon
     await sshExec(ssh, 'id shanutechx-agent &>/dev/null || useradd -r -s /bin/false -d /var/lib/shanutechx shanutechx-agent && mkdir -p /var/lib/shanutechx/workspaces /opt/shanutechx/services/node-agent && chown -R shanutechx-agent:shanutechx-agent /var/lib/shanutechx', log);
 
     step('🛡️ [4/6] Configuring sudoers permissions...');
-    const sudoers = [
+    const sudoersText = [
       '# ShanuTechX Node Agent narrowly-scoped sudo privileges',
       'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl list-units *',
       'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl start *',
@@ -741,8 +741,9 @@ nodesRouter.post('/nodes/connect/stream', async (req: AuthedRequest, res: Respon
       'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/usermod *',
       'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/passwd *',
       'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/ufw *',
-    ].join('\n').replace(/'/g, "'\\''" );
-    await sshExec(ssh, `printf '%s' '${sudoers}' > /etc/sudoers.d/shanutechx-agent && chmod 0440 /etc/sudoers.d/shanutechx-agent && visudo -cf /etc/sudoers.d/shanutechx-agent`, log);
+    ].join('\n');
+    const base64SudoersStr = Buffer.from(sudoersText).toString('base64');
+    await sshExec(ssh, `printf '%s' '${base64SudoersStr}' | base64 -d > /etc/sudoers.d/shanutechx-agent && chmod 0440 /etc/sudoers.d/shanutechx-agent && visudo -cf /etc/sudoers.d/shanutechx-agent`, log);
 
     step('🤖 [5/6] Deploying ShanuTechX Node Agent...');
     // BUG-02 FIX: Same tempfile approach as /nodes/connect

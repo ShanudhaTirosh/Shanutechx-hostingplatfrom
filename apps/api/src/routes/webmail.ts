@@ -824,10 +824,14 @@ webmailRouter.post('/webmail/ics/parse', async (req: AuthedRequest, res: Respons
 
 // 6.1 AI Thread Summarize ("Catch Me Up")
 webmailRouter.post('/webmail/ai/summarize', async (req: AuthedRequest, res: Response) => {
+  const apiKey = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(501).json({ error: 'AI Assistant Service is not configured on this server (missing OPENAI_API_KEY/GEMINI_API_KEY)' });
+  }
+
   const { threadBody, subject } = req.body || {};
   if (!threadBody && !subject) return res.status(400).json({ error: 'Thread text is required' });
 
-  // Intelligent fallback/rule-based synthesis if no external key is passed
   const text = String(threadBody || subject);
   const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 10);
   const bulletPoints = sentences.slice(0, 3).map((s) => s.trim());
@@ -835,11 +839,7 @@ webmailRouter.post('/webmail/ai/summarize', async (req: AuthedRequest, res: Resp
   res.json({
     summary: {
       keyTakeaway: `Key discussion regarding: "${subject || 'Email Thread'}"`,
-      bulletPoints: bulletPoints.length > 0 ? bulletPoints : [
-        'Reviewed action items and feedback from team.',
-        'Requested update before end of business day.',
-        'Next meeting scheduled for upcoming milestone.',
-      ],
+      bulletPoints,
       sentiment: 'professional',
     },
   });
@@ -847,7 +847,12 @@ webmailRouter.post('/webmail/ai/summarize', async (req: AuthedRequest, res: Resp
 
 // 6.2 AI Smart Reply Suggestions (3 Chips)
 webmailRouter.post('/webmail/ai/reply-suggestions', async (req: AuthedRequest, res: Response) => {
-  const { messageBody, senderName } = req.body || {};
+  const apiKey = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(501).json({ error: 'AI Assistant Service is not configured on this server (missing OPENAI_API_KEY/GEMINI_API_KEY)' });
+  }
+
+  const { senderName } = req.body || {};
   const name = senderName || 'there';
 
   res.json({
@@ -861,6 +866,11 @@ webmailRouter.post('/webmail/ai/reply-suggestions', async (req: AuthedRequest, r
 
 // 6.3 AI Draft Assistant ("Prompt to Email")
 webmailRouter.post('/webmail/ai/draft', async (req: AuthedRequest, res: Response) => {
+  const apiKey = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(501).json({ error: 'AI Assistant Service is not configured on this server (missing OPENAI_API_KEY/GEMINI_API_KEY)' });
+  }
+
   const { prompt, tone, recipientName } = req.body || {};
   if (!prompt) return res.status(400).json({ error: 'Prompt instruction is required' });
 
@@ -886,7 +896,7 @@ webmailRouter.post('/webmail/ai/draft', async (req: AuthedRequest, res: Response
 
 // 6.4 AI Phishing & Threat Assessment
 webmailRouter.post('/webmail/ai/threat-check', async (req: AuthedRequest, res: Response) => {
-  const { senderEmail, subject, body } = req.body || {};
+  const { senderEmail, body } = req.body || {};
   const sender = String(senderEmail || '').toLowerCase();
   const text = String(body || '').toLowerCase();
 
@@ -913,6 +923,11 @@ webmailRouter.post('/webmail/ai/threat-check', async (req: AuthedRequest, res: R
 
 // 6.5 AI Inline Language Translator
 webmailRouter.post('/webmail/ai/translate', async (req: AuthedRequest, res: Response) => {
+  const apiKey = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(501).json({ error: 'AI Assistant Service is not configured on this server (missing OPENAI_API_KEY/GEMINI_API_KEY)' });
+  }
+
   const { text, targetLanguage } = req.body || {};
   if (!text) return res.status(400).json({ error: 'Text to translate is required' });
 
@@ -940,6 +955,9 @@ webmailRouter.post('/webmail/delegations', async (req: AuthedRequest, res: Respo
 
   const account = await prisma.smtpAccount.findUnique({ where: { id: smtpAccountId } });
   if (!account) return res.status(404).json({ error: 'SmtpAccount not found' });
+  if (account.userId !== req.user!.id && req.user?.role !== 'dev') {
+    return res.status(403).json({ error: 'You do not own this mailbox account' });
+  }
 
   const adminUser = await prisma.user.findUnique({ where: { id: adminUserId } });
   if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'support')) {
@@ -1012,7 +1030,7 @@ webmailRouter.get('/webmail/admin/stats', async (req: AuthedRequest, res: Respon
         totalSpam,
         queueSize,
         deliveryRate,
-        avgDeliveryMs: 320, // placeholder — hook into SMTP telemetry if available
+        avgDeliveryMs: null, // Telemetry metric when SMTP stats collector is active
       },
     });
   } catch (err) {

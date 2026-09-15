@@ -159,7 +159,13 @@ const handleArchiveUpload = async (req: AuthedRequest, res: any) => {
 
     // Save uploaded archive to object storage for multi-node agent distribution
     const { uploadDeploymentZip } = await import('../lib/r2Storage');
-    const r2ObjectUrl = await uploadDeploymentZip(deployment.id, file.buffer, filename);
+    let r2ObjectUrl: string | null = null;
+    try {
+      r2ObjectUrl = await uploadDeploymentZip(deployment.id, file.buffer, filename);
+    } catch (storageErr) {
+      logger.error({ err: storageErr, deploymentId: deployment.id }, 'R2 object storage archive upload failed (non-fatal, continuing with local workspace)');
+      res.write(JSON.stringify({ phase: 'fetch', message: 'Warning: Failed to upload source archive copy to R2 object storage. Proceeding with local workspace...' }) + '\n');
+    }
 
     const archiveType = isZip ? 'zip' : isRar ? 'rar' : is7z ? '7z' : 'tar';
     const storageMsg = r2ObjectUrl ? 'saved to object storage' : 'saved locally';
