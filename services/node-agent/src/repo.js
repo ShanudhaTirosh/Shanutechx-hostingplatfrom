@@ -39,7 +39,7 @@ async function prepareWorkspace(deploymentId, repoUrl, branch = 'main', remoteBa
       await run('git', ['clone', '--depth', '1', remoteBackupUrl, dir]);
       return dir;
     } catch (err) {
-      // Fall through if clone fails
+      console.warn('[node-agent:repo] Remote backup clone failed, falling back to primary source:', err.message || err);
     }
   }
 

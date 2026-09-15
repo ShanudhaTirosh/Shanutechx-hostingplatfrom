@@ -181,7 +181,8 @@ export default function DeploymentsPage() {
 }
 
 function generateRandomSubdomain() {
-  return `app-${Math.random().toString(36).substring(2, 8)}`;
+  const rand = Math.floor(100000 + Math.random() * 900000).toString(36);
+  return `app-${rand}`;
 }
 
 function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
