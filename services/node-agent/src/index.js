@@ -21,7 +21,7 @@ const {
 const { collectStats } = require('./stats');
 const { addKey } = require('./livekit');
 const { addDomainRoute, removeDomainRoute } = require('./customDomain');
-const { provisionDatabase, scaleDatabase, rotateDatabasePassword, manageDatabaseUser } = require('./managedDb');
+const { provisionDatabase, scaleDatabase, rotateDatabasePassword, manageDatabaseUser, executeDatabaseQuery, backupDatabase, listDatabaseBackups, restoreDatabase } = require('./managedDb');
 const { listDir, readFile, writeFile, writeBinaryFile, extractArchive, makeDir, remove: fsRemove, rename } = require('./filesystem');
 const { provisionProject, deprovisionProject, execSql, listTables, validateIdentifier, insertRow, updateRow, deleteRow } = require('./projects');
 
@@ -777,6 +777,69 @@ app.post('/agent/managed-databases/:containerId/manage-user', async (req, res) =
     res.status(500).json({ error: err.message || 'Failed to manage database user' });
   }
 });
+
+app.post('/agent/managed-databases/:containerId/query', async (req, res) => {
+  const { containerId } = req.params;
+  const { type, query, masterPassword } = req.body || {};
+  if (!type || !query) {
+    return res.status(400).json({ error: 'type and query are required' });
+  }
+
+  try {
+    const result = await executeDatabaseQuery({ containerId, type, query, masterPassword });
+    logger.info({ containerId, type, executionTimeMs: result.executionTimeMs }, 'Managed database query executed');
+    res.json(result);
+  } catch (err) {
+    logger.error({ containerId, err: err.message }, 'Failed to execute query on managed database');
+    res.status(500).json({ error: err.message || 'Failed to execute query' });
+  }
+});
+
+app.post('/agent/managed-databases/:containerId/backup', async (req, res) => {
+  const { containerId } = req.params;
+  const { type, databaseId, masterPassword } = req.body || {};
+  if (!type || !databaseId) {
+    return res.status(400).json({ error: 'type and databaseId are required' });
+  }
+
+  try {
+    const result = await backupDatabase({ containerId, type, databaseId, masterPassword });
+    logger.info({ containerId, databaseId, backupId: result.backupId }, 'Managed database snapshot created');
+    res.json(result);
+  } catch (err) {
+    logger.error({ containerId, databaseId, err: err.message }, 'Failed to create database snapshot');
+    res.status(500).json({ error: err.message || 'Failed to create snapshot' });
+  }
+});
+
+app.get('/agent/managed-databases/:databaseId/backups', async (req, res) => {
+  const { databaseId } = req.params;
+  try {
+    const backups = await listDatabaseBackups({ databaseId });
+    res.json({ backups });
+  } catch (err) {
+    logger.error({ databaseId, err: err.message }, 'Failed to list database snapshots');
+    res.status(500).json({ error: err.message || 'Failed to list database snapshots' });
+  }
+});
+
+app.post('/agent/managed-databases/:containerId/restore', async (req, res) => {
+  const { containerId } = req.params;
+  const { type, databaseId, backupId, masterPassword } = req.body || {};
+  if (!type || !databaseId || !backupId) {
+    return res.status(400).json({ error: 'type, databaseId, and backupId are required' });
+  }
+
+  try {
+    const result = await restoreDatabase({ containerId, type, databaseId, backupId, masterPassword });
+    logger.info({ containerId, databaseId, backupId }, 'Managed database snapshot restored');
+    res.json(result);
+  } catch (err) {
+    logger.error({ containerId, databaseId, backupId, err: err.message }, 'Failed to restore database snapshot');
+    res.status(500).json({ error: err.message || 'Failed to restore database snapshot' });
+  }
+});
+
 
 
 

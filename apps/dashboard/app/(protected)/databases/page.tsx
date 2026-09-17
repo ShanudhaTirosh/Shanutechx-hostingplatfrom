@@ -2,12 +2,32 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
-import { ManagedDatabase, ManagedDatabaseUser } from '@/lib/types';
+import { ManagedDatabase, ManagedDatabaseUser, Node } from '@/lib/types';
+
+type ActiveTab = 'overview' | 'query' | 'scaling' | 'backups' | 'migration' | 'security' | 'connection';
+
+interface BackupItem {
+  backupId: string;
+  databaseId: string;
+  filename: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+const PRESET_TIERS = [
+  { name: 'Micro', cpu: 0.5, memoryMb: 512, storageGb: 10, maxConn: 50, price: '$5/mo' },
+  { name: 'Starter', cpu: 1.0, memoryMb: 2048, storageGb: 25, maxConn: 100, price: '$15/mo' },
+  { name: 'Growth', cpu: 2.0, memoryMb: 4096, storageGb: 50, maxConn: 250, price: '$35/mo' },
+  { name: 'Performance', cpu: 4.0, memoryMb: 8192, storageGb: 100, maxConn: 500, price: '$75/mo' },
+  { name: 'Enterprise', cpu: 8.0, memoryMb: 16384, storageGb: 250, maxConn: 1000, price: '$160/mo' },
+];
 
 export default function ManagedDatabasesPage() {
   const [databases, setDatabases] = useState<ManagedDatabase[]>([]);
+  const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDb, setSelectedDb] = useState<ManagedDatabase | null>(null);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
 
   // Connection details state
   const [connDetails, setConnDetails] = useState<{
@@ -20,6 +40,7 @@ export default function ManagedDatabasesPage() {
     connectionString: string;
   } | null>(null);
   const [loadingConn, setLoadingConn] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // DB Users state
   const [dbUsers, setDbUsers] = useState<ManagedDatabaseUser[]>([]);
@@ -29,6 +50,39 @@ export default function ManagedDatabasesPage() {
   const [newUserPass, setNewUserPass] = useState('');
   const [newUserRole, setNewUserRole] = useState<'admin' | 'read_write' | 'read_only'>('read_write');
   const [createdUserNotice, setCreatedUserNotice] = useState<string | null>(null);
+
+  // Query Console State
+  const [queryInput, setQueryInput] = useState('SELECT * FROM pg_tables WHERE schemaname = \'public\';');
+  const [isExecutingQuery, setIsExecutingQuery] = useState(false);
+  const [queryResult, setQueryResult] = useState<{
+    ok: boolean;
+    exitCode: number;
+    rawOutput: string;
+    executionTimeMs: number;
+  } | null>(null);
+
+  // Backups State
+  const [backups, setBackups] = useState<BackupItem[]>([]);
+  const [loadingBackups, setLoadingBackups] = useState(false);
+  const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+  const [isRestoringBackup, setIsRestoringBackup] = useState<string | null>(null);
+
+  // Resource Scaling State
+  const [scaleCpu, setScaleCpu] = useState<number>(1);
+  const [scaleRamMb, setScaleRamMb] = useState<number>(2048);
+  const [scaleStorageGb, setScaleStorageGb] = useState<number>(25);
+  const [scaleMaxConn, setScaleMaxConn] = useState<number>(100);
+  const [isScaling, setIsScaling] = useState(false);
+
+  // Node Migration State
+  const [targetNodeId, setTargetNodeId] = useState<string>('');
+  const [isMigrating, setIsMigrating] = useState(false);
+
+  // Security / IP Whitelist & Master Pass State
+  const [ipWhitelistInput, setIpWhitelistInput] = useState<string>('0.0.0.0/0');
+  const [showRotatePassModal, setShowRotatePassModal] = useState(false);
+  const [newMasterPass, setNewMasterPass] = useState('');
+  const [isRotatingPass, setIsRotatingPass] = useState(false);
 
   // Provision Modal state
   const [showProvisionModal, setShowProvisionModal] = useState(false);
@@ -40,20 +94,24 @@ export default function ManagedDatabasesPage() {
   const [provMaxConn, setProvMaxConn] = useState(100);
   const [isProvisioning, setIsProvisioning] = useState(false);
 
-  // Action state
+  // Notice State
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchDatabases();
+    fetchDatabasesAndNodes();
   }, []);
 
-  async function fetchDatabases() {
+  async function fetchDatabasesAndNodes() {
     setLoading(true);
     try {
-      const res = await api.managedDatabases.list();
-      setDatabases(res.databases);
-      if (res.databases.length > 0 && !selectedDb) {
-        selectDatabase(res.databases[0]);
+      const [dbRes, nodeRes] = await Promise.all([
+        api.managedDatabases.list(),
+        api.nodes.list().catch(() => ({ nodes: [] })),
+      ]);
+      setDatabases(dbRes.databases);
+      setNodes(nodeRes.nodes || []);
+      if (dbRes.databases.length > 0 && !selectedDb) {
+        selectDatabase(dbRes.databases[0]);
       }
     } catch (err: any) {
       console.error(err);
@@ -66,23 +124,49 @@ export default function ManagedDatabasesPage() {
     setSelectedDb(db);
     setConnDetails(null);
     setDbUsers([]);
+    setBackups([]);
+    setQueryResult(null);
     setCreatedUserNotice(null);
-    loadConnectionAndUsers(db.id);
+    setShowPassword(false);
+
+    // Set scaling sliders
+    setScaleCpu(db.cpuLimit || 1);
+    setScaleRamMb(db.memoryLimitMb || 2048);
+    setScaleStorageGb(db.storageLimitGb || 25);
+    setScaleMaxConn(db.maxConnections || 100);
+    setIpWhitelistInput(db.allowedIps?.join(', ') || '0.0.0.0/0');
+
+    // Default query sample based on engine
+    if (db.type === 'postgres') {
+      setQueryInput('SELECT * FROM pg_tables WHERE schemaname = \'public\';');
+    } else if (db.type === 'mysql') {
+      setQueryInput('SHOW TABLES;');
+    } else if (db.type === 'redis') {
+      setQueryInput('KEYS *');
+    } else if (db.type === 'mongodb') {
+      setQueryInput('db.stats()');
+    }
+
+    loadDatabaseDetails(db.id);
   }
 
-  async function loadConnectionAndUsers(id: string) {
+  async function loadDatabaseDetails(id: string) {
     setLoadingConn(true);
     setLoadingUsers(true);
+    setLoadingBackups(true);
     try {
-      const [connRes, usersRes] = await Promise.all([
+      const [connRes, usersRes, backupRes] = await Promise.all([
         api.managedDatabases.getConnection(id).catch(() => null),
         api.managedDatabases.listUsers(id).catch(() => ({ users: [] })),
+        api.managedDatabases.listBackups(id).catch(() => ({ backups: [] })),
       ]);
       if (connRes) setConnDetails(connRes);
       setDbUsers(usersRes.users);
+      setBackups(backupRes.backups || []);
     } finally {
       setLoadingConn(false);
       setLoadingUsers(false);
+      setLoadingBackups(false);
     }
   }
 
@@ -99,10 +183,10 @@ export default function ManagedDatabasesPage() {
         maxConnections: Number(provMaxConn) || 100,
       });
       setShowProvisionModal(false);
-      await fetchDatabases();
+      await fetchDatabasesAndNodes();
       if (res.database) {
         selectDatabase(res.database);
-        setActionNotice(`Successfully provisioned ${provType.toUpperCase()} database '${res.database.dbName}'!`);
+        setActionNotice(`Provisioned ${provType.toUpperCase()} database '${res.database.dbName}' successfully!`);
         setTimeout(() => setActionNotice(null), 5000);
       }
     } catch (err: any) {
@@ -112,10 +196,99 @@ export default function ManagedDatabasesPage() {
     }
   }
 
+  async function handleExecuteQuery(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!selectedDb || !queryInput.trim()) return;
+    setIsExecutingQuery(true);
+    setQueryResult(null);
+    try {
+      const res = await api.managedDatabases.executeQuery(selectedDb.id, queryInput.trim());
+      setQueryResult(res);
+    } catch (err: any) {
+      setQueryResult({
+        ok: false,
+        exitCode: 1,
+        rawOutput: err.message || 'Query execution failed',
+        executionTimeMs: 0,
+      });
+    } finally {
+      setIsExecutingQuery(false);
+    }
+  }
+
+  async function handleCreateBackup() {
+    if (!selectedDb) return;
+    setIsCreatingBackup(true);
+    try {
+      const res = await api.managedDatabases.backup(selectedDb.id);
+      setActionNotice(`Snapshot backup '${res.backup.backupId}' created (${(res.backup.sizeBytes / 1024 / 1024).toFixed(2)} MB)!`);
+      setTimeout(() => setActionNotice(null), 5000);
+      const updatedBackups = await api.managedDatabases.listBackups(selectedDb.id);
+      setBackups(updatedBackups.backups || []);
+    } catch (err: any) {
+      alert(`Snapshot backup failed: ${err.message}`);
+    } finally {
+      setIsCreatingBackup(false);
+    }
+  }
+
+  async function handleRestoreBackup(backupId: string) {
+    if (!selectedDb || !confirm(`Are you sure you want to restore snapshot '${backupId}'? Current data will be overwritten.`)) return;
+    setIsRestoringBackup(backupId);
+    try {
+      await api.managedDatabases.restore(selectedDb.id, backupId);
+      setActionNotice(`Database successfully restored from snapshot '${backupId}'!`);
+      setTimeout(() => setActionNotice(null), 5000);
+    } catch (err: any) {
+      alert(`Restore failed: ${err.message}`);
+    } finally {
+      setIsRestoringBackup(null);
+    }
+  }
+
+  async function handleScaleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedDb) return;
+    setIsScaling(true);
+    try {
+      const res = await api.managedDatabases.scale(selectedDb.id, {
+        cpuLimit: scaleCpu,
+        memoryLimitMb: scaleRamMb,
+        storageLimitGb: scaleStorageGb,
+        maxConnections: scaleMaxConn,
+      });
+      setActionNotice('Database cgroup resources scaled successfully!');
+      setTimeout(() => setActionNotice(null), 4000);
+      if (res.database) {
+        setSelectedDb(res.database);
+      }
+      fetchDatabasesAndNodes();
+    } catch (err: any) {
+      alert(`Scaling failed: ${err.message}`);
+    } finally {
+      setIsScaling(false);
+    }
+  }
+
+  async function handleMigrateSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedDb) return;
+    setIsMigrating(true);
+    try {
+      const res = await api.managedDatabases.migrate(selectedDb.id, targetNodeId || undefined);
+      setActionNotice(res.message || 'Database migrated successfully!');
+      setTimeout(() => setActionNotice(null), 5000);
+      fetchDatabasesAndNodes();
+    } catch (err: any) {
+      alert(`Migration failed: ${err.message}`);
+    } finally {
+      setIsMigrating(false);
+    }
+  }
+
   async function handleAddUser(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedDb || !newUsername.trim()) return;
-
     try {
       const res = await api.managedDatabases.createUser(selectedDb.id, {
         username: newUsername.trim(),
@@ -125,20 +298,54 @@ export default function ManagedDatabasesPage() {
       setShowAddUserModal(false);
       setNewUsername('');
       setNewUserPass('');
-      setCreatedUserNotice(`User '${res.user.username}' created! Password: ${res.user.password || '(configured)'}`);
-      loadConnectionAndUsers(selectedDb.id);
+      setCreatedUserNotice(`DB User '${res.user.username}' created! Password: ${res.user.password || '(configured)'}`);
+      const usersRes = await api.managedDatabases.listUsers(selectedDb.id);
+      setDbUsers(usersRes.users || []);
     } catch (err: any) {
       alert(`Failed to create DB user: ${err.message}`);
     }
   }
 
   async function handleDeleteUser(username: string) {
-    if (!selectedDb || !confirm(`Delete database user '${username}'?`)) return;
+    if (!selectedDb || !confirm(`Delete DB user '${username}'?`)) return;
     try {
       await api.managedDatabases.deleteUser(selectedDb.id, username);
-      loadConnectionAndUsers(selectedDb.id);
+      const usersRes = await api.managedDatabases.listUsers(selectedDb.id);
+      setDbUsers(usersRes.users || []);
     } catch (err: any) {
       alert(`Failed to delete DB user: ${err.message}`);
+    }
+  }
+
+  async function handleUpdateIpWhitelist(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedDb) return;
+    const ips = ipWhitelistInput.split(',').map((s) => s.trim()).filter(Boolean);
+    try {
+      const res = await api.managedDatabases.updateConfig(selectedDb.id, { allowedIps: ips });
+      if (res.database) setSelectedDb(res.database);
+      setActionNotice('IP Whitelist firewall rules updated!');
+      setTimeout(() => setActionNotice(null), 4000);
+    } catch (err: any) {
+      alert(`Failed to update IP whitelist: ${err.message}`);
+    }
+  }
+
+  async function handleRotateMasterPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedDb || !newMasterPass.trim()) return;
+    setIsRotatingPass(true);
+    try {
+      await api.managedDatabases.rotateMasterPassword(selectedDb.id, newMasterPass.trim());
+      setShowRotatePassModal(false);
+      setNewMasterPass('');
+      setActionNotice('Master password rotated live on container engine and vault!');
+      setTimeout(() => setActionNotice(null), 5000);
+      loadDatabaseDetails(selectedDb.id);
+    } catch (err: any) {
+      alert(`Password rotation failed: ${err.message}`);
+    } finally {
+      setIsRotatingPass(false);
     }
   }
 
@@ -146,38 +353,28 @@ export default function ManagedDatabasesPage() {
     if (!selectedDb) return;
     try {
       await api.managedDatabases.action(selectedDb.id, action);
-      setActionNotice(`Container action '${action}' triggered for ${selectedDb.dbName || selectedDb.id}`);
+      setActionNotice(`Container action '${action}' sent to engine.`);
       setTimeout(() => setActionNotice(null), 4000);
-      fetchDatabases();
+      fetchDatabasesAndNodes();
     } catch (err: any) {
       alert(`Action failed: ${err.message}`);
     }
   }
 
-  async function handleTriggerBackup() {
-    if (!selectedDb) return;
-    try {
-      const res = await api.managedDatabases.backup(selectedDb.id);
-      alert(`Backup snapshot created! Key: ${res.backupKey}`);
-    } catch (err: any) {
-      alert(`Backup failed: ${err.message}`);
-    }
-  }
-
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
+      {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-5">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-              Managed Relational & NoSQL
+              Managed DB Engines
             </span>
-            <span className="text-xs text-text-faint">• Live Cluster Nodes</span>
+            <span className="text-xs text-text-faint">• PostgreSQL, MySQL, Redis, MongoDB</span>
           </div>
-          <h1 className="text-2xl font-bold text-white mt-1">Managed Database Engines</h1>
+          <h1 className="text-2xl font-bold text-white mt-1">Managed Database Clusters</h1>
           <p className="text-xs text-text-muted mt-1">
-            Provision dedicated Postgres, MySQL, Redis, or MongoDB instances with custom DB-level user accounts, connection strings, max connection limits, and automated backups.
+            Enterprise database hosting with live query console, real snapshot dumps, vertical cgroup scaling, zero-loss compute migration, and IP whitelisting.
           </p>
         </div>
         <button
@@ -187,7 +384,7 @@ export default function ManagedDatabasesPage() {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 5v14M5 12h14" />
           </svg>
-          Provision New Database
+          Provision Engine
         </button>
       </div>
 
@@ -199,20 +396,20 @@ export default function ManagedDatabasesPage() {
       )}
 
       {loading ? (
-        <div className="p-12 text-center text-xs text-text-muted animate-pulse">Loading database instances...</div>
+        <div className="p-12 text-center text-xs text-text-muted animate-pulse">Loading database clusters...</div>
       ) : databases.length === 0 ? (
         <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-12 text-center space-y-3">
-          <p className="text-sm font-semibold text-white">No Managed Database Engines Provisioned</p>
+          <p className="text-sm font-semibold text-white">No Managed Database Engines Active</p>
           <p className="text-xs text-text-muted max-w-md mx-auto">
-            Click &quot;Provision New Database&quot; to launch a managed PostgreSQL, MySQL, Redis, or MongoDB database container on your cluster worker nodes.
+            Click &quot;Provision Engine&quot; to launch a dedicated PostgreSQL, MySQL, Redis, or MongoDB database container on your worker nodes.
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Database List sidebar (4 cols) */}
+          {/* Sidebar List (4 cols) */}
           <div className="lg:col-span-4 space-y-3">
             <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1">
-              Active Database Instances ({databases.length})
+              Active Databases ({databases.length})
             </h2>
             <div className="space-y-2">
               {databases.map((db) => {
@@ -243,7 +440,7 @@ export default function ManagedDatabasesPage() {
                     </div>
                     <p className="text-sm font-semibold text-white mt-1">{db.dbName || db.id}</p>
                     <div className="flex items-center justify-between text-[11px] text-text-muted mt-2">
-                      <span>Host: {db.internalHost || 'local'}</span>
+                      <span>{db.cpuLimit || 1} vCPU • {db.memoryLimitMb || 2048}MB</span>
                       <span>Port: {db.internalPort || 'Auto'}</span>
                     </div>
                   </button>
@@ -252,16 +449,16 @@ export default function ManagedDatabasesPage() {
             </div>
           </div>
 
-          {/* Database Details & Users Management (8 cols) */}
+          {/* Details & Control Panel (8 cols) */}
           {selectedDb && (
             <div className="lg:col-span-8 space-y-6">
-              {/* Selected DB Header & Power controls */}
+              {/* Header Box & Quick Actions */}
               <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-6 space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-emerald-400 uppercase">{selectedDb.type} ENGINE</span>
-                      <span className="text-xs text-text-muted">• Version {selectedDb.dbVersion || 'latest'}</span>
+                      <span className="text-xs font-bold text-emerald-400 uppercase">{selectedDb.type} Engine</span>
+                      <span className="text-xs text-text-muted">• v{selectedDb.dbVersion || 'latest'}</span>
                     </div>
                     <h2 className="text-xl font-bold text-white mt-0.5">{selectedDb.dbName || selectedDb.id}</h2>
                   </div>
@@ -287,102 +484,436 @@ export default function ManagedDatabasesPage() {
                     >
                       Restart
                     </button>
-                    <button
-                      onClick={handleTriggerBackup}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 text-xs font-semibold"
-                    >
-                      Snapshot Backup
-                    </button>
                   </div>
                 </div>
 
-                {/* Connection String & Credentials box */}
-                <div className="space-y-3">
-                  <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-                    Connection DSN & Credentials
-                  </h3>
+                {/* Tab Switcher */}
+                <div className="flex items-center gap-1 overflow-x-auto border-b border-white/10 pb-2">
+                  {[
+                    { id: 'overview', label: '📊 Overview' },
+                    { id: 'query', label: '💻 Query Console' },
+                    { id: 'scaling', label: '⚡ Scaling' },
+                    { id: 'backups', label: '💾 Backups' },
+                    { id: 'migration', label: '🚀 Migration' },
+                    { id: 'security', label: '👥 Access & Security' },
+                    { id: 'connection', label: '🔑 Connections' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as ActiveTab)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                        activeTab === tab.id
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow'
+                          : 'text-text-muted hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
 
-                  {loadingConn ? (
-                    <div className="text-xs text-text-muted animate-pulse">Loading connection keys...</div>
-                  ) : connDetails ? (
-                    <div className="space-y-3">
-                      <div className="p-3 bg-black/60 border border-white/10 rounded-xl font-mono text-xs text-emerald-400 break-all select-all flex items-center justify-between">
-                        <span>{connDetails.connectionString}</span>
+                {/* TAB 1: OVERVIEW */}
+                {activeTab === 'overview' && (
+                  <div className="space-y-4 pt-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3">
+                        <span className="text-[10px] text-text-muted uppercase font-semibold block">CPU Provisioned</span>
+                        <span className="text-lg font-bold text-white">{selectedDb.cpuLimit || 1} vCPU</span>
                       </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs bg-white/[0.02] p-3 rounded-xl border border-white/[0.06]">
-                        <div>
-                          <span className="text-text-muted block text-[10px]">Host</span>
-                          <span className="font-semibold text-white">{connDetails.host}</span>
-                        </div>
-                        <div>
-                          <span className="text-text-muted block text-[10px]">Port</span>
-                          <span className="font-semibold text-white">{connDetails.port}</span>
-                        </div>
-                        <div>
-                          <span className="text-text-muted block text-[10px]">Database Name</span>
-                          <span className="font-semibold text-white">{connDetails.databaseName}</span>
-                        </div>
-                        <div>
-                          <span className="text-text-muted block text-[10px]">Master User</span>
-                          <span className="font-semibold text-white">{connDetails.username}</span>
-                        </div>
+                      <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3">
+                        <span className="text-[10px] text-text-muted uppercase font-semibold block">Memory RAM</span>
+                        <span className="text-lg font-bold text-white">{selectedDb.memoryLimitMb || 2048} MB</span>
+                      </div>
+                      <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3">
+                        <span className="text-[10px] text-text-muted uppercase font-semibold block">Max Connections</span>
+                        <span className="text-lg font-bold text-white">{selectedDb.maxConnections || 100}</span>
+                      </div>
+                      <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3">
+                        <span className="text-[10px] text-text-muted uppercase font-semibold block">Storage Limit</span>
+                        <span className="text-lg font-bold text-white">{selectedDb.storageLimitGb || 25} GB</span>
                       </div>
                     </div>
-                  ) : null}
-                </div>
-              </div>
 
-              {/* DB Users Accounts Manager */}
-              <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      Database Users & Access Control ({dbUsers.length})
-                    </h3>
-                    <p className="text-xs text-text-muted">
-                      Database-level credentials created specifically inside this database engine instance.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowAddUserModal(true)}
-                    className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-semibold text-white transition-all"
-                  >
-                    + Create DB User
-                  </button>
-                </div>
-
-                {createdUserNotice && (
-                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs font-mono text-emerald-300 flex items-center justify-between">
-                    <span>{createdUserNotice}</span>
-                    <button onClick={() => setCreatedUserNotice(null)} className="text-white">✕</button>
+                    <div className="p-4 bg-white/[0.02] border border-white/10 rounded-xl space-y-2 text-xs">
+                      <h4 className="font-semibold text-white">Engine Details</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-text-muted">
+                        <div>Host: <span className="text-white font-mono">{selectedDb.internalHost || 'local'}</span></div>
+                        <div>Internal Port: <span className="text-white font-mono">{selectedDb.internalPort || 5432}</span></div>
+                        <div>Database Name: <span className="text-white font-mono">{selectedDb.dbName || 'app'}</span></div>
+                        <div>Allowed IPs: <span className="text-white font-mono">{selectedDb.allowedIps?.join(', ') || '0.0.0.0/0'}</span></div>
+                        <div>Created: <span className="text-white font-mono">{new Date(selectedDb.createdAt).toLocaleDateString()}</span></div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {loadingUsers ? (
-                  <div className="text-xs text-text-muted animate-pulse">Loading database user accounts...</div>
-                ) : dbUsers.length === 0 ? (
-                  <div className="text-xs text-text-muted py-4">No custom database users created yet.</div>
-                ) : (
-                  <div className="divide-y divide-white/5 border border-white/10 rounded-xl overflow-hidden">
-                    {dbUsers.map((u) => (
-                      <div key={u.id} className="p-3.5 bg-white/[0.01] flex items-center justify-between">
-                        <div>
-                          <span className="text-xs font-bold text-white font-mono">{u.username}</span>
-                          <span className="ml-2 text-[10px] uppercase px-2 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20 font-semibold">
-                            Role: {u.role}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
+                {/* TAB 2: QUERY CONSOLE */}
+                {activeTab === 'query' && (
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white">Interactive Query Console</span>
+                      <div className="flex gap-2">
+                        {selectedDb.type === 'postgres' && (
                           <button
-                            onClick={() => handleDeleteUser(u.username)}
-                            className="px-2.5 py-1 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[11px] font-semibold transition-colors"
+                            onClick={() => setQueryInput('SELECT * FROM pg_tables WHERE schemaname = \'public\';')}
+                            className="px-2 py-1 rounded bg-white/5 text-[10px] text-text-muted hover:text-white"
                           >
-                            Delete
+                            Sample Tables Query
                           </button>
+                        )}
+                        {selectedDb.type === 'mysql' && (
+                          <button
+                            onClick={() => setQueryInput('SHOW TABLES;')}
+                            className="px-2 py-1 rounded bg-white/5 text-[10px] text-text-muted hover:text-white"
+                          >
+                            Show Tables
+                          </button>
+                        )}
+                        {selectedDb.type === 'redis' && (
+                          <button
+                            onClick={() => setQueryInput('KEYS *')}
+                            className="px-2 py-1 rounded bg-white/5 text-[10px] text-text-muted hover:text-white"
+                          >
+                            List Keys
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleExecuteQuery} className="space-y-3">
+                      <textarea
+                        value={queryInput}
+                        onChange={(e) => setQueryInput(e.target.value)}
+                        rows={4}
+                        placeholder="Enter query command..."
+                        className="w-full bg-black/80 border border-white/10 rounded-xl p-3 font-mono text-xs text-emerald-400 focus:outline-none focus:border-emerald-500"
+                      />
+
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={isExecutingQuery}
+                          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs rounded-xl transition-all disabled:opacity-50"
+                        >
+                          {isExecutingQuery ? 'Executing Query...' : 'Run Query'}
+                        </button>
+                      </div>
+                    </form>
+
+                    {queryResult && (
+                      <div className="p-4 bg-black/90 border border-white/10 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-text-muted border-b border-white/10 pb-2">
+                          <span>Execution Status: <span className={queryResult.ok ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>{queryResult.ok ? 'SUCCESS (0)' : `ERROR (${queryResult.exitCode})`}</span></span>
+                          <span>Time: {queryResult.executionTimeMs} ms</span>
+                        </div>
+                        <pre className="font-mono text-xs text-white max-h-60 overflow-y-auto whitespace-pre-wrap">
+                          {queryResult.rawOutput || '(No output returned)'}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 3: SCALING */}
+                {activeTab === 'scaling' && (
+                  <div className="space-y-5 pt-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-white mb-2">Preset Compute Tiers</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                        {PRESET_TIERS.map((tier) => (
+                          <button
+                            key={tier.name}
+                            type="button"
+                            onClick={() => {
+                              setScaleCpu(tier.cpu);
+                              setScaleRamMb(tier.memoryMb);
+                              setScaleStorageGb(tier.storageGb);
+                              setScaleMaxConn(tier.maxConn);
+                            }}
+                            className="p-3 bg-white/[0.02] border border-white/10 rounded-xl hover:border-emerald-500/40 text-left transition-all"
+                          >
+                            <span className="text-xs font-bold text-white block">{tier.name}</span>
+                            <span className="text-[10px] text-emerald-400 block">{tier.price}</span>
+                            <span className="text-[10px] text-text-muted block mt-1">{tier.cpu} vCPU • {tier.memoryMb}MB</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleScaleSubmit} className="space-y-4 border-t border-white/10 pt-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-text-muted mb-1">
+                            CPU Cores Limit ({scaleCpu} vCPU)
+                          </label>
+                          <input
+                            type="range"
+                            min="0.5"
+                            max="16"
+                            step="0.5"
+                            value={scaleCpu}
+                            onChange={(e) => setScaleCpu(parseFloat(e.target.value))}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-text-muted mb-1">
+                            RAM Memory ({scaleRamMb} MB)
+                          </label>
+                          <input
+                            type="range"
+                            min="256"
+                            max="32768"
+                            step="256"
+                            value={scaleRamMb}
+                            onChange={(e) => setScaleRamMb(parseInt(e.target.value, 10))}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-text-muted mb-1">
+                            Storage Allocation ({scaleStorageGb} GB)
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="1000"
+                            value={scaleStorageGb}
+                            onChange={(e) => setScaleStorageGb(parseInt(e.target.value, 10))}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-text-muted mb-1">
+                            Max Connections ({scaleMaxConn})
+                          </label>
+                          <input
+                            type="number"
+                            min="10"
+                            max="5000"
+                            value={scaleMaxConn}
+                            onChange={(e) => setScaleMaxConn(parseInt(e.target.value, 10))}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                          />
                         </div>
                       </div>
-                    ))}
+
+                      <button
+                        type="submit"
+                        disabled={isScaling}
+                        className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs rounded-xl disabled:opacity-50"
+                      >
+                        {isScaling ? 'Scaling cgroups...' : 'Apply Resource Changes'}
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                {/* TAB 4: BACKUPS */}
+                {activeTab === 'backups' && (
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-white">Snapshot Dumps & Restores</h4>
+                        <p className="text-[11px] text-text-muted">Real container dumps stored on storage node.</p>
+                      </div>
+                      <button
+                        onClick={handleCreateBackup}
+                        disabled={isCreatingBackup}
+                        className="px-3 py-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 text-xs font-semibold rounded-xl"
+                      >
+                        {isCreatingBackup ? 'Creating Dump...' : '+ Take Snapshot Dump'}
+                      </button>
+                    </div>
+
+                    {loadingBackups ? (
+                      <div className="text-xs text-text-muted animate-pulse">Loading snapshot backups...</div>
+                    ) : backups.length === 0 ? (
+                      <div className="text-xs text-text-muted py-4 text-center">No snapshot backups found.</div>
+                    ) : (
+                      <div className="divide-y divide-white/5 border border-white/10 rounded-xl overflow-hidden">
+                        {backups.map((b) => (
+                          <div key={b.backupId} className="p-3.5 bg-white/[0.01] flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-bold text-white font-mono block">{b.backupId}</span>
+                              <span className="text-[10px] text-text-muted">
+                                Size: {(b.sizeBytes / 1024 / 1024).toFixed(2)} MB • Created: {new Date(b.createdAt).toLocaleString()}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handleRestoreBackup(b.backupId)}
+                              disabled={isRestoringBackup === b.backupId}
+                              className="px-3 py-1 bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 text-xs font-semibold rounded-lg"
+                            >
+                              {isRestoringBackup === b.backupId ? 'Restoring...' : 'Restore'}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 5: MIGRATION */}
+                {activeTab === 'migration' && (
+                  <div className="space-y-4 pt-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-white">Cluster Compute Node Migration</h4>
+                      <p className="text-[11px] text-text-muted">Relocate database instance live to another registered compute node.</p>
+                    </div>
+
+                    <form onSubmit={handleMigrateSubmit} className="space-y-4 bg-white/[0.02] border border-white/10 p-4 rounded-xl">
+                      <div>
+                        <label className="block text-xs font-semibold text-text-muted mb-1">Target Compute Node</label>
+                        <select
+                          value={targetNodeId}
+                          onChange={(e) => setTargetNodeId(e.target.value)}
+                          className="w-full bg-[#121324] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        >
+                          <option value="">Auto Select Optimal Node</option>
+                          {nodes.map((n) => (
+                            <option key={n.id} value={n.id}>
+                              {n.label || n.ip} ({n.ip}) - {n.region || 'global'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isMigrating}
+                        className="px-5 py-2.5 bg-teal-500 hover:bg-teal-600 text-black font-bold text-xs rounded-xl disabled:opacity-50"
+                      >
+                        {isMigrating ? 'Migrating Container...' : 'Migrate Database to Node'}
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                {/* TAB 6: SECURITY & USERS */}
+                {activeTab === 'security' && (
+                  <div className="space-y-6 pt-2">
+                    {/* DB User Accounts */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-white">Database User Accounts ({dbUsers.length})</h4>
+                        <button
+                          onClick={() => setShowAddUserModal(true)}
+                          className="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-xs font-semibold text-white rounded-xl"
+                        >
+                          + Add DB User
+                        </button>
+                      </div>
+
+                      {createdUserNotice && (
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs font-mono text-emerald-300">
+                          {createdUserNotice}
+                        </div>
+                      )}
+
+                      {dbUsers.length === 0 ? (
+                        <div className="text-xs text-text-muted py-2">No custom DB users created.</div>
+                      ) : (
+                        <div className="divide-y divide-white/5 border border-white/10 rounded-xl overflow-hidden">
+                          {dbUsers.map((u) => (
+                            <div key={u.id} className="p-3 bg-white/[0.01] flex items-center justify-between">
+                              <div>
+                                <span className="text-xs font-bold text-white font-mono">{u.username}</span>
+                                <span className="ml-2 text-[10px] px-2 py-0.5 rounded bg-violet-500/10 text-violet-300 font-semibold border border-violet-500/20">
+                                  Role: {u.role}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => handleDeleteUser(u.username)}
+                                className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[11px] font-semibold rounded"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* IP Whitelist */}
+                    <form onSubmit={handleUpdateIpWhitelist} className="space-y-3 border-t border-white/10 pt-4">
+                      <h4 className="text-xs font-bold text-white">IP Whitelist Firewall</h4>
+                      <div>
+                        <label className="block text-[11px] text-text-muted mb-1">Allowed IPs (comma separated CIDRs)</label>
+                        <input
+                          type="text"
+                          value={ipWhitelistInput}
+                          onChange={(e) => setIpWhitelistInput(e.target.value)}
+                          placeholder="0.0.0.0/0, 192.168.1.1/32"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        />
+                      </div>
+                      <button type="submit" className="px-4 py-2 bg-white/10 hover:bg-white/15 text-xs font-bold text-white rounded-xl">
+                        Update Firewall Rules
+                      </button>
+                    </form>
+
+                    {/* Master Password Rotation */}
+                    <div className="border-t border-white/10 pt-4 flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-white">Master Password</h4>
+                        <p className="text-[11px] text-text-muted">Rotate root/master database password live on container engine.</p>
+                      </div>
+                      <button
+                        onClick={() => setShowRotatePassModal(true)}
+                        className="px-3 py-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-xl"
+                      >
+                        Rotate Password
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 7: CONNECTIONS */}
+                {activeTab === 'connection' && (
+                  <div className="space-y-4 pt-2">
+                    <h4 className="text-xs font-bold text-white">Connection String & DSN</h4>
+                    {loadingConn ? (
+                      <div className="text-xs text-text-muted animate-pulse">Loading connection keys...</div>
+                    ) : connDetails ? (
+                      <div className="space-y-4">
+                        <div className="p-3 bg-black/80 border border-white/10 rounded-xl font-mono text-xs text-emerald-400 break-all select-all flex items-center justify-between">
+                          <span>
+                            {showPassword
+                              ? connDetails.connectionString
+                              : connDetails.connectionString.replace(encodeURIComponent(connDetails.password || ''), '••••••••')}
+                          </span>
+                          <button
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="px-2 py-1 text-[10px] bg-white/10 text-white rounded hover:bg-white/20"
+                          >
+                            {showPassword ? 'Hide' : 'Reveal'}
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs bg-white/[0.02] p-3 rounded-xl border border-white/[0.06]">
+                          <div>
+                            <span className="text-text-muted block text-[10px]">Host</span>
+                            <span className="font-semibold text-white">{connDetails.host}</span>
+                          </div>
+                          <div>
+                            <span className="text-text-muted block text-[10px]">Port</span>
+                            <span className="font-semibold text-white">{connDetails.port}</span>
+                          </div>
+                          <div>
+                            <span className="text-text-muted block text-[10px]">Database Name</span>
+                            <span className="font-semibold text-white">{connDetails.databaseName}</span>
+                          </div>
+                          <div>
+                            <span className="text-text-muted block text-[10px]">Master User</span>
+                            <span className="font-semibold text-white">{connDetails.username}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -391,12 +922,12 @@ export default function ManagedDatabasesPage() {
         </div>
       )}
 
-      {/* PROVISION NEW DATABASE MODAL */}
+      {/* PROVISION MODAL */}
       {showProvisionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#0b0c16] border border-white/15 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-base font-bold text-white">Provision Managed Database Engine</h3>
+              <h3 className="text-base font-bold text-white">Provision Managed Database Cluster</h3>
               <button onClick={() => setShowProvisionModal(false)} className="text-text-muted hover:text-white">✕</button>
             </div>
 
@@ -429,7 +960,7 @@ export default function ManagedDatabasesPage() {
                     value={provDbName}
                     onChange={(e) => setProvDbName(e.target.value)}
                     placeholder="my_production_db"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                   />
                 </div>
 
@@ -440,41 +971,7 @@ export default function ManagedDatabasesPage() {
                     value={provUsername}
                     onChange={(e) => setProvUsername(e.target.value)}
                     placeholder="db_master"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-text-primary mb-1">Master Password (Optional)</label>
-                <input
-                  type="password"
-                  value={provPassword}
-                  onChange={(e) => setProvPassword(e.target.value)}
-                  placeholder="Leave empty for secure random password"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-text-primary mb-1">Allowed IP Whitelist</label>
-                  <input
-                    type="text"
-                    value={provAllowedIp}
-                    onChange={(e) => setProvAllowedIp(e.target.value)}
-                    placeholder="0.0.0.0/0"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-text-primary mb-1">Max Connections</label>
-                  <input
-                    type="number"
-                    value={provMaxConn}
-                    onChange={(e) => setProvMaxConn(Number(e.target.value))}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                   />
                 </div>
               </div>
@@ -518,18 +1015,7 @@ export default function ManagedDatabasesPage() {
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
                   placeholder="app_user"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-text-primary mb-1">Password (Optional)</label>
-                <input
-                  type="password"
-                  value={newUserPass}
-                  onChange={(e) => setNewUserPass(e.target.value)}
-                  placeholder="Leave empty for auto-generated password"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                 />
               </div>
 
@@ -538,9 +1024,9 @@ export default function ManagedDatabasesPage() {
                 <select
                   value={newUserRole}
                   onChange={(e) => setNewUserRole(e.target.value as any)}
-                  className="w-full bg-[#121324] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-[#121324] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                 >
-                  <option value="read_write">Read & Write (Default)</option>
+                  <option value="read_write">Read & Write</option>
                   <option value="read_only">Read Only</option>
                   <option value="admin">Database Admin</option>
                 </select>
@@ -559,6 +1045,49 @@ export default function ManagedDatabasesPage() {
                   className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-black"
                 >
                   Create User
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ROTATE MASTER PASSWORD MODAL */}
+      {showRotatePassModal && selectedDb && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0b0c16] border border-white/15 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-base font-bold text-white">Rotate Master Password</h3>
+              <button onClick={() => setShowRotatePassModal(false)} className="text-text-muted hover:text-white">✕</button>
+            </div>
+
+            <form onSubmit={handleRotateMasterPassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-text-primary mb-1">New Master Password *</label>
+                <input
+                  type="password"
+                  required
+                  value={newMasterPass}
+                  onChange={(e) => setNewMasterPass(e.target.value)}
+                  placeholder="At least 8 characters..."
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setShowRotatePassModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-text-muted hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isRotatingPass}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-black disabled:opacity-50"
+                >
+                  {isRotatingPass ? 'Rotating...' : 'Rotate Password'}
                 </button>
               </div>
             </form>

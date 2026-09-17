@@ -1873,13 +1873,25 @@ export const api = {
       apiFetch(`/api/managed-databases/${id}/config`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) =>
         asJson<{ database: ManagedDatabase }>(r)
       ),
+    executeQuery: (id: string, query: string) =>
+      apiFetch(`/api/managed-databases/${id}/query`, { method: 'POST', body: JSON.stringify({ query }) }).then((r) =>
+        asJson<{ ok: boolean; exitCode: number; rawOutput: string; executionTimeMs: number }>(r)
+      ),
+    rotateMasterPassword: (id: string, newPassword: string) =>
+      apiFetch(`/api/managed-databases/${id}/master-password`, { method: 'POST', body: JSON.stringify({ newPassword }) }).then((r) =>
+        asJson<{ ok: boolean; message: string; databaseId: string }>(r)
+      ),
+    listBackups: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}/backups`).then((r) =>
+        asJson<{ backups: Array<{ backupId: string; databaseId: string; filename: string; sizeBytes: number; createdAt: string }> }>(r)
+      ),
     backup: (id: string) =>
       apiFetch(`/api/managed-databases/${id}/backups`, { method: 'POST' }).then((r) =>
-        asJson<{ ok: boolean; backupKey: string }>(r)
+        asJson<{ ok: boolean; backup: { backupId: string; databaseId: string; filename: string; sizeBytes: number; createdAt: string } }>(r)
       ),
-    restore: (id: string, backupKey: string) =>
-      apiFetch(`/api/managed-databases/${id}/restore`, { method: 'POST', body: JSON.stringify({ backupKey }) }).then((r) =>
-        asJson<{ ok: boolean; message: string }>(r)
+    restore: (id: string, backupId: string) =>
+      apiFetch(`/api/managed-databases/${id}/restore`, { method: 'POST', body: JSON.stringify({ backupId }) }).then((r) =>
+        asJson<{ ok: boolean; containerId: string; backupId: string; message: string }>(r)
       ),
     connection: (id: string) =>
       apiFetch(`/api/managed-databases/${id}/connection`).then((r) =>

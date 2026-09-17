@@ -5,7 +5,14 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 import { ownedResourceWhere, canAccessResource } from '../middleware/rbac';
 import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
-import { provisionDatabaseContainer, manageDatabaseUserOnNode } from '../lib/nodeAgentClient';
+import {
+  provisionDatabaseContainer,
+  manageDatabaseUserOnNode,
+  executeDatabaseQueryOnNode,
+  backupDatabaseOnNode,
+  listDatabaseBackupsOnNode,
+  restoreDatabaseOnNode,
+} from '../lib/nodeAgentClient';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { env } from '../env';
 
@@ -245,50 +252,159 @@ managedDatabasesRouter.delete('/managed-databases/:id', async (req: AuthedReques
 });
 
 /**
+ * POST /api/managed-databases/:id/query
+ * Executes a live query (SQL, Redis command, or MongoDB script) on the managed database engine.
+ */
+managedDatabasesRouter.post('/managed-databases/:id/query', async (req: AuthedRequest, res) => {
+  const schema = z.object({ query: z.string().min(1) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const db = await prisma.managedDatabase.findUnique({
+    where: { id: req.params.id },
+    include: { node: true },
+  });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (db.status !== 'running' || !db.containerId || !db.node) {
+    return res.status(400).json({ error: 'Database instance must be running to execute queries' });
+  }
+
+  let masterPassword: string | undefined;
+  if (db.credentialRef) {
+    try {
+      masterPassword = decryptSecret(db.credentialRef, env.secretsEncryptionKey);
+    } catch {}
+  }
+
+  try {
+    const result = await executeDatabaseQueryOnNode(db.node, db.containerId, {
+      type: db.type as any,
+      query: parsed.data.query,
+      masterPassword,
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to execute query on database container' });
+  }
+});
+
+/**
  * POST /api/managed-databases/:id/backups
- *
- * NOT YET IMPLEMENTED — returns 501.
- *
- * Previously this endpoint uploaded a JSON metadata blob (not actual data)
- * to R2 with ContentType 'application/gzip' and reported "backup created
- * successfully". This was misleading — no actual pg_dump, mysqldump, or
- * mongodump was performed. The endpoint has been disabled until real
- * backup infrastructure is implemented via the node-agent.
+ * Creates a real snapshot backup (dump file) of the managed database container via node-agent.
  */
 managedDatabasesRouter.post('/managed-databases/:id/backups', async (req: AuthedRequest, res) => {
-  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  const db = await prisma.managedDatabase.findUnique({
+    where: { id: req.params.id },
+    include: { node: true },
+  });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!db.containerId || !db.node) {
+    return res.status(400).json({ error: 'Database container node unavailable' });
+  }
+
+  let masterPassword: string | undefined;
+  if (db.credentialRef) {
+    try {
+      masterPassword = decryptSecret(db.credentialRef, env.secretsEncryptionKey);
+    } catch {}
+  }
+
+  try {
+    const backupResult = await backupDatabaseOnNode(db.node, db.containerId, {
+      type: db.type as any,
+      databaseId: db.id,
+      masterPassword,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'managed_database.create_backup',
+        target: `${db.id}:${backupResult.backupId}`,
+      },
+    }).catch(() => {});
+
+    res.status(201).json({ ok: true, backup: backupResult });
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to generate database snapshot backup' });
+  }
+});
+
+/**
+ * GET /api/managed-databases/:id/backups
+ * Lists all snapshot backups stored for this managed database instance.
+ */
+managedDatabasesRouter.get('/managed-databases/:id/backups', async (req: AuthedRequest, res) => {
+  const db = await prisma.managedDatabase.findUnique({
+    where: { id: req.params.id },
+    include: { node: true },
+  });
   if (!db) return res.status(404).json({ error: 'Database not found' });
   if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
 
-  res.status(501).json({
-    error: 'Managed database backup is not yet implemented',
-    message: 'Real backup support (pg_dump / mysqldump / mongodump) is under development. Platform-level backups of the core database are available via the admin backup endpoint.',
-    databaseId: db.id,
-    type: db.type,
-  });
+  if (!db.node) {
+    return res.json({ backups: [] });
+  }
+
+  try {
+    const { backups } = await listDatabaseBackupsOnNode(db.node, db.id);
+    res.json({ backups });
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to list database backups' });
+  }
 });
 
 /**
  * POST /api/managed-databases/:id/restore
- *
- * NOT YET IMPLEMENTED — returns 501.
- *
- * Previously this endpoint did nothing except create an audit log and
- * return "restored successfully". No data was ever read from R2 or
- * applied to the target database.
+ * Restores a snapshot backup dump file into the running database container.
  */
 managedDatabasesRouter.post('/managed-databases/:id/restore', async (req: AuthedRequest, res) => {
-  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  const schema = z.object({ backupId: z.string().min(1) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const db = await prisma.managedDatabase.findUnique({
+    where: { id: req.params.id },
+    include: { node: true },
+  });
   if (!db) return res.status(404).json({ error: 'Database not found' });
   if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (db.status !== 'running' || !db.containerId || !db.node) {
+    return res.status(400).json({ error: 'Database container must be running to restore a snapshot' });
+  }
 
-  res.status(501).json({
-    error: 'Managed database restore is not yet implemented',
-    message: 'Real restore support is under development. Once backup is implemented, restore will be available.',
-    databaseId: db.id,
-    type: db.type,
-  });
+  let masterPassword: string | undefined;
+  if (db.credentialRef) {
+    try {
+      masterPassword = decryptSecret(db.credentialRef, env.secretsEncryptionKey);
+    } catch {}
+  }
+
+  try {
+    const result = await restoreDatabaseOnNode(db.node, db.containerId, {
+      type: db.type as any,
+      databaseId: db.id,
+      backupId: parsed.data.backupId,
+      masterPassword,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'managed_database.restore_backup',
+        target: `${db.id}:${parsed.data.backupId}`,
+      },
+    }).catch(() => {});
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to restore database snapshot' });
+  }
 });
+
 
 /**
  * GET /api/managed-databases/:id/users

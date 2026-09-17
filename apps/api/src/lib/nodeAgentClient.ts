@@ -311,6 +311,89 @@ export async function manageDatabaseUserOnNode(
   return (await res.json()) as { ok: boolean };
 }
 
+/** Executes a SQL, Redis, or Mongo query on a live database container via node-agent. */
+export async function executeDatabaseQueryOnNode(
+  node: Node,
+  containerId: string,
+  params: {
+    type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+    query: string;
+    masterPassword?: string;
+  }
+): Promise<{ ok: boolean; exitCode: number; rawOutput: string; executionTimeMs: number }> {
+  const res = await fetch(agentUrl(node, `/agent/managed-databases/${containerId}/query`), {
+    method: 'POST',
+    headers: agentHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => '');
+    throw new Error(`Query execution failed (${res.status}): ${errorText}`);
+  }
+  return (await res.json()) as { ok: boolean; exitCode: number; rawOutput: string; executionTimeMs: number };
+}
+
+/** Triggers a snapshot backup of a managed database on node. */
+export async function backupDatabaseOnNode(
+  node: Node,
+  containerId: string,
+  params: {
+    type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+    databaseId: string;
+    masterPassword?: string;
+  }
+): Promise<{ backupId: string; databaseId: string; filename: string; sizeBytes: number; createdAt: string }> {
+  const res = await fetch(agentUrl(node, `/agent/managed-databases/${containerId}/backup`), {
+    method: 'POST',
+    headers: agentHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => '');
+    throw new Error(`Snapshot backup failed (${res.status}): ${errorText}`);
+  }
+  return (await res.json()) as { backupId: string; databaseId: string; filename: string; sizeBytes: number; createdAt: string };
+}
+
+/** Lists snapshot backups for a managed database from node. */
+export async function listDatabaseBackupsOnNode(
+  node: Node,
+  databaseId: string
+): Promise<{ backups: Array<{ backupId: string; databaseId: string; filename: string; sizeBytes: number; createdAt: string }> }> {
+  const res = await fetch(agentUrl(node, `/agent/managed-databases/${databaseId}/backups`), {
+    headers: agentHeaders(),
+  });
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => '');
+    throw new Error(`Failed to list backups (${res.status}): ${errorText}`);
+  }
+  return (await res.json()) as { backups: Array<{ backupId: string; databaseId: string; filename: string; sizeBytes: number; createdAt: string }> };
+}
+
+/** Restores a snapshot backup into a managed database on node. */
+export async function restoreDatabaseOnNode(
+  node: Node,
+  containerId: string,
+  params: {
+    type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+    databaseId: string;
+    backupId: string;
+    masterPassword?: string;
+  }
+): Promise<{ ok: boolean; containerId: string; backupId: string; message: string }> {
+  const res = await fetch(agentUrl(node, `/agent/managed-databases/${containerId}/restore`), {
+    method: 'POST',
+    headers: agentHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => '');
+    throw new Error(`Snapshot restore failed (${res.status}): ${errorText}`);
+  }
+  return (await res.json()) as { ok: boolean; containerId: string; backupId: string; message: string };
+}
+
+
 
 /** Orchestrates live database migration from source node to target node. */
 export async function migrateDatabaseContainer(

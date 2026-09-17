@@ -199,6 +199,198 @@ async function manageDatabaseUser({ containerId, type, action, username, passwor
   return { ok: true, containerId, username, action };
 }
 
-module.exports = { provisionDatabase, scaleDatabase, rotateDatabasePassword, manageDatabaseUser };
+const fs = require('fs');
+const path = require('path');
+const BACKUP_DIR = process.env.MANAGED_DB_BACKUP_DIR || path.join(process.cwd(), 'backups', 'managed-db');
+
+function ensureBackupDir() {
+  if (!fs.existsSync(BACKUP_DIR)) {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  }
+}
+
+/**
+ * Executes a raw query/command live inside a database container engine.
+ */
+async function executeDatabaseQuery({ containerId, type, query, masterPassword }) {
+  const startTime = Date.now();
+  const container = docker.getContainer(containerId);
+  let cmd = [];
+
+  if (type === 'postgres') {
+    cmd = ['psql', '-U', 'postgres', '-d', 'postgres', '-c', query];
+  } else if (type === 'mysql') {
+    const mysqlPass = masterPassword ? `-p${masterPassword}` : '-proot';
+    cmd = ['mysql', '-uroot', mysqlPass, '-e', query];
+  } else if (type === 'redis') {
+    const redisAuth = masterPassword ? ['-a', masterPassword] : [];
+    // Split query string by whitespace into redis-cli args e.g. "KEYS *" -> ["KEYS", "*"]
+    const args = query.trim().split(/\s+/);
+    cmd = ['redis-cli', ...redisAuth, ...args];
+  } else if (type === 'mongodb') {
+    const mongoAuth = masterPassword ? ['-u', 'app', '-p', masterPassword] : [];
+    cmd = ['mongosh', ...mongoAuth, '--eval', query];
+  } else {
+    throw new Error(`Unsupported database type: ${type}`);
+  }
+
+  const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
+  const stream = await exec.start();
+  let output = '';
+  await new Promise((resolve, reject) => {
+    stream.on('data', (chunk) => { output += chunk.toString(); });
+    stream.on('end', resolve);
+    stream.on('error', reject);
+  });
+
+  const inspect = await exec.inspect();
+  const executionTimeMs = Date.now() - startTime;
+
+  // Clean non-printable docker headers if any
+  const cleanOutput = output.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim();
+
+  return {
+    ok: inspect.ExitCode === 0,
+    exitCode: inspect.ExitCode,
+    rawOutput: cleanOutput,
+    executionTimeMs,
+  };
+}
+
+/**
+ * Creates a real snapshot backup of a managed database container.
+ */
+async function backupDatabase({ containerId, type, databaseId, masterPassword }) {
+  ensureBackupDir();
+  const container = docker.getContainer(containerId);
+  const timestamp = Date.now();
+  const backupId = `snap_${databaseId}_${timestamp}`;
+  const filename = `${backupId}.dump`;
+  const filePath = path.join(BACKUP_DIR, filename);
+
+  let cmd = [];
+  if (type === 'postgres') {
+    cmd = ['pg_dumpall', '-U', 'postgres'];
+  } else if (type === 'mysql') {
+    const mysqlPass = masterPassword ? `-p${masterPassword}` : '-proot';
+    cmd = ['mysqldump', '-uroot', mysqlPass, '--all-databases'];
+  } else if (type === 'redis') {
+    cmd = masterPassword ? ['redis-cli', '-a', masterPassword, 'SAVE'] : ['redis-cli', 'SAVE'];
+  } else if (type === 'mongodb') {
+    const mongoAuth = masterPassword ? ['-u', 'app', '-p', masterPassword] : [];
+    cmd = ['mongodump', ...mongoAuth, '--archive'];
+  } else {
+    throw new Error(`Unsupported database type for backup: ${type}`);
+  }
+
+  const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
+  const stream = await exec.start();
+  let dumpData = Buffer.alloc(0);
+  await new Promise((resolve, reject) => {
+    stream.on('data', (chunk) => {
+      dumpData = Buffer.concat([dumpData, Buffer.from(chunk)]);
+    });
+    stream.on('end', resolve);
+    stream.on('error', reject);
+  });
+
+  const inspect = await exec.inspect();
+  if (inspect.ExitCode !== 0 && type !== 'redis') {
+    throw new Error(`Managed database dump failed (exit ${inspect.ExitCode})`);
+  }
+
+  fs.writeFileSync(filePath, dumpData);
+  const stats = fs.statSync(filePath);
+
+  return {
+    backupId,
+    databaseId,
+    filename,
+    sizeBytes: stats.size,
+    createdAt: new Date(timestamp).toISOString(),
+  };
+}
+
+/**
+ * Lists all snapshot backups stored for a managed database.
+ */
+async function listDatabaseBackups({ databaseId }) {
+  ensureBackupDir();
+  const prefix = `snap_${databaseId}_`;
+  const files = fs.readdirSync(BACKUP_DIR).filter((f) => f.startsWith(prefix) && f.endsWith('.dump'));
+
+  return files.map((filename) => {
+    const filePath = path.join(BACKUP_DIR, filename);
+    const stats = fs.statSync(filePath);
+    const backupId = filename.replace('.dump', '');
+    const timestampStr = backupId.split('_').pop();
+    const timestamp = parseInt(timestampStr, 10) || stats.mtimeMs;
+    return {
+      backupId,
+      databaseId,
+      filename,
+      sizeBytes: stats.size,
+      createdAt: new Date(timestamp).toISOString(),
+    };
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+/**
+ * Restores a snapshot backup into a running database container.
+ */
+async function restoreDatabase({ containerId, type, databaseId, backupId, masterPassword }) {
+  ensureBackupDir();
+  const filename = backupId.endsWith('.dump') ? backupId : `${backupId}.dump`;
+  const filePath = path.join(BACKUP_DIR, filename);
+
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`Backup snapshot file not found: ${filename}`);
+  }
+
+  const container = docker.getContainer(containerId);
+  const fileContent = fs.readFileSync(filePath, 'utf8');
+
+  let cmd = [];
+  if (type === 'postgres') {
+    cmd = ['psql', '-U', 'postgres', '-d', 'postgres'];
+  } else if (type === 'mysql') {
+    const mysqlPass = masterPassword ? `-p${masterPassword}` : '-proot';
+    cmd = ['mysql', '-uroot', mysqlPass];
+  } else {
+    throw new Error(`Restore for ${type} is not supported directly via SQL stream`);
+  }
+
+  const exec = await container.exec({
+    Cmd: cmd,
+    AttachStdin: true,
+    AttachStdout: true,
+    AttachStderr: true,
+  });
+
+  const stream = await exec.start({ hijack: true, stdin: true });
+  stream.write(fileContent);
+  stream.end();
+
+  let output = '';
+  await new Promise((resolve, reject) => {
+    stream.on('data', (chunk) => { output += chunk.toString(); });
+    stream.on('end', resolve);
+    stream.on('error', reject);
+  });
+
+  return { ok: true, containerId, backupId, message: 'Database snapshot successfully restored.' };
+}
+
+module.exports = {
+  provisionDatabase,
+  scaleDatabase,
+  rotateDatabasePassword,
+  manageDatabaseUser,
+  executeDatabaseQuery,
+  backupDatabase,
+  listDatabaseBackups,
+  restoreDatabase,
+};
+
 
 

@@ -154,6 +154,7 @@ export interface Node {
   ramUsedMb: number | null;
   diskUsedGb: number | null;
   lastSeenAt: string | null;
+  region?: string | null;
 }
 
 export interface BuildEvent {
@@ -522,6 +523,9 @@ export interface ManagedDatabase {
   allowedIps?: string[];
   maxConnections?: number | null;
   dbVersion?: string | null;
+  cpuLimit?: number | null;
+  memoryLimitMb?: number | null;
+  storageLimitGb?: number | null;
   user?: ApiUser;
   createdAt: string;
   connectionString?: string;
