@@ -246,86 +246,47 @@ managedDatabasesRouter.delete('/managed-databases/:id', async (req: AuthedReques
 
 /**
  * POST /api/managed-databases/:id/backups
- * Triggers a manual or scheduled S3/R2 backup of this managed database instance.
- */
-/**
- * POST /api/managed-databases/:id/backups
- * Triggers a manual or scheduled S3/R2 backup of this managed database instance.
+ *
+ * NOT YET IMPLEMENTED — returns 501.
+ *
+ * Previously this endpoint uploaded a JSON metadata blob (not actual data)
+ * to R2 with ContentType 'application/gzip' and reported "backup created
+ * successfully". This was misleading — no actual pg_dump, mysqldump, or
+ * mongodump was performed. The endpoint has been disabled until real
+ * backup infrastructure is implemented via the node-agent.
  */
 managedDatabasesRouter.post('/managed-databases/:id/backups', async (req: AuthedRequest, res) => {
   const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
   if (!db) return res.status(404).json({ error: 'Database not found' });
   if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
 
-  const backupKey = `backups/managed-db/${db.type}/${db.id}-${Date.now()}.sql.gz`;
-
-  if (env.r2Endpoint && env.r2AccessKeyId && env.r2SecretAccessKey) {
-    try {
-      const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
-      const client = new S3Client({
-        region: 'auto',
-        endpoint: env.r2Endpoint,
-        credentials: { accessKeyId: env.r2AccessKeyId, secretAccessKey: env.r2SecretAccessKey },
-      });
-
-      const backupMetadata = JSON.stringify({
-        databaseId: db.id,
-        type: db.type,
-        internalHost: db.internalHost,
-        internalPort: db.internalPort,
-        createdAt: new Date().toISOString(),
-      });
-
-      await client.send(
-        new PutObjectCommand({
-          Bucket: env.r2BucketName,
-          Key: backupKey,
-          Body: Buffer.from(backupMetadata),
-          ContentType: 'application/gzip',
-        })
-      );
-    } catch (err: any) {
-      const { logger } = await import('../lib/logger');
-      logger.warn({ err, dbId: db.id }, 'R2 storage upload for managed database backup failed');
-    }
-  }
-
-  await prisma.auditLog.create({
-    data: { adminId: req.user!.id, action: 'managed_database.backup', target: `${db.id}:${backupKey}` },
-  });
-
-  res.status(201).json({
-    ok: true,
+  res.status(501).json({
+    error: 'Managed database backup is not yet implemented',
+    message: 'Real backup support (pg_dump / mysqldump / mongodump) is under development. Platform-level backups of the core database are available via the admin backup endpoint.',
     databaseId: db.id,
-    backupKey,
     type: db.type,
-    createdAt: new Date().toISOString(),
-    message: 'Database backup snapshot created successfully',
   });
 });
 
 /**
  * POST /api/managed-databases/:id/restore
- * Restores a managed database from a specified backup key.
+ *
+ * NOT YET IMPLEMENTED — returns 501.
+ *
+ * Previously this endpoint did nothing except create an audit log and
+ * return "restored successfully". No data was ever read from R2 or
+ * applied to the target database.
  */
 managedDatabasesRouter.post('/managed-databases/:id/restore', async (req: AuthedRequest, res) => {
-  const { backupKey } = req.body || {};
-  if (!backupKey) return res.status(400).json({ error: 'backupKey is required' });
-
   const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
   if (!db) return res.status(404).json({ error: 'Database not found' });
   if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
 
-  await prisma.auditLog.create({
-    data: { adminId: req.user!.id, action: 'managed_database.restore', target: `${db.id}:${backupKey}` },
-  });
-
-  res.json({
-    ok: true,
+  res.status(501).json({
+    error: 'Managed database restore is not yet implemented',
+    message: 'Real restore support is under development. Once backup is implemented, restore will be available.',
     databaseId: db.id,
-    backupKey,
-    restoredAt: new Date().toISOString(),
-    message: `Database restored successfully from backup ${backupKey}`,
+    type: db.type,
   });
 });
 

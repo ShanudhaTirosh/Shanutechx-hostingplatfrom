@@ -27,26 +27,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!loading && apiUser && !belongsUnderAdmin) {
-      const emailLower = (apiUser.email || '').toLowerCase();
-      const isDevOrAdminEmail =
-        emailLower === 'tiroshbrot123@gmail.com' ||
-        emailLower.includes('tirosh') ||
-        emailLower.includes('tiros') ||
-        emailLower.includes('shanu') ||
-        emailLower.startsWith('dev@') ||
-        emailLower.includes('dev') ||
-        emailLower.startsWith('admin@') ||
-        emailLower.includes('admin');
-
-      if (isDevOrAdminEmail) {
-        const targetRole = emailLower.includes('admin') && !emailLower.includes('dev') && !emailLower.includes('tiros') ? 'admin' : 'dev';
-        switchRole(targetRole).catch(() => {});
-        return;
-      }
-
+      // Role is determined server-side only — no client-side email matching.
       router.replace('/dashboard');
     }
-  }, [loading, apiUser, belongsUnderAdmin, router, switchRole]);
+  }, [loading, apiUser, belongsUnderAdmin, router]);
 
   if (loading) return <Spinner label="Loading admin panel..." />;
   if (!belongsUnderAdmin) return null;

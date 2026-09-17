@@ -1,44 +1,102 @@
 import { Router } from 'express';
-import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { generateApiKey } from '../lib/apiKeys';
-import { sendWelcomeNotification, sendPasswordResetNotification } from '../lib/notifications';
-import { env } from '../env';
+import { sendWelcomeNotification } from '../lib/notifications';
+import { firebaseAuth } from '../lib/firebaseAdmin';
+import { logger } from '../lib/logger';
 
 export const authRouter = Router();
 
 /**
+ * Verify a Firebase ID token and return the decoded claims.
+ * Centralises the verification logic for login and register.
+ */
+async function verifyIdToken(idToken: string) {
+  if (!firebaseAuth) {
+    return { error: 'Firebase authentication service is not configured on server', status: 503 as const, decoded: null };
+  }
+  try {
+    const decoded = await firebaseAuth.verifyIdToken(idToken);
+    return { error: null, status: 200 as const, decoded };
+  } catch (err: any) {
+    return { error: `Invalid or expired Firebase ID token: ${err.code ?? err.message}`, status: 401 as const, decoded: null };
+  }
+}
+
+/**
  * POST /api/auth/login
- * Enforces Google, GitHub & Discord OAuth SSO policy. Direct password logins are deprecated.
+ *
+ * Enforces Google, GitHub & Discord OAuth SSO policy.
+ *
+ * SECURITY: The Firebase ID token is cryptographically verified via
+ * firebaseAuth.verifyIdToken(). Only the verified email from the decoded
+ * token is used for user lookup — client-supplied email is ignored.
  */
 authRouter.post('/auth/login', async (req, res) => {
-  const { email, idToken, provider, name, firebaseUid } = req.body || {};
+  const { idToken, provider } = req.body || {};
 
-  // Require Google, GitHub, or Discord OAuth identity verification via Firebase ID Token or OAuth token
-  if (!idToken && !provider) {
+  // Require a real Firebase ID token
+  if (!idToken) {
     return res.status(400).json({
-      error: 'Password authentication disabled',
+      error: 'Firebase ID token is required',
       message: 'ShanuTechX Cloud enforces Google, GitHub & Discord OAuth Single Sign-On (SSO). Please authenticate using Google, GitHub, or Discord.',
       allowedProviders: ['google', 'github', 'discord'],
     });
   }
 
-  if (!email) return res.status(400).json({ error: 'Email address is required' });
+  // ── Verify the token cryptographically ──
+  const { error, status, decoded } = await verifyIdToken(idToken);
+  if (!decoded) {
+    return res.status(status).json({ error });
+  }
 
-  const emailClean = String(email).toLowerCase().trim();
-  let user = await prisma.user.findUnique({ where: { email: emailClean } });
-  if (!user) return res.status(401).json({ error: 'OAuth User account not found. Please sign in via Google, GitHub, or Discord.' });
-  if (user.isBanned) return res.status(403).json({ error: 'Account Banned', message: user.banReason || 'Policy Violation' });
+  if (!decoded.email) {
+    return res.status(401).json({ error: 'OAuth token does not contain an email claim. Please use an OAuth provider that shares your email.' });
+  }
 
-  // Update user profile metadata on every login
-  if ((name && name !== user.displayName) || (firebaseUid && firebaseUid !== user.firebaseUid)) {
+  // Use ONLY the verified email — never the client-supplied one
+  const emailClean = decoded.email.toLowerCase().trim();
+
+  // Look up user by firebaseUid first (canonical), then by verified email
+  let user = await prisma.user.findUnique({ where: { firebaseUid: decoded.uid } });
+
+  if (!user) {
+    // Fall back to email lookup, but only if the email is verified by Firebase
+    if (decoded.email_verified) {
+      user = await prisma.user.findUnique({ where: { email: emailClean } });
+      if (user) {
+        // Link the existing account to this Firebase UID
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { firebaseUid: decoded.uid },
+        });
+      }
+    }
+  }
+
+  if (!user) {
+    return res.status(401).json({ error: 'Account not found. Please register first via Google, GitHub, or Discord.' });
+  }
+
+  if (user.isBanned) {
+    return res.status(403).json({ error: 'Account Banned', message: user.banReason || 'Policy Violation' });
+  }
+
+  // Sync display name from OAuth provider if changed
+  const oauthName = decoded.name || null;
+  if (oauthName && oauthName !== user.displayName) {
     user = await prisma.user.update({
       where: { id: user.id },
-      data: {
-        ...(name ? { displayName: name } : {}),
-        ...(firebaseUid ? { firebaseUid } : {}),
-      },
+      data: { displayName: oauthName },
+    });
+  }
+
+  // Sync email if Firebase reports a change (e.g. user changed primary email)
+  if (emailClean !== user.email) {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { email: emailClean },
     });
   }
 
@@ -53,6 +111,8 @@ authRouter.post('/auth/login', async (req, res) => {
   });
 
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  logger.info({ msg: 'User logged in via verified OAuth', userId: user.id, provider: provider || decoded.firebase?.sign_in_provider });
 
   res.json({
     token: rawKey,
@@ -68,20 +128,100 @@ authRouter.post('/auth/login', async (req, res) => {
 
 /**
  * POST /api/auth/register
- * Register user from Google, GitHub, or Discord OAuth identity
+ *
+ * Register a new user from a verified Google, GitHub, or Discord OAuth identity.
+ *
+ * SECURITY: The Firebase ID token is cryptographically verified.
+ * If an account already exists with a *different* firebaseUid, the request
+ * is rejected with 409 to prevent identity hijacking.
  */
 authRouter.post('/auth/register', async (req, res) => {
-  const { email, name, firebaseUid, provider } = req.body || {};
-  if (!email || !firebaseUid) return res.status(400).json({ error: 'OAuth identity parameters (email, firebaseUid) are required' });
+  const { idToken, provider } = req.body || {};
 
-  const emailClean = String(email).toLowerCase().trim();
-  let user = await prisma.user.findUnique({ where: { email: emailClean } });
+  if (!idToken) {
+    return res.status(400).json({
+      error: 'Firebase ID token is required for registration',
+      allowedProviders: ['google', 'github', 'discord'],
+    });
+  }
 
-  if (!user) {
+  // ── Verify the token cryptographically ──
+  const { error, status, decoded } = await verifyIdToken(idToken);
+  if (!decoded) {
+    return res.status(status).json({ error });
+  }
+
+  if (!decoded.email) {
+    return res.status(401).json({ error: 'OAuth token does not contain an email claim.' });
+  }
+
+  const emailClean = decoded.email.toLowerCase().trim();
+  const firebaseUid = decoded.uid;
+  const name = decoded.name || emailClean.split('@')[0];
+
+  // Check if an account already exists
+  let user = await prisma.user.findUnique({ where: { firebaseUid } });
+
+  if (user) {
+    // Already registered with this Firebase UID — return existing account
+    const { rawKey, keyHash, keyPrefix } = generateApiKey();
+    await prisma.apiKey.create({
+      data: {
+        userId: user.id,
+        label: `OAuth Session Token (${new Date().toISOString().slice(0, 10)})`,
+        keyHash,
+        keyPrefix,
+      },
+    });
+
+    return res.json({
+      token: rawKey,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        role: user.role,
+      },
+    });
+  }
+
+  // Check if email is already taken by a DIFFERENT Firebase UID
+  const existingByEmail = await prisma.user.findUnique({ where: { email: emailClean } });
+  if (existingByEmail) {
+    if (existingByEmail.firebaseUid && existingByEmail.firebaseUid !== firebaseUid) {
+      // SECURITY: Reject — do NOT overwrite an existing user's firebaseUid.
+      // This prevents identity hijacking where attacker registers with the
+      // same email via a different provider and silently takes over the account.
+      logger.warn({
+        msg: 'Registration rejected: email already linked to different Firebase UID',
+        email: emailClean,
+        existingUid: existingByEmail.firebaseUid.slice(0, 8) + '...',
+        attemptedUid: firebaseUid.slice(0, 8) + '...',
+      });
+      return res.status(409).json({
+        error: 'An account with this email already exists and is linked to a different identity.',
+        message: 'Please log in with the original provider you used to create your account.',
+      });
+    }
+
+    // Account exists but has no firebaseUid — link it (only if email is verified)
+    if (decoded.email_verified) {
+      user = await prisma.user.update({
+        where: { id: existingByEmail.id },
+        data: { firebaseUid, displayName: name || existingByEmail.displayName },
+      });
+    } else {
+      return res.status(401).json({
+        error: 'Email not verified by OAuth provider. Cannot link to existing account.',
+      });
+    }
+  } else {
+    // Brand new user
     user = await prisma.user.create({
       data: {
         email: emailClean,
-        displayName: name || emailClean.split('@')[0],
+        displayName: name,
         role: 'customer',
         firebaseUid,
       },
@@ -91,11 +231,6 @@ authRouter.post('/auth/register', async (req, res) => {
       email: user.email,
       name: user.displayName || user.email.split('@')[0],
     }).catch(() => {});
-  } else if (!user.firebaseUid || user.firebaseUid !== firebaseUid) {
-    user = await prisma.user.update({
-      where: { id: user.id },
-      data: { firebaseUid, displayName: name || user.displayName },
-    });
   }
 
   const { rawKey, keyHash, keyPrefix } = generateApiKey();
@@ -109,6 +244,8 @@ authRouter.post('/auth/register', async (req, res) => {
   });
 
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  logger.info({ msg: 'New user registered via verified OAuth', userId: user.id, provider: provider || decoded.firebase?.sign_in_provider });
 
   res.json({
     token: rawKey,
@@ -124,101 +261,38 @@ authRouter.post('/auth/register', async (req, res) => {
 
 /**
  * POST /api/auth/forgot-password
- * Send password reset email with secure token
+ * POST /api/auth/reset-password
+ * POST /api/auth/change-password
+ *
+ * REMOVED — ShanuTechX is an OAuth-only platform (Google, GitHub, Discord SSO).
+ * There is no passwordHash field on the User model — these endpoints previously
+ * accepted passwords but never persisted them, creating a false sense of security.
+ * Password management is handled by the upstream OAuth provider.
  */
-authRouter.post('/auth/forgot-password', async (req, res) => {
-  try {
-    const { email } = req.body || {};
-    if (!email || typeof email !== 'string') {
-      return res.status(400).json({ error: 'Email address is required' });
-    }
-
-    const emailClean = email.toLowerCase().trim();
-    const user = await prisma.user.findUnique({ where: { email: emailClean } });
-
-    // Always respond with success to prevent user enumeration attacks
-    if (!user) {
-      return res.json({
-        ok: true,
-        message: 'If an account with that email exists, a password reset link has been sent.',
-      });
-    }
-
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    await prisma.passwordResetToken.create({
-      data: {
-        email: emailClean,
-        token,
-        expiresAt,
-      },
-    });
-
-    const rootDomain = env.rootDomain || 'shanutechx.com';
-    const resetLink = `https://${rootDomain}/reset-password?token=${token}`;
-
-    void sendPasswordResetNotification(
-      user.email,
-      user.displayName || user.email.split('@')[0],
-      resetLink
-    ).catch(() => {});
-
-    res.json({
-      ok: true,
-      message: 'If an account with that email exists, a password reset link has been sent.',
-      token, // Also return for local testing/dev
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to process password reset request' });
-  }
+authRouter.post('/auth/forgot-password', (_req, res) => {
+  res.status(410).json({
+    error: 'Password management is not available',
+    message: 'ShanuTechX uses OAuth SSO exclusively. To reset your password, visit your Google, GitHub, or Discord account settings.',
+  });
 });
 
-/**
- * POST /api/auth/reset-password
- * Reset password using valid reset token
- */
-authRouter.post('/auth/reset-password', async (req, res) => {
-  try {
-    const { token, newPassword } = req.body || {};
-    if (!token || !newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
-      return res.status(400).json({ error: 'Valid token and new password (min 6 chars) are required' });
-    }
+authRouter.post('/auth/reset-password', (_req, res) => {
+  res.status(410).json({
+    error: 'Password management is not available',
+    message: 'ShanuTechX uses OAuth SSO exclusively. To reset your password, visit your Google, GitHub, or Discord account settings.',
+  });
+});
 
-    const resetRecord = await prisma.passwordResetToken.findUnique({
-      where: { token },
-    });
-
-    if (!resetRecord || resetRecord.expiresAt < new Date()) {
-      return res.status(400).json({ error: 'Invalid or expired password reset token' });
-    }
-
-    const user = await prisma.user.findUnique({ where: { email: resetRecord.email } });
-    if (!user) return res.status(404).json({ error: 'Associated user account not found' });
-
-    // Delete token once used
-    await prisma.passwordResetToken.delete({ where: { id: resetRecord.id } });
-
-    await prisma.auditLog.create({
-      data: {
-        adminId: user.id,
-        action: 'user.password_reset_completed',
-        target: `Password reset via email token for ${user.email}`,
-      },
-    });
-
-    res.json({
-      ok: true,
-      message: 'Password reset successfully. You can now log in with your new password.',
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to reset password' });
-  }
+authRouter.post('/auth/change-password', (_req, res) => {
+  res.status(410).json({
+    error: 'Password management is not available',
+    message: 'ShanuTechX uses OAuth SSO exclusively. To change your password, visit your Google, GitHub, or Discord account settings.',
+  });
 });
 
 /**
  * POST /api/auth/refresh
- * Refresh active SDK token session
+ * Refresh active SDK token session (requires existing valid auth)
  */
 authRouter.post('/auth/refresh', requireAuth, async (req: AuthedRequest, res) => {
   const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
@@ -249,38 +323,4 @@ authRouter.post('/auth/refresh', requireAuth, async (req: AuthedRequest, res) =>
   });
 });
 
-/**
- * POST /api/auth/change-password
- * Handle user credential & password updates for SDK & client applications
- */
-authRouter.post('/auth/change-password', requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    const userId = req.user!.id;
-    const { oldPassword, newPassword } = req.body || {};
-
-    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
-      return res.status(400).json({ error: 'New password must be at least 6 characters long' });
-    }
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return res.status(404).json({ error: 'User account not found' });
-    if (user.isBanned) return res.status(403).json({ error: 'Account Banned' });
-
-    await prisma.auditLog.create({
-      data: {
-        adminId: user.id,
-        action: 'user.password_change',
-        target: `Password updated for ${user.email}`,
-      },
-    });
-
-    res.json({
-      ok: true,
-      message: 'Password updated successfully',
-      updatedAt: new Date().toISOString(),
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to update password' });
-  }
-});
 

@@ -82,13 +82,19 @@ setupRouter.post('/setup/initialize-main-node', async (req: Request, res: Respon
       });
     }
 
-    // First run bootstrap — verify token if SETUP_TOKEN is set in environment
+    // First run bootstrap — ALWAYS require a setup token.
+    // If SETUP_TOKEN is not configured, refuse to proceed (fail closed).
     const requiredToken = process.env.SETUP_TOKEN || process.env.BOOTSTRAP_TOKEN;
-    if (requiredToken) {
-      const providedToken = (req.headers['x-setup-token'] as string) || (req.body && req.body.setupToken);
-      if (providedToken !== requiredToken) {
-        return res.status(401).json({ error: 'Invalid or missing setup authorization token (X-Setup-Token).' });
-      }
+    if (!requiredToken) {
+      logger.error('SETUP_TOKEN or BOOTSTRAP_TOKEN environment variable is required for first-run setup but was not configured.');
+      return res.status(503).json({
+        error: 'First-run setup requires a SETUP_TOKEN or BOOTSTRAP_TOKEN environment variable to be configured.',
+        message: 'Set SETUP_TOKEN in your .env file before running first-time platform initialization.',
+      });
+    }
+    const providedToken = (req.headers['x-setup-token'] as string) || (req.body && req.body.setupToken);
+    if (providedToken !== requiredToken) {
+      return res.status(401).json({ error: 'Invalid or missing setup authorization token (X-Setup-Token).' });
     }
 
     return proceedWithInitialization(req, res);

@@ -57,8 +57,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-shanutechx}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in environment}
       POSTGRES_DB: ${POSTGRES_DB:-shanutechx}
-    ports:
-      - "5432:5432"
+    # No host ports — accessible only via the shanutechx-prod Docker network.
+    # Use `docker exec` or a jump container for ad-hoc access if needed.
     volumes:
       - postgres-prod-data:/var/lib/postgresql/data
     networks:
@@ -73,14 +73,14 @@ services:
     image: redis:7-alpine
     container_name: shanutechx-redis-prod
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in environment}
+    # No host ports — accessible only via the shanutechx-prod Docker network.
     volumes:
       - redis-prod-data:/data
     networks:
       - shanutechx-prod
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -136,7 +136,7 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${POSTGRES_USER:-shanutechx}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-shanutechx}?schema=public
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
       - R2_ENDPOINT=${R2_ENDPOINT:-http://minio:9000}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-shanutechx_minio}
       - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}}
