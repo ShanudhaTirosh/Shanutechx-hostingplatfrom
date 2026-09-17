@@ -342,4 +342,15 @@ containersRouter.get('/nodes/:nodeId/docker/system/df', async (req: AuthedReques
   } catch (err: any) { res.status(502).json({ error: err.message }); }
 });
 
+containersRouter.post('/nodes/:nodeId/docker/system/prune', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { pruneNodeImages } = await import('../lib/nodeAgentClient');
+    const result = await pruneNodeImages(node);
+    res.json(result);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+
 

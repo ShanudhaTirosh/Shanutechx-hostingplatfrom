@@ -922,6 +922,7 @@ export const api = {
   dockerSystem: {
     info: (nodeId: string) => apiFetch(`/api/nodes/${nodeId}/docker/system/info`).then((r) => asJson<any>(r)),
     df: (nodeId: string) => apiFetch(`/api/nodes/${nodeId}/docker/system/df`).then((r) => asJson<any>(r)),
+    prune: (nodeId: string) => apiFetch(`/api/nodes/${nodeId}/docker/system/prune`, { method: 'POST' }).then((r) => asJson<any>(r)),
   },
 
 
