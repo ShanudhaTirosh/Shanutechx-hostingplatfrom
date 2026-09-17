@@ -274,39 +274,4 @@ export default function Pricing() {
 }
 
 
-      {/* Empty state when database returned zero products */}
-      {products !== null && displayed.length === 0 && (
-        <div
-          style={{
-            background: 'rgba(13, 11, 26, 0.75)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: '24px',
-            padding: '48px 32px',
-            textAlign: 'center',
-            backdropFilter: 'blur(16px)',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
-            maxWidth: '820px',
-            margin: '0 auto',
-          }}
-        >
-          <p style={{ fontSize: '15px', color: '#94a3b8', margin: 0, fontWeight: 500 }}>
-            No products are currently listed. Check back soon or contact support.
-          </p>
-        </div>
-      )}
 
-      <div className="mt-14 text-center">
-        <a
-          href="/pricing"
-          className="inline-flex items-center gap-2 text-sm font-medium text-accent-teal-bright hover:underline"
-        >
-          <span>Explore all infrastructure specifications, build settings &amp; VPS features</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-            <polyline points="12 5 19 12 12 19"></polyline>
-          </svg>
-        </a>
-      </div>
-    </section>
-  );
-}
