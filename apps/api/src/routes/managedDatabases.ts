@@ -718,6 +718,11 @@ managedDatabasesRouter.post('/managed-databases/:id/migrate', async (req: Authed
   if (!db) return res.status(404).json({ error: 'Database not found' });
   if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
 
+  // RESTRICTION: Only dev superusers can migrate database containers to another compute node
+  if (req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'Unauthorized: Database cluster node migration is restricted exclusively to dev superusers.' });
+  }
+
   // Determine target compute node
   let targetNode;
   if (parsed.data.targetNodeId) {

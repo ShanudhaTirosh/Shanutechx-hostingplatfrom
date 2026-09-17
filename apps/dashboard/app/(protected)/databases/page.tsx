@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { useAppUser } from '@/lib/AppUserContext';
 import { ManagedDatabase, ManagedDatabaseUser, Node } from '@/lib/types';
 
 type ActiveTab = 'overview' | 'query' | 'scaling' | 'backups' | 'migration' | 'security' | 'connection';
@@ -14,15 +15,47 @@ interface BackupItem {
   createdAt: string;
 }
 
+function calcManagedDbPrice(params: {
+  type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+  cpuLimit?: number | null;
+  memoryLimitMb?: number | null;
+  storageLimitGb?: number | null;
+  maxConnections?: number | null;
+  backupCount?: number;
+}) {
+  const type = params.type || 'postgres';
+  const engineBaseCost = type === 'mongodb' ? 12 : type === 'postgres' ? 10 : type === 'mysql' ? 10 : 8; // redis $8
+  const cpuCost = (params.cpuLimit || 1) * 5; // $5 per 1 vCPU
+  const ramCost = ((params.memoryLimitMb || 2048) / 1024) * 4; // $4 per 1GB RAM
+  const storageCost = (params.storageLimitGb || 25) * 0.20; // $0.20 per 1GB storage
+  const connCost = Math.ceil((params.maxConnections || 100) / 100) * 1.0; // $1.00 per 100 connections
+  const backupsCost = (params.backupCount || 0) * 2.0; // $2.00 / snapshot dump / month
+
+  const totalUsd = Math.round((engineBaseCost + cpuCost + ramCost + storageCost + connCost + backupsCost) * 100) / 100;
+  const totalLkr = Math.round(totalUsd * 300); // 1 USD = 300 LKR
+
+  return {
+    engineBaseCost,
+    cpuCost,
+    ramCost,
+    storageCost,
+    connCost,
+    backupsCost,
+    totalUsd,
+    totalLkr,
+  };
+}
+
 const PRESET_TIERS = [
-  { name: 'Micro', cpu: 0.5, memoryMb: 512, storageGb: 10, maxConn: 50, price: '$5/mo' },
-  { name: 'Starter', cpu: 1.0, memoryMb: 2048, storageGb: 25, maxConn: 100, price: '$15/mo' },
-  { name: 'Growth', cpu: 2.0, memoryMb: 4096, storageGb: 50, maxConn: 250, price: '$35/mo' },
-  { name: 'Performance', cpu: 4.0, memoryMb: 8192, storageGb: 100, maxConn: 500, price: '$75/mo' },
-  { name: 'Enterprise', cpu: 8.0, memoryMb: 16384, storageGb: 250, maxConn: 1000, price: '$160/mo' },
+  { name: 'Micro', cpu: 0.5, memoryMb: 512, storageGb: 10, maxConn: 50 },
+  { name: 'Starter', cpu: 1.0, memoryMb: 2048, storageGb: 25, maxConn: 100 },
+  { name: 'Growth', cpu: 2.0, memoryMb: 4096, storageGb: 50, maxConn: 250 },
+  { name: 'Performance', cpu: 4.0, memoryMb: 8192, storageGb: 100, maxConn: 500 },
+  { name: 'Enterprise', cpu: 8.0, memoryMb: 16384, storageGb: 250, maxConn: 1000 },
 ];
 
 export default function ManagedDatabasesPage() {
+  const { apiUser } = useAppUser();
   const [databases, setDatabases] = useState<ManagedDatabase[]>([]);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,10 +125,15 @@ export default function ManagedDatabasesPage() {
   const [provPassword, setProvPassword] = useState('');
   const [provAllowedIp, setProvAllowedIp] = useState('0.0.0.0/0');
   const [provMaxConn, setProvMaxConn] = useState(100);
+  const [provCpu, setProvCpu] = useState(1);
+  const [provRamMb, setProvRamMb] = useState(2048);
+  const [provStorageGb, setProvStorageGb] = useState(25);
   const [isProvisioning, setIsProvisioning] = useState(false);
 
   // Notice State
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  const isDevUser = apiUser?.role === 'dev';
 
   useEffect(() => {
     fetchDatabasesAndNodes();
@@ -161,7 +199,7 @@ export default function ManagedDatabasesPage() {
         api.managedDatabases.listBackups(id).catch(() => ({ backups: [] })),
       ]);
       if (connRes) setConnDetails(connRes);
-      setDbUsers(usersRes.users);
+      setDbUsers(usersRes.users || []);
       setBackups(backupRes.backups || []);
     } finally {
       setLoadingConn(false);
@@ -221,7 +259,7 @@ export default function ManagedDatabasesPage() {
     setIsCreatingBackup(true);
     try {
       const res = await api.managedDatabases.backup(selectedDb.id);
-      setActionNotice(`Snapshot backup '${res.backup.backupId}' created (${(res.backup.sizeBytes / 1024 / 1024).toFixed(2)} MB)!`);
+      setActionNotice(`Snapshot backup '${res.backup.backupId}' created ($2.00/mo snapshot dump cost)!`);
       setTimeout(() => setActionNotice(null), 5000);
       const updatedBackups = await api.managedDatabases.listBackups(selectedDb.id);
       setBackups(updatedBackups.backups || []);
@@ -257,7 +295,7 @@ export default function ManagedDatabasesPage() {
         storageLimitGb: scaleStorageGb,
         maxConnections: scaleMaxConn,
       });
-      setActionNotice('Database cgroup resources scaled successfully!');
+      setActionNotice('Database cgroup resources and billing pricing scaled successfully!');
       setTimeout(() => setActionNotice(null), 4000);
       if (res.database) {
         setSelectedDb(res.database);
@@ -273,6 +311,10 @@ export default function ManagedDatabasesPage() {
   async function handleMigrateSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedDb) return;
+    if (!isDevUser) {
+      alert('Unauthorized: Cluster node migration is restricted exclusively to dev superusers.');
+      return;
+    }
     setIsMigrating(true);
     try {
       const res = await api.managedDatabases.migrate(selectedDb.id, targetNodeId || undefined);
@@ -361,6 +403,38 @@ export default function ManagedDatabasesPage() {
     }
   }
 
+  // Selected DB Price Breakdown
+  const currentPrice = selectedDb
+    ? calcManagedDbPrice({
+        type: selectedDb.type,
+        cpuLimit: selectedDb.cpuLimit,
+        memoryLimitMb: selectedDb.memoryLimitMb,
+        storageLimitGb: selectedDb.storageLimitGb,
+        maxConnections: selectedDb.maxConnections,
+        backupCount: backups.length,
+      })
+    : null;
+
+  // Scale Estimator Price
+  const scalePrice = calcManagedDbPrice({
+    type: selectedDb?.type || 'postgres',
+    cpuLimit: scaleCpu,
+    memoryLimitMb: scaleRamMb,
+    storageLimitGb: scaleStorageGb,
+    maxConnections: scaleMaxConn,
+    backupCount: backups.length,
+  });
+
+  // Provisioning Price Preview
+  const provPrice = calcManagedDbPrice({
+    type: provType,
+    cpuLimit: provCpu,
+    memoryLimitMb: provRamMb,
+    storageLimitGb: provStorageGb,
+    maxConnections: provMaxConn,
+    backupCount: 0,
+  });
+
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
       {/* Page Header */}
@@ -370,11 +444,11 @@ export default function ManagedDatabasesPage() {
             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
               Managed DB Engines
             </span>
-            <span className="text-xs text-text-faint">• PostgreSQL, MySQL, Redis, MongoDB</span>
+            <span className="text-xs text-text-faint">• Transparent Monthly Pricing & Snapshot Dump Costs</span>
           </div>
           <h1 className="text-2xl font-bold text-white mt-1">Managed Database Clusters</h1>
           <p className="text-xs text-text-muted mt-1">
-            Enterprise database hosting with live query console, real snapshot dumps, vertical cgroup scaling, zero-loss compute migration, and IP whitelisting.
+            Dedicated PostgreSQL, MySQL, Redis, and MongoDB engines with live query console, real snapshot dumps ($2/dump), dynamic cgroup scaling, and IP whitelisting.
           </p>
         </div>
         <button
@@ -414,6 +488,14 @@ export default function ManagedDatabasesPage() {
             <div className="space-y-2">
               {databases.map((db) => {
                 const isSelected = selectedDb?.id === db.id;
+                const dbPrice = calcManagedDbPrice({
+                  type: db.type,
+                  cpuLimit: db.cpuLimit,
+                  memoryLimitMb: db.memoryLimitMb,
+                  storageLimitGb: db.storageLimitGb,
+                  maxConnections: db.maxConnections,
+                  backupCount: selectedDb?.id === db.id ? backups.length : 0,
+                });
                 return (
                   <button
                     key={db.id}
@@ -438,7 +520,10 @@ export default function ManagedDatabasesPage() {
                         {db.status}
                       </span>
                     </div>
-                    <p className="text-sm font-semibold text-white mt-1">{db.dbName || db.id}</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-sm font-semibold text-white">{db.dbName || db.id}</p>
+                      <span className="text-xs font-bold text-emerald-400 font-mono">${dbPrice.totalUsd}/mo</span>
+                    </div>
                     <div className="flex items-center justify-between text-[11px] text-text-muted mt-2">
                       <span>{db.cpuLimit || 1} vCPU • {db.memoryLimitMb || 2048}MB</span>
                       <span>Port: {db.internalPort || 'Auto'}</span>
@@ -490,11 +575,11 @@ export default function ManagedDatabasesPage() {
                 {/* Tab Switcher */}
                 <div className="flex items-center gap-1 overflow-x-auto border-b border-white/10 pb-2">
                   {[
-                    { id: 'overview', label: '📊 Overview' },
+                    { id: 'overview', label: '📊 Overview & Pricing' },
                     { id: 'query', label: '💻 Query Console' },
-                    { id: 'scaling', label: '⚡ Scaling' },
-                    { id: 'backups', label: '💾 Backups' },
-                    { id: 'migration', label: '🚀 Migration' },
+                    { id: 'scaling', label: '⚡ Scaling & Cost' },
+                    { id: 'backups', label: '💾 Backups ($2/dump)' },
+                    { id: 'migration', label: isDevUser ? '🚀 Node Migration' : '🔒 Node Migration (Dev Only)' },
                     { id: 'security', label: '👥 Access & Security' },
                     { id: 'connection', label: '🔑 Connections' },
                   ].map((tab) => (
@@ -512,7 +597,7 @@ export default function ManagedDatabasesPage() {
                   ))}
                 </div>
 
-                {/* TAB 1: OVERVIEW */}
+                {/* TAB 1: OVERVIEW & PRICING */}
                 {activeTab === 'overview' && (
                   <div className="space-y-4 pt-2">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -534,8 +619,48 @@ export default function ManagedDatabasesPage() {
                       </div>
                     </div>
 
+                    {/* PRICING BREAKDOWN CARD */}
+                    {currentPrice && (
+                      <div className="p-4 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-sky-500/10 border border-emerald-500/30 rounded-xl space-y-3">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                          <span className="text-xs font-bold text-white uppercase tracking-wider">Monthly Pricing & Cost Breakdown</span>
+                          <div className="text-right">
+                            <span className="text-xl font-extrabold text-emerald-400 font-mono">${currentPrice.totalUsd}/mo</span>
+                            <span className="text-[10px] text-text-muted block">LKR {currentPrice.totalLkr.toLocaleString()} / month</span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                          <div className="bg-black/40 p-2 rounded-lg border border-white/5">
+                            <span className="text-[10px] text-text-muted block">Engine Base ({selectedDb.type})</span>
+                            <span className="font-mono text-white">${currentPrice.engineBaseCost}.00 / mo</span>
+                          </div>
+                          <div className="bg-black/40 p-2 rounded-lg border border-white/5">
+                            <span className="text-[10px] text-text-muted block">CPU ({selectedDb.cpuLimit || 1} vCPU)</span>
+                            <span className="font-mono text-white">${currentPrice.cpuCost}.00 / mo</span>
+                          </div>
+                          <div className="bg-black/40 p-2 rounded-lg border border-white/5">
+                            <span className="text-[10px] text-text-muted block">RAM ({selectedDb.memoryLimitMb || 2048} MB)</span>
+                            <span className="font-mono text-white">${currentPrice.ramCost}.00 / mo</span>
+                          </div>
+                          <div className="bg-black/40 p-2 rounded-lg border border-white/5">
+                            <span className="text-[10px] text-text-muted block">Storage ({selectedDb.storageLimitGb || 25} GB)</span>
+                            <span className="font-mono text-white">${currentPrice.storageCost.toFixed(2)} / mo</span>
+                          </div>
+                          <div className="bg-black/40 p-2 rounded-lg border border-white/5">
+                            <span className="text-[10px] text-text-muted block">Connections ({selectedDb.maxConnections || 100})</span>
+                            <span className="font-mono text-white">${currentPrice.connCost.toFixed(2)} / mo</span>
+                          </div>
+                          <div className="bg-black/40 p-2 rounded-lg border border-white/5">
+                            <span className="text-[10px] text-text-muted block">Snapshot Dumps ({backups.length})</span>
+                            <span className="font-mono text-emerald-400">${currentPrice.backupsCost.toFixed(2)} / mo</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="p-4 bg-white/[0.02] border border-white/10 rounded-xl space-y-2 text-xs">
-                      <h4 className="font-semibold text-white">Engine Details</h4>
+                      <h4 className="font-semibold text-white">Engine Metadata</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-text-muted">
                         <div>Host: <span className="text-white font-mono">{selectedDb.internalHost || 'local'}</span></div>
                         <div>Internal Port: <span className="text-white font-mono">{selectedDb.internalPort || 5432}</span></div>
@@ -614,29 +739,51 @@ export default function ManagedDatabasesPage() {
                   </div>
                 )}
 
-                {/* TAB 3: SCALING */}
+                {/* TAB 3: SCALING & DYNAMIC COST ESTIMATOR */}
                 {activeTab === 'scaling' && (
                   <div className="space-y-5 pt-2">
+                    {/* DYNAMIC COST ESTIMATOR BANNER */}
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-white uppercase block">Estimated Scale Price</span>
+                        <span className="text-[11px] text-text-muted">Calculated in real time based on configured cgroups</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-2xl font-extrabold text-emerald-400 font-mono">${scalePrice.totalUsd}/mo</span>
+                        <span className="text-[10px] text-text-muted block">LKR {scalePrice.totalLkr.toLocaleString()} / mo</span>
+                      </div>
+                    </div>
+
                     <div>
                       <h4 className="text-xs font-bold text-white mb-2">Preset Compute Tiers</h4>
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                        {PRESET_TIERS.map((tier) => (
-                          <button
-                            key={tier.name}
-                            type="button"
-                            onClick={() => {
-                              setScaleCpu(tier.cpu);
-                              setScaleRamMb(tier.memoryMb);
-                              setScaleStorageGb(tier.storageGb);
-                              setScaleMaxConn(tier.maxConn);
-                            }}
-                            className="p-3 bg-white/[0.02] border border-white/10 rounded-xl hover:border-emerald-500/40 text-left transition-all"
-                          >
-                            <span className="text-xs font-bold text-white block">{tier.name}</span>
-                            <span className="text-[10px] text-emerald-400 block">{tier.price}</span>
-                            <span className="text-[10px] text-text-muted block mt-1">{tier.cpu} vCPU • {tier.memoryMb}MB</span>
-                          </button>
-                        ))}
+                        {PRESET_TIERS.map((tier) => {
+                          const tierPrice = calcManagedDbPrice({
+                            type: selectedDb.type,
+                            cpuLimit: tier.cpu,
+                            memoryLimitMb: tier.memoryMb,
+                            storageLimitGb: tier.storageGb,
+                            maxConnections: tier.maxConn,
+                            backupCount: backups.length,
+                          });
+                          return (
+                            <button
+                              key={tier.name}
+                              type="button"
+                              onClick={() => {
+                                setScaleCpu(tier.cpu);
+                                setScaleRamMb(tier.memoryMb);
+                                setScaleStorageGb(tier.storageGb);
+                                setScaleMaxConn(tier.maxConn);
+                              }}
+                              className="p-3 bg-white/[0.02] border border-white/10 rounded-xl hover:border-emerald-500/40 text-left transition-all"
+                            >
+                              <span className="text-xs font-bold text-white block">{tier.name}</span>
+                              <span className="text-[11px] font-bold text-emerald-400 block">${tierPrice.totalUsd}/mo</span>
+                              <span className="text-[10px] text-text-muted block mt-1">{tier.cpu} vCPU • {tier.memoryMb}MB</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -644,7 +791,7 @@ export default function ManagedDatabasesPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-semibold text-text-muted mb-1">
-                            CPU Cores Limit ({scaleCpu} vCPU)
+                            CPU Cores Limit ({scaleCpu} vCPU) — <span className="text-emerald-400">${scalePrice.cpuCost}/mo</span>
                           </label>
                           <input
                             type="range"
@@ -659,7 +806,7 @@ export default function ManagedDatabasesPage() {
 
                         <div>
                           <label className="block text-xs font-semibold text-text-muted mb-1">
-                            RAM Memory ({scaleRamMb} MB)
+                            RAM Memory ({scaleRamMb} MB) — <span className="text-emerald-400">${scalePrice.ramCost}/mo</span>
                           </label>
                           <input
                             type="range"
@@ -674,7 +821,7 @@ export default function ManagedDatabasesPage() {
 
                         <div>
                           <label className="block text-xs font-semibold text-text-muted mb-1">
-                            Storage Allocation ({scaleStorageGb} GB)
+                            Storage Allocation ({scaleStorageGb} GB) — <span className="text-emerald-400">${scalePrice.storageCost.toFixed(2)}/mo</span>
                           </label>
                           <input
                             type="number"
@@ -688,7 +835,7 @@ export default function ManagedDatabasesPage() {
 
                         <div>
                           <label className="block text-xs font-semibold text-text-muted mb-1">
-                            Max Connections ({scaleMaxConn})
+                            Max Connections ({scaleMaxConn}) — <span className="text-emerald-400">${scalePrice.connCost.toFixed(2)}/mo</span>
                           </label>
                           <input
                             type="number"
@@ -706,26 +853,34 @@ export default function ManagedDatabasesPage() {
                         disabled={isScaling}
                         className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs rounded-xl disabled:opacity-50"
                       >
-                        {isScaling ? 'Scaling cgroups...' : 'Apply Resource Changes'}
+                        {isScaling ? 'Scaling cgroups & billing...' : `Apply Resource Scale ($${scalePrice.totalUsd}/mo)`}
                       </button>
                     </form>
                   </div>
                 )}
 
-                {/* TAB 4: BACKUPS */}
+                {/* TAB 4: BACKUPS ($2/DUMP COST) */}
                 {activeTab === 'backups' && (
                   <div className="space-y-4 pt-2">
+                    <div className="p-3 bg-violet-500/10 border border-violet-500/30 rounded-xl flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-white block">Snapshot Backup Storage Pricing</span>
+                        <span className="text-[11px] text-text-muted">Each snapshot dump costs <strong>$2.00 / month</strong> for node storage retention.</span>
+                      </div>
+                      <span className="text-sm font-bold text-violet-300 font-mono font-bold">${backups.length * 2}.00 / mo ({backups.length} snapshots)</span>
+                    </div>
+
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="text-xs font-bold text-white">Snapshot Dumps & Restores</h4>
-                        <p className="text-[11px] text-text-muted">Real container dumps stored on storage node.</p>
+                        <p className="text-[11px] text-text-muted">Real container dumps stored on node storage.</p>
                       </div>
                       <button
                         onClick={handleCreateBackup}
                         disabled={isCreatingBackup}
                         className="px-3 py-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 text-xs font-semibold rounded-xl"
                       >
-                        {isCreatingBackup ? 'Creating Dump...' : '+ Take Snapshot Dump'}
+                        {isCreatingBackup ? 'Creating Dump...' : '+ Take Snapshot Dump ($2/mo)'}
                       </button>
                     </div>
 
@@ -740,7 +895,7 @@ export default function ManagedDatabasesPage() {
                             <div>
                               <span className="text-xs font-bold text-white font-mono block">{b.backupId}</span>
                               <span className="text-[10px] text-text-muted">
-                                Size: {(b.sizeBytes / 1024 / 1024).toFixed(2)} MB • Created: {new Date(b.createdAt).toLocaleString()}
+                                Size: {(b.sizeBytes / 1024 / 1024).toFixed(2)} MB • Cost: $2.00/mo • Created: {new Date(b.createdAt).toLocaleString()}
                               </span>
                             </div>
                             <button
@@ -757,39 +912,55 @@ export default function ManagedDatabasesPage() {
                   </div>
                 )}
 
-                {/* TAB 5: MIGRATION */}
+                {/* TAB 5: NODE MIGRATION (RESTRICTED TO DEV ROLE ONLY) */}
                 {activeTab === 'migration' && (
                   <div className="space-y-4 pt-2">
                     <div>
-                      <h4 className="text-xs font-bold text-white">Cluster Compute Node Migration</h4>
+                      <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                        Cluster Compute Node Migration
+                        {!isDevUser && (
+                          <span className="text-[10px] bg-red-500/20 text-red-300 border border-red-500/30 px-2 py-0.5 rounded font-semibold uppercase">
+                            Dev Superuser Restricted
+                          </span>
+                        )}
+                      </h4>
                       <p className="text-[11px] text-text-muted">Relocate database instance live to another registered compute node.</p>
                     </div>
 
-                    <form onSubmit={handleMigrateSubmit} className="space-y-4 bg-white/[0.02] border border-white/10 p-4 rounded-xl">
-                      <div>
-                        <label className="block text-xs font-semibold text-text-muted mb-1">Target Compute Node</label>
-                        <select
-                          value={targetNodeId}
-                          onChange={(e) => setTargetNodeId(e.target.value)}
-                          className="w-full bg-[#121324] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                        >
-                          <option value="">Auto Select Optimal Node</option>
-                          {nodes.map((n) => (
-                            <option key={n.id} value={n.id}>
-                              {n.label || n.ip} ({n.ip}) - {n.region || 'global'}
-                            </option>
-                          ))}
-                        </select>
+                    {!isDevUser ? (
+                      <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-xl text-center space-y-2">
+                        <p className="text-xs font-bold text-red-300">🔒 Node Migration Restricted</p>
+                        <p className="text-xs text-text-muted max-w-md mx-auto">
+                          As per platform security policy, database container node migration is restricted exclusively to dev superusers (`role: dev`). Regular customers and standard admin roles cannot initiate database node relocations.
+                        </p>
                       </div>
+                    ) : (
+                      <form onSubmit={handleMigrateSubmit} className="space-y-4 bg-white/[0.02] border border-white/10 p-4 rounded-xl">
+                        <div>
+                          <label className="block text-xs font-semibold text-text-muted mb-1">Target Compute Node</label>
+                          <select
+                            value={targetNodeId}
+                            onChange={(e) => setTargetNodeId(e.target.value)}
+                            className="w-full bg-[#121324] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                          >
+                            <option value="">Auto Select Optimal Node</option>
+                            {nodes.map((n) => (
+                              <option key={n.id} value={n.id}>
+                                {n.label || n.ip} ({n.ip}) - {n.region || 'global'}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                      <button
-                        type="submit"
-                        disabled={isMigrating}
-                        className="px-5 py-2.5 bg-teal-500 hover:bg-teal-600 text-black font-bold text-xs rounded-xl disabled:opacity-50"
-                      >
-                        {isMigrating ? 'Migrating Container...' : 'Migrate Database to Node'}
-                      </button>
-                    </form>
+                        <button
+                          type="submit"
+                          disabled={isMigrating}
+                          className="px-5 py-2.5 bg-teal-500 hover:bg-teal-600 text-black font-bold text-xs rounded-xl disabled:opacity-50"
+                        >
+                          {isMigrating ? 'Migrating Container...' : 'Migrate Database to Node'}
+                        </button>
+                      </form>
+                    )}
                   </div>
                 )}
 
@@ -976,6 +1147,12 @@ export default function ManagedDatabasesPage() {
                 </div>
               </div>
 
+              {/* Dynamic Cost Preview */}
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-between">
+                <span className="text-xs font-bold text-white">Automated Plan Monthly Cost</span>
+                <span className="text-sm font-extrabold text-emerald-400 font-mono">${provPrice.totalUsd}/mo (LKR {provPrice.totalLkr.toLocaleString()})</span>
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
                 <button
                   type="button"
@@ -989,7 +1166,7 @@ export default function ManagedDatabasesPage() {
                   disabled={isProvisioning}
                   className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-black disabled:opacity-50"
                 >
-                  {isProvisioning ? 'Provisioning...' : 'Provision Engine'}
+                  {isProvisioning ? 'Provisioning...' : `Provision Engine ($${provPrice.totalUsd}/mo)`}
                 </button>
               </div>
             </form>
