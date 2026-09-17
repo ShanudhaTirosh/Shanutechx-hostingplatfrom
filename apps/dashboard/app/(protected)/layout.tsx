@@ -7,6 +7,7 @@ import { AppUserProvider, useAppUser } from '@/lib/AppUserContext';
 import Sidebar from '@/components/Sidebar';
 import { NotificationChannelBanner } from '@/components/NotificationChannelBanner';
 import { ToastProvider } from '@/components/ui';
+import { RightClickProtector, DevRightClickToggle } from '@/components/RightClickProtector';
 
 function LoadingSpinner({ message = 'Loading...' }: { message?: string }) {
   return (
@@ -200,7 +201,6 @@ function GatedLayoutContent({ children, sidebarOpen, setSidebarOpen }: { childre
   );
 }
 
-import { RightClickProtector, DevRightClickToggle } from '@/components/RightClickProtector';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
