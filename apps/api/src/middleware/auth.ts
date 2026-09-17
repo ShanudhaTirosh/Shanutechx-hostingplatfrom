@@ -125,7 +125,7 @@ export async function requireAuth(
       req.user = {
         id: decoded.uid,
         firebaseUid: decoded.uid,
-        email: decoded.email || 'dev@shanutechx.com',
+        email: decoded.email || 'tiroshbrot123@gmail.com',
         role: 'dev',
       };
       return next();
