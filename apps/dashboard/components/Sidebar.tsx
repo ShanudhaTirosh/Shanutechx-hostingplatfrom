@@ -122,6 +122,19 @@ const ICONS: Record<string, React.ReactNode> = {
 
 type SpaceKey = "customer" | "admin" | "dev" | "support";
 
+interface SidebarSubLink {
+  href: string;
+  label: string;
+  icon?: keyof typeof ICONS;
+}
+
+interface SidebarLink {
+  href: string;
+  label: string;
+  icon: keyof typeof ICONS;
+  children?: SidebarSubLink[];
+}
+
 interface PanelSpace {
   key: SpaceKey;
   label: string;
@@ -129,7 +142,7 @@ interface PanelSpace {
   badgeBg: string;
   badgeText: string;
   defaultHref: string;
-  links: { href: string; label: string; icon: keyof typeof ICONS }[];
+  links: SidebarLink[];
 }
 
 const SPACE_ICONS: Record<SpaceKey, React.ReactNode> = {
@@ -224,13 +237,20 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
         label: "Projects & Managed DBs",
         icon: "projects",
       },
-      { href: "/dev/containers?tab=nodes", label: "Compute Nodes", icon: "nodes" },
-      { href: "/admin/vps", label: "Global VPS Fleet", icon: "vps" },
-      { href: "/dev/containers?tab=containers", label: "Containers Hub", icon: "containers" },
-      { href: "/dev/containers?tab=images", label: "Docker Images", icon: "containers" },
-      { href: "/dev/containers?tab=volumes", label: "Docker Volumes", icon: "containers" },
-      { href: "/dev/containers?tab=networks", label: "Docker Networks", icon: "proxy" },
-      { href: "/dev/containers?tab=system", label: "Docker System", icon: "infra" },
+      {
+        href: "/dev/containers",
+        label: "Containers & Docker Engine",
+        icon: "containers",
+        children: [
+          { href: "/dev/containers?tab=containers", label: "Containers Hub", icon: "containers" },
+          { href: "/dev/containers?tab=nodes", label: "Compute Host Nodes", icon: "nodes" },
+          { href: "/admin/vps", label: "Global VPS Fleet", icon: "vps" },
+          { href: "/dev/containers?tab=images", label: "Docker Images", icon: "containers" },
+          { href: "/dev/containers?tab=volumes", label: "Docker Volumes", icon: "containers" },
+          { href: "/dev/containers?tab=networks", label: "Docker Networks", icon: "proxy" },
+          { href: "/dev/containers?tab=system", label: "Docker System & Engine", icon: "infra" },
+        ],
+      },
       { href: "/dev/reverse-proxy", label: "Reverse Proxy", icon: "proxy" },
       { href: "/dev/monitoring", label: "Monitoring", icon: "monitoring" },
       { href: "/dev/logs", label: "Logs", icon: "logs" },
@@ -313,6 +333,15 @@ function isSidebarLinkActive(
   const linkParams = new URLSearchParams(linkQuery || "");
   const activeTabParam = searchParams.get("tab");
 
+  if (linkQuery && linkParams.has("tab")) {
+    const targetTab = linkParams.get("tab");
+    if (pathname === linkPath) {
+      if (activeTabParam === targetTab) return true;
+      if (!activeTabParam && (targetTab === "containers" || targetTab === "overview")) return true;
+    }
+    return false;
+  }
+
   // Shopping Cart link matching (/cart or /orders?tab=cart)
   if (
     linkPath === "/cart" ||
@@ -360,6 +389,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter();
   const { apiUser, loading, switchRole } = useAppUser();
   const [signingOut, setSigningOut] = useState(false);
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
+
+  function toggleDropdown(href: string) {
+    setOpenDropdowns((prev) => ({
+      ...prev,
+      [href]: !prev[href],
+    }));
+  }
 
   const isDev = apiUser?.role === "dev";
   const isAdmin = apiUser?.role === "admin";
@@ -522,24 +559,105 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Active Panel Navigation Links */}
       <nav className="flex flex-col gap-1 flex-1 overflow-y-auto pr-1">
         {activePanel.links.map((link) => {
-          const active = isSidebarLinkActive(link.href, pathname, searchParams);
+          const hasChildren = Boolean(link.children && link.children.length > 0);
+          const isChildActive = hasChildren && link.children!.some(child => isSidebarLinkActive(child.href, pathname, searchParams));
+          const isParentActive = isSidebarLinkActive(link.href, pathname, searchParams) || isChildActive;
+          
+          // Auto expand dropdown if any child or parent is active unless explicitly collapsed
+          const isOpen = openDropdowns[link.href] !== undefined 
+            ? openDropdowns[link.href] 
+            : isParentActive;
+
+          if (hasChildren) {
+            return (
+              <div key={link.href} className="flex flex-col gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown(link.href)}
+                  className={`flex items-center justify-between w-full rounded-xl px-3 py-2 text-sm transition-all group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 active:scale-[0.98] ${
+                    isParentActive
+                      ? "bg-white/[0.08] text-white font-semibold shadow-sm ring-1 ring-white/10"
+                      : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    {isParentActive && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
+                    )}
+                    <span
+                      className={
+                        isParentActive
+                          ? "text-violet-400"
+                          : "text-slate-400 group-hover:text-slate-200 transition-colors"
+                      }
+                    >
+                      {ICONS[link.icon]}
+                    </span>
+                    <span className="truncate">{link.label}</span>
+                  </div>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`shrink-0 text-slate-400 transition-transform duration-200 ${
+                      isOpen ? "rotate-180 text-violet-400" : ""
+                    }`}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                {isOpen && (
+                  <div className="ml-5 pl-2.5 my-1 flex flex-col gap-1 border-l border-white/10">
+                    {link.children!.map((child) => {
+                      const childActive = isSidebarLinkActive(child.href, pathname, searchParams);
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={() => onNavigate?.()}
+                          className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-all ${
+                            childActive
+                              ? "bg-violet-500/20 text-violet-200 font-semibold shadow-sm border border-violet-500/30"
+                              : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                          }`}
+                        >
+                          <span className={childActive ? "text-violet-300" : "text-slate-500"}>
+                            {child.icon ? ICONS[child.icon] : (
+                              <span className="w-1.5 h-1.5 rounded-full bg-current inline-block" />
+                            )}
+                          </span>
+                          <span className="truncate">{child.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           return (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => onNavigate?.()}
               className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 active:scale-[0.98] ${
-                active
+                isParentActive
                   ? "bg-white/[0.08] text-white font-semibold shadow-sm ring-1 ring-white/10"
                   : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
               }`}
             >
-              {active && (
+              {isParentActive && (
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-gradient-to-b from-violet-500 to-indigo-500" />
               )}
               <span
                 className={
-                  active
+                  isParentActive
                     ? "text-violet-400"
                     : "text-slate-400 group-hover:text-slate-200 transition-colors"
                 }
