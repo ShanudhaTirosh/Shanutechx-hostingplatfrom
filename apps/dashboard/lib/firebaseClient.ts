@@ -15,8 +15,10 @@ export const firebaseAuth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
 export const githubProvider = new GithubAuthProvider();
-// Request repo & user scopes so GitHub repositories are directly accessible upon login
-githubProvider.addScope('repo');
+// Only request identity scopes for OAuth login — NOT the `repo` scope,
+// which would grant full read/write to ALL of the user's repositories.
+// If repo access is needed later for deployment, use a GitHub App with
+// granular per-repository installation permissions instead.
 githubProvider.addScope('read:user');
 githubProvider.addScope('user:email');
 

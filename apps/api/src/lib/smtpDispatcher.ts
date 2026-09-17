@@ -10,6 +10,14 @@ export interface SmtpServerOptions {
   pass: string;
   secure?: boolean; // true for 465, false for 587/25
   timeoutMs?: number;
+  /**
+   * Set to true ONLY when connecting to a provisioned server that uses a
+   * self-signed certificate (e.g. internal Mailu instances). When false
+   * (the default), TLS certificate validation is enforced and connections
+   * to servers with invalid/untrusted certs will be rejected, preventing
+   * man-in-the-middle attacks on credential transmission.
+   */
+  allowSelfSigned?: boolean;
 }
 
 export interface MailAttachment {
@@ -94,7 +102,14 @@ export async function verifySmtpConnection(options: SmtpServerOptions): Promise<
     };
 
     if (isImplicitTls) {
-      socket = tls.connect(options.port, options.host, { rejectUnauthorized: false }, onConnect);
+      // rejectUnauthorized defaults to true (enforce TLS cert validation).
+      // Only disable if caller explicitly opts in for known self-signed servers.
+      socket = tls.connect(
+        options.port,
+        options.host,
+        { rejectUnauthorized: !options.allowSelfSigned },
+        onConnect
+      );
     } else {
       socket = net.createConnection(options.port, options.host, onConnect);
     }
@@ -240,7 +255,14 @@ export async function sendSmtpEmail(
     };
 
     if (isImplicitTls) {
-      socket = tls.connect(options.port, options.host, { rejectUnauthorized: false }, onConnect);
+      // rejectUnauthorized defaults to true (enforce TLS cert validation).
+      // Only disable if caller explicitly opts in for known self-signed servers.
+      socket = tls.connect(
+        options.port,
+        options.host,
+        { rejectUnauthorized: !options.allowSelfSigned },
+        onConnect
+      );
     } else {
       socket = net.createConnection(options.port, options.host, onConnect);
     }

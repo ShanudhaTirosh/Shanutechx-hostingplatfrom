@@ -13,14 +13,16 @@ export function isPrivateOrLoopbackIp(ip: string): boolean {
   return false;
 }
 
-export async function isSafeWebhookUrl(urlStr: string): Promise<{ safe: boolean; reason?: string }> {
+export async function isSafeWebhookUrl(
+  urlStr: string
+): Promise<{ safe: boolean; reason?: string; resolvedIp?: string }> {
   try {
     const url = new URL(urlStr);
     if (url.protocol !== 'http:' && url.protocol !== 'https:') {
       return { safe: false, reason: 'Only HTTP and HTTPS URLs are allowed' };
     }
     const hostname = url.hostname.toLowerCase();
-    
+
     if (
       hostname === 'localhost' ||
       hostname === '0.0.0.0' ||
@@ -32,22 +34,24 @@ export async function isSafeWebhookUrl(urlStr: string): Promise<{ safe: boolean;
       return { safe: false, reason: 'Loopback and internal hostnames are prohibited' };
     }
 
-    let ipToCheck = hostname;
+    let resolvedIp = hostname;
     if (!net.isIP(hostname)) {
       try {
         const dns = await import('dns');
         const resolved = await dns.promises.lookup(hostname);
-        ipToCheck = resolved.address;
+        resolvedIp = resolved.address;
       } catch {
         return { safe: false, reason: 'Failed to resolve domain hostname' };
       }
     }
 
-    if (isPrivateOrLoopbackIp(ipToCheck)) {
+    if (isPrivateOrLoopbackIp(resolvedIp)) {
       return { safe: false, reason: 'Private/Loopback/Link-local IP addresses are prohibited' };
     }
 
-    return { safe: true };
+    // Return the resolved IP so the caller can pin the connection to it,
+    // closing the DNS-rebinding TOCTOU window between check and connect.
+    return { safe: true, resolvedIp };
   } catch {
     return { safe: false, reason: 'Invalid URL format' };
   }
@@ -213,9 +217,30 @@ export async function fireWebhook(
       let errorMessage: string | undefined;
 
       try {
-        const res = await fetch(webhook.url, {
+        // DNS-rebinding mitigation: connect directly to the IP address that was
+        // verified by isSafeWebhookUrl above, rather than calling fetch(webhook.url)
+        // and letting Node re-resolve the hostname. Between our safety check and a
+        // plain fetch() call, an attacker-controlled DNS TTL can expire and the
+        // record can be swapped to 127.0.0.1, bypassing our SSRF protection.
+        //
+        // We build a pinned URL using the resolved IP (preserving the original port
+        // and path), then pass the original hostname in the Host header so TLS SNI
+        // and virtual hosting still work correctly.
+        const parsedUrl = new URL(webhook.url);
+        const resolvedIp = safeCheck.resolvedIp!;
+        const isIPv6 = resolvedIp.includes(':');
+        const pinnedHost = isIPv6 ? `[${resolvedIp}]` : resolvedIp;
+        const port = parsedUrl.port ? `:${parsedUrl.port}` : '';
+        const pinnedUrl = `${parsedUrl.protocol}//${pinnedHost}${port}${parsedUrl.pathname}${parsedUrl.search}`;
+
+        const res = await fetch(pinnedUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Shanutechx-Signature': signature },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Shanutechx-Signature': signature,
+            // Provide the original hostname so the server can route correctly.
+            Host: parsedUrl.hostname,
+          },
           body,
           signal: AbortSignal.timeout(10_000),
         });
