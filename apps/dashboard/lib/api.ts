@@ -862,6 +862,69 @@ export const api = {
       apiFetch(`/api/nodes/${nodeId}/failover-status`).then((r) => asJson<{ logs: any[] }>(r)),
   },
 
+  containers: {
+    list: (nodeId: string) => apiFetch(`/api/nodes/${nodeId}/containers`).then((r) => asJson<{ containers: any[] }>(r)),
+    action: (nodeId: string, containerId: string, action: 'start' | 'stop' | 'restart') =>
+      apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/action`, { method: 'POST', body: JSON.stringify({ action }) }).then((r) => asJson<{ ok: boolean }>(r)),
+    pause: (nodeId: string, containerId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/pause`, { method: 'POST' }).then((r) => asJson<{ ok: boolean }>(r)),
+    unpause: (nodeId: string, containerId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/unpause`, { method: 'POST' }).then((r) => asJson<{ ok: boolean }>(r)),
+    rename: (nodeId: string, containerId: string, name: string) =>
+      apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/rename`, { method: 'PUT', body: JSON.stringify({ name }) }).then((r) => asJson<{ ok: boolean }>(r)),
+    top: (nodeId: string, containerId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/top`).then((r) => asJson<any>(r)),
+    changes: (nodeId: string, containerId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/changes`).then((r) => asJson<{ changes: any[] }>(r)),
+    logs: (nodeId: string, containerId: string, tail = 200) =>
+      apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/logs?tail=${tail}`).then((r) => asJson<{ logs: string }>(r)),
+    stats: (nodeId: string, containerId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/stats`).then((r) => asJson<any>(r)),
+    execTicket: (nodeId: string, containerId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/exec-ticket`, { method: 'POST' }).then((r) => asJson<any>(r)),
+    remove: (nodeId: string, containerId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/containers/${containerId}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+  },
+
+  dockerImages: {
+    list: (nodeId: string) => apiFetch(`/api/nodes/${nodeId}/images`).then((r) => asJson<{ images: any[] }>(r)),
+    inspect: (nodeId: string, imageId: string) => apiFetch(`/api/nodes/${nodeId}/images/${encodeURIComponent(imageId)}`).then((r) => asJson<any>(r)),
+    pull: (nodeId: string, image: string, tag = 'latest') =>
+      apiFetch(`/api/nodes/${nodeId}/images/pull`, { method: 'POST', body: JSON.stringify({ image, tag }) }).then((r) => asJson<any>(r)),
+    remove: (nodeId: string, imageId: string, force = false) =>
+      apiFetch(`/api/nodes/${nodeId}/images/${encodeURIComponent(imageId)}?force=${force}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    prune: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/images/prune`, { method: 'POST' }).then((r) => asJson<any>(r)),
+  },
+
+  dockerVolumes: {
+    list: (nodeId: string) => apiFetch(`/api/nodes/${nodeId}/volumes`).then((r) => asJson<{ volumes: any[] }>(r)),
+    inspect: (nodeId: string, name: string) => apiFetch(`/api/nodes/${nodeId}/volumes/${encodeURIComponent(name)}`).then((r) => asJson<any>(r)),
+    create: (nodeId: string, name: string, driver = 'local', labels?: Record<string, string>) =>
+      apiFetch(`/api/nodes/${nodeId}/volumes`, { method: 'POST', body: JSON.stringify({ name, driver, labels }) }).then((r) => asJson<any>(r)),
+    remove: (nodeId: string, name: string) =>
+      apiFetch(`/api/nodes/${nodeId}/volumes/${encodeURIComponent(name)}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    prune: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/volumes/prune`, { method: 'POST' }).then((r) => asJson<any>(r)),
+  },
+
+  dockerNetworks: {
+    list: (nodeId: string) => apiFetch(`/api/nodes/${nodeId}/networks`).then((r) => asJson<{ networks: any[] }>(r)),
+    inspect: (nodeId: string, networkId: string) => apiFetch(`/api/nodes/${nodeId}/networks/${encodeURIComponent(networkId)}`).then((r) => asJson<any>(r)),
+    create: (nodeId: string, name: string, driver = 'bridge', options?: any) =>
+      apiFetch(`/api/nodes/${nodeId}/networks`, { method: 'POST', body: JSON.stringify({ name, driver, options }) }).then((r) => asJson<any>(r)),
+    remove: (nodeId: string, networkId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/networks/${encodeURIComponent(networkId)}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    prune: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/networks/prune`, { method: 'POST' }).then((r) => asJson<any>(r)),
+  },
+
+  dockerSystem: {
+    info: (nodeId: string) => apiFetch(`/api/nodes/${nodeId}/docker/system/info`).then((r) => asJson<any>(r)),
+    df: (nodeId: string) => apiFetch(`/api/nodes/${nodeId}/docker/system/df`).then((r) => asJson<any>(r)),
+  },
+
+
   payments: {
     reviewQueue: () => apiFetch('/api/payments/review-queue').then((r) => asJson<{ payments: Payment[] }>(r)),
     review: (id: string, approve: boolean, reason?: string) =>
@@ -1483,20 +1546,6 @@ export const api = {
     routers: () => apiFetch('/api/traefik/routers').then((r) => asJson<{ routers: any[] }>(r)),
     services: () => apiFetch('/api/traefik/services').then((r) => asJson<{ services: any[] }>(r)),
     middlewares: () => apiFetch('/api/traefik/middlewares').then((r) => asJson<{ middlewares: any[] }>(r)),
-  },
-
-  containers: {
-    list: (nodeId: string) =>
-      apiFetch(`/api/nodes/${nodeId}/containers`).then((r) =>
-        asJson<{ containers: Array<{ id: string; name: string; image: string; state: string; status: string; createdAt: number; ports: Array<{ privatePort: number; publicPort?: number; type: string }> }> }>(r)
-      ),
-    action: (nodeId: string, containerId: string, action: 'start' | 'stop' | 'restart') =>
-      apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/action`, {
-        method: 'POST',
-        body: JSON.stringify({ action }),
-      }).then((r) => asJson<{ ok: boolean }>(r)),
-    logs: (nodeId: string, containerId: string) =>
-      apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/logs`).then((r) => asJson<{ logs: string }>(r)),
   },
 
   backups: {

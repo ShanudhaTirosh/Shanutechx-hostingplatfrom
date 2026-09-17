@@ -5,6 +5,7 @@ import {
   HTMLAttributes,
   InputHTMLAttributes,
   TextareaHTMLAttributes,
+  SelectHTMLAttributes,
   ReactNode,
   useState,
   useEffect,
@@ -12,27 +13,33 @@ import {
   createContext,
   useContext,
   useCallback,
+  forwardRef,
 } from 'react';
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 // Card
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   title?: string;
   description?: string;
   action?: ReactNode;
+  glow?: boolean;
+  flat?: boolean;
 }
 
-export function Card({ title, description, action, className = '', children, ...props }: CardProps) {
+export function Card({ title, description, action, glow, flat, className = '', children, ...props }: CardProps) {
   return (
-    <div className={`glass rounded-2xl p-6 ${className}`} {...props}>
+    <div
+      className={`${flat ? 'bg-surface border border-white/[0.06]' : 'glass-card'} rounded-2xl p-6 ${glow ? 'animate-glow-pulse' : ''} ${className}`}
+      {...props}
+    >
       {(title || description || action) && (
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
             {title && <h3 className="text-sm font-bold text-white tracking-tight">{title}</h3>}
             {description && <p className="text-xs text-text-muted mt-0.5">{description}</p>}
           </div>
-          {action && <div>{action}</div>}
+          {action && <div className="shrink-0">{action}</div>}
         </div>
       )}
       {children}
@@ -40,73 +47,119 @@ export function Card({ title, description, action, className = '', children, ...
   );
 }
 
-
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 // Button
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'success' | 'glow';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   loading?: boolean;
+  icon?: ReactNode;
+  iconRight?: ReactNode;
 }
 
 export function Button({
   variant = 'primary',
   size = 'md',
   loading = false,
+  icon,
+  iconRight,
   className = '',
   children,
   disabled,
   ...props
 }: ButtonProps) {
-  const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-6 py-2.5 text-sm' };
+  const sizes = {
+    xs: 'px-2.5 py-1 text-xs gap-1',
+    sm: 'px-3 py-1.5 text-xs gap-1.5',
+    md: 'px-4 py-2 text-sm gap-2',
+    lg: 'px-6 py-2.5 text-sm gap-2',
+  };
   const variants: Record<string, string> = {
-    primary: 'bg-brand-gradient text-white hover:opacity-90 shadow-glow-violet',
-    secondary: 'glass text-text-primary hover:bg-white/[0.07]',
-    danger: 'bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30',
-    ghost: 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]',
+    primary: 'bg-brand-gradient text-white hover:opacity-90 shadow-button-primary active:scale-[0.97]',
+    secondary: 'glass glass-hover text-text-primary active:scale-[0.97]',
+    danger: 'bg-danger-bg text-red-300 border border-red-500/30 hover:bg-red-500/25 hover:border-red-500/50 active:scale-[0.97]',
+    ghost: 'text-text-muted hover:text-text-primary hover:bg-white/[0.04] active:bg-white/[0.06]',
+    success: 'bg-success-bg text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 active:scale-[0.97]',
+    glow: 'bg-brand-gradient text-white shadow-glow-violet hover:shadow-[0_0_30px_rgba(124,58,237,0.45)] active:scale-[0.97]',
   };
   return (
     <button
       disabled={disabled || loading}
-      className={`rounded-full font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 ${sizes[size]} ${variants[variant]} ${className}`}
+      className={`rounded-xl font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center ${sizes[size]} ${variants[variant]} ${className}`}
       {...props}
     >
-      {loading && <span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />}
+      {loading && <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />}
+      {!loading && icon && <span className="shrink-0">{icon}</span>}
+      {children}
+      {iconRight && <span className="shrink-0">{iconRight}</span>}
+    </button>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// IconButton
+// ═════════════════════════════════════════════════════════════
+interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'ghost' | 'glass' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  tooltip?: string;
+}
+export function IconButton({ variant = 'ghost', size = 'md', tooltip, className = '', children, ...props }: IconButtonProps) {
+  const sizes = { sm: 'h-7 w-7', md: 'h-9 w-9', lg: 'h-11 w-11' };
+  const variants: Record<string, string> = {
+    ghost: 'text-text-muted hover:text-text-primary hover:bg-white/[0.06]',
+    glass: 'glass glass-hover text-text-secondary',
+    danger: 'text-text-muted hover:text-red-400 hover:bg-red-500/10',
+  };
+  return (
+    <button
+      title={tooltip}
+      className={`rounded-xl flex items-center justify-center transition-all duration-200 ${sizes[size]} ${variants[variant]} ${className}`}
+      {...props}
+    >
       {children}
     </button>
   );
 }
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 // Input
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   hint?: string;
+  icon?: ReactNode;
 }
-export function Input({ label, error, hint, className = '', id, ...props }: InputProps) {
-  const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
-  return (
-    <div className="flex flex-col gap-1.5">
-      {label && <label htmlFor={inputId} className="text-xs font-medium text-text-muted">{label}</label>}
-      <input
-        id={inputId}
-        className={`w-full bg-white/5 border rounded-xl px-4 py-2.5 text-sm placeholder:text-text-faint focus:outline-none transition-colors ${
-          error ? 'border-red-500/40 focus:border-red-500/60' : 'border-white/10 focus:border-accent-violet/50 focus:bg-white/[0.07]'
-        } ${className}`}
-        {...props}
-      />
-      {error && <p className="text-xs text-red-400">{error}</p>}
-      {hint && !error && <p className="text-xs text-text-muted">{hint}</p>}
-    </div>
-  );
-}
+export const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ label, error, hint, icon, className = '', id, ...props }, ref) => {
+    const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+    return (
+      <div className="flex flex-col gap-1.5">
+        {label && <label htmlFor={inputId} className="text-xs font-medium text-text-muted">{label}</label>}
+        <div className="relative">
+          {icon && <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-faint">{icon}</div>}
+          <input
+            ref={ref}
+            id={inputId}
+            className={`w-full glass-input rounded-xl ${icon ? 'pl-10' : 'px-4'} pr-4 py-2.5 text-sm text-text-primary placeholder:text-text-faint focus:outline-none ${
+              error ? 'border-red-500/40 focus:border-red-500/60' : ''
+            } ${className}`}
+            {...props}
+          />
+        </div>
+        {error && <p className="text-xs text-red-400">{error}</p>}
+        {hint && !error && <p className="text-xs text-text-muted">{hint}</p>}
+      </div>
+    );
+  }
+);
+Input.displayName = 'Input';
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 // Textarea
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
@@ -119,8 +172,8 @@ export function Textarea({ label, error, hint, className = '', id, ...props }: T
       {label && <label htmlFor={textareaId} className="text-xs font-medium text-text-muted">{label}</label>}
       <textarea
         id={textareaId}
-        className={`w-full bg-white/5 border rounded-xl px-4 py-2.5 text-sm placeholder:text-text-faint focus:outline-none transition-colors resize-none ${
-          error ? 'border-red-500/40 focus:border-red-500/60' : 'border-white/10 focus:border-accent-violet/50 focus:bg-white/[0.07]'
+        className={`w-full glass-input rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-faint focus:outline-none resize-none ${
+          error ? 'border-red-500/40 focus:border-red-500/60' : ''
         } ${className}`}
         {...props}
       />
@@ -130,39 +183,108 @@ export function Textarea({ label, error, hint, className = '', id, ...props }: T
   );
 }
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
+// Select
+// ═════════════════════════════════════════════════════════════
+interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
+  label?: string;
+  error?: string;
+  options: { value: string; label: string }[];
+}
+export function Select({ label, error, options, className = '', id, ...props }: SelectProps) {
+  const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+  return (
+    <div className="flex flex-col gap-1.5">
+      {label && <label htmlFor={selectId} className="text-xs font-medium text-text-muted">{label}</label>}
+      <select
+        id={selectId}
+        className={`w-full glass-input rounded-xl px-4 py-2.5 text-sm text-text-primary focus:outline-none appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%238888A0%22%20stroke-width%3D%222.5%22%3E%3Cpath%20d%3D%22M6%209l6%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-[right_12px_center] bg-no-repeat pr-10 ${
+          error ? 'border-red-500/40' : ''
+        } ${className}`}
+        {...props}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value} className="bg-surface text-text-primary">{o.label}</option>
+        ))}
+      </select>
+      {error && <p className="text-xs text-red-400">{error}</p>}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// Toggle / Switch
+// ═════════════════════════════════════════════════════════════
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  disabled,
+  size = 'md',
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label?: string;
+  disabled?: boolean;
+  size?: 'sm' | 'md';
+}) {
+  const dims = size === 'sm' ? { track: 'w-8 h-[18px]', thumb: 'h-3.5 w-3.5', move: 'translate-x-[14px]' } : { track: 'w-10 h-[22px]', thumb: 'h-4 w-4', move: 'translate-x-[18px]' };
+  return (
+    <label className={`inline-flex items-center gap-2.5 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+      <button
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative ${dims.track} rounded-full transition-colors duration-200 ${
+          checked ? 'bg-accent-violet' : 'bg-white/10'
+        }`}
+      >
+        <span className={`absolute left-[3px] top-1/2 -translate-y-1/2 ${dims.thumb} rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? dims.move : ''}`} />
+      </button>
+      {label && <span className="text-sm text-text-secondary">{label}</span>}
+    </label>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
 // Badge / Status
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-white/10 text-text-muted',
-  awaiting_payment: 'bg-yellow-500/15 text-yellow-300',
-  paid: 'bg-emerald-500/15 text-emerald-300',
-  cancelled: 'bg-red-500/15 text-red-300',
+  awaiting_payment: 'bg-warning-bg text-yellow-300',
+  paid: 'bg-success-bg text-emerald-300',
+  cancelled: 'bg-danger-bg text-red-300',
   pending: 'bg-white/10 text-text-muted',
-  auto_approved: 'bg-emerald-500/15 text-emerald-300',
-  manually_approved: 'bg-emerald-500/15 text-emerald-300',
-  manual_review: 'bg-yellow-500/15 text-yellow-300',
-  rejected: 'bg-red-500/15 text-red-300',
-  building: 'bg-yellow-500/15 text-yellow-300',
-  running: 'bg-emerald-500/15 text-emerald-300',
-  failed: 'bg-red-500/15 text-red-300',
+  auto_approved: 'bg-success-bg text-emerald-300',
+  manually_approved: 'bg-success-bg text-emerald-300',
+  manual_review: 'bg-warning-bg text-yellow-300',
+  rejected: 'bg-danger-bg text-red-300',
+  building: 'bg-warning-bg text-yellow-300',
+  running: 'bg-success-bg text-emerald-300',
+  failed: 'bg-danger-bg text-red-300',
   stopped: 'bg-white/10 text-text-muted',
-  starting: 'bg-yellow-500/15 text-yellow-300',
-  stopping: 'bg-yellow-500/15 text-yellow-300',
-  open: 'bg-yellow-500/15 text-yellow-300',
+  starting: 'bg-warning-bg text-yellow-300',
+  stopping: 'bg-warning-bg text-yellow-300',
+  paused: 'bg-info-bg text-blue-300',
+  open: 'bg-warning-bg text-yellow-300',
   closed: 'bg-white/10 text-text-muted',
   low: 'bg-white/10 text-text-muted',
-  medium: 'bg-yellow-500/15 text-yellow-300',
-  high: 'bg-red-500/15 text-red-300',
+  medium: 'bg-warning-bg text-yellow-300',
+  high: 'bg-danger-bg text-red-300',
   admin: 'bg-accent-violet/20 text-accent-violet-light',
   support: 'bg-accent-teal-bright/15 text-accent-teal-bright',
   dev: 'bg-orange-500/15 text-orange-300',
   customer: 'bg-white/10 text-text-muted',
-  active: 'bg-emerald-500/15 text-emerald-300',
+  active: 'bg-success-bg text-emerald-300',
   inactive: 'bg-white/10 text-text-muted',
-  verified: 'bg-emerald-500/15 text-emerald-300',
-  ssl_provisioning: 'bg-yellow-500/15 text-yellow-300',
-  terminated: 'bg-red-500/15 text-red-300',
+  verified: 'bg-success-bg text-emerald-300',
+  ssl_provisioning: 'bg-warning-bg text-yellow-300',
+  terminated: 'bg-danger-bg text-red-300',
+  bridge: 'bg-accent-teal/15 text-accent-teal-bright',
+  host: 'bg-accent-violet/15 text-accent-violet-light',
+  overlay: 'bg-orange-500/15 text-orange-300',
+  local: 'bg-white/10 text-text-muted',
 };
 
 const STATUS_DOTS: Record<string, string> = {
@@ -170,6 +292,7 @@ const STATUS_DOTS: Record<string, string> = {
   building: 'bg-yellow-400',
   starting: 'bg-yellow-400',
   stopping: 'bg-yellow-400',
+  paused: 'bg-blue-400',
   failed: 'bg-red-400',
   stopped: 'bg-white/30',
   open: 'bg-yellow-400',
@@ -179,12 +302,12 @@ const STATUS_DOTS: Record<string, string> = {
   pending: 'bg-white/30',
 };
 
-export function Badge({ status, dot = false }: { status?: string | null; dot?: boolean }) {
+export function Badge({ status, dot = false, className = '' }: { status?: string | null; dot?: boolean; className?: string }) {
   if (!status) return null;
   const color = STATUS_COLORS[status] ?? 'bg-white/10 text-text-muted';
   const dotColor = STATUS_DOTS[status];
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${color}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${color} ${className}`}>
       {dot && dotColor && (
         <span className={`h-1.5 w-1.5 rounded-full ${dotColor} ${['building','starting','stopping'].includes(status) ? 'animate-pulse' : ''}`} />
       )}
@@ -193,38 +316,41 @@ export function Badge({ status, dot = false }: { status?: string | null; dot?: b
   );
 }
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 // Spinner
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 export function Spinner({ label = 'Loading...', fullPage = false }: { label?: string; fullPage?: boolean }) {
   if (fullPage) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-bg/80 backdrop-blur-sm z-50">
-        <div className="flex flex-col items-center gap-3">
-          <span className="h-8 w-8 rounded-full border-2 border-white/10 border-t-accent-teal-bright animate-spin" />
+        <div className="flex flex-col items-center gap-4 animate-fade-in">
+          <div className="relative">
+            <span className="h-10 w-10 rounded-full border-2 border-white/10 border-t-accent-violet animate-spin block" />
+            <span className="absolute inset-0 h-10 w-10 rounded-full border-2 border-transparent border-b-accent-teal-bright animate-spin block" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
+          </div>
           <span className="text-text-muted text-sm">{label}</span>
         </div>
       </div>
     );
   }
   return (
-    <div className="flex items-center gap-2 text-text-muted text-sm py-10 justify-center">
-      <span className="h-4 w-4 rounded-full border-2 border-white/20 border-t-accent-teal-bright animate-spin" />
+    <div className="flex items-center gap-2.5 text-text-muted text-sm py-10 justify-center animate-fade-in">
+      <span className="h-4 w-4 rounded-full border-2 border-white/20 border-t-accent-violet animate-spin" />
       {label}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 // Skeleton Loaders
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 export function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse bg-white/5 rounded ${className}`} />;
+  return <div className={`skeleton-shimmer rounded-lg ${className}`} />;
 }
 
 export function CardSkeleton() {
   return (
-    <Card className="border border-white/[0.06]">
+    <Card flat className="border border-white/[0.06]">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3 flex-1">
           <Skeleton className="h-9 w-9 rounded-xl" />
@@ -253,9 +379,9 @@ export function TableSkeleton({ rows = 3 }: { rows?: number }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// EmptyState Box Container
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
+// EmptyState
+// ═════════════════════════════════════════════════════════════
 export function EmptyState({
   title,
   message,
@@ -270,8 +396,8 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div className={`flex flex-col items-center justify-center p-8 sm:p-12 border border-white/[0.08] rounded-2xl bg-surface-secondary/40 text-center space-y-3 shadow-sm ${className || ''}`}>
-      <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-text-muted shadow-inner mb-1">
+    <div className={`flex flex-col items-center justify-center p-8 sm:p-12 glass-card rounded-2xl text-center space-y-3 animate-fade-in ${className || ''}`}>
+      <div className="w-14 h-14 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-text-muted shadow-inner mb-1">
         {icon || (
           <svg className="w-6 h-6 text-text-muted/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -289,12 +415,12 @@ export function EmptyState({
   );
 }
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 // ErrorBanner
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300 mb-4">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-danger-bg px-4 py-3 text-sm text-red-300 mb-4 animate-slide-down">
       <div className="flex items-center gap-3">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -302,7 +428,7 @@ export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: (
         <span>{message}</span>
       </div>
       {onRetry && (
-        <Button size="sm" variant="ghost" onClick={onRetry} className="text-red-300 hover:text-white">
+        <Button size="xs" variant="ghost" onClick={onRetry} className="text-red-300 hover:text-white shrink-0">
           ↺ Retry
         </Button>
       )}
@@ -310,22 +436,134 @@ export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: (
   );
 }
 
+// ═════════════════════════════════════════════════════════════
+// ProgressBar
+// ═════════════════════════════════════════════════════════════
+export function ProgressBar({
+  value,
+  max = 100,
+  color = 'violet',
+  size = 'md',
+  label,
+  showValue,
+  indeterminate,
+}: {
+  value?: number;
+  max?: number;
+  color?: 'violet' | 'teal' | 'success' | 'warning' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  label?: string;
+  showValue?: boolean;
+  indeterminate?: boolean;
+}) {
+  const percent = value !== undefined ? Math.min(100, Math.max(0, (value / max) * 100)) : 0;
+  const heights = { sm: 'h-1', md: 'h-1.5', lg: 'h-2.5' };
+  const fills: Record<string, string> = {
+    violet: 'bg-brand-gradient',
+    teal: 'bg-gradient-to-r from-accent-teal to-accent-teal-bright',
+    success: 'bg-gradient-to-r from-emerald-500 to-emerald-400',
+    warning: 'bg-gradient-to-r from-yellow-500 to-amber-400',
+    danger: 'bg-gradient-to-r from-red-500 to-red-400',
+  };
+  return (
+    <div className="space-y-1.5">
+      {(label || showValue) && (
+        <div className="flex items-center justify-between text-xs text-text-muted">
+          {label && <span>{label}</span>}
+          {showValue && <span>{Math.round(percent)}%</span>}
+        </div>
+      )}
+      <div className={`${heights[size]} rounded-full bg-white/[0.06] overflow-hidden`}>
+        {indeterminate ? (
+          <div className={`h-full w-1/4 rounded-full ${fills[color]} animate-progress`} />
+        ) : (
+          <div
+            className={`h-full rounded-full ${fills[color]} transition-[width] duration-700 ease-out`}
+            style={{ width: `${percent}%` }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
+// MetricRing (Arcane gauge)
+// ═════════════════════════════════════════════════════════════
+export function MetricRing({
+  percent,
+  size = 80,
+  strokeWidth = 6,
+  color = 'violet',
+  label,
+  valueLabel,
+}: {
+  percent: number;
+  size?: number;
+  strokeWidth?: number;
+  color?: 'violet' | 'teal' | 'success' | 'danger' | 'warning';
+  label?: string;
+  valueLabel?: string;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (Math.min(100, Math.max(0, percent)) / 100) * circumference;
+  const gradients: Record<string, [string, string]> = {
+    violet: ['#7C3AED', '#A855F7'],
+    teal: ['#0EA5E9', '#22D3EE'],
+    success: ['#059669', '#34D399'],
+    danger: ['#DC2626', '#F87171'],
+    warning: ['#D97706', '#FBBF24'],
+  };
+  const [start, end] = gradients[color];
+  const gradId = `ring-${color}-${size}`;
+
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          <defs>
+            <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor={start} />
+              <stop offset="100%" stopColor={end} />
+            </linearGradient>
+          </defs>
+          <circle cx={size / 2} cy={size / 2} r={radius} stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} fill="none" />
+          <circle
+            cx={size / 2} cy={size / 2} r={radius}
+            stroke={`url(#${gradId})`}
+            strokeWidth={strokeWidth}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-xs font-bold text-text-primary">{valueLabel ?? `${Math.round(percent)}%`}</span>
+        </div>
+      </div>
+      {label && <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">{label}</span>}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
 // Table
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 export function Table({ headers, children, className = '' }: {
   headers: string[];
   children: ReactNode;
   className?: string;
 }) {
   return (
-    <div className={`overflow-x-auto rounded-2xl glass ${className}`}>
+    <div className={`overflow-x-auto rounded-2xl glass-card ${className}`}>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-white/[0.06]">
             {headers.map((h) => (
-              <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wide whitespace-nowrap">
+              <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider whitespace-nowrap">
                 {h}
               </th>
             ))}
@@ -340,7 +578,7 @@ export function Table({ headers, children, className = '' }: {
 export function Tr({ children, className = '', onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
   return (
     <tr
-      className={`border-b border-white/[0.04] last:border-0 transition-colors ${onClick ? 'cursor-pointer hover:bg-white/[0.03]' : ''} ${className}`}
+      className={`border-b border-white/[0.04] last:border-0 transition-colors duration-150 ${onClick ? 'cursor-pointer hover:bg-white/[0.03]' : ''} ${className}`}
       onClick={onClick}
     >
       {children}
@@ -352,15 +590,15 @@ export function Td({ children, className = '' }: { children: ReactNode; classNam
   return <td className={`px-4 py-3 text-text-primary ${className}`}>{children}</td>;
 }
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 // Tabs
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 export function Tabs({
   tabs,
   active,
   onChange,
 }: {
-  tabs: { label: string; value: string; count?: number }[];
+  tabs: { label: string; value: string; count?: number; icon?: ReactNode }[];
   active: string;
   onChange: (v: string) => void;
 }) {
@@ -370,15 +608,21 @@ export function Tabs({
         <button
           key={tab.value}
           onClick={() => onChange(tab.value)}
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all flex items-center gap-1.5 ${
+          className={`relative rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${
             active === tab.value
-              ? 'bg-white/[0.08] text-text-primary'
-              : 'text-text-muted hover:text-text-primary'
+              ? 'bg-white/[0.08] text-text-primary shadow-sm'
+              : 'text-text-muted hover:text-text-primary hover:bg-white/[0.03]'
           }`}
         >
+          {tab.icon}
           {tab.label}
           {tab.count !== undefined && (
-            <span className="text-xs rounded-full bg-white/10 px-1.5 py-0.5 leading-none">{tab.count}</span>
+            <span className={`text-[10px] rounded-full px-1.5 py-0.5 leading-none font-mono ${
+              active === tab.value ? 'bg-accent-violet/20 text-accent-violet-light' : 'bg-white/10 text-text-muted'
+            }`}>{tab.count}</span>
+          )}
+          {active === tab.value && (
+            <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-brand-gradient rounded-full animate-tab-indicator" />
           )}
         </button>
       ))}
@@ -386,9 +630,9 @@ export function Tabs({
   );
 }
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 // Modal
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 export function Modal({
   open,
   onClose,
@@ -406,30 +650,32 @@ export function Modal({
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    if (open) document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    if (open) {
+      document.addEventListener('keydown', onKey);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
   }, [open, onClose]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-md transition-all"
+        className="absolute inset-0 bg-black/70 backdrop-blur-md animate-fade-in"
         onClick={() => { if (closeOnOverlayClick) onClose(); }}
       />
-      <div className={`relative z-10 w-full ${width} glass rounded-2xl p-6 animate-scale-in shadow-card border border-white/10`}>
+      <div className={`relative z-10 w-full ${width} glass-elevated rounded-2xl p-6 animate-scale-in border border-white/10`}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-semibold text-base text-text-primary">{title}</h2>
-          <button
-            onClick={onClose}
-            aria-label="Close modal"
-            className="text-text-muted hover:text-text-primary transition-colors p-1.5 rounded-lg hover:bg-white/10"
-          >
+          <IconButton variant="ghost" size="sm" onClick={onClose} tooltip="Close">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M18 6L6 18M6 6l12 12"/>
             </svg>
-          </button>
+          </IconButton>
         </div>
         {children}
       </div>
@@ -437,9 +683,9 @@ export function Modal({
   );
 }
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 // ConfirmDialog
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 export function ConfirmDialog({
   open,
   isOpen,
@@ -473,7 +719,7 @@ export function ConfirmDialog({
   }
   return (
     <Modal open={isOpened} onClose={onClose} title={title} width="max-w-sm">
-      <p className="text-text-muted text-xs mb-6">{message}</p>
+      <p className="text-text-muted text-sm mb-6">{message}</p>
       <div className="flex gap-3 justify-end">
         <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
         <Button variant={danger ? 'danger' : 'primary'} size="sm" loading={loading} onClick={handle}>
@@ -484,11 +730,79 @@ export function ConfirmDialog({
   );
 }
 
+// ═════════════════════════════════════════════════════════════
+// Dropdown / Popover
+// ═════════════════════════════════════════════════════════════
+export function Dropdown({
+  trigger,
+  children,
+  align = 'right',
+}: {
+  trigger: ReactNode;
+  children: ReactNode;
+  align?: 'left' | 'right';
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-// ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <div onClick={() => setOpen(!open)}>{trigger}</div>
+      {open && (
+        <div
+          className={`absolute z-[50] mt-2 min-w-[180px] glass-elevated rounded-xl py-1.5 border border-white/10 animate-scale-in origin-top ${
+            align === 'right' ? 'right-0' : 'left-0'
+          }`}
+          onClick={() => setOpen(false)}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function DropdownItem({
+  children,
+  onClick,
+  icon,
+  danger,
+  disabled,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  icon?: ReactNode;
+  danger?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors duration-150 ${
+        danger
+          ? 'text-red-400 hover:bg-red-500/10'
+          : 'text-text-secondary hover:text-text-primary hover:bg-white/[0.05]'
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+    >
+      {icon && <span className="shrink-0 w-4 h-4 flex items-center justify-center">{icon}</span>}
+      {children}
+    </button>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
 // Toast System
-// ─────────────────────────────────────────────────────────────
-type ToastType = 'success' | 'error' | 'info';
+// ═════════════════════════════════════════════════════════════
+type ToastType = 'success' | 'error' | 'info' | 'warning';
 interface ToastItem { id: number; message: string; type: ToastType; }
 
 const ToastContext = createContext<{
@@ -507,28 +821,34 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
   }, []);
 
+  const dismiss = (id: number) => setToasts((prev) => prev.filter((t) => t.id !== id));
+
   const COLORS: Record<ToastType, string> = {
     success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
     error: 'border-red-500/30 bg-red-500/10 text-red-300',
     info: 'border-accent-violet/30 bg-accent-violet/10 text-accent-violet-light',
+    warning: 'border-yellow-500/30 bg-yellow-500/10 text-yellow-300',
   };
 
-  const ICONS: Record<ToastType, string> = {
-    success: 'M20 6L9 17l-5-5',
-    error: 'M18 6L6 18M6 6l12 12',
-    info: 'M13 16h-1v-4h-1m1-4h.01',
+  const ICONS: Record<ToastType, ReactNode> = {
+    success: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>,
+    error: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>,
+    info: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>,
+    warning: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>,
   };
 
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
+      <div className="fixed bottom-4 right-4 z-[400] flex flex-col gap-2 max-w-sm">
         {toasts.map((t) => (
-          <div key={t.id} className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-card backdrop-blur-md animate-slide-up ${COLORS[t.type]}`}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
-              <path d={ICONS[t.type]}/>
-            </svg>
-            {t.message}
+          <div
+            key={t.id}
+            className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-card backdrop-blur-xl animate-toast-enter cursor-pointer ${COLORS[t.type]}`}
+            onClick={() => dismiss(t.id)}
+          >
+            <span className="shrink-0 mt-0.5">{ICONS[t.type]}</span>
+            <span className="flex-1">{t.message}</span>
           </div>
         ))}
       </div>
@@ -536,21 +856,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 // Stat Card
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 export function StatCard({
   label,
   value,
   icon,
   trend,
   color = 'violet',
+  className,
 }: {
   label: string;
   value: string | number;
   icon?: ReactNode;
   trend?: { value: string; up: boolean };
   color?: 'violet' | 'teal' | 'green' | 'orange';
+  className?: string;
 }) {
   const colors = {
     violet: { bg: 'bg-accent-violet/10', text: 'text-accent-violet-light', glow: 'rgba(124,58,237,0.15)' },
@@ -560,9 +882,12 @@ export function StatCard({
   };
   const c = colors[color];
   return (
-    <div className="glass rounded-2xl p-5 flex items-center gap-4 hover:bg-white/[0.05] transition-colors">
+    <div className={`glass-card rounded-2xl p-5 flex items-center gap-4 group ${className || ''}`}>
       {icon && (
-        <div className={`h-11 w-11 rounded-xl ${c.bg} flex items-center justify-center ${c.text} shrink-0`} style={{ boxShadow: `0 0 16px ${c.glow}` }}>
+        <div
+          className={`h-11 w-11 rounded-xl ${c.bg} flex items-center justify-center ${c.text} shrink-0 transition-transform duration-300 group-hover:scale-110`}
+          style={{ boxShadow: `0 0 16px ${c.glow}` }}
+        >
           {icon}
         </div>
       )}
@@ -579,14 +904,117 @@ export function StatCard({
   );
 }
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
+// KV Row / Detail Row
+// ═════════════════════════════════════════════════════════════
+export function KVRow({ label, value, mono }: { label: string; value: ReactNode; mono?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2.5 border-b border-white/[0.04] last:border-0">
+      <span className="text-xs text-text-muted shrink-0">{label}</span>
+      <span className={`text-sm text-text-primary text-right break-all ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// Chip / Tag
+// ═════════════════════════════════════════════════════════════
+export function Chip({
+  children,
+  onRemove,
+  color = 'default',
+}: {
+  children: ReactNode;
+  onRemove?: () => void;
+  color?: 'default' | 'violet' | 'teal' | 'success' | 'warning' | 'danger';
+}) {
+  const colors: Record<string, string> = {
+    default: 'bg-white/[0.06] text-text-secondary border-white/[0.08]',
+    violet: 'bg-accent-violet/15 text-accent-violet-light border-accent-violet/20',
+    teal: 'bg-accent-teal/15 text-accent-teal-bright border-accent-teal/20',
+    success: 'bg-success-bg text-emerald-300 border-emerald-500/20',
+    warning: 'bg-warning-bg text-yellow-300 border-yellow-500/20',
+    danger: 'bg-danger-bg text-red-300 border-red-500/20',
+  };
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-xs font-medium ${colors[color]}`}>
+      {children}
+      {onRemove && (
+        <button onClick={onRemove} className="hover:text-white transition-colors">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      )}
+    </span>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// SearchInput
+// ═════════════════════════════════════════════════════════════
+export function SearchInput({
+  value,
+  onChange,
+  placeholder = 'Search...',
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  return (
+    <div className={`relative ${className || ''}`}>
+      <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full glass-input rounded-xl pl-10 pr-4 py-2 text-sm text-text-primary placeholder:text-text-faint focus:outline-none"
+      />
+      {value && (
+        <button onClick={() => onChange('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-faint hover:text-text-primary transition-colors">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
 // Formatting Helpers
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 export function formatMoney(amountInSmallestUnit: number, currencyLabel?: string) {
   const currency = currencyLabel || (typeof window !== 'undefined' ? localStorage.getItem('user_currency') || 'LKR' : 'LKR');
   return `${currency} ${(amountInSmallestUnit / 100).toFixed(2)}`;
 }
 
+export function formatBytes(bytes: number, decimals = 2): string {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`;
+}
+
+export function formatRelativeTime(dateString: string | number): string {
+  const date = typeof dateString === 'number' ? new Date(dateString * 1000) : new Date(dateString);
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
+
+// ═════════════════════════════════════════════════════════════
+// RevealSecret
+// ═════════════════════════════════════════════════════════════
 export function RevealSecret({ fetchSecret }: { fetchSecret: () => Promise<string> }) {
   const [value, setValue] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -600,7 +1028,7 @@ export function RevealSecret({ fetchSecret }: { fetchSecret: () => Promise<strin
     finally { setLoading(false); }
   }
 
-  if (value) return <code className="text-xs bg-black/40 rounded px-2 py-1 select-all font-mono">{value}</code>;
+  if (value) return <code className="text-xs bg-black/40 rounded-lg px-2.5 py-1 select-all font-mono">{value}</code>;
   return (
     <div className="inline-flex items-center gap-2">
       <Button variant="secondary" size="sm" onClick={handleReveal} loading={loading}>Reveal password</Button>
@@ -609,25 +1037,98 @@ export function RevealSecret({ fetchSecret }: { fetchSecret: () => Promise<strin
   );
 }
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 // Section Header
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 export function PageHeader({
   title,
   description,
   action,
+  breadcrumbs,
 }: {
   title: string;
   description?: string | ReactNode;
   action?: ReactNode;
+  breadcrumbs?: { label: string; href?: string }[];
 }) {
   return (
-    <div className="flex items-start justify-between mb-6">
-      <div>
-        <h1 className="text-xl font-semibold text-text-primary">{title}</h1>
-        {description && <div className="text-text-muted text-sm mt-0.5">{description}</div>}
+    <div className="mb-6 animate-slide-down">
+      {breadcrumbs && breadcrumbs.length > 0 && (
+        <div className="flex items-center gap-1.5 text-xs text-text-muted mb-2">
+          {breadcrumbs.map((bc, i) => (
+            <span key={i} className="flex items-center gap-1.5">
+              {i > 0 && <span className="text-text-faint">/</span>}
+              {bc.href ? (
+                <a href={bc.href} className="hover:text-text-primary transition-colors">{bc.label}</a>
+              ) : (
+                <span className="text-text-secondary">{bc.label}</span>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-text-primary">{title}</h1>
+          {description && <div className="text-text-muted text-sm mt-0.5">{description}</div>}
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
       </div>
-      {action && <div>{action}</div>}
     </div>
   );
 }
+
+// ═════════════════════════════════════════════════════════════
+// Divider
+// ═════════════════════════════════════════════════════════════
+export function Divider({ label }: { label?: string }) {
+  if (!label) return <hr className="border-white/[0.06] my-4" />;
+  return (
+    <div className="flex items-center gap-3 my-4">
+      <hr className="border-white/[0.06] flex-1" />
+      <span className="text-[10px] text-text-faint uppercase tracking-widest font-medium">{label}</span>
+      <hr className="border-white/[0.06] flex-1" />
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// MetricCard & MetricRing
+// ═════════════════════════════════════════════════════════════
+export function MetricCard({
+  title,
+  value,
+  change,
+  changeType = 'neutral',
+  icon,
+}: {
+  title: string;
+  value: string | number;
+  change?: string;
+  changeType?: 'positive' | 'negative' | 'neutral';
+  icon?: ReactNode;
+}) {
+  const changeColors = {
+    positive: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+    negative: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
+    neutral: 'text-text-muted bg-white/[0.04] border-white/[0.06]',
+  };
+  return (
+    <Card className="p-5 flex flex-col justify-between">
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">{title}</span>
+        {icon && <div className="text-text-muted shrink-0">{icon}</div>}
+      </div>
+      <div>
+        <div className="text-2xl font-bold text-white tracking-tight">{value}</div>
+        {change && (
+          <div className="mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border border-white/[0.06]">
+            <span className={changeColors[changeType]}>{change}</span>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+

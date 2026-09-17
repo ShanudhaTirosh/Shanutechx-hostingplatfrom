@@ -95,13 +95,4 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
   next();
 }
 
-/**
- * Helper function to add custom allowed origins at runtime (e.g., for testing or dynamic domains).
- * NOT recommended for production - configure ALLOWED_ORIGINS array instead.
- */
-export function addAllowedOrigin(origin: string): void {
-  if (!ALLOWED_ORIGINS.includes(origin)) {
-    ALLOWED_ORIGINS.push(origin);
-    logger.info({ origin }, 'Added allowed origin for CSRF protection');
-  }
-}
+

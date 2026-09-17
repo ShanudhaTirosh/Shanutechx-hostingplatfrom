@@ -209,3 +209,24 @@ nodeFailoverWorker.on('failed', (job, err) => {
   }
 })();
 
+async function gracefulWorkerShutdown(signal: string) {
+  logger.info({ signal }, 'Worker process received termination signal. Closing workers cleanly...');
+  try {
+    await Promise.all([
+      sslRenewalWorker.close(),
+      workspaceCleanupWorker.close(),
+      billingSweepWorker.close(),
+      uptimeSweepWorker.close(),
+      nodeFailoverWorker.close(),
+    ]);
+    logger.info('All BullMQ workers shut down gracefully.');
+    process.exit(0);
+  } catch (err) {
+    logger.error({ err }, 'Error during worker graceful shutdown');
+    process.exit(1);
+  }
+}
+
+process.on('SIGTERM', () => void gracefulWorkerShutdown('SIGTERM'));
+process.on('SIGINT', () => void gracefulWorkerShutdown('SIGINT'));
+

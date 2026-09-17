@@ -415,6 +415,17 @@ async function getDockerContainerLogs(containerId, tail = 200) {
   return { containerId, logs };
 }
 
+async function getDockerContainerLogStream(containerId, tail = 100) {
+  const container = docker.getContainer(containerId);
+  return await container.logs({
+    follow: true,
+    stdout: true,
+    stderr: true,
+    tail,
+    timestamps: true,
+  });
+}
+
 async function createDockerContainer({ name, image, env = [], ports = [], volumes = [], network }) {
   // Pull image if not local
   try {
@@ -602,6 +613,7 @@ module.exports = {
   listDockerContainers,
   controlDockerContainer,
   getDockerContainerLogs,
+  getDockerContainerLogStream,
   createDockerContainer,
   listDockerNetworks,
   createDockerNetwork,

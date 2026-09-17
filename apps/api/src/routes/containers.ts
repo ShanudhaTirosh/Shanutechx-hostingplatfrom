@@ -112,3 +112,234 @@ containersRouter.delete('/nodes/:nodeId/containers/:containerId', async (req: Au
   }
 });
 
+// ── Container Extended Management ──────────────────────────────────────────
+
+containersRouter.post('/nodes/:nodeId/containers/:containerId/pause', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { pauseContainer } = await import('../lib/nodeAgentClient');
+    await pauseContainer(node, req.params.containerId);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.post('/nodes/:nodeId/containers/:containerId/unpause', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { unpauseContainer } = await import('../lib/nodeAgentClient');
+    await unpauseContainer(node, req.params.containerId);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.put('/nodes/:nodeId/containers/:containerId/rename', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { renameContainer } = await import('../lib/nodeAgentClient');
+    await renameContainer(node, req.params.containerId, req.body.name);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.get('/nodes/:nodeId/containers/:containerId/top', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { containerTop } = await import('../lib/nodeAgentClient');
+    const result = await containerTop(node, req.params.containerId);
+    res.json(result);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.get('/nodes/:nodeId/containers/:containerId/changes', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { containerChanges } = await import('../lib/nodeAgentClient');
+    const result = await containerChanges(node, req.params.containerId);
+    res.json(result);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+// ── Image Management Routes ────────────────────────────────────────────────
+
+containersRouter.get('/nodes/:nodeId/images', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { listNodeImages } = await import('../lib/nodeAgentClient');
+    const images = await listNodeImages(node);
+    res.json({ images });
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.get('/nodes/:nodeId/images/:imageId', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { inspectNodeImage } = await import('../lib/nodeAgentClient');
+    const info = await inspectNodeImage(node, req.params.imageId);
+    res.json(info);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.post('/nodes/:nodeId/images/pull', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { pullNodeImage } = await import('../lib/nodeAgentClient');
+    const result = await pullNodeImage(node, req.body.image, req.body.tag);
+    res.json(result);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.delete('/nodes/:nodeId/images/:imageId', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { removeNodeImage } = await import('../lib/nodeAgentClient');
+    await removeNodeImage(node, req.params.imageId, req.query.force === 'true');
+    res.json({ ok: true });
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.post('/nodes/:nodeId/images/prune', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { pruneNodeImages } = await import('../lib/nodeAgentClient');
+    const result = await pruneNodeImages(node);
+    res.json(result);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+// ── Volume Management Routes ───────────────────────────────────────────────
+
+containersRouter.get('/nodes/:nodeId/volumes', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { listNodeVolumes } = await import('../lib/nodeAgentClient');
+    const volumes = await listNodeVolumes(node);
+    res.json({ volumes });
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.get('/nodes/:nodeId/volumes/:name', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { inspectNodeVolume } = await import('../lib/nodeAgentClient');
+    const info = await inspectNodeVolume(node, req.params.name);
+    res.json(info);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.post('/nodes/:nodeId/volumes', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { createNodeVolume } = await import('../lib/nodeAgentClient');
+    const result = await createNodeVolume(node, req.body.name, req.body.driver, req.body.labels);
+    res.status(201).json(result);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.delete('/nodes/:nodeId/volumes/:name', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { removeNodeVolume } = await import('../lib/nodeAgentClient');
+    await removeNodeVolume(node, req.params.name);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.post('/nodes/:nodeId/volumes/prune', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { pruneNodeVolumes } = await import('../lib/nodeAgentClient');
+    const result = await pruneNodeVolumes(node);
+    res.json(result);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+// ── Network Management Routes ──────────────────────────────────────────────
+
+containersRouter.get('/nodes/:nodeId/networks', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { listNodeNetworks } = await import('../lib/nodeAgentClient');
+    const networks = await listNodeNetworks(node);
+    res.json({ networks });
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.get('/nodes/:nodeId/networks/:networkId', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { inspectNodeNetwork } = await import('../lib/nodeAgentClient');
+    const info = await inspectNodeNetwork(node, req.params.networkId);
+    res.json(info);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.post('/nodes/:nodeId/networks', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { createNodeNetwork } = await import('../lib/nodeAgentClient');
+    const result = await createNodeNetwork(node, req.body.name, req.body.driver, req.body.options);
+    res.status(201).json(result);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.delete('/nodes/:nodeId/networks/:networkId', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { removeNodeNetwork } = await import('../lib/nodeAgentClient');
+    await removeNodeNetwork(node, req.params.networkId);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.post('/nodes/:nodeId/networks/prune', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { pruneNodeNetworks } = await import('../lib/nodeAgentClient');
+    const result = await pruneNodeNetworks(node);
+    res.json(result);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+// ── Docker System Routes ───────────────────────────────────────────────────
+
+containersRouter.get('/nodes/:nodeId/docker/system/info', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { getNodeDockerInfo } = await import('../lib/nodeAgentClient');
+    const info = await getNodeDockerInfo(node);
+    res.json(info);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+containersRouter.get('/nodes/:nodeId/docker/system/df', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  try {
+    const { getNodeDockerDf } = await import('../lib/nodeAgentClient');
+    const df = await getNodeDockerDf(node);
+    res.json(df);
+  } catch (err: any) { res.status(502).json({ error: err.message }); }
+});
+
+

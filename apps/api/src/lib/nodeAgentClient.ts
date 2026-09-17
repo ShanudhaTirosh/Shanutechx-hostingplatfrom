@@ -427,3 +427,107 @@ export async function getContainerLogs(node: Node, containerId: string, tail = 2
   const data: any = await res.json();
   return data.logs;
 }
+
+export async function pauseContainer(node: Node, containerId: string): Promise<void> {
+  await callNodeAgent(node, `/agent/containers/${containerId}/pause`, 'POST');
+}
+
+export async function unpauseContainer(node: Node, containerId: string): Promise<void> {
+  await callNodeAgent(node, `/agent/containers/${containerId}/unpause`, 'POST');
+}
+
+export async function renameContainer(node: Node, containerId: string, name: string): Promise<void> {
+  await callNodeAgent(node, `/agent/containers/${containerId}/rename`, 'PUT', { name });
+}
+
+export async function containerTop(node: Node, containerId: string): Promise<any> {
+  return callNodeAgent(node, `/agent/containers/${containerId}/top`, 'GET');
+}
+
+export async function containerChanges(node: Node, containerId: string): Promise<any> {
+  return callNodeAgent(node, `/agent/containers/${containerId}/changes`, 'GET');
+}
+
+// ── Images Proxy ─────────────────────────────────────────────────────────────
+
+export async function listNodeImages(node: Node): Promise<any[]> {
+  const res = await callNodeAgent(node, '/agent/images', 'GET');
+  return res.images || [];
+}
+
+export async function inspectNodeImage(node: Node, imageId: string): Promise<any> {
+  return callNodeAgent(node, `/agent/images/${encodeURIComponent(imageId)}`, 'GET');
+}
+
+export async function pullNodeImage(node: Node, image: string, tag = 'latest'): Promise<any> {
+  return callNodeAgent(node, '/agent/images/pull', 'POST', { image, tag });
+}
+
+export async function removeNodeImage(node: Node, imageId: string, force = false): Promise<void> {
+  await callNodeAgent(node, `/agent/images/${encodeURIComponent(imageId)}?force=${force}`, 'DELETE');
+}
+
+export async function tagNodeImage(node: Node, imageId: string, repo: string, tag = 'latest'): Promise<void> {
+  await callNodeAgent(node, `/agent/images/${encodeURIComponent(imageId)}/tag`, 'POST', { repo, tag });
+}
+
+export async function pruneNodeImages(node: Node): Promise<any> {
+  return callNodeAgent(node, '/agent/images/prune', 'POST');
+}
+
+// ── Volumes Proxy ────────────────────────────────────────────────────────────
+
+export async function listNodeVolumes(node: Node): Promise<any[]> {
+  const res = await callNodeAgent(node, '/agent/volumes', 'GET');
+  return res.volumes || [];
+}
+
+export async function inspectNodeVolume(node: Node, name: string): Promise<any> {
+  return callNodeAgent(node, `/agent/volumes/${encodeURIComponent(name)}`, 'GET');
+}
+
+export async function createNodeVolume(node: Node, name: string, driver = 'local', labels?: Record<string, string>): Promise<any> {
+  return callNodeAgent(node, '/agent/volumes', 'POST', { name, driver, labels });
+}
+
+export async function removeNodeVolume(node: Node, name: string): Promise<void> {
+  await callNodeAgent(node, `/agent/volumes/${encodeURIComponent(name)}`, 'DELETE');
+}
+
+export async function pruneNodeVolumes(node: Node): Promise<any> {
+  return callNodeAgent(node, '/agent/volumes/prune', 'POST');
+}
+
+// ── Networks Proxy ───────────────────────────────────────────────────────────
+
+export async function listNodeNetworks(node: Node): Promise<any[]> {
+  const res = await callNodeAgent(node, '/agent/networks', 'GET');
+  return res.networks || [];
+}
+
+export async function inspectNodeNetwork(node: Node, networkId: string): Promise<any> {
+  return callNodeAgent(node, `/agent/networks/${encodeURIComponent(networkId)}`, 'GET');
+}
+
+export async function createNodeNetwork(node: Node, name: string, driver = 'bridge', options?: any): Promise<any> {
+  return callNodeAgent(node, '/agent/networks', 'POST', { name, driver, options });
+}
+
+export async function removeNodeNetwork(node: Node, networkId: string): Promise<void> {
+  await callNodeAgent(node, `/agent/networks/${encodeURIComponent(networkId)}`, 'DELETE');
+}
+
+export async function pruneNodeNetworks(node: Node): Promise<any> {
+  return callNodeAgent(node, '/agent/networks/prune', 'POST');
+}
+
+// ── System Proxy ─────────────────────────────────────────────────────────────
+
+export async function getNodeDockerInfo(node: Node): Promise<any> {
+  return callNodeAgent(node, '/agent/system/info', 'GET');
+}
+
+export async function getNodeDockerDf(node: Node): Promise<any> {
+  return callNodeAgent(node, '/agent/system/df', 'GET');
+}
+

@@ -223,7 +223,10 @@ deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
       },
     });
 
-    return res.status(201).json({ ok: true, deployment: dep });
+    return res.status(201).json({
+      ok: true,
+      deployment: { ...dep, repoUrl: redactRepoUrl(dep.repoUrl) },
+    });
   }
 
   if (!data.repoUrl || !data.internalPort) {
@@ -524,7 +527,7 @@ deploymentsRouter.patch('/deployments/:id/routing', async (req: AuthedRequest, r
   });
 
   logger.info({ deploymentId: deployment.id, routingMode: parse.data.routingMode }, 'Updated routing mode');
-  res.json({ deployment: updated, routingMode: parse.data.routingMode, publishedPort: parse.data.publishedPort || deployment.internalPort });
+  res.json({ deployment: { ...updated, repoUrl: redactRepoUrl(updated.repoUrl) }, routingMode: parse.data.routingMode, publishedPort: parse.data.publishedPort || deployment.internalPort });
 });
 
 
@@ -632,7 +635,10 @@ deploymentsRouter.patch('/deployments/:id/config', async (req: AuthedRequest, re
     },
   });
 
-  res.json({ ok: true, deployment: updated });
+  res.json({
+    ok: true,
+    deployment: { ...updated, repoUrl: redactRepoUrl(updated.repoUrl) },
+  });
 });
 
 deploymentsRouter.post('/deployments/:id/stop', async (req: AuthedRequest, res) => {
@@ -1424,7 +1430,7 @@ deploymentsRouter.post('/deployments/bot-hosting', async (req: AuthedRequest, re
 
   res.status(201).json({
     ok: true,
-    botDeployment: dep,
+    botDeployment: { ...dep, repoUrl: redactRepoUrl(dep.repoUrl) },
     language,
     entryFile: defaultEntry,
     startCommand: defaultStart,

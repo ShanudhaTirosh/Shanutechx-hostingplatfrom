@@ -274,8 +274,10 @@ server.listen(env.port, () => {
 
 async function ensureDefaultMasterNodeRegistered() {
   try {
-    const nodeCount = await prisma.node.count({ where: { isActive: true } });
-    if (nodeCount === 0) {
+    const existing = await prisma.node.findFirst({
+      where: { ip: '127.0.0.1', label: 'Local Master Compute Host' },
+    });
+    if (!existing) {
       await prisma.node.create({
         data: {
           label: 'Local Master Compute Host',

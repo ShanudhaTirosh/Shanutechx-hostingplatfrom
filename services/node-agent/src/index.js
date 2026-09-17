@@ -5,7 +5,19 @@ const express = require('express');
 const pino = require('pino');
 const { prepareWorkspace, pushWorkspaceToRemote, WORKSPACES_DIR } = require('./repo');
 const { buildImage } = require('./build');
-const { runContainer, stopAndRemove, stopContainer, getLogs, streamLogs, startContainer, restartContainer, listContainers, getContainerMetrics } = require('./docker');
+const {
+  runContainer, stopAndRemove, stopContainer, getLogs, streamLogs, startContainer, restartContainer, listContainers, getContainerMetrics, inspectContainer,
+  // Container enhancements (Arcane-inspired)
+  pauseContainer, unpauseContainer, renameContainer, containerTop, containerChanges, streamContainerStats,
+  // Image management
+  listImages, pullImage, removeImage, inspectImage, tagImage, pruneImages,
+  // Volume management
+  listVolumes, createVolume, removeVolume, inspectVolume, pruneVolumes,
+  // Network management
+  listNetworks: listDockerNetworksNew, createNetwork: createDockerNetworkNew, removeNetwork, inspectNetwork, pruneNetworks,
+  // System
+  getSystemInfo, getDiskUsage,
+} = require('./docker');
 const { collectStats } = require('./stats');
 const { addKey } = require('./livekit');
 const { addDomainRoute, removeDomainRoute } = require('./customDomain');
@@ -147,6 +159,293 @@ app.get('/agent/containers/:containerId/logs', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.get('/agent/containers/:containerId/inspect', async (req, res) => {
+  try {
+    const info = await inspectContainer(req.params.containerId);
+    res.json(info);
+  } catch (err) {
+    logger.error({ err }, 'Failed to inspect container');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/containers/:containerId/pause', async (req, res) => {
+  try {
+    await pauseContainer(req.params.containerId);
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, 'Failed to pause container');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/containers/:containerId/unpause', async (req, res) => {
+  try {
+    await unpauseContainer(req.params.containerId);
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, 'Failed to unpause container');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/agent/containers/:containerId/rename', async (req, res) => {
+  const { name } = req.body || {};
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  try {
+    await renameContainer(req.params.containerId, name);
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, 'Failed to rename container');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/agent/containers/:containerId/top', async (req, res) => {
+  try {
+    const result = await containerTop(req.params.containerId);
+    res.json(result);
+  } catch (err) {
+    logger.error({ err }, 'Failed to get container processes');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/agent/containers/:containerId/changes', async (req, res) => {
+  try {
+    const changes = await containerChanges(req.params.containerId);
+    res.json({ changes: changes || [] });
+  } catch (err) {
+    logger.error({ err }, 'Failed to get container changes');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/agent/containers/:containerId/stats/stream', async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.write('data: {"type":"connected"}\n\n');
+
+  let statsStream;
+  try {
+    statsStream = await streamContainerStats(req.params.containerId);
+    req.on('close', () => { if (statsStream) statsStream.destroy(); });
+    statsStream.on('data', (chunk) => {
+      const line = chunk.toString().trim();
+      if (line) res.write(`data: ${line}\n\n`);
+    });
+    statsStream.on('end', () => res.end());
+    statsStream.on('error', () => res.end());
+  } catch (err) {
+    logger.error({ err }, 'Failed to start stats stream');
+    res.write(`data: {"error":"${err.message}"}\n\n`);
+    res.end();
+  }
+});
+
+// ── Image Management (Arcane-inspired) ───────────────────────────────────────
+
+app.get('/agent/images', async (_req, res) => {
+  try {
+    const images = await listImages();
+    res.json({ images });
+  } catch (err) {
+    logger.error({ err }, 'Failed to list images');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/agent/images/:imageId', async (req, res) => {
+  try {
+    const info = await inspectImage(decodeURIComponent(req.params.imageId));
+    res.json(info);
+  } catch (err) {
+    logger.error({ err }, 'Failed to inspect image');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/images/pull', async (req, res) => {
+  const { image, tag } = req.body || {};
+  if (!image) return res.status(400).json({ error: 'image name is required' });
+  try {
+    const result = await pullImage(image, tag || 'latest');
+    logger.info({ image, tag }, 'Image pulled');
+    res.json(result);
+  } catch (err) {
+    logger.error({ err, image }, 'Failed to pull image');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/agent/images/:imageId', async (req, res) => {
+  const force = req.query.force === 'true';
+  try {
+    await removeImage(decodeURIComponent(req.params.imageId), force);
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, 'Failed to remove image');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/images/:imageId/tag', async (req, res) => {
+  const { repo, tag } = req.body || {};
+  if (!repo) return res.status(400).json({ error: 'repo is required' });
+  try {
+    await tagImage(decodeURIComponent(req.params.imageId), repo, tag || 'latest');
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, 'Failed to tag image');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/images/prune', async (_req, res) => {
+  try {
+    const result = await pruneImages();
+    res.json(result);
+  } catch (err) {
+    logger.error({ err }, 'Failed to prune images');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Volume Management (Arcane-inspired) ──────────────────────────────────────
+
+app.get('/agent/volumes', async (_req, res) => {
+  try {
+    const volumes = await listVolumes();
+    res.json({ volumes });
+  } catch (err) {
+    logger.error({ err }, 'Failed to list volumes');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/agent/volumes/:name', async (req, res) => {
+  try {
+    const info = await inspectVolume(req.params.name);
+    res.json(info);
+  } catch (err) {
+    logger.error({ err }, 'Failed to inspect volume');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/volumes', async (req, res) => {
+  const { name, driver, labels } = req.body || {};
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  try {
+    const vol = await createVolume(name, driver, labels);
+    logger.info({ name }, 'Volume created');
+    res.status(201).json(vol);
+  } catch (err) {
+    logger.error({ err }, 'Failed to create volume');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/agent/volumes/:name', async (req, res) => {
+  try {
+    await removeVolume(req.params.name);
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, 'Failed to remove volume');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/volumes/prune', async (_req, res) => {
+  try {
+    const result = await pruneVolumes();
+    res.json(result);
+  } catch (err) {
+    logger.error({ err }, 'Failed to prune volumes');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Network Management (Arcane-inspired) ─────────────────────────────────────
+
+app.get('/agent/networks', async (_req, res) => {
+  try {
+    const networks = await listDockerNetworksNew();
+    res.json({ networks });
+  } catch (err) {
+    logger.error({ err }, 'Failed to list networks');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/agent/networks/:networkId', async (req, res) => {
+  try {
+    const info = await inspectNetwork(req.params.networkId);
+    res.json(info);
+  } catch (err) {
+    logger.error({ err }, 'Failed to inspect network');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/networks', async (req, res) => {
+  const { name, driver, options } = req.body || {};
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  try {
+    const result = await createDockerNetworkNew(name, driver, options);
+    logger.info({ name, driver }, 'Network created');
+    res.status(201).json(result);
+  } catch (err) {
+    logger.error({ err }, 'Failed to create network');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/agent/networks/:networkId', async (req, res) => {
+  try {
+    await removeNetwork(req.params.networkId);
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, 'Failed to remove network');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/networks/prune', async (_req, res) => {
+  try {
+    const result = await pruneNetworks();
+    res.json(result);
+  } catch (err) {
+    logger.error({ err }, 'Failed to prune networks');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Docker System Info (Arcane-inspired) ─────────────────────────────────────
+
+app.get('/agent/system/info', async (_req, res) => {
+  try {
+    const info = await getSystemInfo();
+    res.json(info);
+  } catch (err) {
+    logger.error({ err }, 'Failed to get system info');
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/agent/system/df', async (_req, res) => {
+  try {
+    const df = await getDiskUsage();
+    res.json(df);
+  } catch (err) {
+    logger.error({ err }, 'Failed to get disk usage');
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 /**
  * Build and run a deployment. Body:
@@ -291,19 +590,24 @@ app.get('/agent/deployments/:containerId/logs/stream', async (req, res) => {
   let logStream;
   
   try {
-    req.on('close', () => {
+    logStream = await nodeEngine.getDockerContainerLogStream(containerId);
+
+    const cleanup = () => {
       if (logStream && typeof logStream.destroy === 'function') {
         logStream.destroy();
       }
+    };
+
+    req.on('close', () => {
+      logger.info({ containerId }, 'Client disconnected from log stream');
+      cleanup();
     });
 
     logStream.on('data', (chunk) => {
-      // Each chunk is plain text log data (already demultiplexed)
-      // Split by newlines and send each line as a separate SSE event
+      // Each chunk is plain text log data (already demultiplexed or raw buffer)
       const lines = chunk.toString('utf-8').split('\n');
       for (const line of lines) {
         if (line.trim()) {
-          // Send as SSE event with JSON data
           const event = {
             type: 'log',
             data: line,
@@ -329,16 +633,7 @@ app.get('/agent/deployments/:containerId/logs/stream', async (req, res) => {
     logger.error({ containerId, err }, 'Failed to start log stream');
     res.write(`data: ${JSON.stringify({type:"error",message:"Failed to start log stream"})}\n\n`);
     res.end();
-    return;
   }
-  
-  // Handle client disconnect
-  req.on('close', () => {
-    logger.info({ containerId }, 'Client disconnected from log stream');
-    if (logStream) {
-      logStream.destroy();
-    }
-  });
 });
 
 app.post('/agent/deployments/:containerId/stop', async (req, res) => {

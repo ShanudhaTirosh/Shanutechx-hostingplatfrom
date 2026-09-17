@@ -249,7 +249,305 @@ async function getContainerMetrics(containerId) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────
+// Container Enhancements (Arcane-inspired)
+// ─────────────────────────────────────────────────────────────
+
+async function pauseContainer(containerId) {
+  const container = docker.getContainer(containerId);
+  await container.pause();
+}
+
+async function unpauseContainer(containerId) {
+  const container = docker.getContainer(containerId);
+  await container.unpause();
+}
+
+async function renameContainer(containerId, newName) {
+  const container = docker.getContainer(containerId);
+  await container.rename({ name: newName });
+}
+
+/** Returns the list of running processes inside a container (docker top). */
+async function containerTop(containerId) {
+  const container = docker.getContainer(containerId);
+  return container.top();
+}
+
+/** Returns filesystem changes since the container was created. */
+async function containerChanges(containerId) {
+  const container = docker.getContainer(containerId);
+  return container.changes();
+}
+
+/**
+ * Streams live CPU/memory/network stats for a container via SSE-compatible
+ * readable stream. Each data event is a JSON object with the full stats payload.
+ */
+async function streamContainerStats(containerId) {
+  const container = docker.getContainer(containerId);
+  const statsStream = await container.stats({ stream: true });
+
+  const { Transform } = require('stream');
+  const transform = new Transform({
+    readableObjectMode: false,
+    writableObjectMode: false,
+    transform(chunk, _encoding, callback) {
+      try {
+        const raw = JSON.parse(chunk.toString());
+        const cpuDelta = (raw.cpu_stats?.cpu_usage?.total_usage || 0) - (raw.precpu_stats?.cpu_usage?.total_usage || 0);
+        const sysDelta = (raw.cpu_stats?.system_cpu_usage || 0) - (raw.precpu_stats?.system_cpu_usage || 0);
+        const cpus = raw.cpu_stats?.online_cpus || 1;
+        const cpuPercent = sysDelta > 0 && cpuDelta > 0 ? Math.round((cpuDelta / sysDelta) * cpus * 100 * 100) / 100 : 0;
+
+        const memUsed = Math.round((raw.memory_stats?.usage || 0) / (1024 * 1024));
+        const rawLimit = raw.memory_stats?.limit || 0;
+        const memLimit = rawLimit > 0 && rawLimit < 1024 * 1024 * 1024 * 1024 ? Math.round(rawLimit / (1024 * 1024)) : null;
+        const memPercent = memLimit ? Math.round((memUsed / memLimit) * 100 * 100) / 100 : 0;
+
+        // Network I/O
+        const nets = raw.networks || {};
+        let rxBytes = 0, txBytes = 0;
+        for (const iface of Object.values(nets)) {
+          rxBytes += iface.rx_bytes || 0;
+          txBytes += iface.tx_bytes || 0;
+        }
+
+        // Block I/O
+        const blkStats = raw.blkio_stats?.io_service_bytes_recursive || [];
+        let blkRead = 0, blkWrite = 0;
+        for (const entry of blkStats) {
+          if (entry.op === 'read' || entry.op === 'Read') blkRead += entry.value || 0;
+          if (entry.op === 'write' || entry.op === 'Write') blkWrite += entry.value || 0;
+        }
+
+        const computed = {
+          cpuPercent,
+          memoryUsedMb: memUsed,
+          memoryLimitMb: memLimit,
+          memoryPercent: memPercent,
+          networkRxBytes: rxBytes,
+          networkTxBytes: txBytes,
+          blockReadBytes: blkRead,
+          blockWriteBytes: blkWrite,
+          pids: raw.pids_stats?.current || 0,
+          timestamp: new Date().toISOString(),
+        };
+        this.push(JSON.stringify(computed) + '\n');
+      } catch (_e) {
+        // Skip malformed chunks
+      }
+      callback();
+    },
+  });
+
+  statsStream.pipe(transform);
+  statsStream.on('error', (err) => transform.destroy(err));
+  // Allow callers to stop the underlying docker stats stream
+  const origDestroy = transform.destroy.bind(transform);
+  transform.destroy = (...args) => {
+    if (typeof statsStream.destroy === 'function') statsStream.destroy();
+    return origDestroy(...args);
+  };
+  return transform;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Image Management (Arcane-inspired)
+// ─────────────────────────────────────────────────────────────
+
+async function listImages() {
+  const images = await docker.listImages({ all: false });
+  return images.map((img) => ({
+    id: img.Id,
+    repoTags: img.RepoTags || [],
+    repoDigests: img.RepoDigests || [],
+    size: img.Size,
+    virtualSize: img.VirtualSize,
+    created: img.Created,
+    labels: img.Labels || {},
+    containers: img.Containers,
+  }));
+}
+
+async function pullImage(imageName, tag = 'latest') {
+  const fullName = `${imageName}:${tag}`;
+  return new Promise((resolve, reject) => {
+    docker.pull(fullName, (err, stream) => {
+      if (err) return reject(err);
+      const events = [];
+      docker.modem.followProgress(stream, (pullErr, output) => {
+        if (pullErr) return reject(pullErr);
+        resolve({ image: fullName, events: output });
+      }, (event) => {
+        events.push(event);
+      });
+    });
+  });
+}
+
+async function removeImage(imageId, force = false) {
+  const image = docker.getImage(imageId);
+  await image.remove({ force });
+}
+
+async function inspectImage(imageId) {
+  const image = docker.getImage(imageId);
+  return image.inspect();
+}
+
+async function tagImage(sourceId, repo, tag) {
+  const image = docker.getImage(sourceId);
+  await image.tag({ repo, tag });
+}
+
+async function pruneImages() {
+  return docker.pruneImages({ filters: { dangling: { true: true } } });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Volume Management (Arcane-inspired)
+// ─────────────────────────────────────────────────────────────
+
+async function listVolumes() {
+  const result = await docker.listVolumes();
+  return (result.Volumes || []).map((v) => ({
+    name: v.Name,
+    driver: v.Driver,
+    mountpoint: v.Mountpoint,
+    scope: v.Scope,
+    labels: v.Labels || {},
+    options: v.Options || {},
+    createdAt: v.CreatedAt,
+  }));
+}
+
+async function createVolume(name, driver = 'local', labels = {}) {
+  const vol = await docker.createVolume({ Name: name, Driver: driver, Labels: labels });
+  return vol;
+}
+
+async function removeVolume(name) {
+  const vol = docker.getVolume(name);
+  await vol.remove();
+}
+
+async function inspectVolume(name) {
+  const vol = docker.getVolume(name);
+  return vol.inspect();
+}
+
+async function pruneVolumes() {
+  return docker.pruneVolumes();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Network Management (Arcane-inspired)
+// ─────────────────────────────────────────────────────────────
+
+async function listNetworks() {
+  const networks = await docker.listNetworks();
+  return networks.map((n) => ({
+    id: n.Id,
+    name: n.Name,
+    driver: n.Driver,
+    scope: n.Scope,
+    internal: n.Internal,
+    enableIPv6: n.EnableIPv6,
+    ipam: n.IPAM,
+    containers: n.Containers || {},
+    labels: n.Labels || {},
+    created: n.Created,
+  }));
+}
+
+async function createNetwork(name, driver = 'bridge', options = {}) {
+  const network = await docker.createNetwork({
+    Name: name,
+    Driver: driver,
+    Options: options,
+  });
+  return { id: network.id, name };
+}
+
+async function removeNetwork(networkId) {
+  const network = docker.getNetwork(networkId);
+  await network.remove();
+}
+
+async function inspectNetwork(networkId) {
+  const network = docker.getNetwork(networkId);
+  return network.inspect();
+}
+
+async function pruneNetworks() {
+  return docker.pruneNetworks();
+}
+
+// ─────────────────────────────────────────────────────────────
+// System Info (Arcane-inspired)
+// ─────────────────────────────────────────────────────────────
+
+async function getSystemInfo() {
+  const info = await docker.info();
+  return {
+    dockerVersion: info.ServerVersion,
+    apiVersion: info.ApiVersion,
+    os: info.OperatingSystem,
+    osType: info.OSType,
+    architecture: info.Architecture,
+    kernel: info.KernelVersion,
+    cpus: info.NCPU,
+    memoryBytes: info.MemTotal,
+    containers: info.Containers,
+    containersRunning: info.ContainersRunning,
+    containersPaused: info.ContainersPaused,
+    containersStopped: info.ContainersStopped,
+    images: info.Images,
+    storageDriver: info.Driver,
+    runtimes: Object.keys(info.Runtimes || {}),
+    swarm: info.Swarm?.LocalNodeState || 'inactive',
+    name: info.Name,
+    id: info.ID,
+  };
+}
+
+async function getDiskUsage() {
+  const df = await docker.df();
+  const formatSize = (bytes) => {
+    if (!bytes) return '0 B';
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+  };
+
+  return {
+    images: {
+      count: (df.Images || []).length,
+      totalSize: (df.Images || []).reduce((sum, i) => sum + (i.Size || 0), 0),
+      totalSizeHuman: formatSize((df.Images || []).reduce((sum, i) => sum + (i.Size || 0), 0)),
+      reclaimable: (df.Images || []).filter((i) => (i.Containers || 0) === 0).reduce((sum, i) => sum + (i.Size || 0), 0),
+    },
+    containers: {
+      count: (df.Containers || []).length,
+      totalSize: (df.Containers || []).reduce((sum, c) => sum + (c.SizeRw || 0), 0),
+      totalSizeHuman: formatSize((df.Containers || []).reduce((sum, c) => sum + (c.SizeRw || 0), 0)),
+    },
+    volumes: {
+      count: (df.Volumes || []).length,
+      totalSize: (df.Volumes || []).reduce((sum, v) => sum + (v.UsageData?.Size || 0), 0),
+      totalSizeHuman: formatSize((df.Volumes || []).reduce((sum, v) => sum + (v.UsageData?.Size || 0), 0)),
+    },
+    buildCache: {
+      count: (df.BuildCache || []).length,
+      totalSize: (df.BuildCache || []).reduce((sum, b) => sum + (b.Size || 0), 0),
+      totalSizeHuman: formatSize((df.BuildCache || []).reduce((sum, b) => sum + (b.Size || 0), 0)),
+    },
+  };
+}
+
 module.exports = {
+  // Existing
   runContainer,
   stopAndRemove,
   stopContainer,
@@ -261,4 +559,33 @@ module.exports = {
   listContainers,
   getContainerMetrics,
   inspectContainer,
+  // Container enhancements
+  pauseContainer,
+  unpauseContainer,
+  renameContainer,
+  containerTop,
+  containerChanges,
+  streamContainerStats,
+  // Image management
+  listImages,
+  pullImage,
+  removeImage,
+  inspectImage,
+  tagImage,
+  pruneImages,
+  // Volume management
+  listVolumes,
+  createVolume,
+  removeVolume,
+  inspectVolume,
+  pruneVolumes,
+  // Network management
+  listNetworks,
+  createNetwork,
+  removeNetwork,
+  inspectNetwork,
+  pruneNetworks,
+  // System
+  getSystemInfo,
+  getDiskUsage,
 };

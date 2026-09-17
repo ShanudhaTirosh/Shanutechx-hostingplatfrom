@@ -27,7 +27,7 @@ export interface ClientProject {
   region: string;
   status: 'ACTIVE' | 'PROVISIONING' | 'SUSPENDED';
   anonKey: string;
-  serviceKey: string;
+  hasServiceKey: boolean;
   smtpConfigured: boolean;
   studioPort?: number;
   apiPort?: number;
@@ -57,7 +57,7 @@ function serializeProject(p: any): ClientProject {
     region: p.region,
     status: p.status as ClientProject['status'],
     anonKey: p.anonKey || SUPABASE_ANON_KEY,
-    serviceKey: p.serviceKey || SUPABASE_SERVICE_ROLE_KEY,
+    hasServiceKey: Boolean(p.serviceKey || SUPABASE_SERVICE_ROLE_KEY),
     smtpConfigured: p.smtpConfigured,
     studioPort,
     apiPort: p.apiPort ?? 8001,
@@ -665,16 +665,14 @@ supabaseRouter.get('/supabase/integrations', requireAuth, requireAdminOrDev, asy
 supabaseRouter.get('/supabase/config', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.API_BASE_URL || '';
   const anonKey = process.env.SUPABASE_ANON_KEY || '';
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
   const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || '';
-  const secretKey = process.env.SUPABASE_SECRET_KEY || '';
 
   res.json({
     supabaseUrl,
     anonKey,
-    serviceRoleKey,
+    hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
     publishableKey,
-    secretKey,
+    hasSecretKey: Boolean(process.env.SUPABASE_SECRET_KEY),
     studioUrl: `${supabaseUrl}/supabase`,
     smtpConfigured: !!process.env.SMTP_HOST
   });
