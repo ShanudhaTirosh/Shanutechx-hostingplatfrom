@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ShanuTechX Platform Architecture",
+    "output": "shanutechx-architecture.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "primary-path",
+        "label": "Primary Request & Provisioning Path",
+        "focus": ["users", "api_gateway", "postgres_db", "worker_service", "node_agent"],
+        "note": "Trace a request from client apps to platform core API and down to host node agent execution."
+      },
+      {
+        "id": "auth-and-infra",
+        "label": "Identity & External Services",
+        "focus": ["auth_sso", "api_gateway", "cloudflare_ext"],
+        "note": "Isolate OAuth SSO identity validation and Cloudflare auto-DNS / backup services."
+      },
+      {
+        "id": "compute-execution",
+        "label": "Host Compute & Container Isolation",
+        "focus": ["node_agent", "docker_engine"],
+        "note": "Host node RPC agent managing Docker container lifecycle on VPS instances."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "users",
+      "type": "external",
+      "label": "Client Applications",
+      "sublabel": "Dashboard / Web / Mobile",
+      "pos": [40, 260],
+      "size": [140, 64]
+    },
+    {
+      "id": "auth_sso",
+      "type": "security",
+      "label": "OAuth SSO Provider",
+      "sublabel": "Google / GitHub / Discord",
+      "pos": [40, 110],
+      "size": [140, 64],
+      "tag": "OAuth 2.0 Identity"
+    },
+    {
+      "id": "api_gateway",
+      "type": "backend",
+      "label": "Platform REST API",
+      "sublabel": "Express TypeScript :4000",
+      "pos": [260, 260],
+      "size": [150, 64]
+    },
+    {
+      "id": "postgres_db",
+      "type": "database",
+      "label": "PostgreSQL 16",
+      "sublabel": "Prisma ORM :5432",
+      "pos": [490, 260],
+      "size": [140, 64]
+    },
+    {
+      "id": "bullmq_queue",
+      "type": "messagebus",
+      "label": "BullMQ Job Queue",
+      "sublabel": "Redis Async Tasks",
+      "pos": [260, 410],
+      "size": [150, 64]
+    },
+    {
+      "id": "worker_service",
+      "type": "backend",
+      "label": "Orchestration Worker",
+      "sublabel": "BullMQ Worker Process",
+      "pos": [490, 410],
+      "size": [150, 64]
+    },
+    {
+      "id": "node_agent",
+      "type": "cloud",
+      "label": "Host Node Agent",
+      "sublabel": "VPS Telemetry Agent :7700",
+      "pos": [720, 410],
+      "size": [150, 64]
+    },
+    {
+      "id": "docker_engine",
+      "type": "cloud",
+      "label": "Docker Engine",
+      "sublabel": "Host Container Runtime",
+      "pos": [720, 260],
+      "size": [150, 64]
+    },
+    {
+      "id": "cloudflare_ext",
+      "type": "external",
+      "label": "Cloudflare Services",
+      "sublabel": "Auto-DNS & R2 Backups",
+      "pos": [490, 110],
+      "size": [150, 64]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Platform Control Plane",
+      "wraps": ["api_gateway", "postgres_db", "bullmq_queue", "worker_service"]
+    },
+    {
+      "kind": "security-group",
+      "label": "VPS Compute Node Host",
+      "wraps": ["node_agent", "docker_engine"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-auth",
+      "from": "users",
+      "to": "auth_sso",
+      "label": "OAuth Login",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "auth-api-verify",
+      "from": "auth_sso",
+      "to": "api_gateway",
+      "label": "Bearer Token",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "id": "client-to-api",
+      "from": "users",
+      "to": "api_gateway",
+      "label": "HTTPS REST API",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-to-db",
+      "from": "api_gateway",
+      "to": "postgres_db",
+      "label": "Prisma SQL",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-to-queue",
+      "from": "api_gateway",
+      "to": "bullmq_queue",
+      "label": "Enqueue Job",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "queue-to-worker",
+      "from": "bullmq_queue",
+      "to": "worker_service",
+      "label": "Poll Jobs"
+    },
+    {
+      "id": "worker-to-agent",
+      "from": "worker_service",
+      "to": "node_agent",
+      "label": "RPC Exec",
+      "variant": "emphasis"
+    },
+    {
+      "id": "agent-to-docker",
+      "from": "node_agent",
+      "to": "docker_engine",
+      "label": "Manage Containers",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "api-to-cloudflare",
+      "from": "api_gateway",
+      "to": "cloudflare_ext",
+      "label": "DNS & Backups",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Authentication & Edge",
+      "items": [
+        "Enforces OAuth SSO via Google, GitHub, and Discord",
+        "Direct email/password login is strictly disabled"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Control Plane Core",
+      "items": [
+        "Express REST API (port 4000) backed by PostgreSQL 16 & Prisma",
+        "Asynchronous jobs queued via Redis BullMQ engine"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Compute & External Integration",
+      "items": [
+        "Node Agent (port 7700) orchestrates Docker on VPS nodes",
+        "Auto-provisions Cloudflare DNS records & R2 object backups"
+      ]
+    }
+  ]
+}
