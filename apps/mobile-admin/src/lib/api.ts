@@ -246,7 +246,7 @@ export const api = {
             )
           ).toString()
         : '';
-      return apiFetch(`/api/admin/deployments${qs}`).then((r) =>
+      return apiFetch(`/api/deployments${qs}`).then((r) =>
         asJson<{ deployments: Deployment[]; total: number }>(r)
       );
     },
@@ -293,12 +293,12 @@ export const api = {
             )
           ).toString()
         : '';
-      return apiFetch(`/api/admin/databases${qs}`).then((r) =>
+      return apiFetch(`/api/managed-databases${qs}`).then((r) =>
         asJson<{ databases: ManagedDatabase[]; total: number }>(r)
       );
     },
     get: (id: string) =>
-      apiFetch(`/api/databases/${id}`).then((r) => asJson<{ database: ManagedDatabase }>(r)),
+      apiFetch(`/api/managed-databases/${id}`).then((r) => asJson<{ database: ManagedDatabase }>(r)),
   },
 };
 

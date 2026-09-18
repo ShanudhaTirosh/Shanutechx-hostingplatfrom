@@ -8,6 +8,7 @@ import { sendSmtpReleaseEmail, getTierFromPlanName, generateDefaultAliases } fro
 import { generateLiveKitKeyPair } from './livekit';
 import { selectNodeForDeployment } from './nodeSelector';
 import { registerLiveKitKey, provisionDatabaseContainer } from './nodeAgentClient';
+import { wildduckClient } from './wildduckClient';
 import crypto from 'crypto';
 
 /**
@@ -132,11 +133,34 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
           const expiresAt = new Date();
           expiresAt.setDate(expiresAt.getDate() + (specs.minCommitmentMonths ? specs.minCommitmentMonths * 30 : 90));
 
+          let wildduckUserId: string | undefined;
+          let wildduckAddressId: string | undefined;
+
+          if (env.wildduckApiKey) {
+            try {
+              const quotaGb = storageQuotaMb === -1 ? 100 : Math.max(1, Math.ceil(storageQuotaMb / 1024));
+              const wdUser = await wildduckClient.createUser({
+                username,
+                password: autoPassword,
+                name: order.user.displayName || order.user.email,
+                quotaGb,
+              });
+              wildduckUserId = wdUser.id;
+              const fullEmail = `${username}@${env.rootDomain}`;
+              const addr = await wildduckClient.createAddress(wdUser.id, fullEmail, order.user.displayName || undefined).catch(() => null);
+              if (addr) wildduckAddressId = addr.id;
+            } catch (wdErr: any) {
+              logger.warn({ orderId: order.id, err: wdErr.message }, 'WildDuck API user creation failed during order fulfillment (non-fatal)');
+            }
+          }
+
           await prisma.smtpAccount.create({
             data: {
               userId: order.userId,
               orderItemId: item.id,
               postalOrgId: 'shanutechx',
+              wildduckUserId,
+              wildduckAddressId,
               smtpHost,
               smtpPort: 587,
               smtpUsername: username,
@@ -281,13 +305,39 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
                 orderItemId: item.id,
                 nodeId: node.id,
                 subdomain,
-                status: 'pending',
+                status: 'building',
                 internalPort: 3000,
                 cpuLimit: specs.cpuCores ?? undefined,
                 memoryLimit: specs.memoryMB ?? specs.ramMB ?? undefined,
                 storageLimit: specs.storageGB ?? undefined,
                 exposureMode: isBotHosting ? 'no_ssl' : 'ssl_with_proxy',
               },
+            });
+
+            // Asynchronously trigger container build & run on target node
+            const { buildAndRun } = await import('./nodeAgentClient');
+            void buildAndRun(
+              node,
+              {
+                deploymentId: dep.id,
+                repoUrl: 'starter://empty',
+                subdomain: dep.subdomain ?? undefined,
+                internalPort: 3000,
+                cpuLimit: specs.cpuCores ?? undefined,
+                memoryLimit: specs.memoryMB ?? specs.ramMB ?? undefined,
+                storageLimit: specs.storageGB ?? undefined,
+                exposureMode: dep.exposureMode ?? 'ssl_with_proxy',
+              },
+              () => {}
+            ).then(async (result) => {
+              if (result.phase === 'done' || result.containerId) {
+                await prisma.deployment.update({
+                  where: { id: dep.id },
+                  data: { status: 'running', containerId: result.containerId, lastDeployAt: new Date() },
+                });
+              }
+            }).catch((err) => {
+              logger.warn({ deploymentId: dep.id, err: err.message }, 'Container build step failed during order auto-fulfillment (non-fatal)');
             });
 
             fulfilledItems.push(`Hosting Instance (${subdomain}.${env.deploymentsRootDomain})`);
