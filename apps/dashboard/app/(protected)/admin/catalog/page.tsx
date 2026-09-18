@@ -16,7 +16,7 @@ export default function AdminCatalogPage() {
   // Form states
   const [name, setName] = useState('');
   const [slogan, setSlogan] = useState('');
-  const [category, setCategory] = useState('CMS');
+  const [category, setCategory] = useState('Web Applications');
   const [yaml, setYaml] = useState('version: "3.8"\nservices:\n  app:\n    image: nginx:alpine');
 
   function loadCatalog() {
@@ -178,9 +178,10 @@ export default function AdminCatalogPage() {
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full bg-[#121324] border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
                 >
-                  <option value="CMS">CMS</option>
+                  <option value="Web Applications">Web Applications</option>
                   <option value="Database">Database</option>
                   <option value="Automation">Automation</option>
+                  <option value="CMS">CMS</option>
                   <option value="Frontend">Frontend</option>
                   <option value="Monitoring">Monitoring</option>
                 </select>
