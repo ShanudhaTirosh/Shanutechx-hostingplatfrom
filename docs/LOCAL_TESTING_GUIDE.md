@@ -114,7 +114,7 @@ NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="your-project.firebaseapp.com"
 NEXT_PUBLIC_FIREBASE_PROJECT_ID="your-firebase-project-id"
 NEXT_PUBLIC_API_BASE_URL=http://localhost:4000
 ```
-Leave `NEXT_PUBLIC_GRAFANA_URL` and `NEXT_PUBLIC_POSTAL_ADMIN_URL` blank unless you're also
+Leave `NEXT_PUBLIC_GRAFANA_URL` and `NEXT_PUBLIC_WILDDUCK_ADMIN_URL` blank unless you're also
 standing up the observability stack (§8) or a real mail server.
 
 ---

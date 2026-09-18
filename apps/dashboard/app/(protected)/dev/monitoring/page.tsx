@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
  * Dev/admin-only. Rather than reinvent Prometheus/Grafana's charting inside
  * ShanuTechX's own UI, this links to (and optionally iframes) the real
  * Grafana instance from infra/control-plane/observability/. Set
- * NEXT_PUBLIC_GRAFANA_URL to enable it — same pattern as the SMTP page's
- * NEXT_PUBLIC_POSTAL_ADMIN_URL link.
+ * NEXT_PUBLIC_GRAFANA_URL to enable it — same pattern as the Webmail page's
+ * NEXT_PUBLIC_WILDDUCK_ADMIN_URL link.
  *
  * HONEST STATUS: the observability stack (Prometheus/Grafana/Loki/Promtail)
  * is real infra-as-code written for this project, but has not been run or

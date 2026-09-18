@@ -23,9 +23,9 @@ GRACE_PERIOD_DAYS=7            # 7 days grace period (recommended)
 # External Services
 REDIS_URL=redis://host:6379
 LEASEWEB_API_KEY=<your-api-key>
-POSTAL_API_URL=<your-postal-url>
-POSTAL_API_KEY=<your-postal-key>
-POSTAL_FROM_ADDRESS=noreply@yourdomain.com
+WILDDUCK_API_URL=<your-wildduck-url>
+WILDDUCK_API_KEY=<your-wildduck-key>
+WILDDUCK_FROM_ADDRESS=noreply@yourdomain.com
 
 # Optional
 NODE_ENV=production

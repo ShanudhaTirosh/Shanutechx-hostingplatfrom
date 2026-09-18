@@ -34,11 +34,11 @@ Configure production values in `.env`:
 - `NODE_AGENT_SECRET`, `SECRETS_ENCRYPTION_KEY`, `JWT_SECRET`: Random 32/64-byte hex values.
 - `CLOUDFLARE_API_TOKEN`: Cloudflare Zone DNS API key.
 
-### Step 3. Generate Postal & Supabase Keys
+### Step 3. Generate WildDuck Mail & Supabase Keys
 ```bash
 cd apps/api && npm install && cd ../..
 node infra/supabase/generate-keys.js
-openssl genrsa -out infra/postal/signing.key 2048
+# WildDuck Mail Server API keys are generated via WildDuck REST API / mail-api.${ROOT_DOMAIN}
 ```
 
 ### Step 4. Launch Stack & Apply Database Migrations
