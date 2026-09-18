@@ -69,6 +69,7 @@ import { wafRouter } from './routes/waf';
 import { edgeRulesRouter } from './routes/edgeRules';
 import { nixpacksRouter } from './routes/nixpacks';
 import { volumesRouter } from './routes/volumes';
+import { notificationsRouter } from './routes/notifications';
 import { initWildDuckOnBoot } from './lib/wildduckInitializer';
 import { ensureDefaultProductsSeeded } from './lib/seedProducts';
 import { fullFirebaseDataMigration } from './lib/firebaseSync';
@@ -206,6 +207,7 @@ app.use('/api', wafRouter);
 app.use('/api', edgeRulesRouter);
 app.use('/api', nixpacksRouter);
 app.use('/api', volumesRouter);
+app.use('/api', notificationsRouter);
 
 
 // Catches any request that didn't match a route above. Without this,

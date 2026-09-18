@@ -554,4 +554,31 @@ export interface SupabaseClientProject {
   createdAt: string;
 }
 
+export interface DatabaseBackup {
+  id: string;
+  databaseId: string;
+  s3Endpoint?: string | null;
+  s3Bucket: string;
+  s3Key: string;
+  sizeBytes?: string | number | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  errorMessage?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
+}
+
+export type NotificationChannelType = 'discord' | 'whatsapp' | 'email' | 'webhook';
+
+export interface NotificationChannel {
+  id: string;
+  userId: string;
+  name: string;
+  type: NotificationChannelType;
+  configJson: Record<string, any>;
+  isEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+
 

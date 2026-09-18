@@ -1918,8 +1918,36 @@ export const api = {
       apiFetch(`/api/managed-databases/${id}/scale`, { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<{ ok: boolean; message: string; database: ManagedDatabase }>(r)
       ),
+    s3Backups: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}/s3-backups`).then((r) => asJson<{ backups: any[] }>(r)),
+    createS3Backup: (id: string, data: { s3Endpoint?: string; s3Bucket: string; s3AccessKeyId?: string; s3SecretAccessKey?: string; region?: string }) =>
+      apiFetch(`/api/managed-databases/${id}/s3-backups`, { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ ok: boolean; backup: any }>(r)
+      ),
+    restoreS3Backup: (id: string, backupId: string) =>
+      apiFetch(`/api/managed-databases/${id}/s3-restore`, { method: 'POST', body: JSON.stringify({ backupId }) }).then((r) =>
+        asJson<{ ok: boolean; restoredBackupId: string }>(r)
+      ),
   },
 
+  notifications: {
+    listChannels: () =>
+      apiFetch('/api/notifications/channels').then((r) => asJson<{ channels: any[] }>(r)),
+    createChannel: (data: { name: string; type: string; configJson: Record<string, any>; isEnabled?: boolean }) =>
+      apiFetch('/api/notifications/channels', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ channel: any }>(r)
+      ),
+    updateChannel: (id: string, data: { name?: string; configJson?: Record<string, any>; isEnabled?: boolean }) =>
+      apiFetch(`/api/notifications/channels/${id}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ channel: any }>(r)
+      ),
+    deleteChannel: (id: string) =>
+      apiFetch(`/api/notifications/channels/${id}`, { method: 'DELETE' }).then((r) => asJson<{ success: boolean }>(r)),
+    testChannel: (id: string) =>
+      apiFetch(`/api/notifications/channels/${id}/test`, { method: 'POST' }).then((r) =>
+        asJson<{ success: boolean; detail: string; dispatchedAt: string }>(r)
+      ),
+  },
 
   devSupabase: {
     health: () =>
@@ -1963,3 +1991,4 @@ export const api = {
       apiFetch(`/api/supabase/logs${service ? `?service=${service}` : ''}`).then((r) => asJson<{ logs: any[] }>(r)),
   },
 };
+

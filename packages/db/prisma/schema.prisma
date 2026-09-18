@@ -194,6 +194,7 @@ model User {
   webmailTodos          WebmailTodo[]
   webmailEvents         WebmailEvent[]
   reviews               Review[]
+  notificationChannels  NotificationChannel[]
 }
 
 // Real Expo push tokens, registered by the mobile admin app
@@ -1321,6 +1322,7 @@ model ManagedDatabase {
   createdAt      DateTime              @default(now())
 
   dbUsers ManagedDatabaseUser[]
+  backups DatabaseBackup[]
 }
 
 model ManagedDatabaseUser {
@@ -1786,5 +1788,60 @@ model PasswordResetToken {
 
   @@index([email])
   @@index([token])
+}
+
+enum BackupStatus {
+  pending
+  in_progress
+  completed
+  failed
+}
+
+model DatabaseBackup {
+  id           String          @id @default(cuid())
+  databaseId   String
+  database     ManagedDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+  s3Endpoint   String?         // Optional custom endpoint for self-hosted S3 / MinIO / Garage / Ceph
+  s3Bucket     String
+  s3Key        String
+  sizeBytes    BigInt?         @default(0)
+  status       BackupStatus    @default(pending)
+  errorMessage String?
+  createdAt    DateTime        @default(now())
+  completedAt  DateTime?
+
+  @@index([databaseId, createdAt])
+}
+
+model GitHubAppConfig {
+  id               String   @id @default("global")
+  appId            String
+  slug             String
+  clientId         String
+  clientSecretEnc  String   // AES-256-GCM encrypted
+  privateKeyEnc    String   // AES-256-GCM encrypted
+  webhookSecretEnc String?  // AES-256-GCM encrypted
+  updatedAt        DateTime @updatedAt
+}
+
+enum NotificationChannelType {
+  discord
+  whatsapp
+  email
+  webhook
+}
+
+model NotificationChannel {
+  id         String                  @id @default(cuid())
+  userId     String
+  user       User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  type       NotificationChannelType
+  configJson Json                    // e.g., { webhookUrl, phoneNumber, email, headers }
+  isEnabled  Boolean                 @default(true)
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  @@index([userId, isEnabled])
 }
 

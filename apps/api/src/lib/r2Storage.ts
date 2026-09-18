@@ -1,42 +1,36 @@
-import { S3Client, CreateBucketCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
+import { S3Client, CreateBucketCommand, HeadBucketCommand, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { env } from '../env';
 import { logger } from './logger';
 
 /**
- * Per-project object storage on Cloudflare R2. Confirmed against Cloudflare's
- * own docs (developers.cloudflare.com/r2/reference/data-location/) that R2's
- * S3-compatible API supports CreateBucketCommand via @aws-sdk/client-s3,
- * same package already used for platform DB backups in lib/backup.ts.
- *
- * Honest limitation: this reuses the platform's single, shared R2 access
- * key (env.r2AccessKeyId/r2SecretAccessKey) scoped to a bucket name per
- * project — it does NOT create a separate, bucket-scoped API token per
- * project. Cloudflare does support scoped tokens, but that's a different,
- * account-level Cloudflare API (not the S3-compatible one), and wiring that
- * up is future work, not something to fake here. In practice this means:
- * any code holding the platform's R2 credentials could reach any project's
- * bucket, not just its own — acceptable for now since only the Node Agent
- * and API server hold these credentials, not customers directly, but worth
- * revisiting before this is a customer self-service feature rather than a
- * dev-only one.
+ * Per-project object storage on Cloudflare R2 / AWS S3 / Self-Hosted MinIO.
  */
 
-function getR2Client(): S3Client | null {
-  if (!env.r2Endpoint || !env.r2AccessKeyId || !env.r2SecretAccessKey) {
+export function getCustomS3Client(options?: { endpoint?: string; accessKeyId?: string; secretAccessKey?: string; region?: string }): S3Client | null {
+  const endpoint = options?.endpoint || env.r2Endpoint;
+  const accessKeyId = options?.accessKeyId || env.r2AccessKeyId;
+  const secretAccessKey = options?.secretAccessKey || env.r2SecretAccessKey;
+  const region = options?.region || 'auto';
+
+  if (!endpoint || !accessKeyId || !secretAccessKey) {
     return null;
   }
   return new S3Client({
-    region: 'auto',
-    endpoint: env.r2Endpoint,
+    region,
+    endpoint,
     credentials: {
-      accessKeyId: env.r2AccessKeyId,
-      secretAccessKey: env.r2SecretAccessKey,
+      accessKeyId,
+      secretAccessKey,
     },
+    forcePathStyle: true, // required for MinIO and self-hosted S3 endpoints
   });
 }
 
+function getR2Client(): S3Client | null {
+  return getCustomS3Client();
+}
+
 function bucketNameFor(projectId: string): string {
-  // R2/S3 bucket names: lowercase, hyphens only, 3-63 chars.
   return `shanutechx-project-${projectId}`.toLowerCase().slice(0, 63);
 }
 
@@ -48,8 +42,6 @@ export async function provisionProjectBucket(projectId: string): Promise<{ bucke
 
   const bucketName = bucketNameFor(projectId);
 
-  // Idempotent: if it already exists (e.g. a retry after a partial
-  // failure), don't error — just confirm and move on.
   try {
     await client.send(new HeadBucketCommand({ Bucket: bucketName }));
     logger.info({ bucketName }, 'R2 bucket already exists for project, reusing');
@@ -68,7 +60,6 @@ export async function uploadDeploymentZip(deploymentId: string, buffer: Buffer, 
 
   if (client) {
     try {
-      const { PutObjectCommand } = await import('@aws-sdk/client-s3');
       await client.send(
         new PutObjectCommand({
           Bucket: bucketName,
@@ -86,4 +77,5 @@ export async function uploadDeploymentZip(deploymentId: string, buffer: Buffer, 
   }
   return null;
 }
+
 
