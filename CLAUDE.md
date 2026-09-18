@@ -2,8 +2,8 @@
 
 ShanuTechX is an autonomous, enterprise-grade cloud-hosting platform and container orchestration engine built as a Node.js monorepo. This document details the platform architecture, capabilities, development workflows, and coding guardrails.
 
-Operational quick-start commands: see [AGENTS.md](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/AGENTS.md).
-Defect audit report & vulnerability fixes: see [BUG_AUDIT.md](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/BUG_AUDIT.md).
+Operational quick-start commands: see [`AGENTS.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/AGENTS.md).  
+Defect audit report & vulnerability fixes: see [`BUG_AUDIT.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/BUG_AUDIT.md).
 
 ---
 
@@ -28,9 +28,11 @@ ShanuTechX integrates full-lifecycle cloud hosting, container builds, managed in
 - **Mobile Admin App:** Standalone Expo / React Native Android & iOS application ([`apps/mobile-admin`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/mobile-admin)) for payment proof approvals, metric charts, and customer management.
 
 ### 3. Security, Billing & Storage Infrastructure
+- **Single Sign-On (SSO) Enforcement:** OAuth authentication exclusively via Google, GitHub, and Discord. Direct password input forms are disabled across client applications.
+- **Dev Superuser Role:** The `dev` user role (`role: 'dev'`) possesses complete, unrestricted superuser access to every part of the platform, bypassing resource ownership limits while non-dev users (`customer`, `support`, `admin`) remain strictly restricted.
 - **Secrets Vault:** AES-256-GCM authenticated secret encryption ([`secretsVault.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/secretsVault.ts)) with SHA-256 key derivation.
 - **Cloudflare R2 Storage Backups:** Automatic database snapshot backups and file storage integration ([`r2Storage.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/r2Storage.ts)).
-- **Automated Billing Sweeps & Dunning:** Daily automated checks ([`billing.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/billing.ts)) for past-due subscriptions, graceful grace periods, and container suspension.
+- **Automated Billing Sweeps & Dunning:** Daily automated checks ([`billing.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/billing.ts)) for past-due subscriptions, graceful grace periods, and container suspension via BullMQ.
 - **Abuse & Fraud Detection:** Instant account suspension and deployment teardown pipeline ([`abuseDetector.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/abuseDetector.ts)).
 
 ---
@@ -45,14 +47,15 @@ shanutechx/
 │   ├── web/             # Public Dark-Theme Marketing & Landing Site (Next.js 14 App Router)
 │   └── mobile-admin/    # Standalone Mobile Admin App (Expo / React Native)
 ├── packages/
-│   ├── db/              # Prisma 5.22 Schema & Database Migrations
+│   ├── db/              # Prisma 5.22 Schema & Database Migrations Ledger
 │   ├── client/          # @shanutechx/client Developer TypeScript SDK
 │   ├── catalog/         # One-Click App Catalog Templates Engine
 │   ├── deployments/     # Shared deployment type definitions and build helpers
 │   ├── node-agent/      # Node agent client interfaces
 │   ├── auth/            # Auth middleware SDK helpers
 │   ├── types/           # Shared TypeScript types
-│   └── tracing/         # OpenTelemetry tracing wrappers
+│   ├── tracing/         # OpenTelemetry tracing wrappers
+│   └── supabase-js/     # Derived Supabase Client SDK Suite (+ auth-js, functions-js, postgrest-js, realtime-js, storage-js)
 ├── services/
 │   ├── node-agent/      # Plain JS (.js) VPS container control agent & telemetry daemon
 │   ├── discord-bot/     # Discord notification and ticket management bot

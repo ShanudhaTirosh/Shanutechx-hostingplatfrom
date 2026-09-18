@@ -1,6 +1,6 @@
 # AGENTS.md — ShanuTechX Operational & Architecture Quick-Start
 
-ShanuTechX is an autonomous enterprise cloud-hosting platform and container orchestration engine built as an npm workspace monorepo. See [CLAUDE.md](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/CLAUDE.md) for complete technical capabilities and design guardrails; see [BUG_AUDIT.md](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/BUG_AUDIT.md) for defect tracking.
+ShanuTechX is an autonomous enterprise cloud-hosting platform and container orchestration engine built as an npm workspace monorepo. See [`CLAUDE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/CLAUDE.md) for complete technical capabilities and design guardrails; see [`BUG_AUDIT.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/BUG_AUDIT.md) for defect tracking.
 
 ---
 
@@ -16,7 +16,15 @@ ShanuTechX is an autonomous enterprise cloud-hosting platform and container orch
   - [`discord-bot/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/discord-bot) — Discord.js bot daemon for notification webhooks, support ticketing, and payment review alerts.
   - [`whatsapp-bot/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/whatsapp-bot) — Baileys WhatsApp messaging gateway for customer notifications.
 - **`packages/`**
-  - `db`, `client`, `catalog`, `deployments`, `node-agent`, `auth`, `types`, `tracing` — shared packages & derived Supabase SDKs.
+  - [`db`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/db) — Prisma 5.22 schema and PostgreSQL migrations ledger.
+  - [`client`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/client) — `@shanutechx/client` Developer REST API TypeScript SDK.
+  - [`catalog`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/catalog) — One-click Docker Compose app template catalog manager.
+  - [`deployments`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/deployments) — Shared deployment types and build engine helpers.
+  - [`node-agent`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/node-agent) — `@shanutechx/node-agent` RPC client interfaces.
+  - [`auth`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/auth) — Authentication middleware and token validation helpers.
+  - [`types`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/types) — Core shared platform TypeScript type definitions.
+  - [`tracing`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/tracing) — OpenTelemetry tracing & metrics instrumentation wrappers.
+  - **Supabase SDK Suite:** [`supabase-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/supabase-js), [`auth-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/auth-js), [`functions-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/functions-js), [`postgrest-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/postgrest-js), [`realtime-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/realtime-js), [`storage-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/storage-js).
 
 ---
 

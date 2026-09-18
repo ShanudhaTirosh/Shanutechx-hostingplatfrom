@@ -1,15 +1,18 @@
 # 🤖 ShanuTechX Discord Bot Service (`services/discord-bot`)
 
-> Automated Discord Bot for Server Management, Support Ticket Automation, Invoice & Credential Delivery, and Unified Event Notifications.
+Automated Discord Bot daemon for server management, support ticket automation, payment review queue alerts, and unified event notifications.
+
+Operational Quick-Start: see [`AGENTS.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/AGENTS.md)  
+Defect Audit Report: see [`BUG_AUDIT.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/BUG_AUDIT.md)
 
 ---
 
-## 📋 Features
+## 📋 Features & Capabilities
 
-- **Automated Ticket Management**: Allows customers to open support tickets via `/ticket create`, view status, reply to messages, and close tickets directly within Discord.
-- **Server & Deployment Management**: Supports `/server status`, `/deployments list`, and `/nodes status` commands for real-time infrastructure visibility.
-- **Direct Delivery & Notifications**: Sends direct messages (DMs) with invoice PDFs, payment approvals, VPS SSH credentials, and deployment failure alerts.
-- **Unified Channel Alerts**: Posts automated rich embeds to `#alerts` channels for new payments, orders, tickets, and node failover events.
+- **Automated Ticket Management**: Open support tickets via `/ticket create`, view status, reply to messages, and close tickets within Discord.
+- **Infrastructure Commands**: `/server status`, `/deployments list`, and `/nodes status` for real-time node visibility.
+- **Direct Messaging (DM)**: Sends direct messages for payment approvals, VPS SSH credentials, and container alerts.
+- **Unified Channel Alerts**: Posts rich embeds to `#alerts` channels for payments, orders, tickets, and node failovers.
 
 ---
 
@@ -27,7 +30,7 @@ LOG_LEVEL="info"
 
 ---
 
-## 🚀 Running via Docker & Monorepo
+## 🚀 Commands & Execution
 
 ```bash
 # Local execution:

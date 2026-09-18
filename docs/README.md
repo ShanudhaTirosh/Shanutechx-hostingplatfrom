@@ -1,85 +1,37 @@
-# ShanUtechX Documentation
+# ShanuTechX Documentation Hub
 
-Welcome to the ShanUtechX documentation. This directory contains all project documentation organized by category.
+Welcome to the ShanuTechX documentation hub. This directory contains comprehensive documentation, architecture guides, deployment runbooks, and audit reports for the platform.
 
-## 📁 Directory Structure
+---
 
-### `/deployment`
-Deployment guides, checklists, and production configuration
-- Deployment checklists
-- Production deployment guides
-- Environment setup
+## 🚀 Quick Navigation
 
-### `/development`
-Development guides, setup instructions, and troubleshooting
-- Setup and installation guides
-- Development workflows
-- Build and test reports
-- Docker setup
-- Troubleshooting guides
+- **[`CLAUDE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/CLAUDE.md)** — Core AI context & architecture guide.
+- **[`AGENTS.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/AGENTS.md)** — Operational quick-start & commands manual.
+- **[`BUG_AUDIT.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/BUG_AUDIT.md)** — Complete defect tracking & security audit ledger.
+- **[`SETUP_AND_CONFIGURATION_GUIDE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/SETUP_AND_CONFIGURATION_GUIDE.md)** — Master setup & port directory.
 
-### `/audits`
-Code audits, security reviews, and audit reports
-- Comprehensive audit reports
-- Security audit findings
-- Code quality assessments
+---
 
-### `/sprints`
-Sprint summaries, progress tracking, and task completions
-- Sprint progress reports
-- Completed tasks summaries
-- Feature implementation logs
+## 📝 Key Documentation Files
 
-## 🚀 Quick Start
+- **[`PROJECT_STRUCTURE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/PROJECT_STRUCTURE.md)** — Comprehensive monorepo workspace directory tree.
+- **[`DEPLOYMENT_GUIDE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/DEPLOYMENT_GUIDE.md)** — Production deployment & multi-container orchestration manual.
+- **[`NEW_FEATURES.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/NEW_FEATURES.md)** — Detailed overview of recent platform capabilities.
+- **[`COMPREHENSIVE_AUDIT_AND_RESOLUTION_REPORT.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/COMPREHENSIVE_AUDIT_AND_RESOLUTION_REPORT.md)** — Multi-pass vulnerability audit report.
+- **[`LOCAL_DEV_README.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/LOCAL_DEV_README.md)** — Local development environment setup guide.
 
-1. **New Developers**: Start with [development/SETUP_COMPLETE.md](development/SETUP_COMPLETE.md)
-2. **Deployment**: See [deployment/DEPLOYMENT_CHECKLIST.md](deployment/DEPLOYMENT_CHECKLIST.md)
-3. **Quick Reference**: Check [QUICK_START.md](QUICK_START.md)
+---
 
-## 📝 Key Documents
+## 📊 Monorepo Layout
 
-- **[QUICK_START.md](QUICK_START.md)** - Get up and running quickly
-- **[QUICK_SUMMARY.md](QUICK_SUMMARY.md)** - Project overview
-- **[CLAUDE.md](CLAUDE.md)** - AI assistant context and guidelines
-
-## 🔧 Scripts and Configuration
-
-Scripts and configuration files have been moved to:
-- **Scripts**: `/config/scripts/` - PowerShell and CMD scripts
-- **Firebase Config**: `/config/firebase/` - Firebase admin SDK and configs
-
-## 📦 Build Artifacts
-
-Build artifacts are stored in:
-- **Build Output**: `/.build/` - Build artifacts (gitignored)
-
-## 🔒 Security Note
-
-⚠️ Firebase admin SDK keys and credentials are stored in `/config/firebase/` and should be gitignored. Never commit sensitive credentials to version control.
-
-## 📊 Project Structure
-
-```
+```text
 shanutechx/
-├── apps/           # Main applications (API, Dashboard, Web)
-├── services/       # Microservices (Discord, WhatsApp, Node Agent)
-├── packages/       # Shared packages
-├── android/        # Android applications
-├── infra/          # Infrastructure as code
-├── templates/      # Service templates
-├── tests/          # Test suites
-└── docs/           # Documentation (you are here)
+├── apps/           # Core applications (api, dashboard, web, mobile-admin)
+├── services/       # Autonomous daemons (node-agent, discord-bot, whatsapp-bot)
+├── packages/       # Shared SDKs & modules (db, client, catalog, deployments, auth, types, tracing, supabase-js suite)
+├── infra/          # Traefik, PostgreSQL, Redis control-plane & node configs
+├── templates/      # 15+ One-click catalog Compose application templates
+├── tests/          # Node test runner unit tests & Playwright E2E suites
+└── docs/           # Central documentation hub (you are here)
 ```
-
-## 🤝 Contributing
-
-When adding new documentation:
-1. Place it in the appropriate subdirectory
-2. Update this README with a link
-3. Follow the existing naming conventions
-4. Keep the root clean - documentation goes in `/docs/`
-
-## 📚 Additional Resources
-
-- [Project README](../README.md) - Main project overview
-- [GitHub Workflows](../.github/workflows/) - CI/CD configuration

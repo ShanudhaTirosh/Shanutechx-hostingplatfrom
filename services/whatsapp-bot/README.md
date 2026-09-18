@@ -1,14 +1,17 @@
 # 📱 ShanuTechX WhatsApp Bot Service (`services/whatsapp-bot`)
 
-> Automated WhatsApp Notification & Order Management Engine built with Baileys.
+Automated WhatsApp Notification & Customer Messaging Engine built with Baileys.
+
+Operational Quick-Start: see [`AGENTS.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/AGENTS.md)  
+Defect Audit Report: see [`BUG_AUDIT.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/BUG_AUDIT.md)
 
 ---
 
-## 📋 Features
+## 📋 Features & Capabilities
 
 - **Automated Payment & Order Alerts**: Sends instant WhatsApp messages to customers upon payment submission, approval, or rejection.
-- **Credential & Invoice Delivery**: Delivers VPS SSH passwords, database connection URIs, and invoice links directly to the customer's mobile number (`phoneNumber`).
-- **Interactive Bot Commands**: Customers can text `!status`, `!invoice`, `!support`, or `!deployments` for instant account summaries.
+- **Credential & Invoice Delivery**: Delivers VPS SSH passwords, database connection URIs, and invoice links directly to the customer's phone number (`phoneNumber`).
+- **Interactive Bot Commands**: Customers can text `!status`, `!invoice`, `!support`, or `!deployments` for account summaries.
 - **Persistent Baileys Auth Session**: Preserves QR pairing credentials across container restarts in `./auth`.
 
 ---
@@ -25,7 +28,7 @@ LOG_LEVEL="info"
 
 ---
 
-## 🚀 Running via Docker & Monorepo
+## 🚀 Commands & Execution
 
 ```bash
 # Local execution:

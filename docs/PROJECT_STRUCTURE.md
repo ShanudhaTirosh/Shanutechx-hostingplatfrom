@@ -1,280 +1,70 @@
-# 📁 ShanuTechX — Project Structure
+# 📁 ShanuTechX — Project Structure & Monorepo Map
 
-> Complete directory map of the ShanuTechX monorepo.
+> Complete directory map and workspace organization guide for the ShanuTechX monorepo.
+
+Operational Quick-Start: see [`AGENTS.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/AGENTS.md)  
+Defect Tracking Ledger: see [`BUG_AUDIT.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/BUG_AUDIT.md)
 
 ---
 
-## Root Directory
+## Root Directory Structure
 
-```
+```text
 shanutechx/
-├── README.md                    # Main project documentation
+├── README.md                    # Main project overview & badge catalog
+├── AGENTS.md                    # Operational quick-start & monorepo workspace summary
+├── CLAUDE.md                    # AI context, system capabilities & design guardrails
+├── BUG_AUDIT.md                 # Complete vulnerability audit & defect tracking report
+├── SETUP_AND_CONFIGURATION_GUIDE.md # Comprehensive setup manual & master port directory
 ├── LICENSE                      # MIT License
-├── package.json                 # Root workspace package
-├── .gitignore
-├── .dockerignore
-│
-├── apps/                        # Main applications
-├── services/                    # Infrastructure services (node agent)
-├── packages/                    # Shared SDK libraries
-├── templates/                   # App catalog YAML templates
-├── templates_removed_phase15/   # Archived legacy templates
-├── docker/                      # Docker infrastructure stacks
-├── docs/                        # Documentation
-├── references/                  # Upstream open-source reference repos
-├── config/                      # Configuration files
-├── infra/                       # Infrastructure scripts
-├── tests/                       # Test suites
-│
-├── docker-compose.local.yml     # Local dev docker-compose
-├── deploy-production.sh         # Production deployment script
-├── deploy-to-production.sh      # Full deployment automation
-├── setup-full-stack.cmd         # Windows full stack setup
-├── start-dev.cmd                # Windows dev start
-└── run-full-stack.cmd           # Windows full stack runner
+├── package.json                 # Root monorepo npm workspace definition
+├── docker-compose.local.yml     # Local development Docker Compose stack
+├── docker-compose.prod.yml      # Production infrastructure Compose stack with Traefik 3.x
+├── apps/                        # Platform frontend & API applications
+├── services/                    # Autonomous daemons & microservices
+├── packages/                    # Shared TypeScript SDKs & core modules (14 packages)
+├── templates/                   # Docker Compose application catalog templates
+├── infra/                       # Control-plane & node infrastructure configurations
+├── tests/                       # Unit test runner suite & Playwright E2E scaffolding
+└── docs/                        # Central documentation hub
 ```
 
 ---
 
-## apps/
+## 📦 Subsystems & Workspace Breakdown
 
-### apps/api/ — Express REST API
+### 1. [`apps/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps) — Platform Applications
 
-```
-apps/api/
-├── src/
-│   ├── index.ts                 # Express app entry point
-│   ├── middleware/
-│   │   ├── auth.ts              # JWT authentication + role guards
-│   │   ├── rateLimit.ts         # Rate limiting
-│   │   └── validate.ts          # Zod request validation
-│   ├── lib/
-│   │   ├── secretsVault.ts      # AES-256-GCM encryption/decryption
-│   │   ├── leasewebClient.ts    # Leaseweb VPS API client
-│   │   ├── notifier.ts          # Discord + email notifications
-│   │   └── db.ts                # Prisma client singleton
-│   └── routes/
-│       ├── auth.ts              # Login / register / JWT refresh
-│       ├── deployments.ts       # App deployment CRUD + env update
-│       ├── deployWebhooks.ts    # Auto-deploy webhook info endpoint
-│       ├── filesystem.ts        # File manager proxy routes
-│       │                        #   → list, read, write, mkdir, delete
-│       │                        #   → upload-binary, extract, rename
-│       │                        #   → git-commit-push
-│       ├── gitConnect.ts        # GitHub/GitLab App OAuth + token storage
-│       ├── nodes.ts             # Node agent management + install.sh
-│       ├── catalog.ts           # App catalog templates
-│       ├── databases.ts         # Managed DB provisioning
-│       ├── leaseweb.ts          # Leaseweb VPS reseller API
-│       ├── monitoring.ts        # Uptime synthetic monitoring
-│       ├── status.ts            # Public platform status endpoint
-│       ├── secrets.ts           # Secrets vault (Infisical-style)
-│       ├── smtp.ts              # SMTP account management
-│       ├── billing.ts           # Stripe billing + invoices
-│       ├── tickets.ts           # Support tickets
-│       ├── users.ts             # User management
-│       ├── admin/               # Admin-only routes
-│       └── settings.ts          # Platform settings
-├── tsconfig.json
-└── package.json
-```
-
-### apps/dashboard/ — Next.js 15 Customer Dashboard
-
-```
-apps/dashboard/
-├── app/
-│   ├── layout.tsx               # Root layout (fonts, providers)
-│   ├── page.tsx                 # Landing / redirect
-│   ├── status/
-│   │   └── page.tsx             # Public platform status page (no auth)
-│   └── (protected)/             # Auth-required pages
-│       ├── deployments/
-│       │   ├── page.tsx         # Deployment list + create new
-│       │   └── [id]/
-│       │       └── page.tsx     # Deployment detail (4 tabs):
-│       │                        #   📊 Overview & Logs
-│       │                        #   📁 File Manager & Git Push
-│       │                        #   🔐 Environment Variables
-│       │                        #   ⚡ Auto-Deploy Webhook
-│       ├── vps/
-│       │   └── page.tsx         # VPS management (Leaseweb)
-│       ├── catalog/
-│       │   └── page.tsx         # App catalog browser
-│       ├── databases/
-│       │   └── page.tsx         # Managed databases
-│       ├── monitoring/
-│       │   └── page.tsx         # Uptime monitors
-│       ├── smtp/
-│       │   └── page.tsx         # SMTP account management
-│       ├── webmail/
-│       │   └── page.tsx         # Gmail-style webmail
-│       ├── secrets/
-│       │   └── page.tsx         # Secrets vault
-│       ├── billing/
-│       │   └── page.tsx         # Billing & invoices
-│       ├── tickets/
-│       │   └── page.tsx         # Support tickets
-│       ├── settings/
-│       │   └── page.tsx         # Platform settings (password gated)
-│       └── admin/
-│           ├── nodes/page.tsx   # Node manager (connect/install)
-│           ├── users/page.tsx   # User management
-│           └── ...
-│
-├── components/
-│   ├── ui.tsx                   # Shared UI components (Button, Card, Badge, Modal...)
-│   ├── Sidebar.tsx              # Navigation sidebar
-│   ├── FileManagerPanel.tsx     # Browser file manager + code editor
-│   ├── EnvVarsPanel.tsx         # Encrypted environment variables UI
-│   ├── DeployWebhookPanel.tsx   # Auto-deploy webhook setup UI
-│   ├── DomainManagement.tsx     # Custom domain management
-│   ├── EnvVarEditor.tsx         # Standalone env var editor widget
-│   └── ...
-│
-├── lib/
-│   ├── api.ts                   # Typed API client (all fetch bindings)
-│   ├── logUtils.ts              # Log filtering and formatting utilities
-│   ├── auth.ts                  # Auth helper functions
-│   └── types.ts                 # Shared TypeScript types
-│
-├── public/                      # Static assets
-├── next.config.ts
-├── tsconfig.json
-└── package.json
-```
+- **[`apps/api/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api)** — Core Express REST API backend (TypeScript) with Prisma 5.22 & PostgreSQL 16. Entrypoints: `src/index.ts` (Express server) and `src/worker.ts` (BullMQ repeatable queue worker).
+- **[`apps/dashboard/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard)** — Next.js 14 App Router customer & admin control panel dashboard studio.
+- **[`apps/web/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web)** — Next.js 14 App Router dark-theme public marketing storefront and documentation portal.
+- **[`apps/mobile-admin/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/mobile-admin)** — Standalone Expo / React Native Android & iOS admin mobile app.
 
 ---
 
-## services/node-agent/
+### 2. [`services/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services) — Infrastructure Services & Daemons
 
-```
-services/node-agent/
-├── .env                         # Agent runtime environment
-├── .env.example                 # Reference env file
-├── Dockerfile                   # Node agent container image
-├── package.json
-└── src/
-    ├── index.js                 # Express server + all route handlers
-    │   Routes:
-    │   ├── POST /agent/deploy           # Full deploy (clone + build + run)
-    │   ├── POST /agent/build            # Build Docker image (Railpack)
-    │   ├── POST /agent/run              # Run container
-    │   ├── GET  /agent/logs/:id         # Get container logs
-    │   ├── GET  /agent/logs/stream/:id  # Stream container logs (SSE)
-    │   ├── GET  /agent/stats/:id        # CPU/RAM/disk stats
-    │   ├── POST /agent/stop/:id         # Stop container
-    │   ├── POST /agent/start/:id        # Start container
-    │   ├── POST /agent/restart/:id      # Restart container
-    │   ├── DELETE /agent/remove/:id     # Stop + remove container
-    │   │
-    │   ├── GET  /agent/fs/:id/list      # List workspace directory
-    │   ├── GET  /agent/fs/:id/read      # Read file content
-    │   ├── PUT  /agent/fs/:id/write     # Write text file
-    │   ├── POST /agent/fs/:id/upload-binary  # Write binary (base64)
-    │   ├── POST /agent/fs/:id/extract   # Extract archive (zip/tar)
-    │   ├── POST /agent/fs/:id/mkdir     # Create directory
-    │   ├── DELETE /agent/fs/:id/delete  # Delete file/directory
-    │   ├── POST /agent/fs/:id/rename    # Rename/move path
-    │   │
-    │   ├── POST /agent/domain/add       # Add Traefik reverse proxy route
-    │   ├── POST /agent/domain/remove    # Remove Traefik route
-    │   ├── POST /agent/db/provision     # Provision managed database container
-    │   ├── POST /agent/livekit/add-key  # Add LiveKit API key
-    │   └── GET  /agent/containers       # List all containers
-    │
-    ├── filesystem.js            # Jail-pathed file operations
-    │   ├── listDir()
-    │   ├── readFile()
-    │   ├── writeFile()
-    │   ├── writeBinaryFile()    # Base64 → binary write
-    │   ├── extractArchive()     # zip/tar.gz/tgz/tar extraction
-    │   ├── makeDir()
-    │   ├── remove()
-    │   └── rename()
-    │
-    ├── docker.js                # Docker container lifecycle
-    ├── build.js                 # Railpack image builder
-    ├── repo.js                  # Git workspace preparation
-    ├── stats.js                 # Container resource stats
-    ├── customDomain.js          # Traefik route management
-    ├── managedDb.js             # DB container provisioning
-    ├── livekit.js               # LiveKit key management
-    └── projects.js              # Supabase-compatible project management
-```
+- **[`services/node-agent/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent)** — Plain JS (`.js`) container control daemon & telemetry agent per VPS host node (`src/nodeEngine.js`, `src/filesystem.js`).
+- **[`services/discord-bot/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/discord-bot)** — Discord.js bot daemon for webhook routing, ticketing, and payment review alerts.
+- **[`services/whatsapp-bot/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/whatsapp-bot)** — Baileys WhatsApp messaging gateway for customer notifications.
 
 ---
 
-## templates/
+### 3. [`packages/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages) — Shared Packages & Derived Supabase SDKs
 
-```
-templates/
-├── redis.yaml           # Redis 7 — in-memory cache
-├── n8n.yaml             # n8n + PostgreSQL 16 — workflow automation
-├── lavalink.yaml        # Lavalink 4 — Discord audio node
-├── mongodb.yaml         # MongoDB 7 — document database
-├── wordpress.yaml       # WordPress + MariaDB 10.11 — CMS
-└── livekit.yaml         # LiveKit Server + Redis — WebRTC platform
-```
-
----
-
-## packages/
-
-```
-packages/
-├── db/
-│   ├── schema.prisma        # Prisma data model
-│   ├── migrations/          # Database migration files
-│   └── seed.ts              # Database seeder
-└── (SDK libraries)
-```
+- **[`db`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/db)** — Prisma 5.22 schema, database migrations ledger, and seeders.
+- **[`client`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/client)** — `@shanutechx/client` Developer REST API TypeScript SDK.
+- **[`catalog`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/catalog)** — One-click Docker Compose app template catalog manager.
+- **[`deployments`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/deployments)** — Shared deployment type definitions and build engine helpers.
+- **[`node-agent`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/node-agent)** — `@shanutechx/node-agent` RPC client interfaces.
+- **[`auth`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/auth)** — Authentication middleware and token validation helpers.
+- **[`types`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/types)** — Core shared platform TypeScript type definitions.
+- **[`tracing`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/tracing)** — OpenTelemetry tracing wrappers.
+- **Supabase SDK Suite:** [`supabase-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/supabase-js), [`auth-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/auth-js), [`functions-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/functions-js), [`postgrest-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/postgrest-js), [`realtime-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/realtime-js), [`storage-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/storage-js).
 
 ---
 
-## docker/
+### 4. [`infra/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/infra) & [`templates/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/templates)
 
-```
-docker/
-├── supabase/
-│   └── docker-compose.yml   # Supabase self-hosted (Kong:8001, Studio:3003, PG:5435)
-├── infisical/
-│   └── docker-compose.yml   # Infisical vault (API:4004, PG:5434, Redis:6380)
-└── docker-compose.shanutechx.yml  # Master compose file
-```
-
----
-
-## docs/
-
-```
-docs/
-├── START_HERE.md              # Quick onboarding guide
-├── LOCAL_SETUP_GUIDE.md       # Local development setup
-├── DEPLOYMENT_GUIDE.md        # Production server deployment
-├── PROJECT_STRUCTURE.md       # This file
-├── NEW_FEATURES.md            # Feature changelog by phase
-├── FULL_STACK_GUIDE.md        # Full stack architecture guide
-├── QUICK_START.md             # 5-minute quick start
-├── LOCAL_DEV_README.md        # Local dev environment details
-├── LOCAL_TESTING_GUIDE.md     # Testing guide
-├── PHASE15_PATCH_NOTES.md     # Phase 15 patch notes
-├── DELIVERY_NOTES.md          # Feature delivery notes
-└── audits/                    # Code audit reports
-```
-
----
-
-## references/
-
-```
-references/
-├── grafana-main/          # Grafana dashboard (AGPL-3.0) — dashboard widgets inspiration
-├── infisical-main/        # Infisical (MIT) — secrets vault inspiration
-├── railpack-main/         # Railpack (MIT) — build engine
-├── supabase-master/       # Supabase (Apache-2.0) — project management stack
-├── uptime-kuma-master/    # Uptime Kuma (MIT) — monitoring & status page
-└── vps-monitor-main/      # vps-monitor (MIT) — VPS telemetry
-```
-
-> These reference repositories are kept for development reference only. They are not used directly in the production build.
+- **`infra/control-plane/`**: Compose configs for Traefik 3.x, PostgreSQL 16, Redis 7, MinIO, Postal Mail, Supabase.
+- **`templates/`**: Docker Compose YAML app templates (WordPress + MariaDB, Grafana, N8N, Hermes AI Agent, Redis, MinIO, PostgreSQL, etc.).
