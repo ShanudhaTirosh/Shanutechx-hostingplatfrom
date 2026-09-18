@@ -181,7 +181,9 @@ export default function DeploymentsPage() {
 }
 
 function generateRandomSubdomain() {
-  const rand = Math.floor(100000 + Math.random() * 900000).toString(36);
+  const rand = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID().slice(0, 6)
+    : Math.floor(100000 + Math.random() * 900000).toString(36);
   return `app-${rand}`;
 }
 
@@ -290,7 +292,8 @@ function NewDeploymentForm({ onDeployed }: { onDeployed: () => void }) {
       setPreferredName(appName);
       setBranch(found.defaultBranch || "main");
       if (!customSubdomain || customSubdomain.startsWith("app-")) {
-        const cleanSub = `${appName.slice(0, 20)}-${Math.random().toString(36).substring(2, 6)}`;
+        const randSuffix = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().slice(0, 4) : Math.random().toString(36).substring(2, 6);
+        const cleanSub = `${appName.slice(0, 20)}-${randSuffix}`;
         setCustomSubdomain(cleanSub);
       }
     }

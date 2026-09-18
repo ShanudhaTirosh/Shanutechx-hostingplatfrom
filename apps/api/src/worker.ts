@@ -12,6 +12,7 @@ import {
   workspaceCleanupQueue,
   NodeFailoverSweepJob,
   nodeFailoverQueue,
+  PushReceiptJob,
 } from './lib/queue';
 import { executeSSLRenewalJob } from './jobs/ssl-renewal';
 import { runBillingChecks } from './lib/billing';
@@ -19,6 +20,7 @@ import { runUptimeChecks } from './lib/uptimeMonitor';
 import { executeWorkspaceCleanupJob } from './jobs/workspace-cleanup';
 import { checkMetricAlerts } from './lib/alerts';
 import { checkNodeHealthAndFailover } from './lib/nodeMonitor';
+import { executePushReceiptJob } from './jobs/push-receipt';
 import { logger } from './lib/logger';
 
 
@@ -182,7 +184,21 @@ nodeFailoverWorker.on('failed', (job, err) => {
   logger.error({ jobId: job?.id, err }, 'Node failover watchdog job failed');
 });
 
-[sslRenewalWorker, workspaceCleanupWorker, billingSweepWorker, uptimeSweepWorker, nodeFailoverWorker].forEach((w) => {
+const pushReceiptWorker = new Worker<PushReceiptJob>(
+  'push-receipt',
+  async (job) => {
+    logger.info({ jobId: job.id }, 'Starting push receipt check job execution');
+    const result = await executePushReceiptJob(job.data);
+    logger.info({ jobId: job.id, ...result }, 'Push receipt check job completed');
+  },
+  { connection: redisConnectionOptions, concurrency: 2 }
+);
+
+pushReceiptWorker.on('failed', (job, err) => {
+  logger.error({ jobId: job?.id, err }, 'Push receipt check job failed');
+});
+
+[sslRenewalWorker, workspaceCleanupWorker, billingSweepWorker, uptimeSweepWorker, nodeFailoverWorker, pushReceiptWorker].forEach((w) => {
   w.on('error', (err) => {
     logger.warn({ err: err.message, worker: w.name }, 'Worker Redis connection error caught');
   });
@@ -218,6 +234,7 @@ async function gracefulWorkerShutdown(signal: string) {
       billingSweepWorker.close(),
       uptimeSweepWorker.close(),
       nodeFailoverWorker.close(),
+      pushReceiptWorker.close(),
     ]);
     logger.info('All BullMQ workers shut down gracefully.');
     process.exit(0);

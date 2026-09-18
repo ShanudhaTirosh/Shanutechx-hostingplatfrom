@@ -2,6 +2,12 @@ import { Queue } from 'bullmq';
 import { env } from '../env';
 import { logger } from './logger';
 
+// Push receipt ticket map entry
+export interface PushReceiptJob {
+  /** Maps Expo ticket IDs to the expoToken that produced them */
+  ticketToToken: Array<{ ticketId: string; expoToken: string }>;
+}
+
 /**
  * Plain connection options for BullMQ.
  * SIDESTEP CRASHES: If Redis is offline in local dev mode, retryStrategy returns null
@@ -108,6 +114,24 @@ export const nodeFailoverQueue = new Queue<NodeFailoverSweepJob>('node-failover'
   },
 });
 
+/**
+ * Queue for deferred Expo push receipt checking.
+ * Jobs are enqueued immediately after sending push tickets and processed
+ * after a 30-second delay (Expo docs: receipts usually aren't ready
+ * for several minutes; 30 s catches the fast failures and avoids the
+ * inline 2 s anti-pattern).
+ */
+export const pushReceiptQueue = new Queue<PushReceiptJob>('push-receipt', {
+  connection: redisConnectionOptions,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 30000 },
+    delay: 30_000, // Wait 30 s before the worker picks this up
+    removeOnComplete: { age: 60 * 60 * 24 },
+    removeOnFail: { age: 60 * 60 * 24 * 7 },
+  },
+});
+
 billingSweepQueue.on('error', () => {
   isRedisConnected = false;
 });
@@ -118,6 +142,9 @@ workspaceCleanupQueue.on('error', () => {
   isRedisConnected = false;
 });
 nodeFailoverQueue.on('error', () => {
+  isRedisConnected = false;
+});
+pushReceiptQueue.on('error', () => {
   isRedisConnected = false;
 });
 

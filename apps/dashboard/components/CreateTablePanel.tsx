@@ -70,7 +70,7 @@ interface ColumnDef {
 }
 
 function makeId() {
-  return Math.random().toString(36).slice(2);
+  return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
 }
 
 function defaultColumn(overrides: Partial<ColumnDef> = {}): ColumnDef {

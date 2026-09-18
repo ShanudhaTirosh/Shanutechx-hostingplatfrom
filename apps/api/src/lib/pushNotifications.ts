@@ -90,51 +90,25 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload): 
   await checkReceiptsAndCleanup(ticketToToken);
 }
 
+import { pushReceiptQueue } from './queue';
+
 /**
- * Expo's push API is two-step: sendPushNotificationsAsync returns
- * "tickets" immediately (accepted-for-delivery, not delivered), and a
- * separate receipt check confirms actual delivery or reports errors like
- * DeviceNotRegistered. This does the receipt check inline after a short
- * delay rather than requiring a separate cron job — simpler operationally,
- * at the cost of not catching failures that only show up after the
- * process this ran in has exited (Expo's docs recommend checking receipts
- * up to ~30 min later for full reliability; this checks after 2s, which
- * catches immediate rejections but may miss later-surfacing ones — a
- * proper background job would be the improvement, deliberately not
- * built here without a way to test it against real receipts).
+ * Enqueues push receipt checking to BullMQ pushReceiptQueue. The job runs
+ * after a 30-second delay in worker.ts, per Expo best practices (receipts
+ * take time to become available).
  */
 async function checkReceiptsAndCleanup(ticketToToken: Map<string, string>): Promise<void> {
-  const receiptIds = Array.from(ticketToToken.keys());
-  if (receiptIds.length === 0) return;
+  const items = Array.from(ticketToToken.entries()).map(([ticketId, expoToken]) => ({
+    ticketId,
+    expoToken,
+  }));
+  if (items.length === 0) return;
 
-  // Give Expo a moment before asking for receipts — checking immediately
-  // is a documented anti-pattern (receipts usually aren't ready yet).
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-
-  const deadTokens: string[] = [];
-  const receiptChunks = expo.chunkPushNotificationReceiptIds(receiptIds);
-
-  for (const chunk of receiptChunks) {
-    try {
-      const receipts = await expo.getPushNotificationReceiptsAsync(chunk);
-      for (const receiptId in receipts) {
-        const receipt = receipts[receiptId];
-        if (receipt.status === 'error') {
-          logger.warn({ receiptId, receipt }, 'Push notification delivery error');
-          if (receipt.details?.error === 'DeviceNotRegistered') {
-            const deadToken = ticketToToken.get(receiptId);
-            if (deadToken) deadTokens.push(deadToken);
-          }
-        }
-      }
-    } catch (err) {
-      logger.error({ err }, 'Failed to fetch push notification receipts');
-    }
-  }
-
-  if (deadTokens.length > 0) {
-    await prisma.pushToken.deleteMany({ where: { expoToken: { in: deadTokens } } });
-    logger.info({ count: deadTokens.length }, 'Removed push tokens Expo reported as no longer registered');
+  try {
+    await pushReceiptQueue.add('check-push-receipts', { ticketToToken: items });
+    logger.info({ count: items.length }, 'Enqueued push receipt check job to BullMQ');
+  } catch (err) {
+    logger.warn({ err: String(err) }, 'Failed to enqueue push receipt job to Redis — push receipts will not be checked for this batch');
   }
 }
 

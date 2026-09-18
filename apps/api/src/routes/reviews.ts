@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdmin, AuthedRequest } from '../middleware/auth';
+import { logger } from '../lib/logger';
 
 export const reviewsRouter = Router();
 
@@ -73,7 +74,7 @@ async function ensureSeedReviews() {
       }
     }
   } catch (err) {
-    console.error('Failed to seed initial reviews:', err);
+    logger.error({ err }, 'Failed to seed initial reviews');
   }
 }
 

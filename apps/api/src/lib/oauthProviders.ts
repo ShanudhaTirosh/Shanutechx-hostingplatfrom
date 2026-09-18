@@ -15,13 +15,37 @@
 
 export type OAuthProviderName = 'google' | 'github' | 'discord';
 
+export interface GoogleProfileResponse {
+  sub: string;
+  email?: string;
+  email_verified?: boolean | string;
+  name?: string;
+  picture?: string;
+}
+
+export interface GitHubProfileResponse {
+  id: number | string;
+  login?: string;
+  email?: string | null;
+  name?: string;
+}
+
+export interface DiscordProfileResponse {
+  id: string;
+  email?: string | null;
+  verified?: boolean;
+  username?: string;
+}
+
+export type RawOAuthProfile = GoogleProfileResponse | GitHubProfileResponse | DiscordProfileResponse | Record<string, unknown>;
+
 export interface OAuthProviderDef {
   authorizeUrl: string;
   tokenUrl: string;
   userInfoUrl: string;
   scope: string;
   /** Extracts a stable provider user id and an email from that provider's user-info response shape. */
-  extractProfile: (profile: any) => { providerUserId: string; email: string | null };
+  extractProfile: (profile: Record<string, unknown>) => { providerUserId: string; email: string | null };
 }
 
 export const OAUTH_PROVIDERS: Record<OAuthProviderName, OAuthProviderDef> = {
@@ -30,30 +54,39 @@ export const OAUTH_PROVIDERS: Record<OAuthProviderName, OAuthProviderDef> = {
     tokenUrl: 'https://oauth2.googleapis.com/token',
     userInfoUrl: 'https://www.googleapis.com/oauth2/v3/userinfo',
     scope: 'openid email profile',
-    extractProfile: (p) => ({
-      providerUserId: p.sub,
-      email: (p.email_verified === true || p.email_verified === 'true') ? (p.email ?? null) : null,
-    }),
+    extractProfile: (p: Record<string, unknown>) => {
+      const profile = p as unknown as GoogleProfileResponse;
+      return {
+        providerUserId: profile.sub,
+        email: (profile.email_verified === true || profile.email_verified === 'true') ? (profile.email ?? null) : null,
+      };
+    },
   },
   github: {
     authorizeUrl: 'https://github.com/login/oauth/authorize',
     tokenUrl: 'https://github.com/login/oauth/access_token',
     userInfoUrl: 'https://api.github.com/user',
     scope: 'read:user user:email',
-    extractProfile: (p) => ({
-      providerUserId: String(p.id),
-      email: null, // Always use /user/emails fallback to ensure primary && verified status
-    }),
+    extractProfile: (p: Record<string, unknown>) => {
+      const profile = p as unknown as GitHubProfileResponse;
+      return {
+        providerUserId: String(profile.id),
+        email: null, // Always use /user/emails fallback to ensure primary && verified status
+      };
+    },
   },
   discord: {
     authorizeUrl: 'https://discord.com/api/oauth2/authorize',
     tokenUrl: 'https://discord.com/api/oauth2/token',
     userInfoUrl: 'https://discord.com/api/users/@me',
     scope: 'identify email',
-    extractProfile: (p) => ({
-      providerUserId: p.id,
-      email: p.verified === true ? (p.email ?? null) : null,
-    }),
+    extractProfile: (p: Record<string, unknown>) => {
+      const profile = p as unknown as DiscordProfileResponse;
+      return {
+        providerUserId: profile.id,
+        email: profile.verified === true ? (profile.email ?? null) : null,
+      };
+    },
   },
 };
 

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { parseTemplateYaml, validateTemplateStructure, TemplateMeta } from './template-parser';
+import { logger } from '../../lib/logger';
 
 /**
  * In-memory cache structure with TTL
@@ -88,10 +89,7 @@ async function buildCatalogFromFilesystem(): Promise<TemplateMeta[]> {
         const validation = validateTemplateStructure(templateDetails);
         
         if (!validation.valid) {
-          console.warn(
-            `Template validation failed for ${filename}:`,
-            validation.errors.join(', ')
-          );
+          logger.warn({ filename, errors: validation.errors }, 'Template validation failed — skipping');
           // Skip invalid templates but log the issues
           continue;
         }
@@ -112,25 +110,17 @@ async function buildCatalogFromFilesystem(): Promise<TemplateMeta[]> {
         templates.push(templateMeta);
       } catch (error) {
         // Log parsing error and skip this template
-        console.error(
-          `Failed to parse template ${filename}:`,
-          error instanceof Error ? error.message : String(error)
-        );
+        logger.error({ filename, err: error instanceof Error ? error.message : String(error) }, 'Failed to parse template — skipping');
         // Continue to next template
         continue;
       }
     }
 
-    console.log(
-      `Catalog rebuilt: ${templates.length} valid templates loaded from filesystem`
-    );
+    logger.info({ count: templates.length }, 'Catalog rebuilt from filesystem');
 
     return templates;
   } catch (error) {
-    console.error(
-      'Failed to read templates directory:',
-      error instanceof Error ? error.message : String(error)
-    );
+    logger.error({ err: error instanceof Error ? error.message : String(error) }, 'Failed to read templates directory — returning empty catalog');
     // Return empty array if templates directory cannot be read
     return [];
   }
@@ -184,10 +174,7 @@ export async function getTemplateBySlug(slug: string): Promise<{
 
     return null;
   } catch (error) {
-    console.error(
-      `Failed to get template by slug ${slug}:`,
-      error instanceof Error ? error.message : String(error)
-    );
+    logger.error({ slug, err: error instanceof Error ? error.message : String(error) }, 'Failed to get template by slug');
     return null;
   }
 }

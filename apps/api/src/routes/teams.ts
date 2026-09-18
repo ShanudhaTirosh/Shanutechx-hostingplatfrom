@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { sendTeamInviteNotification } from '../lib/notifications';
+import { logger } from '../lib/logger';
 
 export const teamsRouter = Router();
 
@@ -254,7 +255,7 @@ teamsRouter.post('/teams/:id/invites', async (req: AuthedRequest, res) => {
     role: parsed.data.role,
     inviteLink,
   }).catch((err) => {
-    console.error('Failed to send team invite email:', err);
+    logger.error({ err, email: parsed.data.email, teamId }, 'Failed to send team invite email');
   });
 
   res.status(201).json({

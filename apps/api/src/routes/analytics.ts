@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdmin } from '../middleware/auth';
+import { logger } from '../lib/logger';
 
 export const analyticsRouter = Router();
 
@@ -339,7 +340,7 @@ analyticsRouter.get('/admin/analytics', async (req, res) => {
       revenueByMonth,
     });
   } catch (err: any) {
-    console.error('[Analytics Error]', err);
+    logger.error({ err }, '[Analytics] Failed to generate analytics telemetry');
     res.status(500).json({ error: err.message || 'Failed to generate analytics telemetry' });
   }
 });

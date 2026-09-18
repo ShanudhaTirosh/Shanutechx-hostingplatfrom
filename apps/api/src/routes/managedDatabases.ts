@@ -15,6 +15,7 @@ import {
 } from '../lib/nodeAgentClient';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { env } from '../env';
+import { logger } from '../lib/logger';
 
 export const managedDatabasesRouter = Router();
 
@@ -236,7 +237,7 @@ managedDatabasesRouter.delete('/managed-databases/:id', async (req: AuthedReques
     if (db.containerId && db.node) {
       const { containerAction } = await import('../lib/nodeAgentClient');
       await containerAction(db.node, db.containerId, 'stop').catch((err) => {
-        console.warn(`[ManagedDB Delete] Could not stop container ${db.containerId}: ${err?.message}`);
+        logger.warn({ containerId: db.containerId, err: err?.message }, '[ManagedDB Delete] Could not stop container before deletion');
       });
     }
     await prisma.managedDatabase.update({ where: { id: db.id }, data: { status: 'terminated' } });

@@ -116,7 +116,8 @@ export default function DevDeployPage() {
         ]);
         setDeploySuccess(`https://${res.deployment.subdomain || projectName + '.shanutechx.app'}`);
       } else if (activeTab === 'zip' && zipFile) {
-        const generatedRepoName = `app-zip-${Math.floor(Date.now() / 1000)}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const randSuffix = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Math.floor(1000 + Math.random() * 9000).toString();
+        const generatedRepoName = `app-zip-${Math.floor(Date.now() / 1000)}-${randSuffix}`;
         setDeployLogs((prev) => [
           ...prev,
           `[ZIP] Received archive '${zipFile.name}' (${(zipFile.size / 1024).toFixed(1)} KB)`,
