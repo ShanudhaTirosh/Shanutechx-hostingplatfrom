@@ -277,13 +277,15 @@ function DeployModal({
   tpl: CatalogTemplate;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const { apiUser } = useAppUser();
   const [nodes, setNodes] = useState<Array<{ id: string; name: string; location: string }>>([]);
   const [nodeId, setNodeId] = useState('');
   const [projectName, setProjectName] = useState(`${tpl.slug}-${Date.now().toString(36)}`);
+  const [exposureMode, setExposureMode] = useState<'ssl_with_proxy' | 'internal_only' | 'raw_tcp'>('ssl_with_proxy');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState<{ deploymentId: string; project: string } | null>(null);
+  const [success, setSuccess] = useState<{ deploymentId: string; project: string; generatedSecrets?: Record<string, string> } | null>(null);
   
   const [envVars, setEnvVars] = useState<Record<string, string>>({});
   const [customKey, setCustomKey] = useState('');
@@ -348,12 +350,16 @@ function DeployModal({
     try {
       const res = await api.catalog.deploy({
         slug: tpl.slug,
-        nodeId: nodeId || 'default', // fallback if node auto-select logic is used for customer
+        nodeId: nodeId || 'default',
         projectName,
         envVars,
         teamId: selectedScope === 'personal' ? null : selectedScope,
       });
-      setSuccess({ deploymentId: res.deployment.id, project: res.deployment.subdomain ?? projectName });
+      setSuccess({
+        deploymentId: res.deployment.id,
+        project: res.deployment.subdomain ?? projectName,
+        generatedSecrets: (res as any).generatedSecrets,
+      });
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -367,13 +373,13 @@ function DeployModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-surface-card shadow-2xl overflow-hidden"
+        className="relative z-10 w-full max-w-lg rounded-2xl border border-white/10 bg-surface-card shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* top gradient strip */}
         <div className="h-1" style={{ background: `linear-gradient(90deg, ${color}, ${color}55)` }} />
 
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-5 max-h-[85vh] overflow-y-auto">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-text-primary">Deploy {tpl.name}</h2>
@@ -387,48 +393,111 @@ function DeployModal({
           </div>
 
           {success ? (
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center space-y-2">
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-center space-y-4">
               <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5">
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
               </div>
-              <p className="text-sm font-semibold text-emerald-400">Deployment Started!</p>
-              <p className="text-xs text-text-muted">Project: <code className="text-emerald-300">{success.project}</code></p>
-              <p className="text-xs text-text-faint">Deployment ID: <code className="text-text-muted">{success.deploymentId}</code></p>
-              <button
-                onClick={onClose}
-                className="mt-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 transition-colors"
-              >
-                Close
-              </button>
+              <div>
+                <p className="text-base font-bold text-emerald-400">Deployment Provisioned!</p>
+                <p className="text-xs text-text-muted mt-1">Application URL: <code className="text-emerald-300 font-mono">https://{success.project}.app.shanutechx.com</code></p>
+              </div>
+
+              {/* Generated Secrets Banner */}
+              {success.generatedSecrets && Object.keys(success.generatedSecrets).length > 0 && (
+                <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-left space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-amber-400 flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 0121 9z" />
+                      </svg>
+                      Auto-Generated Master Passwords
+                    </span>
+                    <button
+                      onClick={() => {
+                        const copyText = Object.entries(success.generatedSecrets!)
+                          .map(([k, v]) => `${k}=${v}`)
+                          .join('\n');
+                        navigator.clipboard.writeText(copyText);
+                        alert('Credentials copied to clipboard!');
+                      }}
+                      className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
+                    >
+                      Copy All
+                    </button>
+                  </div>
+                  <div className="space-y-1 font-mono text-[11px] text-white bg-black/40 p-2 rounded max-h-32 overflow-y-auto">
+                    {Object.entries(success.generatedSecrets).map(([k, v]) => (
+                      <div key={k} className="flex justify-between items-center gap-2">
+                        <span className="text-text-muted">{k}:</span>
+                        <span className="text-amber-200 select-all font-semibold">{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <button
+                  onClick={() => router.push(`/deployments/${success.deploymentId}`)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors flex items-center gap-1.5"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  </svg>
+                  <span>Open Control Panel</span>
+                </button>
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 rounded-xl text-xs text-text-muted border border-white/10 hover:bg-white/[0.04]"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           ) : (
             <>
-              {/* Ownership Scope Selector (Personal Account vs Team Workspace) */}
+              {/* Ownership Scope Selector */}
               <div>
                 <ResourceScopeSelector value={selectedScope} onChange={setSelectedScope} />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-text-muted">Project Name</label>
+                <label className="text-xs font-medium text-text-muted">Project Name & Subdomain</label>
                 <input
                   value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-surface text-sm text-text-primary border border-white/10 focus:outline-none focus:border-white/25 placeholder:text-text-faint"
+                  onChange={(e) => setProjectName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  className="w-full px-3 py-2 rounded-lg bg-surface text-sm font-mono text-text-primary border border-white/10 focus:outline-none focus:border-accent-cyan placeholder:text-text-faint"
                   placeholder="my-n8n-instance"
                 />
+                <p className="text-[11px] text-text-faint">
+                  URL slug: <span className="font-mono text-accent-cyan">https://{projectName || 'app'}.app.shanutechx.com</span>
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-text-muted">Network Exposure Mode</label>
+                <select
+                  value={exposureMode}
+                  onChange={(e) => setExposureMode(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-lg bg-surface text-xs text-text-primary border border-white/10 focus:outline-none"
+                >
+                  <option value="ssl_with_proxy">HTTPS SSL Proxy (Cloudflare DNS + SSL)</option>
+                  <option value="internal_only">Internal Isolated VPC Network Only</option>
+                  <option value="raw_tcp">Raw TCP Direct Port Exposure</option>
+                </select>
               </div>
 
               {isAdminOrDev && (
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-text-muted">Target Node</label>
+                  <label className="text-xs font-medium text-text-muted">Target Compute Node</label>
                   <select
                     value={nodeId}
                     onChange={(e) => setNodeId(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg bg-surface text-sm text-text-primary border border-white/10 focus:outline-none focus:border-white/25"
                   >
-                    <option value="">Select a node…</option>
+                    <option value="">Auto-Select Best Available Node…</option>
                     {nodes.map((n) => (
                       <option key={n.id} value={n.id}>{n.name} — {n.location}</option>
                     ))}
@@ -438,7 +507,7 @@ function DeployModal({
 
               {!isAdminOrDev && (
                 <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-xs text-blue-300">
-                  Your app will be deployed on the next available node. The node will be automatically selected.
+                  Your app will be deployed on the next available high-performance node. Node selection is handled automatically.
                 </div>
               )}
 
@@ -498,13 +567,13 @@ function DeployModal({
                       value={customKey}
                       onChange={(e) => setCustomKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ''))}
                       placeholder="KEY"
-                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface text-xs text-text-primary border border-white/10 focus:outline-none"
+                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface text-xs text-text-primary border border-white/10 focus:outline-none font-mono"
                     />
                     <input
                       value={customValue}
                       onChange={(e) => setCustomValue(e.target.value)}
                       placeholder="VALUE"
-                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface text-xs text-text-primary border border-white/10 focus:outline-none"
+                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface text-xs text-text-primary border border-white/10 focus:outline-none font-mono"
                     />
                     <button
                       type="button"
