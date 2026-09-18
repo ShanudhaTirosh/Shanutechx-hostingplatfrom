@@ -76,6 +76,8 @@ const createDeploymentSchema = z.object({
   teamId: z.string().nullable().optional(),
   isPendingConfig: z.boolean().optional(),
   status: z.enum(['pending', 'pending_configuration']).optional(),
+  rootDir: z.string().max(255).optional().nullable(),
+  watchPaths: z.array(z.string()).optional().default([]),
 }).refine((data) => data.templateId || data.isPendingConfig || (data.repoUrl && data.internalPort), {
   message: 'Either templateId, isPendingConfig, or both repoUrl and internalPort are required',
 });
@@ -595,6 +597,8 @@ const updateConfigSchema = z.object({
   exposureMode: z.enum(['ssl_with_proxy', 'raw_tcp', 'internal_only']).optional(),
   subdomain: z.string().optional(),
   envVars: z.record(z.string()).optional(),
+  rootDir: z.string().max(255).optional().nullable(),
+  watchPaths: z.array(z.string()).optional(),
 });
 
 deploymentsRouter.patch('/deployments/:id/config', async (req: AuthedRequest, res) => {
@@ -606,7 +610,7 @@ deploymentsRouter.patch('/deployments/:id/config', async (req: AuthedRequest, re
     return res.status(400).json({ error: parsed.error.issues });
   }
 
-  const { repoUrl, branch, frameworkPreset, startCommand, entryFile, internalPort, exposureMode, subdomain, envVars } = parsed.data;
+  const { repoUrl, branch, frameworkPreset, startCommand, entryFile, internalPort, exposureMode, subdomain, envVars, rootDir, watchPaths } = parsed.data;
 
   if (subdomain !== undefined && subdomain.trim()) {
     const check = await validateCustomSubdomain(subdomain, deployment.id);
@@ -631,6 +635,8 @@ deploymentsRouter.patch('/deployments/:id/config', async (req: AuthedRequest, re
       internalPort: internalPort !== undefined ? internalPort : deployment.internalPort,
       exposureMode: exposureMode !== undefined ? exposureMode : deployment.exposureMode,
       subdomain: subdomain !== undefined ? subdomain : deployment.subdomain,
+      rootDir: rootDir !== undefined ? rootDir : deployment.rootDir,
+      watchPaths: watchPaths !== undefined ? watchPaths : deployment.watchPaths,
       envVarsEncrypted,
     },
   });

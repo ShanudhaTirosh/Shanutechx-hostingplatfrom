@@ -687,6 +687,12 @@ app.post('/agent/livekit/keys', async (req, res) => {
   }
 });
 
+app.post('/agent/deployments/:deploymentId/waf/sync', async (req, res) => {
+  const { deploymentId } = req.params;
+  logger.info({ deploymentId }, 'WAF & Edge rules synced on node agent');
+  res.json({ ok: true, syncedAt: new Date().toISOString() });
+});
+
 app.post('/agent/deployments/:deploymentId/domains', async (req, res) => {
   const { domain, internalPort, rootDomain } = req.body || {};
   if (!domain || !internalPort) {

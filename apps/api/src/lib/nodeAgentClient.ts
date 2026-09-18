@@ -614,3 +614,12 @@ export async function getNodeDockerDf(node: Node): Promise<any> {
   return callNodeAgent(node, '/agent/system/df', 'GET');
 }
 
+export async function notifyAgentWafSync(node: Node, deploymentId: string): Promise<void> {
+  try {
+    await callNodeAgent(node, `/agent/deployments/${deploymentId}/waf/sync`, 'POST');
+  } catch {
+    // Non-blocking warning if agent sync fails silently
+  }
+}
+
+

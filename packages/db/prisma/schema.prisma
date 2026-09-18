@@ -507,8 +507,53 @@ model Deployment {
   zipSourceUrl         String? // ZIP archive file source path/URL for non-git deployments
   sourceType           String? @default("git") // git | zip | template
 
+  // Monorepo & Buildpacks Integration (Railway/Nixpacks standards)
+  rootDir        String?   // Monorepo subfolder path (e.g. "apps/web")
+  watchPaths     String[]  @default([]) // Glob patterns triggering auto-redeploy (e.g. ["apps/web/**", "packages/**"])
+  nixpacksConfig Json?     // Custom nixpacks.toml / railway.toml phase overrides (setup, install, build, start)
+
+  // Vercel-style Edge Routing & HTTP Controls
+  edgeRules Json? // Custom rewrites, redirects, response headers, and scheduled crons
+
+  // Security, WAF & Cloudflare Turnstile Challenge Protection
+  deploymentProtectionPassword String?  // Encrypted HTTP Basic Auth password for URL protection
+  wafTurnstileEnabled          Boolean  @default(false) // Trigger Cloudflare Turnstile challenge on suspicious requests
+
+  // App Sleeping (scale to zero when idle)
+  isSleeping          Boolean @default(false)
+  sleepTimeoutMinutes Int?    @default(30)
+
   uptimeChecks  UptimeCheck[]
   customDomains CustomDomain[]
+  wafRules      WafRule[]
+  volumes       DeploymentVolume[]
+}
+
+model WafRule {
+  id           String     @id @default(cuid())
+  deploymentId String
+  deployment   Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  action       String     // "allow" | "block" | "rate_limit" | "turnstile_challenge"
+  matchType    String     // "ip" | "ip_range" | "header" | "path" | "user_agent" | "country"
+  matchValue   String
+  description  String?
+  isEnabled    Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+
+  @@index([deploymentId, isEnabled])
+}
+
+model DeploymentVolume {
+  id            String     @id @default(cuid())
+  deploymentId  String
+  deployment    Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  name          String
+  hostPath      String
+  containerPath String
+  sizeGb        Int        @default(5)
+  createdAt     DateTime   @default(now())
+
+  @@index([deploymentId])
 }
 
 // One-click app templates — pre-filled repo URL, runtime, and default env

@@ -65,6 +65,10 @@ import { dockerDeploymentsRouter } from './routes/dockerDeployments';
 import { uploadDeploymentsRouter } from './routes/zipDeployments';
 import { nodeEngineRouter } from './routes/nodeEngine';
 import { setupRouter } from './routes/setup';
+import { wafRouter } from './routes/waf';
+import { edgeRulesRouter } from './routes/edgeRules';
+import { nixpacksRouter } from './routes/nixpacks';
+import { volumesRouter } from './routes/volumes';
 import { initWildDuckOnBoot } from './lib/wildduckInitializer';
 import { ensureDefaultProductsSeeded } from './lib/seedProducts';
 import { fullFirebaseDataMigration } from './lib/firebaseSync';
@@ -198,6 +202,10 @@ app.use('/api', internalBotRouter);
 app.use('/api', botAdminRouter);
 app.use('/api', observabilityRouter);
 app.use('/api', reviewsRouter);
+app.use('/api', wafRouter);
+app.use('/api', edgeRulesRouter);
+app.use('/api', nixpacksRouter);
+app.use('/api', volumesRouter);
 
 
 // Catches any request that didn't match a route above. Without this,

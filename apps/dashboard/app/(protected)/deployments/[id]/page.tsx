@@ -295,11 +295,39 @@ export default function DeploymentDetailPage() {
           </p>
         </div>
 
-        {/* FeatherPanel Power Actions */}
+        {/* Tech Integration Quick Hub Actions */}
         <div className="flex items-center gap-2 flex-wrap">
+          <Button size="sm" variant="secondary" onClick={() => router.push(`/deployments/${deploymentId}/waf`)} className="flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-accent-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <span>Firewall & Security</span>
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => router.push(`/deployments/${deploymentId}/edge-rules`)} className="flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span>Edge Rules</span>
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => router.push(`/deployments/${deploymentId}/nixpacks`)} className="flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-accent-violet" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+            <span>Build & Workspace</span>
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => router.push(`/deployments/${deploymentId}/volumes`)} className="flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+            </svg>
+            <span>Persistent Disks</span>
+          </Button>
           {deployment.status === 'stopped' || deployment.status === 'failed' ? (
-            <Button size="sm" onClick={handleStart} loading={starting}>
-              ▶ Start Server
+            <Button size="sm" onClick={handleStart} loading={starting} className="flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Start Server</span>
             </Button>
           ) : (
             <>
@@ -413,11 +441,29 @@ export default function DeploymentDetailPage() {
           {/* Terminal Console Stream */}
           <Card title="Interactive Server Console" action={
             <div className="flex items-center gap-2">
-              <Button size="sm" variant={isStreamingLogs ? 'secondary' : 'primary'} onClick={() => setIsStreamingLogs(!isStreamingLogs)}>
-                {isStreamingLogs ? '⏸ Pause Stream' : '▶ Stream Live'}
+              <Button size="sm" variant={isStreamingLogs ? 'secondary' : 'primary'} onClick={() => setIsStreamingLogs(!isStreamingLogs)} className="flex items-center gap-1.5">
+                {isStreamingLogs ? (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Pause Stream</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Stream Live</span>
+                  </>
+                )}
               </Button>
-              <Button size="sm" variant="secondary" onClick={loadLogs} loading={loadingLogs}>
-                ↺ Refresh
+              <Button size="sm" variant="secondary" onClick={loadLogs} loading={loadingLogs} className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Refresh</span>
               </Button>
             </div>
           }>
