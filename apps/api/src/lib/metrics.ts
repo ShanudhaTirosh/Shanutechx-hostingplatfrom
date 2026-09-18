@@ -57,15 +57,33 @@ const openTicketsGauge = new client.Gauge({
   registers: [registry],
 });
 
+// Referenced by Grafana dashboard panel "Nodes Online" (panel ID 5)
+const nodesOnlineGauge = new client.Gauge({
+  name: 'shanutechx_nodes_online',
+  help: 'Number of registered VPS host nodes currently marked as active',
+  registers: [registry],
+});
+
+// Referenced by Grafana dashboard panel "Database Connection Pool Usage" (panel ID 10)
+const dbPoolActiveGauge = new client.Gauge({
+  name: 'shanutechx_db_pool_active_connections',
+  help: 'Number of managed database instances currently in the running state',
+  registers: [registry],
+});
+
 export async function refreshBusinessMetrics(): Promise<void> {
-  const [deployments, payments, tickets] = await Promise.all([
+  const [deployments, payments, tickets, nodesOnline, dbRunning] = await Promise.all([
     prisma.deployment.count({ where: { status: 'running' } }),
     prisma.payment.count({ where: { status: 'manual_review' } }),
     prisma.ticket.count({ where: { status: 'open' } }),
+    prisma.node.count({ where: { isActive: true } }),
+    prisma.managedDatabase.count({ where: { status: 'running' } }),
   ]);
   activeDeploymentsGauge.set(deployments);
   pendingPaymentsGauge.set(payments);
   openTicketsGauge.set(tickets);
+  nodesOnlineGauge.set(nodesOnline);
+  dbPoolActiveGauge.set(dbRunning);
 }
 
 /** Express middleware — records request count + duration per route/method/status. */

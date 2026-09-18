@@ -237,34 +237,121 @@ export default function AdminObservabilityStudioPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-[#0b0e22] border border-white/10 rounded-2xl p-5 space-y-2">
               <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">CPU CLUSTER USAGE</span>
-              <span className="text-2xl font-black text-white">{clusterMetrics?.cpuUsagePct || 24.5}%</span>
+              <span className="text-2xl font-black text-white">{clusterMetrics?.cpuUsagePct || 0}%</span>
               <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                <div style={{ width: `${Math.min(100, clusterMetrics?.cpuUsagePct || 24.5)}%` }} className="h-full bg-gradient-to-r from-emerald-400 to-indigo-500 rounded-full" />
+                <div style={{ width: `${Math.min(100, clusterMetrics?.cpuUsagePct || 0)}%` }} className="h-full bg-gradient-to-r from-emerald-400 to-indigo-500 rounded-full" />
               </div>
             </div>
 
             <div className="bg-[#0b0e22] border border-white/10 rounded-2xl p-5 space-y-2">
               <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">RAM ALLOCATION</span>
-              <span className="text-2xl font-black text-white">{clusterMetrics?.memoryUsagePct || 48.2}%</span>
+              <span className="text-2xl font-black text-white">{clusterMetrics?.memoryUsagePct || 0}%</span>
               <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                <div style={{ width: `${Math.min(100, clusterMetrics?.memoryUsagePct || 48.2)}%` }} className="h-full bg-gradient-to-r from-purple-400 to-cyan-400 rounded-full" />
+                <div style={{ width: `${Math.min(100, clusterMetrics?.memoryUsagePct || 0)}%` }} className="h-full bg-gradient-to-r from-purple-400 to-cyan-400 rounded-full" />
               </div>
             </div>
 
             <div className="bg-[#0b0e22] border border-white/10 rounded-2xl p-5 space-y-2">
               <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">P95 RESPONSE LATENCY</span>
-              <span className="text-2xl font-black text-emerald-400">{clusterMetrics?.p95LatencyMs || 6}ms</span>
-              <span className="text-xs text-slate-400 block font-mono">P99: {clusterMetrics?.p99LatencyMs || 14}ms</span>
+              <span className="text-2xl font-black text-emerald-400">{clusterMetrics?.p95LatencyMs || 0}ms</span>
+              <span className="text-xs text-slate-400 block font-mono">P99: {clusterMetrics?.p99LatencyMs || 0}ms</span>
             </div>
 
             <div className="bg-[#0b0e22] border border-white/10 rounded-2xl p-5 space-y-2">
               <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">SERVICE THROUGHPUT</span>
-              <span className="text-2xl font-black text-indigo-300">{clusterMetrics?.throughputRps || 340} RPS</span>
-              <span className="text-xs text-slate-400 block font-mono">{clusterMetrics?.activeContainersCount || 16} Containers Active</span>
+              <span className="text-2xl font-black text-indigo-300">{clusterMetrics?.throughputRps || 0} RPS</span>
+              <span className="text-xs text-slate-400 block font-mono">{clusterMetrics?.activeContainersCount || 0} Containers Active</span>
             </div>
           </div>
+
+          {/* Metrics History Chart — rendered from real Prometheus range queries */}
+          {clusterMetrics?.metricsHistory && clusterMetrics.metricsHistory.length > 0 ? (
+            <div className="bg-[#0b0e22] border border-white/10 rounded-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-extrabold text-white tracking-tight">Cluster Metrics — Last 60 Minutes</h3>
+                <div className="flex items-center gap-4 text-[10px] font-mono">
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-emerald-400 inline-block rounded" /> CPU %</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-purple-400 inline-block rounded" /> RAM %</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-amber-400 inline-block rounded" /> Latency ms</span>
+                </div>
+              </div>
+
+              {(() => {
+                const history = clusterMetrics.metricsHistory;
+                const W = 800, H = 160, PAD = { t: 8, b: 28, l: 32, r: 8 };
+                const innerW = W - PAD.l - PAD.r;
+                const innerH = H - PAD.t - PAD.b;
+                const n = history.length;
+
+                // Normalise each series to the chart height independently
+                const norm = (vals: number[]) => {
+                  const max = Math.max(...vals, 1);
+                  return vals.map(v => (v / max) * innerH);
+                };
+
+                const cpuN = norm(history.map((p: { time: string; cpu: number; ram: number; latency: number }) => p.cpu));
+                const ramN = norm(history.map((p: { time: string; cpu: number; ram: number; latency: number }) => p.ram));
+                const latN = norm(history.map((p: { time: string; cpu: number; ram: number; latency: number }) => p.latency));
+
+                const toPath = (vals: number[]) =>
+                  vals.map((v, i) => {
+                    const x = PAD.l + (i / (n - 1)) * innerW;
+                    const y = PAD.t + innerH - v;
+                    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+                  }).join(' ');
+
+                const cpuPath = toPath(cpuN);
+                const ramPath = toPath(ramN);
+                const latPath = toPath(latN);
+
+                // X-axis time labels — show every 3rd label to avoid crowding
+                const labels = history.map((p: { time: string; cpu: number; ram: number; latency: number }, i: number) => ({ label: p.time, i })).filter((_: { label: string; i: number }, i: number) => i % 3 === 0);
+
+                return (
+                  <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ fontFamily: 'monospace' }}>
+                    {/* Grid lines */}
+                    {[0, 0.25, 0.5, 0.75, 1].map(frac => {
+                      const y = PAD.t + innerH * (1 - frac);
+                      return (
+                        <g key={frac}>
+                          <line x1={PAD.l} x2={W - PAD.r} y1={y} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+                          <text x={PAD.l - 4} y={y + 4} fill="rgba(255,255,255,0.3)" fontSize={8} textAnchor="end">
+                            {Math.round(frac * 100)}
+                          </text>
+                        </g>
+                      );
+                    })}
+
+                    {/* Series paths */}
+                    <path d={cpuPath} fill="none" stroke="#34d399" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+                    <path d={ramPath} fill="none" stroke="#c084fc" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+                    <path d={latPath} fill="none" stroke="#fbbf24" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+
+                    {/* X-axis labels */}
+                    {labels.map(({ label, i }: { label: string; i: number }) => {
+                      const x = PAD.l + (i / (n - 1)) * innerW;
+                      return (
+                        <text key={i} x={x} y={H - 6} fill="rgba(255,255,255,0.35)" fontSize={8} textAnchor="middle">
+                          {label}
+                        </text>
+                      );
+                    })}
+                  </svg>
+                );
+              })()}
+            </div>
+          ) : (
+            <div className="bg-[#0b0e22] border border-white/10 rounded-2xl p-8 text-center">
+              <p className="text-slate-500 text-sm font-mono">
+                {clusterMetrics?.status === 'connected'
+                  ? 'No historical data yet — Prometheus may need more scrape cycles.'
+                  : 'Connect Prometheus to view the metrics history chart.'}
+              </p>
+            </div>
+          )}
         </div>
       )}
+
 
       {/* TAB 3: DASHBOARDS */}
       {activeTab === 'dashboards' && (
