@@ -18,6 +18,7 @@
 
 Operational Quick-Start: see [`AGENTS.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/AGENTS.md)  
 Platform Architecture & Technical Guide: see [`CLAUDE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/CLAUDE.md)  
+Technology Stack & Reference Architecture Manual: see [`TECH_STACK_AND_ARCHITECTURE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/TECH_STACK_AND_ARCHITECTURE.md)  
 Defect Audit & Vulnerability Report: see [`BUG_AUDIT.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/BUG_AUDIT.md)
 
 ---

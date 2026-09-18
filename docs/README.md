@@ -6,6 +6,7 @@ Welcome to the ShanuTechX documentation hub. This directory contains comprehensi
 
 ## 🚀 Quick Navigation
 
+- **[`TECH_STACK_AND_ARCHITECTURE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/TECH_STACK_AND_ARCHITECTURE.md)** — Full technology stack, rationale & reference architectures guide.
 - **[`CLAUDE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/CLAUDE.md)** — Core AI context & architecture guide.
 - **[`AGENTS.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/AGENTS.md)** — Operational quick-start & commands manual.
 - **[`BUG_AUDIT.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/BUG_AUDIT.md)** — Complete defect tracking & security audit ledger.

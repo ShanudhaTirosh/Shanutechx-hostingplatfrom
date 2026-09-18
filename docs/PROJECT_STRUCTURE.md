@@ -66,5 +66,5 @@ shanutechx/
 
 ### 4. [`infra/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/infra) & [`templates/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/templates)
 
-- **`infra/control-plane/`**: Compose configs for Traefik 3.x, PostgreSQL 16, Redis 7, MinIO, Postal Mail, Supabase.
+- **`infra/control-plane/`**: Compose configs for Traefik 3.x, PostgreSQL 16, Redis 7, MinIO, WildDuck Mail Server, Supabase.
 - **`templates/`**: Docker Compose YAML app templates (WordPress + MariaDB, Grafana, N8N, Hermes AI Agent, Redis, MinIO, PostgreSQL, etc.).

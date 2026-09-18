@@ -19,7 +19,7 @@
 | **Build Engine** | BuildKit | - | socket | Container image builder for Railpack |
 | **Object Storage** | MinIO | 9000/9001 | internal | Self-hosted S3-compatible storage for backups, uploads, and Supabase Storage — swappable for real Cloudflare R2 |
 | **BaaS** | Supabase stack (`supabase-db`, `supabase-auth`, `supabase-rest`, `supabase-realtime`, `supabase-storage`, `supabase-imgproxy`, `supabase-meta`, `supabase-kong`, `supabase-studio`) | 8000 (Kong, public), Studio public | internal (Kong+Studio public) | Self-hosted Postgres+GoTrue+PostgREST+Realtime+Storage+Studio, backing the Managed Backend-as-a-Service module |
-| **Mail** | Postal (`postal-db`, `postal-web`, `postal-smtp`, `postal-worker`) | 25, 587, web UI public | internal (web UI + SMTP public) | Self-hosted mail server backing the Business Email / SMTP module |
+| **Mail** | WildDuck (`wildduck-mongo`, `wildduck-api`, `wildduck-engine`, `wildduck-imap`, `haraka-app`) | 25, 587, 8080, 993 | internal & Traefik SSL | Self-hosted scalable IMAP/SMTP WildDuck mail server backing the Business Email / Webmail Studio |
 | **Observability** | Prometheus | 9090 | internal | Metrics collection & time series storage |
 | **Observability** | Grafana | 3000 | internal | Real-time monitoring dashboards |
 | **Observability** | Loki & Promtail | 3100, 9080 | internal | Container log aggregation stack |
@@ -30,11 +30,11 @@
 
 ### 1. Control Plane Server Setup
 
-Requirements: Ubuntu 22.04 LTS+, minimum 2 CPU cores, 4 GB RAM, 40 GB SSD. If you're running the full stack (control plane + Supabase + Postal, all together), size up — 4 CPU cores / 8 GB RAM is a more realistic minimum once Supabase's several services and Postal's mail processing are added in.
+Requirements: Ubuntu 22.04 LTS+, minimum 2 CPU cores, 4 GB RAM, 40 GB SSD. If you're running the full stack (control plane + Supabase + WildDuck Mail), size up — 4 CPU cores / 8 GB RAM is a realistic minimum.
 
 ```bash
 # Clone the repository
-git clone https://github.com/shanutechx/shanutechx.git /opt/shanutechx
+git clone https://github.com/ShanudhaTirosh/Shanutechx-hostingplatfrom.git /opt/shanutechx
 cd /opt/shanutechx
 
 # Copy environment files
@@ -42,15 +42,11 @@ cp infra/control-plane/.env.example infra/control-plane/.env
 cp apps/api/.env.example apps/api/.env
 
 # Generate the Supabase JWT_SECRET / ANON_KEY / SERVICE_ROLE_KEY triple
-# and paste the output into infra/control-plane/.env
 cd apps/api && npm install && cd ../..
 node infra/supabase/generate-keys.js
-
-# Generate Postal's DKIM/signing key (postal-web won't start without it)
-openssl genrsa -out infra/postal/signing.key 2048
 ```
 
-Edit `infra/control-plane/.env` and `apps/api/.env` with your domain, database passwords, and API secrets — see the comments in `infra/control-plane/.env.example` for what each one is for, including the new MinIO/Supabase/Postal section.
+Edit `infra/control-plane/.env` and `apps/api/.env` with your domain, database passwords, and API secrets (including `WILDDUCK_API_KEY`).
 
 ### 2. Launching Everything Together
 
@@ -59,19 +55,14 @@ cd /opt/shanutechx/infra/control-plane
 docker compose up -d --build
 ```
 
-This single command brings up the control plane, MinIO, the full self-hosted Supabase stack, and the full Postal mail stack together — not just the core API/dashboard. Run database migrations once everything reports healthy:
+This single command brings up the control plane, MinIO, the full self-hosted Supabase stack, and the WildDuck Mail Server stack together. Run database migrations once everything reports healthy:
 ```bash
 docker compose exec api npx prisma migrate deploy --schema ../../packages/db/prisma/schema.prisma
 ```
 
-Then finish Postal's one-time initialization (this can't be automated — it's Postal's own first-run flow):
-```bash
-docker compose exec postal-web postal initialize
-docker compose exec postal-web postal make-user
-```
-Log into `https://postal.${ROOT_DOMAIN}`, create an Organization + Mail Server, copy its API key into `apps/api/.env` as `POSTAL_API_KEY`, then `docker compose restart api`.
+Log into `https://mail-api.${ROOT_DOMAIN}` or manage mailboxes via Webmail Studio (`/webmail`) in the control panel.
 
-**What still needs real DNS before it'll work end-to-end:** point `A` records at this server's public IP for `${ROOT_DOMAIN}`, `api.${ROOT_DOMAIN}`, `app.${ROOT_DOMAIN}`, `supabase.${ROOT_DOMAIN}`, `studio.${ROOT_DOMAIN}`, and `postal.${ROOT_DOMAIN}` — Traefik's Let's Encrypt HTTP challenge needs each of those to actually resolve here first. For mail specifically, also set up reverse DNS (PTR) + SPF/DKIM/DMARC once Postal gives you its DKIM key — this is a hard requirement for mail deliverability, not optional.
+**What still needs real DNS before it'll work end-to-end:** point `A` records at this server's public IP for `${ROOT_DOMAIN}`, `api.${ROOT_DOMAIN}`, `app.${ROOT_DOMAIN}`, `supabase.${ROOT_DOMAIN}`, `studio.${ROOT_DOMAIN}`, and `mail-api.${ROOT_DOMAIN}` — Traefik's Let's Encrypt HTTP challenge needs each of those to actually resolve here first.
 
 ### 3. Launching Observability Stack (Optional)
 
