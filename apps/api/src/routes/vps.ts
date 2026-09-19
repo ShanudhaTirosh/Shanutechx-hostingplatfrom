@@ -223,7 +223,8 @@ vpsRouter.get('/vps-provisions/:id/download-key', async (req: AuthedRequest, res
     return res.status(404).json({ error: 'No SSH Private Key attached to this VPS server provision' });
   }
 
-  const filename = `vps-key-${provision.ip || provision.id}.pem`;
+  const safeIdentifier = (provision.ip || provision.id).replace(/[^a-zA-Z0-9.-]/g, '_');
+  const filename = `vps-key-${safeIdentifier}.pem`;
   res.setHeader('Content-Type', 'application/x-pem-file');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.send(keyContent);

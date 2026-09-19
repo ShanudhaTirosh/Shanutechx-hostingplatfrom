@@ -122,13 +122,7 @@ export async function requireAuth(
         });
       }
     } catch (_dbErr: any) {
-      req.user = {
-        id: decoded.uid,
-        firebaseUid: decoded.uid,
-        email: decoded.email || 'tiroshbrot123@gmail.com',
-        role: 'dev',
-      };
-      return next();
+      return res.status(503).json({ error: 'Database service temporarily unavailable' });
     }
 
     if (user.isBanned) {

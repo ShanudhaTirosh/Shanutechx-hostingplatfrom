@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
-import { generateApiKey } from '../lib/apiKeys';
+import { generateApiKey, hashApiKey } from '../lib/apiKeys';
 import { sendWelcomeNotification } from '../lib/notifications';
 import { firebaseAuth } from '../lib/firebaseAdmin';
 import { logger } from '../lib/logger';
@@ -53,6 +53,16 @@ authRouter.post('/auth/login', async (req, res) => {
 
   if (!decoded.email) {
     return res.status(401).json({ error: 'OAuth token does not contain an email claim. Please use an OAuth provider that shares your email.' });
+  }
+
+  // Enforce allowed OAuth SSO providers
+  const signInProvider = decoded.firebase?.sign_in_provider;
+  const allowedProviders = ['google.com', 'github.com', 'oidc.discord', 'custom'];
+  if (signInProvider && !allowedProviders.includes(signInProvider)) {
+    return res.status(403).json({
+      error: 'Unauthorized OAuth Provider',
+      message: 'ShanuTechX Cloud strictly enforces Google, GitHub & Discord OAuth SSO.',
+    });
   }
 
   // Use ONLY the verified email — never the client-supplied one
@@ -298,6 +308,18 @@ authRouter.post('/auth/refresh', requireAuth, async (req: AuthedRequest, res) =>
   const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
   if (!user) return res.status(404).json({ error: 'User not found' });
   if (user.isBanned) return res.status(403).json({ error: 'Account Banned' });
+
+  // Revoke current calling key if provided via x-api-key or bearer
+  const apiKeyHeader = req.headers['x-api-key'] as string | undefined;
+  const header = req.headers.authorization;
+  const currentToken = apiKeyHeader || (header?.startsWith('Bearer ') ? header.slice('Bearer '.length) : undefined);
+  if (currentToken && currentToken.startsWith('shx_')) {
+    const keyHash = hashApiKey(currentToken);
+    await prisma.apiKey.updateMany({
+      where: { keyHash, userId: user.id },
+      data: { revokedAt: new Date() },
+    }).catch(() => null);
+  }
 
   const { rawKey, keyHash, keyPrefix } = generateApiKey();
   await prisma.apiKey.create({

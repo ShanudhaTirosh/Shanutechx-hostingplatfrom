@@ -17,7 +17,8 @@ export async function callNodeAgent(
   node: Node,
   path: string,
   method: string = 'GET',
-  body?: any
+  body?: any,
+  timeoutMs: number = 60_000
 ): Promise<any> {
   const url = agentUrl(node, path);
   const headers = agentHeaders({ 'Content-Type': 'application/json' });
@@ -25,6 +26,7 @@ export async function callNodeAgent(
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) {
     const errorText = await res.text().catch(() => '');
@@ -82,6 +84,7 @@ export async function buildAndRun(
       method: 'POST',
       headers: agentHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(600_000), // 10-minute maximum build timeout
     }
   );
 

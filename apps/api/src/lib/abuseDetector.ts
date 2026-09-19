@@ -81,6 +81,18 @@ export async function banUserAndTeardownResources({
       stoppedCount++;
     }
 
+    // 3b. Stop and teardown all running managed databases
+    await prisma.managedDatabase.updateMany({
+      where: { userId, status: 'running' },
+      data: { status: 'stopped' },
+    });
+
+    // 3c. Mark all VPS provisions as terminated
+    await prisma.vpsProvision.updateMany({
+      where: { userId, status: 'provisioned' },
+      data: { status: 'terminated' },
+    });
+
     // 4. Log Audit Log event
     await prisma.auditLog.create({
       data: {

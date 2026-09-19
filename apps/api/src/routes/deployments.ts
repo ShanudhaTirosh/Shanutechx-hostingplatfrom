@@ -1279,7 +1279,7 @@ deploymentsRouter.patch('/deployments/:id/env', async (req: AuthedRequest, res) 
           branch: deployment.branch ?? undefined,
           subdomain: deployment.subdomain ?? undefined,
           internalPort: deployment.internalPort,
-          envVars: parsed.data.envVars, // Pass the new environment variables
+          envVars: finalEnvVars, // Pass the new environment variables
           cpuLimit: deployment.cpuLimit ?? undefined,
           memoryLimit: deployment.memoryLimit ?? undefined,
           storageLimit: deployment.storageLimit ?? undefined,

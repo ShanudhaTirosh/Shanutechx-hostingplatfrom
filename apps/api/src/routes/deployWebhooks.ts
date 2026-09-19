@@ -6,6 +6,8 @@ import { canAccessResource } from '../middleware/rbac';
 import { buildAndRun } from '../lib/nodeAgentClient';
 import { logger } from '../lib/logger';
 import { notifyDiscordChannel } from '../lib/discordWebhooks';
+import { encryptSecret, decryptSecret } from '../lib/secretsVault';
+import { env } from '../env';
 
 /**
  * Deliberate scoping decision (see architecture plan / delivery notes):
@@ -26,19 +28,15 @@ export const deployWebhooksRouter = Router();
 deployWebhooksRouter.get('/deployments/:id/webhook-info', requireAuth, async (req: AuthedRequest, res) => {
   const deployment = await prisma.deployment.findUnique({ where: { id: req.params.id } });
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
+
   if (!(await canAccessResource(deployment.userId, req))) {
     return res.status(404).json({ error: 'Deployment not found' });
   }
 
   const webhookUrl = `/api/deploy-webhooks/${deployment.id}`;
   res.json({
+    hasSecret: !!deployment.deployWebhookSecret,
     webhookUrl,
-    hasSecret: Boolean(deployment.deployWebhookSecret),
-    repoUrl: deployment.repoUrl,
-    instructions: {
-      github: `In your GitHub repo → Settings → Webhooks → Add webhook: Payload URL = <your API base>${webhookUrl}, Content type = application/json, Secret = (generated below), Events = "Just the push event".`,
-      gitlab: `In your GitLab repo → Settings → Webhooks: URL = <your API base>${webhookUrl}, Secret Token = (generated below), Trigger = "Push events".`,
-    },
   });
 });
 
@@ -59,7 +57,8 @@ deployWebhooksRouter.post('/deployments/:id/webhook-secret', requireAuth, async 
   }
 
   const secret = crypto.randomBytes(32).toString('hex');
-  await prisma.deployment.update({ where: { id: deployment.id }, data: { deployWebhookSecret: secret } });
+  const encSecret = encryptSecret(secret, env.secretsEncryptionKey);
+  await prisma.deployment.update({ where: { id: deployment.id }, data: { deployWebhookSecret: encSecret } });
 
   const webhookUrl = `/api/deploy-webhooks/${deployment.id}`;
   res.json({
@@ -99,6 +98,13 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
     return res.status(409).json({ error: 'Deployment has no repo/port to rebuild from' });
   }
 
+  let rawSecret = deployment.deployWebhookSecret;
+  try {
+    rawSecret = decryptSecret(deployment.deployWebhookSecret, env.secretsEncryptionKey);
+  } catch {
+    // Fallback for existing plaintext secrets
+  }
+
   const githubSignature = req.headers['x-hub-signature-256'] as string | undefined;
   const gitlabToken = req.headers['x-gitlab-token'] as string | undefined;
 
@@ -110,7 +116,7 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
       : JSON.stringify(req.body || {});
     const expected =
       'sha256=' +
-      crypto.createHmac('sha256', deployment.deployWebhookSecret).update(rawPayload).digest('hex');
+      crypto.createHmac('sha256', rawSecret).update(rawPayload).digest('hex');
     try {
       verified =
         expected.length === githubSignature.length &&
@@ -121,8 +127,8 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
   } else if (gitlabToken) {
     // GitLab: a plain shared-secret header, not HMAC — compare directly.
     verified =
-      gitlabToken.length === deployment.deployWebhookSecret.length &&
-      crypto.timingSafeEqual(Buffer.from(gitlabToken), Buffer.from(deployment.deployWebhookSecret));
+      gitlabToken.length === rawSecret.length &&
+      crypto.timingSafeEqual(Buffer.from(gitlabToken), Buffer.from(rawSecret));
   }
 
   if (!verified) {

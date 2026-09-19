@@ -640,7 +640,7 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
         nodeId,
         status: 'running',
         containerId: composeName,
-        subdomain: composeName,
+        subdomain: meta.requiresExposedPort !== false ? composeName : null,
         repoUrl: `template:${slug}`,
         internalPort: meta.port ?? 80,
       },
@@ -648,33 +648,34 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
 
     // Automatic Managed Database provisioning & connection wiring for templates requiring database services
     const managedDatabasesCreated: any[] = [];
-    const templateDbTypes: Array<{ type: 'postgres' | 'mysql' | 'redis' | 'mongodb'; port: number; secretKey?: string }> = [];
+    const templateDbTypes: Array<{ type: 'postgres' | 'mysql' | 'redis' | 'mongodb'; port: number; secretKey?: string; serviceName?: string }> = [];
 
     if (slug === 'wordpress') {
-      templateDbTypes.push({ type: 'mysql', port: 3306, secretKey: 'WORDPRESS_DB_PASSWORD' });
+      templateDbTypes.push({ type: 'mysql', port: 3306, secretKey: 'WORDPRESS_DB_PASSWORD', serviceName: 'db' });
     } else if (slug === 'n8n') {
-      templateDbTypes.push({ type: 'postgres', port: 5432, secretKey: 'DB_POSTGRESDB_PASSWORD' });
+      templateDbTypes.push({ type: 'postgres', port: 5432, secretKey: 'DB_POSTGRESDB_PASSWORD', serviceName: 'postgres' });
     } else if (slug === 'redis') {
-      templateDbTypes.push({ type: 'redis', port: 6379, secretKey: 'REDIS_PASSWORD' });
+      templateDbTypes.push({ type: 'redis', port: 6379, secretKey: 'REDIS_PASSWORD', serviceName: 'redis' });
     } else if (slug === 'mongodb') {
-      templateDbTypes.push({ type: 'mongodb', port: 27017, secretKey: 'MONGO_INITDB_ROOT_PASSWORD' });
+      templateDbTypes.push({ type: 'mongodb', port: 27017, secretKey: 'MONGO_INITDB_ROOT_PASSWORD', serviceName: 'mongodb' });
     } else if (slug === 'hermes-agent') {
-      templateDbTypes.push({ type: 'redis', port: 6379, secretKey: 'HERMES_SECRET_KEY' });
+      templateDbTypes.push({ type: 'redis', port: 6379, secretKey: 'HERMES_SECRET_KEY', serviceName: 'redis' });
     } else if (slug === 'supabase-lite') {
-      templateDbTypes.push({ type: 'postgres', port: 5432, secretKey: 'POSTGRES_PASSWORD' });
+      templateDbTypes.push({ type: 'postgres', port: 5432, secretKey: 'POSTGRES_PASSWORD', serviceName: 'postgres' });
     }
 
     for (const dbMeta of templateDbTypes) {
       const dbPassword = (dbMeta.secretKey && envVars[dbMeta.secretKey]) || (dbMeta.secretKey && generatedSecrets[dbMeta.secretKey]) || generateStrongSecret();
       const encCred = encryptSecret(dbPassword, env.secretsEncryptionKey);
+      const hostName = dbMeta.serviceName || `${composeName}-db`;
       const mDb = await prisma.managedDatabase.create({
         data: {
           userId: req.user!.id,
           nodeId,
           type: dbMeta.type,
           status: 'running',
-          containerId: `${composeName}-${dbMeta.type}`,
-          internalHost: `${composeName}-db`,
+          containerId: `${composeName}-${hostName}`,
+          internalHost: hostName,
           internalPort: dbMeta.port,
           credentialRef: encCred,
         },
