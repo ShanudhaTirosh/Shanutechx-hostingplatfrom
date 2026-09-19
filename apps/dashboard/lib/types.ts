@@ -550,7 +550,12 @@ export interface SupabaseClientProject {
   poolerSettingsJson?: any;
   nodeId?: string | null;
   nodeIp?: string | null;
+  nodeLabel?: string | null;
+  subdomain?: string;
   studioUrl?: string;
+  apiUrl?: string;
+  metaUrl?: string;
+  dbUrl?: string;
   createdAt: string;
 }
 

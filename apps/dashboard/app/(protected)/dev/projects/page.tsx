@@ -397,16 +397,30 @@ export default function UnifiedDevProjectsPage() {
                         {/* CONNECTION ENDPOINTS */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 relative z-10 font-mono">
                           <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
-                            <label className="text-[10px] text-text-muted uppercase font-bold">Studio URL</label>
+                            <label className="text-[10px] text-text-muted uppercase font-bold">Studio Dashboard URL</label>
                             <div className="text-xs text-emerald-300 font-bold truncate">
                               {selectedSupabaseProject.studioUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.studioPort || 8000}`}
                             </div>
                           </div>
 
                           <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
-                            <label className="text-[10px] text-text-muted uppercase font-bold">PostgreSQL Direct URI</label>
+                            <label className="text-[10px] text-text-muted uppercase font-bold">Kong REST / Auth API Gateway</label>
                             <div className="text-xs text-cyan-300 font-bold truncate">
-                              postgres://postgres:[pass]@{selectedSupabaseProject.nodeIp || 'localhost'}:{selectedSupabaseProject.dbPort || 5432}/{selectedSupabaseProject.dbName}
+                              {selectedSupabaseProject.apiUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.apiPort || 8001}`}
+                            </div>
+                          </div>
+
+                          <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
+                            <label className="text-[10px] text-text-muted uppercase font-bold">Supabase Meta / Admin API</label>
+                            <div className="text-xs text-violet-300 font-bold truncate">
+                              {selectedSupabaseProject.metaUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:8080`}
+                            </div>
+                          </div>
+
+                          <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
+                            <label className="text-[10px] text-text-muted uppercase font-bold">PostgreSQL Direct Connection URI</label>
+                            <div className="text-xs text-amber-300 font-bold truncate">
+                              {selectedSupabaseProject.dbUrl || `postgresql://postgres:postgres@${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.dbPort || 5432}/${selectedSupabaseProject.dbName}`}
                             </div>
                           </div>
                         </div>
@@ -760,18 +774,25 @@ export default function UnifiedDevProjectsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-text-muted mb-1">Target Host VPS Node</label>
+                    <label className="block text-xs font-semibold text-text-muted mb-1">Target Host VPS Compute Node</label>
                     <select
                       value={supaNodeId}
                       onChange={(e) => setSupaNodeId(e.target.value)}
                       className="w-full bg-[#121324] border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
                     >
-                      {nodes.map((n) => (
-                        <option key={n.id} value={n.id}>
-                          {n.label} ({n.ip})
-                        </option>
-                      ))}
+                      {nodes.length === 0 ? (
+                        <option value="">Default (Main Node)</option>
+                      ) : (
+                        nodes.map((n) => (
+                          <option key={n.id} value={n.id}>
+                            {n.label} ({n.ip}) - {n.cpuCores || 4} Cores / {n.ramMb || 8192} MB RAM
+                          </option>
+                        ))
+                      )}
                     </select>
+                    <p className="text-[10px] text-emerald-400 font-mono mt-1">
+                      ⚡ Auto-creates unproxied DNS A-record (proxied: false): supabase-&lt;name&gt;.shanutechx.com ➔ Node IP
+                    </p>
                   </div>
                 </>
               ) : (

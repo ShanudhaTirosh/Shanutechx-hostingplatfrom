@@ -171,8 +171,8 @@ nodesRouter.post('/nodes/register', async (req: Request, res: Response) => {
   const cleanLabel = label.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '') || 'node';
   const nodeSubdomain = `node-${cleanLabel}`;
   try {
-    await createSubdomainRecord(nodeSubdomain, ip);
-    logger.info({ nodeSubdomain, ip }, 'Auto-created Cloudflare DNS record for registered node');
+    await createSubdomainRecord(nodeSubdomain, ip, false);
+    logger.info({ nodeSubdomain, ip }, 'Auto-created unproxied Cloudflare DNS record for registered node');
   } catch (dnsErr) {
     logger.warn({ dnsErr, nodeSubdomain, ip }, 'Cloudflare DNS auto-record registration skipped or failed');
   }

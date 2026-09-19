@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
+import { requireAuth, requireDev, AuthedRequest } from '../middleware/auth';
 import { logger } from '../lib/logger';
 import { prisma } from '../lib/prisma';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
@@ -38,16 +38,28 @@ export interface ClientProject {
   poolerSettingsJson?: any;
   nodeId?: string | null;
   nodeIp?: string | null;
+  nodeLabel?: string | null;
+  subdomain?: string;
   studioUrl?: string;
+  apiUrl?: string;
+  metaUrl?: string;
+  dbUrl?: string;
   createdAt: string;
 }
 
 function serializeProject(p: any): ClientProject {
   const studioPort = p.studioPort ?? 8000;
+  const apiPort = p.apiPort ?? 8001;
+  const dbPort = p.dbPort ?? 5432;
+  const metaPort = 8080;
   const rootDomain = env.rootDomain || 'shanutechx.com';
   const cleanSlug = p.name ? p.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '') : 'default';
   const hostSubdomain = `supabase-${cleanSlug}.${rootDomain}`;
+
   const studioUrl = `http://${hostSubdomain}:${studioPort}`;
+  const apiUrl = `http://${hostSubdomain}:${apiPort}`;
+  const metaUrl = `http://${hostSubdomain}:${metaPort}`;
+  const dbUrl = `postgresql://postgres:postgres@${hostSubdomain}:${dbPort}/${p.dbName || 'postgres'}`;
 
   return {
     id: p.id,
@@ -60,15 +72,20 @@ function serializeProject(p: any): ClientProject {
     hasServiceKey: Boolean(p.serviceKey || SUPABASE_SERVICE_ROLE_KEY),
     smtpConfigured: p.smtpConfigured,
     studioPort,
-    apiPort: p.apiPort ?? 8001,
-    dbPort: p.dbPort ?? 5432,
+    apiPort,
+    dbPort,
     storageLimitMb: p.storageLimitMb ?? 5120,
     extensions: p.extensions ?? ['uuid-ossp', 'pgcrypto', 'pgvector'],
     authSettingsJson: p.authSettingsJson ?? { emailEnabled: true, githubEnabled: true, googleEnabled: false },
     poolerSettingsJson: p.poolerSettingsJson ?? { mode: 'transaction', poolSize: 20, port: 6543 },
     nodeId: p.nodeId ?? null,
     nodeIp: p.nodeIp ?? null,
+    nodeLabel: p.node?.label ?? null,
+    subdomain: hostSubdomain,
     studioUrl,
+    apiUrl,
+    metaUrl,
+    dbUrl,
     createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
   };
 }
@@ -138,7 +155,7 @@ async function fetchJson(url: string, options: RequestInit = {}) {
 }
 
 // 1. Service Health & Status
-supabaseRouter.get('/supabase/health', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/health', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   const [kongRes, metaRes, realtimeRes] = await Promise.all([
     fetchJson(`${SUPABASE_KONG_URL}/health`),
     fetchJson(`${SUPABASE_META_URL}/health`),
@@ -169,13 +186,17 @@ supabaseRouter.get('/supabase/health', requireAuth, requireAdminOrDev, async (_r
 });
 
 // 2. Multi-Project Management API
-supabaseRouter.get('/supabase/projects', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
-  const projects = await prisma.supabaseClientProject.findMany({ orderBy: { createdAt: 'desc' } });
-  const serialized = projects.map(serializeProject);
+supabaseRouter.get('/supabase/projects', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
+  const [projects, nodes] = await Promise.all([
+    prisma.supabaseClientProject.findMany({ orderBy: { createdAt: 'desc' } }),
+    prisma.node.findMany({ select: { id: true, label: true, ip: true } }),
+  ]);
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const serialized = projects.map((p) => serializeProject({ ...p, node: p.nodeId ? nodeMap.get(p.nodeId) : null }));
   res.json({ projects: serialized, total: serialized.length });
 });
 
-supabaseRouter.post('/supabase/projects', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/projects', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
   const { name, clientEmail, region, nodeId } = req.body;
   if (!name || !clientEmail) {
     return res.status(400).json({ error: 'Project name and client email are required' });
@@ -195,7 +216,8 @@ supabaseRouter.post('/supabase/projects', requireAuth, requireAdminOrDev, async 
 
   if (selectedNode?.ip) {
     const hostSubdomain = `supabase-${cleanSlug}`;
-    await createSubdomainRecord(hostSubdomain, selectedNode.ip).catch((err: any) => {
+    // Pass false to create an unproxied Cloudflare A-record directly pointing to node IP
+    await createSubdomainRecord(hostSubdomain, selectedNode.ip, false).catch((err: any) => {
       logger.warn(`Failed to auto-create Cloudflare DNS for Supabase project ${hostSubdomain}: ${err?.message || err}`);
     });
   }
@@ -216,10 +238,10 @@ supabaseRouter.post('/supabase/projects', requireAuth, requireAdminOrDev, async 
     },
   });
 
-  res.status(201).json({ project: serializeProject(newProject) });
+  res.status(201).json({ project: serializeProject({ ...newProject, node: selectedNode }) });
 });
 
-supabaseRouter.delete('/supabase/projects/:id', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.delete('/supabase/projects/:id', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   if (id === 'proj_default') {
     return res.status(400).json({ error: 'Cannot delete default project' });
@@ -232,7 +254,7 @@ supabaseRouter.delete('/supabase/projects/:id', requireAuth, requireAdminOrDev, 
   res.json({ ok: true, deletedId: id });
 });
 
-supabaseRouter.patch('/supabase/projects/:id/config', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.patch('/supabase/projects/:id/config', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   const {
     dbPassword,
@@ -269,13 +291,13 @@ supabaseRouter.patch('/supabase/projects/:id/config', requireAuth, requireAdminO
 });
 
 // 3. SMTP Config & Connection Verification
-supabaseRouter.get('/supabase/smtp/config', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/smtp/config', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   const config = await getAuthSmtpConfig();
   const { passwordEnc, ...safeConfig } = config;
   res.json({ smtpConfig: safeConfig, hasPassword: !!passwordEnc });
 });
 
-supabaseRouter.post('/supabase/smtp/config', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/smtp/config', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
   const { host, port, user, pass, senderEmail, senderName, enableEmailSignup, enableAutoconfirm } = req.body;
 
   const data: any = {};
@@ -295,7 +317,7 @@ supabaseRouter.post('/supabase/smtp/config', requireAuth, requireAdminOrDev, asy
   res.json({ ok: true, smtpConfig: safeConfig });
 });
 
-supabaseRouter.post('/supabase/smtp/verify', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/smtp/verify', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   const config = await getAuthSmtpConfig();
   const result = await verifySmtpConnection({
     host: config.host,
@@ -307,7 +329,7 @@ supabaseRouter.post('/supabase/smtp/verify', requireAuth, requireAdminOrDev, asy
 });
 
 // 4. Send Real Test Email over SMTP Transport
-supabaseRouter.post('/supabase/smtp/test-email', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/smtp/test-email', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
   const { recipientEmail, templateId } = req.body;
   const target = recipientEmail || req.user?.email || 'admin@shanutechx.com';
   const config = await getAuthSmtpConfig();
@@ -373,12 +395,12 @@ supabaseRouter.post('/supabase/smtp/test-email', requireAuth, requireAdminOrDev,
 });
 
 // 5. Auth Email Templates API
-supabaseRouter.get('/supabase/smtp/templates', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/smtp/templates', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   const templates = await prisma.supabaseEmailTemplate.findMany();
   res.json({ templates });
 });
 
-supabaseRouter.post('/supabase/smtp/templates', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/smtp/templates', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
   const { id, subject, html } = req.body;
   if (!id || !subject || !html) {
     return res.status(400).json({ error: 'Template id, subject, and html are required' });
@@ -391,7 +413,7 @@ supabaseRouter.post('/supabase/smtp/templates', requireAuth, requireAdminOrDev, 
 });
 
 // 6. SMTP Outbound Delivery Logs
-supabaseRouter.get('/supabase/smtp/logs', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/smtp/logs', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   const logs = await prisma.supabaseSmtpDeliveryLog.findMany({ take: 50, orderBy: { createdAt: 'desc' } });
   res.json({
     logs: logs.map((l: any) => ({
@@ -409,7 +431,7 @@ supabaseRouter.get('/supabase/smtp/logs', requireAuth, requireAdminOrDev, async 
 });
 
 // 7. GoTrue Auth User Management Endpoints
-supabaseRouter.get('/supabase/auth/users', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/auth/users', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   const result = await fetchJson(`${SUPABASE_KONG_URL}/auth/v1/admin/users`);
   if (!result.ok) {
     return res.json({
@@ -431,7 +453,7 @@ supabaseRouter.get('/supabase/auth/users', requireAuth, requireAdminOrDev, async
   res.json({ users: usersList, total: usersList.length });
 });
 
-supabaseRouter.post('/supabase/auth/users', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/auth/users', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
   const { email, password, user_metadata } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
@@ -451,7 +473,7 @@ supabaseRouter.post('/supabase/auth/users', requireAuth, requireAdminOrDev, asyn
   res.status(201).json(result.data);
 });
 
-supabaseRouter.delete('/supabase/auth/users/:id', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.delete('/supabase/auth/users/:id', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   if (!id) return res.status(400).json({ error: 'User ID is required' });
 
@@ -466,7 +488,7 @@ supabaseRouter.delete('/supabase/auth/users/:id', requireAuth, requireAdminOrDev
 });
 
 // 8. Database Studio endpoints
-supabaseRouter.get('/supabase/db/schemas', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/db/schemas', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   const result = await fetchJson(`${SUPABASE_META_URL}/schemas`);
   if (!result.ok) {
     return res.status(503).json({ error: 'Supabase Meta service is unreachable', isFallback: true, schemas: [] });
@@ -474,7 +496,7 @@ supabaseRouter.get('/supabase/db/schemas', requireAuth, requireAdminOrDev, async
   res.json({ schemas: result.data });
 });
 
-supabaseRouter.get('/supabase/db/tables', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/db/tables', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   const result = await fetchJson(`${SUPABASE_META_URL}/tables`);
   if (!result.ok) {
     return res.status(503).json({ error: 'Supabase Meta service is unreachable', isFallback: true, tables: [] });
@@ -482,7 +504,7 @@ supabaseRouter.get('/supabase/db/tables', requireAuth, requireAdminOrDev, async 
   res.json({ tables: result.data });
 });
 
-supabaseRouter.post('/supabase/db/query', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/db/query', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
   const { sql } = req.body;
   if (!sql) return res.status(400).json({ error: 'SQL query parameter is required' });
 
@@ -508,7 +530,7 @@ supabaseRouter.post('/supabase/db/query', requireAuth, requireAdminOrDev, async 
 });
 
 // 9. Storage Buckets endpoints
-supabaseRouter.get('/supabase/storage/buckets', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/storage/buckets', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   const result = await fetchJson(`${SUPABASE_KONG_URL}/storage/v1/bucket`);
   if (!result.ok) {
     return res.status(503).json({ error: 'Supabase Storage service is unreachable', isFallback: true, buckets: [] });
@@ -517,7 +539,7 @@ supabaseRouter.get('/supabase/storage/buckets', requireAuth, requireAdminOrDev, 
   res.json({ buckets: bucketList });
 });
 
-supabaseRouter.post('/supabase/storage/buckets', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/storage/buckets', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
   const { id, name, isPublic } = req.body;
   if (!id || !name) {
     return res.status(400).json({ error: 'Bucket ID and name are required' });
@@ -541,7 +563,7 @@ supabaseRouter.post('/supabase/storage/buckets', requireAuth, requireAdminOrDev,
 });
 
 // 10. Edge Functions & Platform Config
-supabaseRouter.get('/supabase/functions', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/functions', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   res.json({
     functions: [
       { id: 'func_01', name: 'hello-world', status: 'ACTIVE', version: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
@@ -551,7 +573,7 @@ supabaseRouter.get('/supabase/functions', requireAuth, requireAdminOrDev, async 
 });
 
 // 11. Security & Performance Advisors Linter Endpoint
-supabaseRouter.get('/supabase/advisors', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/advisors', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   let securityLints = [
     {
       id: 'sec_rls_01',
@@ -608,7 +630,7 @@ supabaseRouter.get('/supabase/advisors', requireAuth, requireAdminOrDev, async (
 
 
 // 12. Observability Metrics Endpoint
-supabaseRouter.get('/supabase/observability', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/observability', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   const mem = process.memoryUsage();
   const dbCount = await prisma.supabaseClientProject.count().catch(() => 1);
 
@@ -629,7 +651,7 @@ supabaseRouter.get('/supabase/observability', requireAuth, requireAdminOrDev, as
 });
 
 // 13. System & API Log Stream Endpoint
-supabaseRouter.get('/supabase/logs', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/logs', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
   const service = (req.query.service as string) || 'all';
 
   const logs = [
@@ -644,7 +666,7 @@ supabaseRouter.get('/supabase/logs', requireAuth, requireAdminOrDev, async (req:
 });
 
 // 14. Integrations (Webhooks, Vault, FDW) Endpoint
-supabaseRouter.get('/supabase/integrations', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/integrations', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   res.json({
     webhooks: [
       { id: 'wh_01', name: 'Order Created Webhook', table: 'public.orders', events: ['INSERT'], url: 'https://api.shanutechx.com/webhooks/orders', status: 'ACTIVE' }
@@ -662,7 +684,7 @@ supabaseRouter.get('/supabase/integrations', requireAuth, requireAdminOrDev, asy
 });
 
 // 15. System Config & Environment Credentials Endpoint
-supabaseRouter.get('/supabase/config', requireAuth, requireAdminOrDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/config', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.API_BASE_URL || '';
   const anonKey = process.env.SUPABASE_ANON_KEY || '';
   const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || '';
