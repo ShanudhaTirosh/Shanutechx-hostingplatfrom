@@ -237,7 +237,34 @@ webmailRouter.get('/webmail/threads/:threadId', async (req: AuthedRequest, res: 
   res.json({ threadId, messages, total: messages.length });
 });
 
-// 1.4 Get Single Message Details
+// 1.4 Get Snoozed & Scheduled Messages (must be registered before /messages/:id)
+webmailRouter.get('/webmail/messages/snoozed', async (req: AuthedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const snoozed = await prisma.webmailSnooze.findMany({
+      where: { userId, snoozedUntil: { gte: new Date() } },
+      orderBy: { snoozedUntil: 'asc' },
+    });
+    return res.json({ snoozed });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to fetch snoozed messages' });
+  }
+});
+
+webmailRouter.get('/webmail/messages/scheduled', async (req: AuthedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const scheduled = await prisma.webmailScheduledSend.findMany({
+      where: { userId, status: 'pending' },
+      orderBy: { scheduledFor: 'asc' },
+    });
+    return res.json({ scheduled });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to list scheduled sends' });
+  }
+});
+
+// 1.5 Get Single Message Details
 webmailRouter.get('/webmail/messages/:id', async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   const userId = req.user!.id;
@@ -1183,60 +1210,11 @@ webmailRouter.post('/webmail/messages/:id/snooze', async (req: AuthedRequest, re
   }
 });
 
-/**
- * GET /webmail/messages/snoozed
- */
-webmailRouter.get('/webmail/messages/snoozed', async (req: AuthedRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const snoozed = await prisma.webmailSnooze.findMany({
-      where: { userId, snoozedUntil: { gte: new Date() } },
-      orderBy: { snoozedUntil: 'asc' },
-    });
-    return res.json({ snoozed });
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to fetch snoozed messages' });
-  }
+webmailRouter.get('/webmail/messages/snoozed_legacy_alias', async (req: AuthedRequest, res: Response) => {
+  res.redirect(307, '/webmail/messages/snoozed');
 });
 
-/**
- * GET & POST /webmail/labels & /webmail/messages/:id/labels
- */
-webmailRouter.get('/webmail/labels', async (req: AuthedRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const labels = await prisma.webmailLabel.findMany({ where: { userId } });
-    return res.json({ labels });
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to fetch labels' });
-  }
-});
 
-webmailRouter.post('/webmail/labels', async (req: AuthedRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const { name, color } = req.body;
-    if (!name) return res.status(400).json({ error: 'Name is required' });
-
-    const label = await prisma.webmailLabel.create({
-      data: { userId, name, color: color || '#6366f1' },
-    });
-    return res.json({ label });
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to create label' });
-  }
-});
-
-webmailRouter.delete('/webmail/labels/:id', async (req: AuthedRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const { id } = req.params;
-    await prisma.webmailLabel.deleteMany({ where: { id, userId } });
-    return res.json({ ok: true });
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to delete label' });
-  }
-});
 
 webmailRouter.post('/webmail/messages/:id/labels', async (req: AuthedRequest, res: Response) => {
   try {
@@ -1282,17 +1260,8 @@ webmailRouter.post('/webmail/messages/schedule', async (req: AuthedRequest, res:
   }
 });
 
-webmailRouter.get('/webmail/messages/scheduled', async (req: AuthedRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const scheduled = await prisma.webmailScheduledSend.findMany({
-      where: { userId, status: 'pending' },
-      orderBy: { scheduledFor: 'asc' },
-    });
-    return res.json({ scheduled });
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to list scheduled sends' });
-  }
+webmailRouter.get('/webmail/messages/scheduled_legacy_alias', async (req: AuthedRequest, res: Response) => {
+  res.redirect(307, '/webmail/messages/scheduled');
 });
 
 webmailRouter.delete('/webmail/messages/scheduled/:id', async (req: AuthedRequest, res: Response) => {
@@ -1483,87 +1452,7 @@ webmailRouter.get('/webmail/security/audit-log', async (req: AuthedRequest, res:
   }
 });
 
-/**
- * BUSINESS ANALYTICS & MAIL MERGE
- */
-webmailRouter.get('/webmail/business/analytics', async (req: AuthedRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const totalSent = await prisma.webmailMessage.count({ where: { userId, folder: 'sent' } });
-    const totalReceived = await prisma.webmailMessage.count({ where: { userId, folder: 'inbox' } });
-    const totalSpam = await prisma.webmailMessage.count({ where: { userId, folder: 'spam' } });
 
-    return res.json({
-      analytics: {
-        totalSent,
-        totalReceived,
-        totalSpam,
-        openRatePct: 88.4,
-        clickRatePct: 24.1,
-        bounceRatePct: 0.6,
-        avgResponseTimeMins: 14,
-        timeline: [
-          { day: 'Mon', sent: 12, received: 45 },
-          { day: 'Tue', sent: 28, received: 64 },
-          { day: 'Wed', sent: 45, received: 89 },
-          { day: 'Thu', sent: 34, received: 72 },
-          { day: 'Fri', sent: 50, received: 110 },
-          { day: 'Sat', sent: 8, received: 15 },
-          { day: 'Sun', sent: 5, received: 12 },
-        ],
-      },
-    });
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to fetch mail analytics' });
-  }
-});
-
-webmailRouter.post('/webmail/business/mail-merge', async (req: AuthedRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const { recipients, subject, bodyTemplate } = req.body;
-    if (!Array.isArray(recipients) || !subject || !bodyTemplate) {
-      return res.status(400).json({ error: 'recipients array, subject, and bodyTemplate required' });
-    }
-
-    let dispatchedCount = 0;
-    for (const r of recipients) {
-      let personalizedBody = bodyTemplate;
-      if (r.variables && typeof r.variables === 'object') {
-        for (const [k, v] of Object.entries(r.variables)) {
-          personalizedBody = personalizedBody.replace(new RegExp(`{{\\s*${k}\\s*}}`, 'g'), String(v));
-        }
-      }
-
-      await prisma.webmailMessage.create({
-        data: {
-          userId,
-          folder: 'sent',
-          senderName: (req.user as any).displayName || 'User',
-          senderEmail: req.user!.email,
-          recipientEmail: r.email,
-          subject,
-          snippet: personalizedBody.slice(0, 100),
-          htmlBody: personalizedBody,
-          isRead: true,
-        },
-      });
-      dispatchedCount++;
-    }
-
-    await prisma.webmailAuditLog.create({
-      data: {
-        userId,
-        action: 'mail_merge_dispatched',
-        details: { count: dispatchedCount, subject },
-      },
-    });
-
-    return res.json({ ok: true, dispatchedCount });
-  } catch (err) {
-    return res.status(500).json({ error: 'Mail merge dispatch failed' });
-  }
-});
 
 // =====================================================================
 // CUSTOMER MAILBOX & DOMAIN MANAGEMENT HUB (PLAN QUOTAS & DNS WIZARD)

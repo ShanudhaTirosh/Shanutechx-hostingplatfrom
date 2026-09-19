@@ -85,13 +85,14 @@ export async function requireAuth(
         // An unverified email claim must never be enough to take over an
         // existing account — this prevents the account-takeover vector where
         // an attacker registers with an unverified address matching an
-        // existing customer and gets their Firebase UID silently merged in.
+        // existing customer.
         if (decoded.email_verified) {
           const existingByEmail = await prisma.user.findUnique({
             where: { email: decoded.email },
           });
 
-          if (existingByEmail) {
+          // B-05 FIX: Reject relinking if existing user already has a different firebaseUid
+          if (existingByEmail && (!existingByEmail.firebaseUid || existingByEmail.firebaseUid === decoded.uid)) {
             user = await prisma.user.update({
               where: { id: existingByEmail.id },
               data: {
@@ -106,15 +107,17 @@ export async function requireAuth(
       if (!user) {
         // New user: always start as 'customer'. Role elevation must go through
         // PATCH /admin/staff/:userId/role — never via email address matching.
+        // B-14 FIX: Use unique placeholder if email is absent to avoid P2002 collision on User.email
+        const fallbackEmail = decoded.email || `no-email-${decoded.uid}@shanutechx.internal`;
         user = await prisma.user.create({
           data: {
             firebaseUid: decoded.uid,
-            email: decoded.email ?? '',
+            email: fallbackEmail,
             displayName: decoded.name ?? null,
             role: 'customer',
           },
         });
-      } else if (decoded.email && user.email !== decoded.email) {
+      } else if (decoded.email && user.email !== decoded.email && !user.email.endsWith('@shanutechx.internal')) {
         // Keep the stored email in sync if Firebase reports a change.
         user = await prisma.user.update({
           where: { id: user.id },

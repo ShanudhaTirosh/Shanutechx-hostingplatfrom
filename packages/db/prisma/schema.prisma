@@ -195,6 +195,8 @@ model User {
   webmailEvents         WebmailEvent[]
   reviews               Review[]
   notificationChannels  NotificationChannel[]
+
+  @@index([assignedAdminId])
 }
 
 // Real Expo push tokens, registered by the mobile admin app
@@ -214,6 +216,8 @@ model PushToken {
   platform   String // 'ios' | 'android'
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Node {
@@ -269,6 +273,8 @@ model Service {
   createdAt     DateTime      @default(now())
 
   orderItems OrderItem[]
+
+  @@index([nodeId])
 }
 
 enum ProductCategory {
@@ -350,6 +356,9 @@ model Order {
   payments Payment[]
   invoice  Invoice?
   tickets  Ticket[]
+
+  @@index([userId])
+  @@index([teamId])
 }
 
 model OrderItem {
@@ -374,6 +383,10 @@ model OrderItem {
   vpsProvision    VpsProvision?
   managedDatabase ManagedDatabase?
   subscription    Subscription?
+
+  @@index([orderId])
+  @@index([serviceId])
+  @@index([planId])
 }
 
 model Payment {
@@ -403,6 +416,9 @@ model Payment {
   rejectionReason String?
 
   smsEvent SmsEvent?
+
+  @@index([orderId])
+  @@index([reviewedById])
 }
 
 model SmsEvent {
@@ -528,6 +544,12 @@ model Deployment {
   customDomains CustomDomain[]
   wafRules      WafRule[]
   volumes       DeploymentVolume[]
+
+  @@index([userId])
+  @@index([teamId])
+  @@index([nodeId])
+  @@index([parentDeploymentId])
+  @@index([templateId])
 }
 
 model WafRule {
@@ -611,6 +633,7 @@ model WebmailMessage {
   @@index([userId, folder])
   @@index([userId, threadId])
   @@index([userId, category])
+  @@index([smtpAccountId])
 }
 
 // User-created custom folders
@@ -626,6 +649,7 @@ model WebmailFolder {
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([parentId])
 }
 
 // User-created custom labels
@@ -666,6 +690,7 @@ model WebmailSignature {
   createdAt     DateTime @default(now())
 
   @@index([userId])
+  @@index([smtpAccountId])
 }
 
 // Saved canned responses / templates
@@ -695,6 +720,7 @@ model WebmailAutoReply {
   createdAt     DateTime  @default(now())
 
   @@index([userId])
+  @@index([smtpAccountId])
 }
 
 // Blocked senders list
@@ -736,6 +762,7 @@ model WebmailSnooze {
   createdAt    DateTime @default(now())
 
   @@index([userId, snoozedUntil])
+  @@index([messageId])
 }
 
 // Scheduled send queue
@@ -875,6 +902,8 @@ model SmtpAccount {
   maxAliases      Int      @default(10)
   planTier        String   @default("pro")
   allowedAdminIds String[] @default([]) // Dev-assigned admin user IDs allowed to read/write/send via this mailbox
+
+  @@index([userId])
 }
 
 // Platform-wide outbound mailer config (singleton row, id "global").
@@ -903,6 +932,9 @@ model LiveKitProject {
   nodeId       String?
   isActive     Boolean    @default(true)
   createdAt    DateTime   @default(now())
+
+  @@index([userId])
+  @@index([nodeId])
 }
 
 enum VpsProvisionStatus {
@@ -940,6 +972,9 @@ model VpsProvision {
   provisionedById String? // User ID of admin/dev who completed manual setup
 
   leasewebVpsId String?
+
+  @@index([userId])
+  @@index([provisionedById])
 }
 
 enum NotificationEvent {
@@ -1050,6 +1085,7 @@ model EmailDomain {
   createdAt     DateTime @default(now())
 
   @@index([userId])
+  @@index([smtpAccountId])
 }
 
 // Secrets Vault for encrypted environment secret storage (AES-256-GCM).
@@ -1087,6 +1123,7 @@ model SecretAuditEntry {
   createdAt DateTime      @default(now())
 
   @@index([projectId])
+  @@index([actorId])
 }
 
 // Supabase client projects and configuration.
@@ -1113,6 +1150,8 @@ model SupabaseClientProject {
   nodeId             String?  // Node.id this stack is provisioned on
   nodeIp             String?  // Cached node IP for direct Studio URL: http://nodeIp:studioPort
   createdAt          DateTime @default(now())
+
+  @@index([nodeId])
 }
 
 // Singleton row (id "global") for GoTrue/Supabase-Auth outbound email
@@ -1162,6 +1201,8 @@ model AuditLog {
 
   // Null = staff-performed, 'customer' = customer self-service action.
   actorRole String?
+
+  @@index([adminId])
 }
 
 // Customer support tickets. Separate from the Realtime DB live-chat
@@ -1182,6 +1223,9 @@ model Ticket {
   updatedAt DateTime       @updatedAt
 
   messages TicketMessage[]
+
+  @@index([userId])
+  @@index([orderId])
 }
 
 model TicketMessage {
@@ -1193,6 +1237,9 @@ model TicketMessage {
   senderRole TicketSenderRole
   body       String
   createdAt  DateTime         @default(now())
+
+  @@index([ticketId])
+  @@index([senderId])
 }
 
 // Tracks recurring services (monthly/yearly hosting plans, SMTP, LiveKit,
@@ -1212,6 +1259,8 @@ model Subscription {
   createdAt        DateTime           @default(now())
   pastDueAt        DateTime?
   cancelledAt      DateTime?
+
+  @@index([userId])
 }
 
 // One row per periodic HTTP check against a deployment's public subdomain
@@ -1259,6 +1308,8 @@ model ApiKey {
   lastUsedAt DateTime?
   createdAt  DateTime  @default(now())
   revokedAt  DateTime?
+
+  @@index([userId])
 }
 
 // Customer-configured outbound webhooks — notifies a customer's own system
@@ -1277,6 +1328,8 @@ model Webhook {
   createdAt DateTime     @default(now())
 
   deliveries WebhookDelivery[]
+
+  @@index([userId])
 }
 
 // Delivery attempt log — lets a customer see whether their webhook is actually firing and succeeding.
@@ -1323,6 +1376,9 @@ model ManagedDatabase {
 
   dbUsers ManagedDatabaseUser[]
   backups DatabaseBackup[]
+
+  @@index([userId])
+  @@index([nodeId])
 }
 
 model ManagedDatabaseUser {
@@ -1378,6 +1434,9 @@ model Project {
   authUsers    ProjectAuthUser[]
   oauthConfigs ProjectOAuthConfig[]
   magicLinks   ProjectMagicLink[]
+
+  @@index([userId])
+  @@index([nodeId])
 }
 
 // History log for runBackup() calls (manual "Run backup now" clicks and the
@@ -1434,6 +1493,7 @@ model ProjectOAuthAccount {
   createdAt      DateTime        @default(now())
 
   @@unique([provider, providerUserId])
+  @@index([authUserId])
 }
 
 // Per-project OAuth app credentials, set by the project's dev in the Dev
@@ -1465,6 +1525,8 @@ model ProjectMagicLink {
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+
+  @@index([projectId])
 }
 
 model NodeBootstrapLog {
@@ -1474,6 +1536,8 @@ model NodeBootstrapLog {
   output    String
   success   Boolean
   createdAt DateTime @default(now())
+
+  @@index([nodeId])
 }
 
 // =====================================================================
@@ -1697,6 +1761,8 @@ model Team {
   invites     TeamInvite[]
   orders      Order[]
   deployments Deployment[]
+
+  @@index([ownerId])
 }
 
 model TeamMember {
@@ -1711,6 +1777,7 @@ model TeamMember {
   permissions ResourcePermission[]
 
   @@unique([teamId, userId])
+  @@index([userId])
 }
 
 model TeamInvite {
@@ -1729,6 +1796,8 @@ model TeamInvite {
 
   @@index([token])
   @@index([email])
+  @@index([teamId])
+  @@index([invitedByUserId])
 }
 
 model ResourcePermission {

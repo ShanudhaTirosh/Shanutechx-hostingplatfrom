@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { env } from '../env';
 import { decryptSecret } from '../lib/secretsVault';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
+import { authRateLimiter } from '../middleware/rateLimit';
 import { logger } from '../lib/logger';
 import { storeState, consumeState } from '../lib/redis';
 
@@ -33,24 +34,30 @@ function omitCredentialRef<T extends { credentialRef: string }>(account: T) {
 /**
  * POST /api/webmail/auth/login
  * Direct authentication endpoint for standalone webmail users.
+ * B-11 FIX: Protected by authRateLimiter and uses indexed DB queries.
  */
-webmailAuthRouter.post('/webmail/auth/login', async (req: Request, res: Response) => {
+webmailAuthRouter.post('/webmail/auth/login', authRateLimiter, async (req: Request, res: Response) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const { email, password } = parsed.data;
   const inputClean = email.toLowerCase().trim();
 
-  // Search by smtpUsername, full email, or custom alias match
-  const accounts = await prisma.smtpAccount.findMany({
-    include: { user: { select: { id: true, email: true, displayName: true } } },
-  });
+  // Parse email parts if format is username@domain
+  const atIdx = inputClean.lastIndexOf('@');
+  const userPrefix = atIdx > -1 ? inputClean.substring(0, atIdx) : inputClean;
+  const domainPart = atIdx > -1 ? inputClean.substring(atIdx + 1) : '';
 
-  const account = accounts.find((acc) => {
-    const usernameMatch = acc.smtpUsername.toLowerCase() === inputClean;
-    const fullEmailMatch = `${acc.smtpUsername}@${acc.customDomain || env.rootDomain}`.toLowerCase() === inputClean;
-    const aliasMatch = Array.isArray(acc.aliases) && acc.aliases.some((a) => a.toLowerCase() === inputClean);
-    return usernameMatch || fullEmailMatch || aliasMatch;
+  // B-11 FIX: Indexed lookup instead of loading all accounts into memory
+  const account = await prisma.smtpAccount.findFirst({
+    where: {
+      OR: [
+        { smtpUsername: inputClean },
+        ...(domainPart ? [{ smtpUsername: userPrefix, customDomain: domainPart }] : []),
+        { aliases: { has: inputClean } },
+      ],
+    },
+    include: { user: { select: { id: true, email: true, displayName: true } } },
   });
 
   if (!account || !account.credentialRef) {
@@ -109,10 +116,18 @@ webmailAuthRouter.post('/webmail/auth/sso-ticket', requireAuth, async (req: Auth
   if (requestedAccountId) {
     account = await prisma.smtpAccount.findUnique({ where: { id: requestedAccountId } });
   } else {
+    // B-20 FIX: Default to caller's own mailbox or explicitly allowed mailboxes first.
     account = await prisma.smtpAccount.findFirst({
-      where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+      where: { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
       orderBy: { createdAt: 'asc' },
     });
+
+    // If caller is dev and has no assigned mailbox, permit fallback only if explicit
+    if (!account && role === 'dev') {
+      account = await prisma.smtpAccount.findFirst({
+        orderBy: { createdAt: 'asc' },
+      });
+    }
   }
 
   if (!account) {

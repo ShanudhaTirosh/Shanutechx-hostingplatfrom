@@ -8,6 +8,7 @@ import { sendSmtpReleaseEmail, getTierFromPlanName, generateDefaultAliases } fro
 import { generateLiveKitKeyPair } from './livekit';
 import { selectNodeForDeployment } from './nodeSelector';
 import { registerLiveKitKey, provisionDatabaseContainer } from './nodeAgentClient';
+import { formatCurrency } from './currency';
 import { wildduckClient } from './wildduckClient';
 import crypto from 'crypto';
 
@@ -97,7 +98,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
           Order: order.id,
           Customer: order.user.email,
           Plan: item.plan?.name || item.service?.name || 'VPS Server',
-          Amount: `LKR ${order.totalLkr}`,
+          Amount: formatCurrency(order.totalLkr, 'LKR'),
           Status: 'Pending Admin Manual Setup',
         });
       } catch (err) {
@@ -188,7 +189,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
             aliases,
             orderId: order.id,
             paymentId: 'AUTO_PROVISION',
-            amountPaid: `LKR ${order.totalLkr}`,
+            amountPaid: formatCurrency(order.totalLkr, 'LKR'),
           });
 
           fulfilledItems.push(`SMTP Mailbox (${username}@${env.rootDomain})`);

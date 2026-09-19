@@ -11,7 +11,7 @@ import { removeStaffFromRealtimeDb } from '../lib/chatAdminSync';
 
 export const adminRouter = Router();
 
-adminRouter.use(requireAuth, requireAdmin);
+adminRouter.use('/admin', requireAuth, requireAdmin);
 
 adminRouter.get('/admin/customers', async (req: AuthedRequest, res) => {
   const { take, skip } = parsePagination(req.query);

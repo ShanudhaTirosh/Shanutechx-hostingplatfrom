@@ -59,7 +59,15 @@ export async function consumeMagicLink(projectId: string, rawToken: string): Pro
     return null;
   }
 
-  await prisma.projectMagicLink.update({ where: { id: link.id }, data: { usedAt: new Date() } });
+  const updateResult = await prisma.projectMagicLink.updateMany({
+    where: { id: link.id, usedAt: null },
+    data: { usedAt: new Date() },
+  });
+
+  if (updateResult.count === 0) {
+    return null;
+  }
+
   return link.email;
 }
 

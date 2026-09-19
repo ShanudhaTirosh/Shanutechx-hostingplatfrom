@@ -113,7 +113,6 @@ export default function DeploymentIDEPage() {
         repoUrl={deployment.repoUrl}
         subdomain={deployment.subdomain}
         apiBaseUrl={API_BASE_URL}
-        authToken={typeof window !== 'undefined' ? localStorage.getItem('token') || '' : ''}
       />
     </div>
   );

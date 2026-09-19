@@ -6,7 +6,7 @@ const {
   TextInputStyle,
   ActionRowBuilder,
 } = require('discord.js');
-const fetch = require('node-fetch');
+const fetch = globalThis.fetch;
 
 const API_BASE = process.env.API_INTERNAL_URL || 'http://localhost:4000';
 const INTERNAL_SECRET = process.env.DISCORD_INTERNAL_SECRET;

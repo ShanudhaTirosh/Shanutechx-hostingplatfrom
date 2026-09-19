@@ -6,7 +6,7 @@ import { ownedResourceWhere } from '../middleware/rbac';
 import { parsePagination } from '../lib/pagination';
 import { activateSubscriptionsForOrder } from '../lib/billing';
 import { idempotent } from '../middleware/idempotent';
-import { convertToLkr, Currency } from '../lib/currency';
+import { convertToLkr, formatCurrency, Currency } from '../lib/currency';
 import { fireWebhook } from '../lib/webhooks';
 import { notifyDiscordChannel } from '../lib/discordWebhooks';
 import { fulfillOrder } from '../lib/orderFulfillment';
@@ -233,7 +233,7 @@ ordersRouter.post('/cart/checkout', idempotent, async (req: AuthedRequest, res) 
     await activateSubscriptionsForOrder(order.id);
     await fulfillOrder(order.id);
     void fireWebhook(req.user!.id, 'order_paid', { orderId: order.id, total, currency: currency ?? 'LKR' });
-    void notifyDiscordChannel('new_order', { 'Order': order.id, 'Customer': req.user!.email, 'Total': `${total} ${currency ?? 'LKR'}`, 'Status': 'paid (free)' });
+    void notifyDiscordChannel('new_order', { 'Order': order.id, 'Customer': req.user!.email, 'Total': formatCurrency(total, currency ?? 'LKR'), 'Status': 'paid (free)' });
 
     void sendInvoiceDeliveryNotification(
       req.user!,
@@ -255,7 +255,7 @@ ordersRouter.post('/cart/checkout', idempotent, async (req: AuthedRequest, res) 
     data: { status: 'awaiting_payment' },
   });
 
-  void notifyDiscordChannel('new_order', { 'Order': order.id, 'Customer': req.user!.email, 'Total': `${total} ${currency ?? 'LKR'}`, 'Status': 'awaiting payment' });
+  void notifyDiscordChannel('new_order', { 'Order': order.id, 'Customer': req.user!.email, 'Total': formatCurrency(total, currency ?? 'LKR'), 'Status': 'awaiting payment' });
 
   res.json({
     order: updated,

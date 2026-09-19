@@ -27,9 +27,21 @@ export async function storeState<T>(prefix: string, key: string, value: T, ttlSe
 
 export async function consumeState<T>(prefix: string, key: string): Promise<T | null> {
   const fullKey = `${prefix}:${key}`;
-  const data = await redis.get(fullKey);
+  let data: string | null = null;
+  try {
+    data = (await redis.eval(
+      `local val = redis.call('GET', KEYS[1]) if val then redis.call('DEL', KEYS[1]) end return val`,
+      1,
+      fullKey
+    )) as string | null;
+  } catch {
+    data = await redis.get(fullKey);
+    if (data) {
+      await redis.del(fullKey);
+    }
+  }
+
   if (!data) return null;
-  await redis.del(fullKey);
   try {
     return JSON.parse(data) as T;
   } catch {

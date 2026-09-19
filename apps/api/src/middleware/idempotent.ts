@@ -1,17 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import Redis from 'ioredis';
-import { env } from '../env';
+import crypto from 'crypto';
+import { redis } from '../lib/redis';
 import { AuthedRequest } from './auth';
 import { logger } from '../lib/logger';
 
-// Deliberately a separate, independent ioredis client from the BullMQ
-// queue's connection (see lib/queue.ts's comment on why bullmq gets plain
-// connection options instead of an instance) — this one has nothing to do
-// with bullmq, so there's no version-conflict risk handing it a real
-// ioredis instance directly.
-const redis = new Redis(env.redisUrl);
-
-const TTL_SECONDS = 60 * 10; // 10 minutes — long enough to cover a retry storm, short enough not to accumulate forever
+const TTL_SECONDS = 60 * 10; // 10 minutes
 
 interface CachedResponse {
   status: number;
@@ -19,49 +12,48 @@ interface CachedResponse {
 }
 
 /**
- * Applied to checkout and payment-proof-upload specifically — the two
- * endpoints where a double-tap or a retried request on a flaky mobile
- * connection could otherwise create a duplicate order or a duplicate
- * payment record. The client sends an `Idempotency-Key` header (any
- * unique-per-attempt string, e.g. a UUID generated once per button press);
- * a repeated request with the same key within the TTL window gets the
- * original response replayed instead of re-running the handler.
- *
- * Scoped per-user, not just per-key — two different users could otherwise
- * collide on the same key, and more importantly a leaked/guessed key
- * shouldn't let someone else replay your response.
+ * Idempotency middleware to prevent duplicate requests (e.g. checkout, payment upload).
+ * Key is bound to user ID, HTTP method, route path, idempotency key header, and body hash.
  */
 export function idempotent(req: Request, res: Response, next: NextFunction) {
-  const key = req.headers['idempotency-key'];
-  if (typeof key !== 'string' || !key) {
-    return next(); // no key provided — not required, just supported
+  const headerVal = req.headers['idempotency-key'] || req.headers['x-idempotency-key'];
+  const key = Array.isArray(headerVal) ? headerVal[0] : headerVal;
+
+  if (typeof key !== 'string' || !key.trim()) {
+    return next(); // no key provided — process request normally
   }
 
   const userId = (req as AuthedRequest).user?.id;
-  // BUG-05 FIX: If user is not authenticated yet, do not fall back to 'anonymous'
-  // to avoid cross-user key collision or DoS attacks across unauthenticated requests.
   if (!userId) {
     return next();
   }
 
-  const cacheKey = `idempotency:${userId}:${req.path}:${key}`;
+  const rawBodyStr = (req as any).rawBody
+    ? (req as any).rawBody.toString('utf8')
+    : JSON.stringify(req.body || {});
+  const bodyHash = crypto.createHash('sha256').update(rawBodyStr).digest('hex').slice(0, 16);
 
-  // BUG-22 FIX: Set a short 30-second TTL on IN_PROGRESS marker so that if a server
-  // crashes before setting the final cached response or clearing the key, it won't block forever.
+  const cacheKey = `idempotency:${userId}:${req.method}:${req.path}:${key.trim()}:${bodyHash}`;
+
   redis
-    .set(cacheKey, 'IN_PROGRESS', 'EX', 30, 'NX')
+    .set(cacheKey, 'IN_PROGRESS', 'EX', 45, 'NX')
     .then((result) => {
       if (result !== 'OK') {
-        // Key already exists — either in-progress concurrently, or previously completed
-        return redis.get(cacheKey).then((cached) => {
-          if (cached && cached !== 'IN_PROGRESS') {
-            try {
-              const parsed: CachedResponse = JSON.parse(cached);
-              return res.status(parsed.status).json(parsed.body);
-            } catch {}
-          }
-          return res.status(409).json({ error: 'A request with this idempotency key is currently processing or completed' });
-        });
+        // Key already exists — return cached response or conflict
+        return redis
+          .get(cacheKey)
+          .then((cached) => {
+            if (cached && cached !== 'IN_PROGRESS') {
+              try {
+                const parsed: CachedResponse = JSON.parse(cached);
+                return res.status(parsed.status).json(parsed.body);
+              } catch {}
+            }
+            return res.status(409).json({
+              error: 'A request with this idempotency key and payload is currently processing or completed',
+            });
+          })
+          .catch(() => next());
       }
 
       const originalJson = res.json.bind(res);
@@ -81,9 +73,7 @@ export function idempotent(req: Request, res: Response, next: NextFunction) {
       next();
     })
     .catch((err) => {
-      // Redis being unavailable shouldn't take down checkout/uploads —
-      // fail open (process the request normally, just without dedup).
-      logger.error({ cacheKey, err }, 'Idempotency cache lookup failed, proceeding without it');
+      logger.error({ cacheKey, err: err.message }, 'Idempotency cache lookup failed, failing open');
       next();
     });
 }

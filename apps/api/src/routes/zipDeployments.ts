@@ -157,6 +157,18 @@ const handleArchiveUpload = async (req: AuthedRequest, res: any) => {
             await execFileAsync('bsdtar', ['-xf', tempArchivePath, '-C', targetDir], execOpts);
           }
         }
+      } else if (isSingleCompressed) {
+        try {
+          if (filename.endsWith('.gz')) {
+            await execFileAsync('gzip', ['-d', '-c', tempArchivePath], execOpts);
+          } else if (filename.endsWith('.bz2')) {
+            await execFileAsync('bzip2', ['-d', '-c', tempArchivePath], execOpts);
+          } else if (filename.endsWith('.xz')) {
+            await execFileAsync('xz', ['-d', '-c', tempArchivePath], execOpts);
+          }
+        } catch {
+          // Non-fatal fallback
+        }
       }
     } finally {
       // Immediately remove temporary upload file regardless of outcome

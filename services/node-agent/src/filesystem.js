@@ -12,9 +12,27 @@ const execFileAsync = util.promisify(execFile);
 
 const WORKSPACE_ROOT = process.env.AGENT_WORKSPACES_DIR || process.env.WORKSPACE_ROOT || '/var/lib/shanutechx/workspaces';
 
+const fsSync = require('fs');
+
+/**
+ * Resolve realpath for path or deepest existing parent directory.
+ */
+function getRealPathSafe(targetPath) {
+  try {
+    return fsSync.realpathSync(targetPath);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      const parent = path.dirname(targetPath);
+      if (parent === targetPath) return targetPath;
+      return path.join(getRealPathSafe(parent), path.basename(targetPath));
+    }
+    throw err;
+  }
+}
+
 /**
  * Resolve a path relative to the deployment workspace and validate it doesn't
- * escape the workspace root — protection against directory traversal.
+ * escape the workspace root — protection against directory & symlink traversal.
  */
 function resolveSafe(deploymentId, relPath = '') {
   const safeDepId = path.basename(String(deploymentId || ''));
@@ -22,19 +40,25 @@ function resolveSafe(deploymentId, relPath = '') {
     throw Object.assign(new Error('Invalid deployment ID'), { statusCode: 400 });
   }
 
-  const rootResolved = path.resolve(WORKSPACE_ROOT);
-  const base = path.resolve(rootResolved, safeDepId);
+  const rootResolved = getRealPathSafe(path.resolve(WORKSPACE_ROOT));
+  const base = getRealPathSafe(path.resolve(rootResolved, safeDepId));
 
   if (base !== rootResolved && !base.startsWith(rootResolved + path.sep)) {
     throw Object.assign(new Error('Path escape detected'), { statusCode: 400 });
   }
 
   const cleanRel = String(relPath || '').replace(/\\/g, '/').replace(/^\/+/, '');
-  const target = path.resolve(base, cleanRel);
-  if (target !== base && !target.startsWith(base + path.sep)) {
+  const lexicalTarget = path.resolve(base, cleanRel);
+  if (lexicalTarget !== base && !lexicalTarget.startsWith(base + path.sep)) {
     throw Object.assign(new Error('Path escape detected'), { statusCode: 400 });
   }
-  return target;
+
+  const realTarget = getRealPathSafe(lexicalTarget);
+  if (realTarget !== base && !realTarget.startsWith(base + path.sep)) {
+    throw Object.assign(new Error('Path escape detected via symlink'), { statusCode: 400 });
+  }
+
+  return realTarget;
 }
 
 /** List directory entries (shallow, with type/size). */

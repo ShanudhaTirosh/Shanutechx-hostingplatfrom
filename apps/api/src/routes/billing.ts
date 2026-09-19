@@ -4,7 +4,7 @@ import { env } from '../env';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { ownedResourceWhere } from '../middleware/rbac';
 import { runBillingChecks } from '../lib/billing';
-import { convertToLkr, Currency } from '../lib/currency';
+import { convertToLkr, formatCurrency, Currency } from '../lib/currency';
 import { notifyAdmins } from '../lib/notifications';
 import { notifyDiscordChannel } from '../lib/discordWebhooks';
 import { verifySharedSecret } from '../lib/gateAuth';
@@ -134,7 +134,7 @@ billingRouter.post('/subscriptions/:id/renew', requireAuth, async (req: AuthedRe
     'Subscription': subscription.id,
     'Customer': subscription.user.email,
     'Plan': subscription.orderItem.plan?.name ?? 'Unknown Plan',
-    'Amount (LKR)': renewalOrder.totalLkr,
+    'Amount (LKR)': formatCurrency(renewalOrder.totalLkr, 'LKR'),
   });
 
   res.status(202).json({

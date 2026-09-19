@@ -266,7 +266,7 @@ nodesRouter.post('/nodes/:id/stats', async (req: Request, res: Response) => {
 });
 
 // ── 2. ADMIN / STAFF PROTECTED ROUTING ──
-nodesRouter.use(requireAuth, requireAdminOrDev);
+nodesRouter.use('/nodes', requireAuth, requireAdminOrDev);
 
 nodesRouter.get('/nodes', async (_req: AuthedRequest, res: Response) => {
   const nodes = await prisma.node.findMany({ orderBy: { createdAt: 'asc' } });

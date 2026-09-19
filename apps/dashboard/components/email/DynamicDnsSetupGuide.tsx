@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '@/lib/useAuth';
 
 interface DynamicDnsSetupGuideProps {
   domain: string;
@@ -73,15 +74,8 @@ export default function DynamicDnsSetupGuide({
     if (!domain || domain === 'clientdomain.com') return;
     setVerifying(true);
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('token') || localStorage.getItem('webmail_token');
-
-      const res = await fetch(`${apiBase}/api/smtp/verify-dns`, {
+      const res = await apiFetch('/api/smtp/verify-dns', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({ domain }),
       });
 

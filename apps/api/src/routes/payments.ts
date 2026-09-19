@@ -18,6 +18,7 @@ import { encryptSecret } from '../lib/secretsVault';
 import { sendSmtpReleaseEmail, getTierFromPlanName, generateDefaultAliases } from '../lib/smtpProvisioner';
 import { extendSubscription } from './billing';
 import { fulfillOrder } from '../lib/orderFulfillment';
+import { formatCurrency } from '../lib/currency';
 
 export const paymentsRouter = Router();
 
@@ -75,7 +76,7 @@ paymentsRouter.post(
       void notifyDiscordChannel('new_payment_submitted', {
         'Order': order.id,
         'Customer': order.user.email,
-        'Amount (LKR)': order.totalLkr,
+        'Amount (LKR)': formatCurrency(order.totalLkr, 'LKR'),
         'Proof': payment.proofUrl ?? '(none)',
       });
 

@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react';
+import { getAuthToken } from '@/lib/useAuth';
 
 interface FileItem {
   name: string;
@@ -62,9 +63,9 @@ export default function WebIDE({
 
   const activeTab = openTabs.find((t) => t.path === activeTabPath);
 
-  const getAuthHeaders = useCallback(() => {
+  const getAuthHeaders = useCallback(async () => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const token = authToken || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+    const token = authToken || (await getAuthToken().catch(() => null));
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -79,8 +80,9 @@ export default function WebIDE({
   // Fetch directory list
   const fetchDir = useCallback(async (dirPath: string = ''): Promise<FileItem[]> => {
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch(`${apiBaseUrl}/api/fs/${deploymentId}/list?path=${encodeURIComponent(dirPath)}`, {
-        headers: getAuthHeaders(),
+        headers,
       });
       if (!res.ok) throw new Error('Failed to load files');
       const data = await res.json();
@@ -121,8 +123,9 @@ export default function WebIDE({
     }
 
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch(`${apiBaseUrl}/api/fs/${deploymentId}/read?path=${encodeURIComponent(filePath)}`, {
-        headers: getAuthHeaders(),
+        headers,
       });
       if (!res.ok) throw new Error('Failed to read file content');
       const data = await res.json();
@@ -178,9 +181,10 @@ export default function WebIDE({
     if (!activeTab) return;
     setSaving(true);
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch(`${apiBaseUrl}/api/fs/${deploymentId}/write`, {
         method: 'PUT',
-        headers: getAuthHeaders(),
+        headers,
         body: JSON.stringify({ path: activeTab.path, content: activeTab.content }),
       });
 
@@ -206,9 +210,10 @@ export default function WebIDE({
     if (!activeTab) return;
     setPushing(true);
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch(`${apiBaseUrl}/api/fs/${deploymentId}/git-commit-push`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers,
         body: JSON.stringify({
           filePath: activeTab.path,
           content: activeTab.content,

@@ -96,6 +96,7 @@ app.use(
       'Content-Type',
       'Authorization',
       'X-Requested-With',
+      'Idempotency-Key',
       'X-Idempotency-Key',
       'Cache-Control',
       'Accept',
@@ -137,7 +138,17 @@ app.use(
 app.use(globalLimiter);
 app.use(metricsMiddleware);
 app.use(
+  '/api/fs',
   express.json({
+    limit: '50mb',
+    verify: (req, _res, buf) => {
+      (req as express.Request).rawBody = buf;
+    },
+  })
+);
+app.use(
+  express.json({
+    limit: '10mb',
     verify: (req, _res, buf) => {
       (req as express.Request).rawBody = buf;
     },
@@ -236,25 +247,30 @@ app.use((err: any, _req: express.Request, res: express.Response, next: express.N
 
   // Sanitize Prisma errors (hide database internals)
   if (err?.code && typeof err.code === 'string' && err.code.startsWith('P')) {
-    statusCode = 400;
-    switch (err.code) {
-      case 'P2002': {
-        const target = err.meta?.target;
-        const field = Array.isArray(target) ? target[0] : (typeof target === 'string' ? target : 'field');
-        message = `A record with this ${field} already exists`;
-        break;
+    if (err.code.startsWith('P1') || err.code === 'P2024') {
+      statusCode = 503;
+      message = 'Database service temporarily unavailable. Please try again later.';
+    } else {
+      statusCode = 400;
+      switch (err.code) {
+        case 'P2002': {
+          const target = err.meta?.target;
+          const field = Array.isArray(target) ? target[0] : (typeof target === 'string' ? target : 'field');
+          message = `A record with this ${field} already exists`;
+          break;
+        }
+        case 'P2025':
+          message = 'The requested resource was not found';
+          break;
+        case 'P2003':
+          message = 'This action cannot be completed due to related records';
+          break;
+        case 'P2014':
+          message = 'Cannot delete this record because it has associated data';
+          break;
+        default:
+          message = 'Database operation failed. Please try again.';
       }
-      case 'P2025':
-        message = 'The requested resource was not found';
-        break;
-      case 'P2003':
-        message = 'This action cannot be completed due to related records';
-        break;
-      case 'P2014':
-        message = 'Cannot delete this record because it has associated data';
-        break;
-      default:
-        message = 'Database operation failed. Please try again.';
     }
   }
 

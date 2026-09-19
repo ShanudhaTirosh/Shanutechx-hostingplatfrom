@@ -7,18 +7,37 @@ import pino from 'pino';
  */
 export const logger = pino({
   level: process.env.LOG_LEVEL ?? 'info',
-  // Defense-in-depth redaction for secret-shaped field names.
+  serializers: {
+    err: pino.stdSerializers.err,
+    error: pino.stdSerializers.err,
+  },
+  // Defense-in-depth redaction for secret-shaped field names across arbitrary depth.
   redact: {
     paths: [
+      'password',
       '*.password',
+      '**.password',
+      'token',
       '*.token',
+      '**.token',
+      'secret',
       '*.secret',
+      '**.secret',
+      'apiKey',
       '*.apiKey',
+      '**.apiKey',
+      'accessToken',
       '*.accessToken',
+      'refreshToken',
       '*.refreshToken',
+      'clientSecret',
       '*.clientSecret',
-      '*.serviceRoleKey',
+      'privateKey',
       '*.privateKey',
+      'authorization',
+      '*.authorization',
+      'headers.authorization',
+      '*.headers.authorization',
     ],
     censor: '[REDACTED]',
   },

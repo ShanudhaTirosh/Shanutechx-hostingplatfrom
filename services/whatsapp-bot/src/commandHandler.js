@@ -1,4 +1,4 @@
-const fetch = require('node-fetch');
+const fetch = globalThis.fetch;
 
 const API_BASE = process.env.API_INTERNAL_URL || 'http://localhost:3000';
 const INTERNAL_SECRET = process.env.WHATSAPP_INTERNAL_SECRET;

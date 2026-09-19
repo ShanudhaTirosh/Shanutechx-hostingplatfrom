@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { env } from '../env';
-import { requireAuth, requireDev, AuthedRequest } from '../middleware/auth';
+import { requireAuth, requireDev, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 import { ownedResourceWhere, verifyResourceOwnershipAsync } from '../middleware/rbac';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { verifySmtpConnection, sendSmtpEmail } from '../lib/smtpDispatcher';
@@ -115,7 +115,7 @@ function isSsrfTarget(host: string): boolean {
 }
 
 // 0. Platform Mail Admin Telemetry
-smtpRouter.get('/admin/mail/telemetry', async (_req: AuthedRequest, res) => {
+smtpRouter.get('/admin/mail/telemetry', requireAdminOrDev, async (_req: AuthedRequest, res) => {
   try {
     const [totalMailboxes, totalStorage, sentTodayCount, accounts] = await Promise.all([
       prisma.smtpAccount.count(),

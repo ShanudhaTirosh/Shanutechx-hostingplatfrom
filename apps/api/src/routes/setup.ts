@@ -6,13 +6,15 @@ import { env } from '../env';
 import { encryptSecret } from '../lib/secretsVault';
 import { logger } from '../lib/logger';
 import { initWildDuckOnBoot } from '../lib/wildduckInitializer';
-import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
+import { requireAuth, requireDev, AuthedRequest } from '../middleware/auth';
+import { verifySharedSecret } from '../lib/gateAuth';
 
 export const setupRouter = Router();
 
 /**
  * GET /api/setup/status
- * Returns current platform initialization status (whether Main Node & Dev Admin exist).
+ * Returns current platform initialization status.
+ * Sanitized to avoid disclosing host IP, infrastructure tags, or internal metrics publicly.
  */
 setupRouter.get('/setup/status', async (_req: Request, res: Response) => {
   try {
@@ -25,17 +27,7 @@ setupRouter.get('/setup/status', async (_req: Request, res: Response) => {
 
     res.json({
       isInitialized: !!mainNode && devAdminCount > 0,
-      mainNode: mainNode
-        ? {
-            id: mainNode.id,
-            label: mainNode.label,
-            ip: mainNode.ip,
-            roleTags: mainNode.roleTags,
-            isActive: mainNode.isActive,
-            createdAt: mainNode.createdAt,
-          }
-        : null,
-      devAdminCount,
+      hasMainNode: !!mainNode,
       rootDomain: env.rootDomain,
     });
   } catch (err: any) {
@@ -52,7 +44,6 @@ const initializeMainNodeSchema = z.object({
   privateKey: z.string().optional(),
   rootDomain: z.string().optional(),
   devAdminEmail: z.string().email(),
-  devAdminPassword: z.string().min(8),
   cpuCores: z.number().int().positive().optional().default(4),
   ramMb: z.number().int().positive().optional().default(8192),
   diskGb: z.number().int().positive().optional().default(100),
@@ -62,7 +53,7 @@ const initializeMainNodeSchema = z.object({
  * POST /api/setup/initialize-main-node
  * One-click automated setup & main node registration for Linux VPS host node.
  * Unauthenticated on first boot when isInitialized is false; strictly guarded
- * by requireAuth + requireAdminOrDev once platform is initialized.
+ * by requireAuth + requireDev once platform is initialized.
  */
 setupRouter.post('/setup/initialize-main-node', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -73,11 +64,11 @@ setupRouter.post('/setup/initialize-main-node', async (req: Request, res: Respon
 
     const isInitialized = !!existingMainNode && devCount > 0;
 
-    // If platform is already initialized, enforce strict admin/dev auth
+    // B-07 FIX: If platform is already initialized, enforce strict DEV superuser auth
     if (isInitialized) {
       return requireAuth(req as AuthedRequest, res, () => {
-        requireAdminOrDev(req as AuthedRequest, res, () => {
-          proceedWithInitialization(req, res);
+        requireDev(req as AuthedRequest, res, () => {
+          proceedWithInitialization(req, res, true);
         });
       });
     }
@@ -93,18 +84,19 @@ setupRouter.post('/setup/initialize-main-node', async (req: Request, res: Respon
       });
     }
     const providedToken = (req.headers['x-setup-token'] as string) || (req.body && req.body.setupToken);
-    if (providedToken !== requiredToken) {
+    // B-29 FIX: Use constant-time secret comparison
+    if (!providedToken || !verifySharedSecret(providedToken, requiredToken)) {
       return res.status(401).json({ error: 'Invalid or missing setup authorization token (X-Setup-Token).' });
     }
 
-    return proceedWithInitialization(req, res);
+    return await proceedWithInitialization(req, res, false);
   } catch (err: any) {
     logger.error({ err: err.message }, 'Setup initialization check failed');
     return res.status(500).json({ error: 'Setup initialization check failed' });
   }
 });
 
-async function proceedWithInitialization(req: Request, res: Response) {
+async function proceedWithInitialization(req: Request, res: Response, isReconfiguration: boolean) {
   const parsed = initializeMainNodeSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -117,7 +109,6 @@ async function proceedWithInitialization(req: Request, res: Response) {
     sshPassword,
     privateKey,
     devAdminEmail,
-    devAdminPassword,
     cpuCores,
     ramMb,
     diskGb,
@@ -188,9 +179,14 @@ async function proceedWithInitialization(req: Request, res: Response) {
     ? await prisma.node.update({ where: { id: existingNode.id }, data: nodeData })
     : await prisma.node.create({ data: nodeData });
 
-  // 4. Create/Ensure Dev Admin User (refuse hijacking pre-existing non-dev user accounts)
+  // 4. Create/Ensure Dev Admin User (B-07 FIX: Do not grant dev role post-initialization)
   let devAdmin = await prisma.user.findUnique({ where: { email: devAdminEmail.toLowerCase() } });
   if (!devAdmin) {
+    if (isReconfiguration) {
+      return res.status(403).json({
+        error: 'Platform is already initialized. New dev admin accounts cannot be created via setup endpoint.',
+      });
+    }
     devAdmin = await prisma.user.create({
       data: {
         email: devAdminEmail.toLowerCase(),
@@ -201,7 +197,7 @@ async function proceedWithInitialization(req: Request, res: Response) {
     });
   } else if (devAdmin.role !== 'dev') {
     return res.status(400).json({
-      error: `User account with email ${devAdminEmail} already exists as a non-dev user. Please specify a fresh email address for the platform owner account.`,
+      error: `User account with email ${devAdminEmail} already exists as a non-dev user.`,
     });
   }
 

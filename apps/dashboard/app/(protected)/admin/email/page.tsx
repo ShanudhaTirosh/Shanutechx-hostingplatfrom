@@ -65,9 +65,7 @@ export default function AdminEmailPage() {
         api.email.adminStats(),
         api.email.mailboxes(),
         api.admin.allUsers().catch(() => ({ users: [] })),
-        fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/admin/mail/telemetry`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        }).then((r) => r.json()).catch(() => null),
+        api.email.getTelemetry().catch(() => null),
       ]);
 
       setStats(statsRes);

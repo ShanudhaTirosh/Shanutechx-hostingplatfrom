@@ -189,6 +189,189 @@ catalogRouter.get('/catalog/:slug', (req, res) => {
   res.json({ template: { ...meta, yaml: content } });
 });
 
+// ── Template deploy ───────────────────────────────────────────────────────────
+
+// Auto-generated secret keys for catalog templates
+const AUTO_GENERATED_SECRET_KEYS: Record<string, string[]> = {
+  lavalink: ['LAVALINK_PASSWORD'],
+  livekit: ['LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET'],
+  mongodb: ['MONGO_INITDB_ROOT_PASSWORD'],
+  n8n: ['DB_POSTGRESDB_PASSWORD'],
+  redis: ['REDIS_PASSWORD'],
+  wordpress: ['MYSQL_ROOT_PASSWORD', 'WORDPRESS_DB_PASSWORD'],
+  'hermes-agent': ['HERMES_SECRET_KEY'],
+  grafana: ['GF_SECURITY_ADMIN_PASSWORD'],
+  'uptime-kuma': ['UPTIME_KUMA_SECRET'],
+  'supabase-lite': ['POSTGRES_PASSWORD'],
+};
+
+function generateStrongSecret(): string {
+  return crypto.randomBytes(24).toString('base64url');
+}
+
+import { scanTextForAbuse, banUserAndTeardownResources } from '../lib/abuseDetector';
+
+const deploySchema = z.object({
+  slug: z.string().min(1),
+  nodeId: z.string().min(1),
+  envVars: z.record(z.string()).optional(),
+  projectName: z.string().min(1).optional(),
+  teamId: z.string().nullable().optional(),
+});
+
+/**
+ * POST /api/catalog/deploy
+ * Deploys a template via the node-agent docker compose endpoint.
+ * B-04 FIX: Must be registered BEFORE /catalog/:slug so 'deploy' is not treated as a slug parameter.
+ */
+catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
+  const parsed = deploySchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { slug, nodeId: inputNodeId, envVars: customerEnvVars = {}, projectName, teamId } = parsed.data;
+
+  // Abuse protection scan on environment variables & project name
+  const abuseScanText = JSON.stringify(customerEnvVars) + (projectName || '') + slug;
+  const abuseCheck = scanTextForAbuse(abuseScanText);
+  if (abuseCheck.flagged) {
+    await banUserAndTeardownResources({
+      userId: req.user!.id,
+      reason: `Prohibited content detected during catalog deployment: ${abuseCheck.reason}`,
+      detectedBy: 'Automated Abuse Scanner (Catalog Deployment)',
+    });
+    return res.status(403).json({ error: `Account suspended due to policy violation: ${abuseCheck.reason}` });
+  }
+
+  const envVars = { ...customerEnvVars };
+  const generatedSecrets: Record<string, string> = {};
+  for (const key of AUTO_GENERATED_SECRET_KEYS[slug] ?? []) {
+    if (!envVars[key]) {
+      const value = generateStrongSecret();
+      envVars[key] = value;
+      generatedSecrets[key] = value;
+    }
+  }
+
+  const filename = `${slug}.yaml`;
+  const filePath = path.join(TEMPLATES_DIR, filename);
+  const altPath = path.join(TEMPLATES_DIR, `${slug}.yml`);
+  const resolved = fs.existsSync(filePath) ? filePath : fs.existsSync(altPath) ? altPath : null;
+  if (!resolved) return res.status(404).json({ error: `Template "${slug}" not found` });
+
+  let composeName = `${slug}-${Date.now().toString(36)}`;
+  if (projectName && projectName.trim()) {
+    const val = await validateCustomSubdomain(projectName);
+    if (!val.valid || !val.formatted) {
+      return res.status(400).json({ error: val.error ?? 'Invalid project name' });
+    }
+    composeName = val.formatted;
+  }
+
+  const yamlContent = fs.readFileSync(resolved, 'utf8');
+  const meta = parseMeta(yamlContent, path.basename(resolved));
+
+  const isAdmin = req.user!.role === 'admin' || req.user!.role === 'dev';
+  let node;
+  try {
+    node = await selectNodeForDeployment({
+      requiredTag: 'node-hosting',
+      isAdminDeployment: isAdmin,
+      explicitNodeId: inputNodeId !== 'default' ? inputNodeId : undefined,
+    });
+  } catch (err) {
+    if (err instanceof NodeSelectionError) return res.status(409).json({ error: err.message });
+    throw err;
+  }
+
+  const nodeId = node.id;
+
+  try {
+    const agentRes = await fetch(nodeAgentUrl(node.ip, '/agent/compose/up'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-agent-secret': env.nodeAgentSecret,
+      },
+      body: JSON.stringify({ composeYaml: yamlContent, projectName: composeName, envVars }),
+    });
+
+    if (!agentRes.ok) {
+      const body = (await agentRes.json().catch(() => ({}))) as Record<string, unknown>;
+      return res.status(agentRes.status).json({ error: (body.error as string) ?? 'Agent error' });
+    }
+
+    const agentData = await agentRes.json() as Record<string, unknown>;
+
+    const deployment = await prisma.deployment.create({
+      data: {
+        userId: req.user!.id,
+        teamId: teamId ?? null,
+        nodeId,
+        status: 'running',
+        containerId: composeName,
+        subdomain: meta.requiresExposedPort !== false ? composeName : null,
+        repoUrl: `template:${slug}`,
+        internalPort: meta.port ?? 80,
+      },
+    });
+
+    const managedDatabasesCreated: any[] = [];
+    const templateDbTypes: Array<{ type: 'postgres' | 'mysql' | 'redis' | 'mongodb'; port: number; secretKey?: string; serviceName?: string }> = [];
+
+    if (slug === 'wordpress') {
+      templateDbTypes.push({ type: 'mysql', port: 3306, secretKey: 'WORDPRESS_DB_PASSWORD', serviceName: 'db' });
+    } else if (slug === 'n8n') {
+      templateDbTypes.push({ type: 'postgres', port: 5432, secretKey: 'DB_POSTGRESDB_PASSWORD', serviceName: 'postgres' });
+    } else if (slug === 'redis') {
+      templateDbTypes.push({ type: 'redis', port: 6379, secretKey: 'REDIS_PASSWORD', serviceName: 'redis' });
+    } else if (slug === 'mongodb') {
+      templateDbTypes.push({ type: 'mongodb', port: 27017, secretKey: 'MONGO_INITDB_ROOT_PASSWORD', serviceName: 'mongodb' });
+    } else if (slug === 'hermes-agent') {
+      templateDbTypes.push({ type: 'redis', port: 6379, secretKey: 'HERMES_SECRET_KEY', serviceName: 'redis' });
+    } else if (slug === 'supabase-lite') {
+      templateDbTypes.push({ type: 'postgres', port: 5432, secretKey: 'POSTGRES_PASSWORD', serviceName: 'postgres' });
+    }
+
+    for (const dbMeta of templateDbTypes) {
+      const dbPassword = (dbMeta.secretKey && envVars[dbMeta.secretKey]) || (dbMeta.secretKey && generatedSecrets[dbMeta.secretKey]) || generateStrongSecret();
+      const encCred = encryptSecret(dbPassword, env.secretsEncryptionKey);
+      const hostName = dbMeta.serviceName || `${composeName}-db`;
+      const mDb = await prisma.managedDatabase.create({
+        data: {
+          userId: req.user!.id,
+          nodeId,
+          type: dbMeta.type,
+          status: 'running',
+          containerId: `${composeName}-${hostName}`,
+          internalHost: hostName,
+          internalPort: dbMeta.port,
+          credentialRef: encCred,
+        },
+      });
+      managedDatabasesCreated.push({ id: mDb.id, type: mDb.type, internalHost: mDb.internalHost, internalPort: mDb.internalPort });
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: `catalog.deploy:${slug}`,
+        target: deployment.id,
+      },
+    });
+
+    logger.info({ slug, nodeId, deploymentId: deployment.id, databases: managedDatabasesCreated.length }, 'Template deployed with automated database wiring');
+    res.status(201).json({
+      deployment,
+      agent: agentData,
+      ...(managedDatabasesCreated.length > 0 ? { managedDatabases: managedDatabasesCreated } : {}),
+      ...(Object.keys(generatedSecrets).length > 0 ? { generatedSecrets } : {}),
+    });
+  } catch (err: any) {
+    logger.error({ err, slug, nodeId }, 'Failed to deploy template');
+    res.status(500).json({ error: err.message ?? 'Deploy failed' });
+  }
+});
+
 /**
  * POST /api/catalog/:slug
  * Create a new template in the catalog.
@@ -513,198 +696,4 @@ catalogRouter.delete('/catalog/:slug', requireRole('admin', 'dev'), async (req: 
   }
 });
 
-// ── Template deploy ───────────────────────────────────────────────────────────
 
-// Auto-generated secret keys for catalog templates
-const AUTO_GENERATED_SECRET_KEYS: Record<string, string[]> = {
-  lavalink: ['LAVALINK_PASSWORD'],
-  livekit: ['LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET'],
-  mongodb: ['MONGO_INITDB_ROOT_PASSWORD'],
-  n8n: ['DB_POSTGRESDB_PASSWORD'],
-  redis: ['REDIS_PASSWORD'],
-  wordpress: ['MYSQL_ROOT_PASSWORD', 'WORDPRESS_DB_PASSWORD'],
-  'hermes-agent': ['HERMES_SECRET_KEY'],
-  grafana: ['GF_SECURITY_ADMIN_PASSWORD'],
-  'uptime-kuma': ['UPTIME_KUMA_SECRET'],
-  'supabase-lite': ['POSTGRES_PASSWORD'],
-};
-
-function generateStrongSecret(): string {
-  // 24 random bytes, base64url-encoded (~32 chars, alphanumeric-ish,
-  // safe to embed directly in a Compose env value with no quoting
-  // concerns) — plenty of entropy for a service credential.
-  return crypto.randomBytes(24).toString('base64url');
-}
-
-import { scanTextForAbuse, banUserAndTeardownResources } from '../lib/abuseDetector';
-
-const deploySchema = z.object({
-  slug: z.string().min(1),
-  nodeId: z.string().min(1),
-  envVars: z.record(z.string()).optional(),
-  projectName: z.string().min(1).optional(),
-  teamId: z.string().nullable().optional(),
-});
-
-/**
- * POST /api/catalog/deploy
- * Deploys a template via the node-agent docker compose endpoint.
- */
-catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
-  const parsed = deploySchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-
-  const { slug, nodeId: inputNodeId, envVars: customerEnvVars = {}, projectName, teamId } = parsed.data;
-
-  // Abuse protection scan on environment variables & project name
-  const abuseScanText = JSON.stringify(customerEnvVars) + (projectName || '') + slug;
-  const abuseCheck = scanTextForAbuse(abuseScanText);
-  if (abuseCheck.flagged) {
-    await banUserAndTeardownResources({
-      userId: req.user!.id,
-      reason: `Prohibited content detected during catalog deployment: ${abuseCheck.reason}`,
-      detectedBy: 'Automated Abuse Scanner (Catalog Deployment)',
-    });
-    return res.status(403).json({ error: `Account suspended due to policy violation: ${abuseCheck.reason}` });
-  }
-
-  // Fill in any required secret the customer didn't supply with a fresh,
-  // strong random value (see AUTO_GENERATED_SECRET_KEYS above). Track
-  // which ones we generated so we can hand them back in the response --
-  // this is the only time they're ever shown, so the customer needs to
-  // save them now.
-  const envVars = { ...customerEnvVars };
-  const generatedSecrets: Record<string, string> = {};
-  for (const key of AUTO_GENERATED_SECRET_KEYS[slug] ?? []) {
-    if (!envVars[key]) {
-      const value = generateStrongSecret();
-      envVars[key] = value;
-      generatedSecrets[key] = value;
-    }
-  }
-
-  const filename = `${slug}.yaml`;
-  const filePath = path.join(TEMPLATES_DIR, filename);
-  const altPath = path.join(TEMPLATES_DIR, `${slug}.yml`);
-  const resolved = fs.existsSync(filePath) ? filePath : fs.existsSync(altPath) ? altPath : null;
-  if (!resolved) return res.status(404).json({ error: `Template "${slug}" not found` });
-
-  let composeName = `${slug}-${Date.now().toString(36)}`;
-  if (projectName && projectName.trim()) {
-    const val = await validateCustomSubdomain(projectName);
-    if (!val.valid || !val.formatted) {
-      return res.status(400).json({ error: val.error ?? 'Invalid project name' });
-    }
-    composeName = val.formatted;
-  }
-
-  const yamlContent = fs.readFileSync(resolved, 'utf8');
-  const meta = parseMeta(yamlContent, path.basename(resolved));
-
-  const isAdmin = req.user!.role === 'admin' || req.user!.role === 'dev';
-  let node;
-  try {
-    node = await selectNodeForDeployment({
-      requiredTag: 'node-hosting',
-      isAdminDeployment: isAdmin,
-      explicitNodeId: inputNodeId !== 'default' ? inputNodeId : undefined,
-    });
-  } catch (err) {
-    if (err instanceof NodeSelectionError) return res.status(409).json({ error: err.message });
-    throw err;
-  }
-
-  const nodeId = node.id;
-
-  try {
-    const agentRes = await fetch(nodeAgentUrl(node.ip, '/agent/compose/up'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-agent-secret': env.nodeAgentSecret,
-      },
-      body: JSON.stringify({ composeYaml: yamlContent, projectName: composeName, envVars }),
-    });
-
-    if (!agentRes.ok) {
-      const body = (await agentRes.json().catch(() => ({}))) as Record<string, unknown>;
-      return res.status(agentRes.status).json({ error: (body.error as string) ?? 'Agent error' });
-    }
-
-    const agentData = await agentRes.json() as Record<string, unknown>;
-
-    const deployment = await prisma.deployment.create({
-      data: {
-        userId: req.user!.id,
-        teamId: teamId ?? null,
-        nodeId,
-        status: 'running',
-        containerId: composeName,
-        subdomain: meta.requiresExposedPort !== false ? composeName : null,
-        repoUrl: `template:${slug}`,
-        internalPort: meta.port ?? 80,
-      },
-    });
-
-    // Automatic Managed Database provisioning & connection wiring for templates requiring database services
-    const managedDatabasesCreated: any[] = [];
-    const templateDbTypes: Array<{ type: 'postgres' | 'mysql' | 'redis' | 'mongodb'; port: number; secretKey?: string; serviceName?: string }> = [];
-
-    if (slug === 'wordpress') {
-      templateDbTypes.push({ type: 'mysql', port: 3306, secretKey: 'WORDPRESS_DB_PASSWORD', serviceName: 'db' });
-    } else if (slug === 'n8n') {
-      templateDbTypes.push({ type: 'postgres', port: 5432, secretKey: 'DB_POSTGRESDB_PASSWORD', serviceName: 'postgres' });
-    } else if (slug === 'redis') {
-      templateDbTypes.push({ type: 'redis', port: 6379, secretKey: 'REDIS_PASSWORD', serviceName: 'redis' });
-    } else if (slug === 'mongodb') {
-      templateDbTypes.push({ type: 'mongodb', port: 27017, secretKey: 'MONGO_INITDB_ROOT_PASSWORD', serviceName: 'mongodb' });
-    } else if (slug === 'hermes-agent') {
-      templateDbTypes.push({ type: 'redis', port: 6379, secretKey: 'HERMES_SECRET_KEY', serviceName: 'redis' });
-    } else if (slug === 'supabase-lite') {
-      templateDbTypes.push({ type: 'postgres', port: 5432, secretKey: 'POSTGRES_PASSWORD', serviceName: 'postgres' });
-    }
-
-    for (const dbMeta of templateDbTypes) {
-      const dbPassword = (dbMeta.secretKey && envVars[dbMeta.secretKey]) || (dbMeta.secretKey && generatedSecrets[dbMeta.secretKey]) || generateStrongSecret();
-      const encCred = encryptSecret(dbPassword, env.secretsEncryptionKey);
-      const hostName = dbMeta.serviceName || `${composeName}-db`;
-      const mDb = await prisma.managedDatabase.create({
-        data: {
-          userId: req.user!.id,
-          nodeId,
-          type: dbMeta.type,
-          status: 'running',
-          containerId: `${composeName}-${hostName}`,
-          internalHost: hostName,
-          internalPort: dbMeta.port,
-          credentialRef: encCred,
-        },
-      });
-      managedDatabasesCreated.push({ id: mDb.id, type: mDb.type, internalHost: mDb.internalHost, internalPort: mDb.internalPort });
-    }
-
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user!.id,
-        action: `catalog.deploy:${slug}`,
-        target: deployment.id,
-      },
-    });
-
-    logger.info({ slug, nodeId, deploymentId: deployment.id, databases: managedDatabasesCreated.length }, 'Template deployed with automated database wiring');
-    res.status(201).json({
-      deployment,
-      agent: agentData,
-      ...(managedDatabasesCreated.length > 0 ? { managedDatabases: managedDatabasesCreated } : {}),
-      // Only present if we generated any secret the customer didn't
-      // supply -- shown once, not persisted anywhere in retrievable
-      // plaintext form, so the frontend must surface these to the
-      // customer immediately (e.g. a "save these now" dialog) and never
-      // rely on fetching them again later.
-      ...(Object.keys(generatedSecrets).length > 0 ? { generatedSecrets } : {}),
-    });
-  } catch (err: any) {
-    logger.error({ err, slug, nodeId }, 'Failed to deploy template');
-    res.status(500).json({ error: err.message ?? 'Deploy failed' });
-  }
-});

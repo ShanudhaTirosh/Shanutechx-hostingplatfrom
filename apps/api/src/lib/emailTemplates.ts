@@ -63,12 +63,13 @@ export function renderOrderPaidEmail({
 }): { subject: string; html: string; text: string } {
   const safeName = escapeHtml(customerName);
   const subject = `Order Confirmed & Provisioned (#${orderId.slice(0, 8).toUpperCase()})`;
+  const formattedTotal = (totalLkr / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const itemsHtml = items
     .map(
       (item) => `<tr>
       <td>${escapeHtml(item.name)}</td>
       <td style="text-align: center;">${item.quantity}</td>
-      <td style="text-align: right;">Rs ${item.price.toLocaleString('en-LK')}</td>
+      <td style="text-align: right;">Rs ${(item.price / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
     </tr>`
     )
     .join('');
@@ -93,13 +94,13 @@ export function renderOrderPaidEmail({
       </tbody>
     </table>
 
-    <p style="text-align: right; font-size: 16px; font-weight: 700; color: #4ade80;">Total Paid: Rs ${totalLkr.toLocaleString('en-LK')}</p>
+    <p style="text-align: right; font-size: 16px; font-weight: 700; color: #4ade80;">Total Paid: Rs ${formattedTotal}</p>
 
     <a href="https://${env.rootDomain}/dashboard" class="btn">Access Dashboard & Services →</a>
   `
   );
 
-  const text = `Thank you for your order, ${customerName}!\nPayment for Order #${orderId} (Rs ${totalLkr}) has been confirmed and provisioned.\nAccess your services at https://${env.rootDomain}/dashboard`;
+  const text = `Thank you for your order, ${customerName}!\nPayment for Order #${orderId} (Rs ${formattedTotal}) has been confirmed and provisioned.\nAccess your services at https://${env.rootDomain}/dashboard`;
 
   return { subject, html, text };
 }
@@ -403,13 +404,14 @@ export function renderInvoiceDeliveryEmail({
 }): { subject: string; html: string; text: string } {
   const safeName = escapeHtml(customerName);
   const subject = `Official Tax Invoice — Order #${orderId.slice(0, 8).toUpperCase()}`;
+  const formattedTotal = (totalLkr / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const itemsHtml = items
     .map(
       (item) => `<tr>
       <td>${escapeHtml(item.name)}</td>
       <td style="text-align: center;">${item.quantity}</td>
-      <td style="text-align: right;">Rs ${item.price.toLocaleString('en-LK')}</td>
+      <td style="text-align: right;">Rs ${(item.price / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
     </tr>`
     )
     .join('');
@@ -436,13 +438,13 @@ export function renderInvoiceDeliveryEmail({
       </tbody>
     </table>
 
-    <p style="text-align: right; font-size: 16px; font-weight: 700; color: #4ade80;">Total Paid: Rs ${totalLkr.toLocaleString('en-LK')}</p>
+    <p style="text-align: right; font-size: 16px; font-weight: 700; color: #4ade80;">Total Paid: Rs ${formattedTotal}</p>
 
     <a href="${targetLink}" class="btn">Download Official Invoice PDF →</a>
   `
   );
 
-  const text = `Invoice for ${customerName} (Order #${orderId.slice(0, 8).toUpperCase()}):\nTotal: Rs ${totalLkr}\nDownload PDF at ${targetLink}`;
+  const text = `Invoice for ${customerName} (Order #${orderId.slice(0, 8).toUpperCase()}):\nTotal: Rs ${formattedTotal}\nDownload PDF at ${targetLink}`;
 
   return { subject, html, text };
 }
