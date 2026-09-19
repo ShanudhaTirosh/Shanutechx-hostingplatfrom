@@ -287,11 +287,14 @@ vpsRouter.get('/vps-provisions/:id/reveal-password', async (req: AuthedRequest, 
 
   const password = decryptSecret(provision.credentialRef, env.secretsEncryptionKey);
 
-  if ((req.user!.role === 'admin' || req.user!.role === 'dev') && provision.userId !== req.user!.id) {
-    await prisma.auditLog.create({
-      data: { adminId: req.user!.id, action: 'vps.reveal_password', target: provision.id },
-    });
-  }
+  await prisma.auditLog.create({
+    data: {
+      adminId: (req.user!.role === 'admin' || req.user!.role === 'dev') ? req.user!.id : null,
+      action: 'vps.reveal_password',
+      target: provision.id,
+      actorRole: req.user!.role,
+    },
+  });
 
   res.json({
     username: provision.username || 'root',

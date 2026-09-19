@@ -1458,6 +1458,7 @@ app.listen(PORT, BIND_HOST, () => {
             'x-agent-secret': AGENT_SECRET,
           },
           body: JSON.stringify(stats),
+          signal: AbortSignal.timeout(10_000),
         });
       } catch (err) {
         logger.debug({ err }, 'Periodic node stats reporting failed');
