@@ -175,34 +175,30 @@ const handleArchiveUpload = async (req: AuthedRequest, res: any) => {
       await fs.unlink(tempArchivePath).catch(() => {});
     }
 
-    // Save uploaded archive to object storage for multi-node agent distribution
-    const { uploadDeploymentZip } = await import('../lib/r2Storage');
-    let r2ObjectUrl: string | null = null;
-    try {
-      r2ObjectUrl = await uploadDeploymentZip(deployment.id, file.buffer, filename);
-    } catch (storageErr) {
-      logger.error({ err: storageErr, deploymentId: deployment.id }, 'R2 object storage archive upload failed (non-fatal, continuing with local workspace)');
-      res.write(JSON.stringify({ phase: 'fetch', message: 'Warning: Failed to upload source archive copy to R2 object storage. Proceeding with local workspace...' }) + '\n');
-    }
-
     const archiveType = isZip ? 'zip' : isRar ? 'rar' : is7z ? '7z' : 'tar';
-    const storageMsg = r2ObjectUrl ? 'saved to object storage' : 'saved locally';
-    res.write(JSON.stringify({ phase: 'fetch', message: `${archiveType.toUpperCase()} archive extracted successfully and ${storageMsg}. Creating automated platform shadow Git backup repository...` }) + '\n');
+    res.write(JSON.stringify({ phase: 'fetch', message: `${archiveType.toUpperCase()} archive extracted successfully. Creating automated GitHub shadow backup repository...` }) + '\n');
 
     const archiveScheme = `${archiveType}://${filename}`;
 
-    // Sync workspace to platform shadow backup repo on GitHub
+    // Sync workspace to platform private shadow backup repo on GitHub (Primary Backup Engine)
     const { syncWorkspaceToShadowBackup } = await import('../lib/shadowBackup');
-    void syncWorkspaceToShadowBackup(deployment.id, `Uploaded ${archiveType.toUpperCase()} project archive "${filename}"`).catch((err) => {
-      logger.warn({ err, deploymentId: deployment.id }, `Shadow backup sync failed after ${archiveType.toUpperCase()} extract (non-fatal)`);
-    });
+    let githubBackupUrl: string | null = null;
+    try {
+      const synced = await syncWorkspaceToShadowBackup(deployment.id, `Uploaded ${archiveType.toUpperCase()} project archive "${filename}"`);
+      if (synced) {
+        githubBackupUrl = `github://backup-${deployment.id}`;
+        res.write(JSON.stringify({ phase: 'fetch', message: 'Successfully backed up project workspace to private GitHub repository!' }) + '\n');
+      }
+    } catch (err) {
+      logger.warn({ err, deploymentId: deployment.id }, `GitHub shadow backup sync failed after ${archiveType.toUpperCase()} extract (non-fatal)`);
+    }
 
     // Update deployment model in DB
     await prisma.deployment.update({
       where: { id: deployment.id },
       data: {
         sourceType: archiveType,
-        zipSourceUrl: r2ObjectUrl || filename,
+        zipSourceUrl: githubBackupUrl || filename,
         repoUrl: archiveScheme,
         status: 'building',
       } as any,
