@@ -167,11 +167,16 @@ studioPlatformRouter.all('/pg-meta/:ref/*', async (req: Request, res: Response) 
     const formatted = formatStudioPlatformProject(project);
     const metaPort = 8080;
     const pathSuffix = (req.params as any)[0] || '';
-    const targetUrl = `http://${formatted.db_host}:${metaPort}/${pathSuffix}`;
+    const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+    
+    // Resolve target host: inside docker network use 'meta' if local or specified db_host
+    const hostTarget = (formatted.db_host === '127.0.0.1' || formatted.db_host === 'localhost') ? 'meta' : formatted.db_host;
+    const targetUrl = `http://${hostTarget}:${metaPort}/${pathSuffix}${queryString}`;
 
     const headers: Record<string, string> = {
       'content-type': 'application/json',
-      x_connection_encrypted: formatted.connectionString,
+      'x-connection-encrypted': formatted.connectionString,
+      'x-postgres-connection-string': formatted.connectionString,
     };
 
     const fetchOptions: any = {

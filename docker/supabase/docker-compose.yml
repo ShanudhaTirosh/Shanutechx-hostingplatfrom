@@ -27,7 +27,7 @@ services:
       NEXT_PUBLIC_IS_PLATFORM: "true"
       ALLOWED_ADMIN_EMAILS: ${ALLOWED_ADMIN_EMAILS:-tiroshbrot123@gmail.com}
       SUPABASE_PLATFORM_API_URL: ${SUPABASE_PLATFORM_API_URL:-http://api:4000/api/platform}
-      STUDIO_PG_META_URL: http://meta:8080
+      STUDIO_PG_META_URL: ${STUDIO_PG_META_URL:-http://api:4000/api/platform/pg-meta}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       POSTGRES_HOST: ${POSTGRES_HOST:-db}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
