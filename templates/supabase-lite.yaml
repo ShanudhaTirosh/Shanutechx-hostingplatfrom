@@ -4,6 +4,9 @@
 # tags: database,supabase,postgres,baas,auth,storage
 # logo: https://raw.githubusercontent.com/walkxlk/assets/main/supabase.png
 # port: 8000
+# defaultInternalPort: 3000
+# requiresExposedPort: true
+# recommendedExposureMode: ssl_with_proxy
 
 version: '3.8'
 
