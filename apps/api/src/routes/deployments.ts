@@ -164,6 +164,13 @@ deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
     return res.status(403).json({ error: 'Resource limits can only be set by admin or dev users' });
   }
 
+  // Non-dev users are permanently enforced to ssl_with_proxy; dev users default to ssl_with_proxy automatically
+  if (!callerIsDev) {
+    data.exposureMode = 'ssl_with_proxy';
+  } else if (!data.exposureMode) {
+    data.exposureMode = 'ssl_with_proxy';
+  }
+
   // If creating a deployment in pending configuration state (e.g. Vercel-style draft creation)
   if (data.isPendingConfig || data.status === 'pending_configuration') {
     let node;
@@ -510,6 +517,10 @@ deploymentsRouter.patch('/deployments/:id/routing', async (req: AuthedRequest, r
   const deployment = await loadOwnedDeployment(req, req.params.id);
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
 
+  if (req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'Only dev superusers can modify network routing mode directly. All client deployments are permanently exposed via SSL Reverse Proxy (ssl_with_proxy).' });
+  }
+
   const schema = z.object({
     routingMode: z.enum(['proxied', 'direct', 'no_ssl']),
     publishedPort: z.number().optional(),
@@ -624,6 +635,11 @@ deploymentsRouter.patch('/deployments/:id/config', async (req: AuthedRequest, re
     envVarsEncrypted = encryptSecret(JSON.stringify(envVars), env.secretsEncryptionKey);
   }
 
+  const callerIsDev = req.user!.role === 'dev';
+  const effectiveExposureMode = callerIsDev
+    ? (exposureMode !== undefined ? exposureMode : deployment.exposureMode)
+    : 'ssl_with_proxy';
+
   const updated = await prisma.deployment.update({
     where: { id: deployment.id },
     data: {
@@ -633,7 +649,7 @@ deploymentsRouter.patch('/deployments/:id/config', async (req: AuthedRequest, re
       startCommand: startCommand !== undefined ? startCommand : deployment.startCommand,
       entryFile: entryFile !== undefined ? entryFile : deployment.entryFile,
       internalPort: internalPort !== undefined ? internalPort : deployment.internalPort,
-      exposureMode: exposureMode !== undefined ? exposureMode : deployment.exposureMode,
+      exposureMode: effectiveExposureMode,
       subdomain: subdomain !== undefined ? subdomain : deployment.subdomain,
       rootDir: rootDir !== undefined ? rootDir : deployment.rootDir,
       watchPaths: watchPaths !== undefined ? watchPaths : deployment.watchPaths,

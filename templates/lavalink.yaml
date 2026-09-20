@@ -5,7 +5,7 @@
 # port: 2333
 # defaultInternalPort: 2333
 # requiresExposedPort: true
-# recommendedExposureMode: ssl_with_proxy
+# recommendedExposureMode: raw_tcp
 
 services:
   lavalink:

@@ -289,18 +289,27 @@ export function CodeDeploymentPanel({ deployment, onChanged }: Props) {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-text-muted block mb-1.5 flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Exposure Mode</span>
+              <label className="text-xs font-medium text-text-muted block mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Exposure Mode</span>
+                </span>
+                {!isDevUser && (
+                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                    {exposureMode === 'raw_tcp' ? 'Direct Port (TCP / DB)' : 'SSL Proxy (HTTPS)'} (System Recommended)
+                  </span>
+                )}
               </label>
               <select
                 value={exposureMode}
+                disabled={!isDevUser}
                 onChange={(e) => setExposureMode(e.target.value)}
-                className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-cyan"
+                className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-cyan disabled:opacity-80 disabled:cursor-not-allowed"
               >
-                <option value="ssl_with_proxy">Reverse Proxy + Free SSL / TLS (HTTPS)</option>
-                <option value="ssl_direct">Direct SSL Port Mapping</option>
-                <option value="no_ssl">No SSL (Raw HTTP / TCP Exposure)</option>
+                <option value="ssl_with_proxy">Reverse Proxy + Free SSL / TLS (HTTPS Web App)</option>
+                <option value="raw_tcp">Direct TCP Port Mapping (Databases & Games)</option>
+                {isDevUser && <option value="ssl_direct">Direct SSL Port Mapping</option>}
+                {isDevUser && <option value="no_ssl">No SSL (Internal / Direct Exposure)</option>}
               </select>
             </div>
           </div>

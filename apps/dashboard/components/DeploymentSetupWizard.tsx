@@ -23,6 +23,8 @@ import {
   Rocket,
 } from 'lucide-react';
 
+import { useAppUser } from '@/lib/AppUserContext';
+
 interface Props {
   deploymentId: string;
   initialDeployment: any;
@@ -35,11 +37,13 @@ const TEMPLATE_PRESETS = [
   { id: 'nextjs', name: 'Next.js App Router', icon: Box, framework: 'Next.js', startCmd: 'npm run start', port: 3000, exposure: 'ssl_with_proxy' },
   { id: 'python-fastapi', name: 'Python FastAPI App', icon: Terminal, framework: 'Python', startCmd: 'uvicorn main:app --host 0.0.0.0 --port 8000', port: 8000, exposure: 'ssl_with_proxy' },
   { id: 'static-html', name: 'Static HTML / Web Hosting', icon: Globe, framework: 'Static', startCmd: 'npx serve -s . -p 8080', port: 8080, exposure: 'ssl_with_proxy' },
-  { id: 'discord-bot', name: 'Discord Bot Daemon', icon: Radio, framework: 'Node.js', startCmd: 'node index.js', port: 3000, exposure: 'internal_only' },
-  { id: 'whatsapp-bot', name: 'WhatsApp Messaging Bot', icon: Radio, framework: 'Node.js', startCmd: 'npm start', port: 3000, exposure: 'internal_only' },
+  { id: 'discord-bot', name: 'Discord Bot Daemon', icon: Radio, framework: 'Node.js', startCmd: 'node index.js', port: 3000, exposure: 'ssl_with_proxy' },
+  { id: 'whatsapp-bot', name: 'WhatsApp Messaging Bot', icon: Radio, framework: 'Node.js', startCmd: 'npm start', port: 3000, exposure: 'ssl_with_proxy' },
 ];
 
 export function DeploymentSetupWizard({ deploymentId, initialDeployment, connectedAccounts = [], onComplete }: Props) {
+  const { apiUser } = useAppUser();
+  const isDevUser = apiUser?.role === 'dev';
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [sourceType, setSourceType] = useState<'git' | 'zip' | 'template'>('git');
   
@@ -381,32 +385,52 @@ export function DeploymentSetupWizard({ deploymentId, initialDeployment, connect
 
           {/* Network Exposure Mode */}
           <div className="space-y-3">
-            <label className="text-xs font-medium text-text-muted block">Network Exposure Mode</label>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { id: 'ssl_with_proxy', title: 'HTTPS Subdomain', desc: 'Expose with automatic SSL & domain routing', icon: Globe },
-                { id: 'raw_tcp', title: 'Direct TCP Port', desc: 'Direct container port mapping (Databases, Games)', icon: Radio },
-                { id: 'internal_only', title: 'Private / Bot Mode', desc: 'Internal service only (Discord / WhatsApp Bots)', icon: Lock },
-              ].map((m) => {
-                const isSel = exposureMode === m.id;
-                const Icon = m.icon;
-                return (
-                  <div
-                    key={m.id}
-                    onClick={() => setExposureMode(m.id as any)}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-1.5 ${
-                      isSel
-                        ? 'bg-accent-violet/20 border-accent-violet text-white font-semibold'
-                        : 'bg-black/30 border-white/[0.06] text-text-muted hover:border-white/20'
-                    }`}
-                  >
-                    <Icon className={`h-5 w-5 ${isSel ? 'text-accent-violet' : 'text-text-muted'}`} />
-                    <h4 className="text-xs font-semibold">{m.title}</h4>
-                    <p className="text-[10px] text-text-faint">{m.desc}</p>
-                  </div>
-                );
-              })}
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-text-muted block">Network Exposure Mode</label>
+              {!isDevUser && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                  <Lock className="h-3 w-3" /> SSL Reverse Proxy (System Default)
+                </span>
+              )}
             </div>
+            {isDevUser ? (
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { id: 'ssl_with_proxy', title: 'HTTPS Subdomain', desc: 'Expose with automatic SSL & domain routing', icon: Globe },
+                  { id: 'raw_tcp', title: 'Direct TCP Port', desc: 'Direct container port mapping (Databases, Games)', icon: Radio },
+                  { id: 'internal_only', title: 'Private / Bot Mode', desc: 'Internal service only (Discord / WhatsApp Bots)', icon: Lock },
+                ].map((m) => {
+                  const isSel = exposureMode === m.id;
+                  const Icon = m.icon;
+                  return (
+                    <div
+                      key={m.id}
+                      onClick={() => setExposureMode(m.id as any)}
+                      className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-1.5 ${
+                        isSel
+                          ? 'bg-accent-violet/20 border-accent-violet text-white font-semibold'
+                          : 'bg-black/30 border-white/[0.06] text-text-muted hover:border-white/20'
+                      }`}
+                    >
+                      <Icon className={`h-5 w-5 ${isSel ? 'text-accent-violet' : 'text-text-muted'}`} />
+                      <h4 className="text-xs font-semibold">{m.title}</h4>
+                      <p className="text-[10px] text-text-faint">{m.desc}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Globe className="h-5 w-5 text-emerald-400" />
+                  <div>
+                    <h4 className="text-xs font-semibold text-white">SSL Reverse Proxy / Cloudflare Tunnel</h4>
+                    <p className="text-[10px] text-text-muted">Automatic free SSL certificate, DDoS protection, and subdomain routing.</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/20 px-2 py-1 rounded">Active System Default</span>
+              </div>
+            )}
           </div>
 
           {exposureMode === 'ssl_with_proxy' && (
