@@ -96,4 +96,7 @@ export const env = {
   // Grafana Loki Log Aggregation
   lokiUrl: process.env.LOKI_URL ?? '',
   lokiOrgId: process.env.LOKI_ORG_ID ?? '',
+
+  // Single-Email Whitelist Restriction for Supabase Studio SSO
+  allowedAdminEmails: process.env.ALLOWED_ADMIN_EMAILS ?? 'tiroshbrot123@gmail.com',
 };

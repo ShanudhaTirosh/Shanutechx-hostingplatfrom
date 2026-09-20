@@ -5,7 +5,10 @@
 services:
   studio:
     container_name: supabase-studio
-    image: supabase/studio:2026.08.03-sha-022b374
+    build:
+      context: .
+      dockerfile: Dockerfile.studio
+    image: shanutechx/supabase-studio:latest
     restart: unless-stopped
     ports:
       - "127.0.0.1:3003:3000"
@@ -13,7 +16,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "node -e \"fetch('http://localhost:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})\""
+          "node -e \"fetch('http://localhost:3000/api/platform/profile').then((r) => {if (r.status !== 200 && r.status !== 403) throw new Error(r.status)})\""
         ]
       timeout: 10s
       interval: 5s
@@ -21,6 +24,9 @@ services:
       start_period: 20s
     environment:
       HOSTNAME: "0.0.0.0"
+      NEXT_PUBLIC_IS_PLATFORM: "true"
+      ALLOWED_ADMIN_EMAILS: ${ALLOWED_ADMIN_EMAILS:-tiroshbrot123@gmail.com}
+      SUPABASE_PLATFORM_API_URL: ${SUPABASE_PLATFORM_API_URL:-http://api:4000/api/platform}
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       POSTGRES_HOST: ${POSTGRES_HOST:-db}

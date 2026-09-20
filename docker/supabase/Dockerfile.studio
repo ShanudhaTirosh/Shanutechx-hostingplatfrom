@@ -1,0 +1,24 @@
+# Custom Self-Hosted Multi-Project Supabase Studio Container for ShanuTechX Platform
+# Features:
+# 1. Multi-project dropdown switcher enabled (NEXT_PUBLIC_IS_PLATFORM=true).
+# 2. Dynamic platform API integration pointing to ShanuTechX API Gateway.
+# 3. Google OAuth Single-Email Admin Whitelist restriction (tiroshbrot123@gmail.com).
+
+FROM supabase/studio:2026.08.03-sha-022b374
+
+LABEL maintainer="ShanuTechX Platform Engineering <admin@shanutechx.com>"
+LABEL description="Custom Multi-Tenant Supabase Studio Image with Google SSO Whitelist Restrictor"
+
+# Platform UI Mode configuration
+ENV NEXT_PUBLIC_IS_PLATFORM="true"
+ENV STUDIO_PG_META_URL="http://api:4000/api/platform/pg-meta"
+ENV SUPABASE_PLATFORM_API_URL="http://api:4000/api/platform"
+ENV ALLOWED_ADMIN_EMAILS="tiroshbrot123@gmail.com"
+
+# Expose standard Next.js Studio web port
+EXPOSE 3000
+
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
+  CMD node -e "fetch('http://localhost:3000/api/platform/profile').then((r) => {if (r.status !== 200 && r.status !== 403) process.exit(1)})"
+
+CMD ["node", "server.js"]
