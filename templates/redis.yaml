@@ -3,6 +3,9 @@
 # tags: redis, cache, key-value, database, nosql
 # logo: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/redis.svg
 # port: 6379
+# defaultInternalPort: 6379
+# requiresExposedPort: true
+# recommendedExposureMode: ssl_with_proxy
 
 services:
   redis:

@@ -4,6 +4,9 @@
 # tags: analytics,monitoring,grafana,metrics,visualization
 # logo: https://raw.githubusercontent.com/walkxlk/assets/main/grafana.png
 # port: 3000
+# defaultInternalPort: 3000
+# requiresExposedPort: true
+# recommendedExposureMode: ssl_with_proxy
 
 version: '3.8'
 

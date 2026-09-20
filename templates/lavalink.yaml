@@ -3,6 +3,9 @@
 # tags: lavalink, discord, bot, audio, music, spotify, youtube
 # logo: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/discord.svg
 # port: 2333
+# defaultInternalPort: 2333
+# requiresExposedPort: true
+# recommendedExposureMode: ssl_with_proxy
 
 services:
   lavalink:

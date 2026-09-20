@@ -4,6 +4,9 @@
 # tags: uptime,monitoring,kuma,status-page,metrics
 # logo: https://raw.githubusercontent.com/walkxlk/assets/main/uptime-kuma.png
 # port: 3001
+# defaultInternalPort: 3001
+# requiresExposedPort: true
+# recommendedExposureMode: ssl_with_proxy
 
 version: '3.8'
 

@@ -3,6 +3,9 @@
 # tags: n8n, automation, workflow, postgresql, low-code
 # logo: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/n8n.svg
 # port: 5678
+# defaultInternalPort: 5678
+# requiresExposedPort: true
+# recommendedExposureMode: ssl_with_proxy
 
 services:
   postgres:

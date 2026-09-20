@@ -14,6 +14,7 @@ import { parseTemplateYaml, validateTemplateStructure } from '../lib/catalog/tem
 import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
 import { syncCatalogToFirebase } from '../lib/firebaseSync';
 import { validateCustomSubdomain } from '../lib/subdomain';
+import { createSubdomainRecord } from '../lib/cloudflare';
 
 export const catalogRouter = Router();
 catalogRouter.use(requireAuth);
@@ -51,9 +52,11 @@ function parseMeta(content: string, filename: string): TemplateMeta {
     if (!line.startsWith('#') && line.trim()) break;
   }
   const slug = path.basename(filename, path.extname(filename));
-  const reqPort = meta.requiresExposedPort ? meta.requiresExposedPort.toLowerCase() === 'true' : false;
   const parsedPort = meta.defaultInternalPort ? parseInt(meta.defaultInternalPort, 10) : (meta.port ? parseInt(meta.port, 10) : null);
-  const recMode = (meta.recommendedExposureMode as any) || (reqPort ? 'ssl_with_proxy' : 'internal_only');
+  const reqPort = meta.requiresExposedPort !== undefined
+    ? meta.requiresExposedPort.toLowerCase() === 'true'
+    : parsedPort !== null;
+  const recMode = (meta.recommendedExposureMode as any) || (parsedPort !== null || reqPort ? 'ssl_with_proxy' : 'ssl_with_proxy');
 
   return {
     slug,
@@ -302,6 +305,16 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
 
     const agentData = await agentRes.json() as Record<string, unknown>;
 
+    const targetSubdomain = meta.requiresExposedPort !== false ? composeName : null;
+    if (targetSubdomain && node.ip) {
+      try {
+        await createSubdomainRecord(targetSubdomain, node.ip, true);
+        logger.info({ targetSubdomain, ip: node.ip }, 'Auto-registered Cloudflare SSL proxy DNS record for catalog deployment');
+      } catch (dnsErr) {
+        logger.warn({ dnsErr, targetSubdomain }, 'Cloudflare DNS auto-record registration skipped or failed');
+      }
+    }
+
     const deployment = await prisma.deployment.create({
       data: {
         userId: req.user!.id,
@@ -309,9 +322,10 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
         nodeId,
         status: 'running',
         containerId: composeName,
-        subdomain: meta.requiresExposedPort !== false ? composeName : null,
+        subdomain: targetSubdomain,
         repoUrl: `template:${slug}`,
         internalPort: meta.port ?? 80,
+        exposureMode: meta.recommendedExposureMode || 'ssl_with_proxy',
       },
     });
 

@@ -3,6 +3,9 @@
 # tags: livekit, webrtc, video, audio, streaming, voice
 # logo: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/livekit.svg
 # port: 7880
+# defaultInternalPort: 7880
+# requiresExposedPort: true
+# recommendedExposureMode: ssl_with_proxy
 
 services:
   redis:

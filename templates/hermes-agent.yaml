@@ -4,6 +4,9 @@
 # tags: ai,agent,hermes,llm,python,langchain
 # logo: https://raw.githubusercontent.com/walkxlk/assets/main/hermes-agent.png
 # port: 8080
+# defaultInternalPort: 8080
+# requiresExposedPort: true
+# recommendedExposureMode: ssl_with_proxy
 
 version: '3.8'
 

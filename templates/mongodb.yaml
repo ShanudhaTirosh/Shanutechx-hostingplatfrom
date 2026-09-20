@@ -3,6 +3,9 @@
 # tags: mongodb, database, nosql, mongo, document
 # logo: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/mongodb.svg
 # port: 27017
+# defaultInternalPort: 27017
+# requiresExposedPort: true
+# recommendedExposureMode: ssl_with_proxy
 
 services:
   mongodb:
