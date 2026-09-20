@@ -273,6 +273,17 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
   const yamlContent = fs.readFileSync(resolved, 'utf8');
   const meta = parseMeta(yamlContent, path.basename(resolved));
 
+  // Auto-detect and generate any missing $SERVICE_PASSWORD_* placeholders in template YAML
+  const servicePasswordMatches = Array.from(new Set(yamlContent.match(/\$SERVICE_PASSWORD_[A-Za-z0-9_]+/g) || []));
+  for (const rawMatch of servicePasswordMatches) {
+    const envKey = rawMatch.replace(/^\$/, '');
+    if (!envVars[envKey]) {
+      const value = generateStrongSecret();
+      envVars[envKey] = value;
+      generatedSecrets[envKey] = value;
+    }
+  }
+
   const isAdmin = req.user!.role === 'admin' || req.user!.role === 'dev';
   let node;
   try {
