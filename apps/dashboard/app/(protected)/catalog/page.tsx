@@ -288,6 +288,7 @@ function DeployModal({
   const [success, setSuccess] = useState<{ deploymentId: string; project: string; generatedSecrets?: Record<string, string> } | null>(null);
   
   const [envVars, setEnvVars] = useState<Record<string, string>>({});
+  const [maskedKeys, setMaskedKeys] = useState<Record<string, boolean>>({});
   const [customKey, setCustomKey] = useState('');
   const [customValue, setCustomValue] = useState('');
   const [fetchingYaml, setFetchingYaml] = useState(true);
@@ -463,30 +464,49 @@ function DeployModal({
                 <ResourceScopeSelector value={selectedScope} onChange={setSelectedScope} />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-text-muted">Project Name & Subdomain</label>
-                <input
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  className="w-full px-3 py-2 rounded-lg bg-surface text-sm font-mono text-text-primary border border-white/10 focus:outline-none focus:border-accent-cyan placeholder:text-text-faint"
-                  placeholder="my-n8n-instance"
-                />
-                <p className="text-[11px] text-text-faint">
-                  URL slug: <span className="font-mono text-accent-cyan">https://{projectName || 'app'}.app.shanutechx.com</span>
-                </p>
-              </div>
+              {/* Project Subdomain & Network Exposure */}
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-text-muted">Project Name & Platform Subdomain</label>
+                  <input
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    className="w-full px-3 py-2 rounded-lg bg-surface text-sm font-mono text-text-primary border border-white/10 focus:outline-none focus:border-accent-cyan placeholder:text-text-faint"
+                    placeholder="my-app-instance"
+                  />
+                </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-text-muted">Network Exposure Mode</label>
-                <select
-                  value={exposureMode}
-                  onChange={(e) => setExposureMode(e.target.value as any)}
-                  className="w-full px-3 py-2 rounded-lg bg-surface text-xs text-text-primary border border-white/10 focus:outline-none"
-                >
-                  <option value="ssl_with_proxy">HTTPS SSL Proxy (Cloudflare DNS + SSL)</option>
-                  <option value="internal_only">Internal Isolated VPC Network Only</option>
-                  <option value="raw_tcp">Raw TCP Direct Port Exposure</option>
-                </select>
+                {/* Exposure Mode Info Card */}
+                {tpl.recommendedExposureMode === 'raw_tcp' || tpl.category === 'database' ? (
+                  <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                        <span>Direct Host TCP Port Access (Database / TCP Service)</span>
+                      </div>
+                      <p className="text-[11px] text-text-muted">
+                        Binds directly to node host port for GUI client connections (Redis Insight, TablePlus, Compass).
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-300">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h1.5a2.5 2.5 0 002.5-2.5V7" />
+                        </svg>
+                        <span>Automated Web URL & Free SSL Reverse Proxy</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded">Active Default</span>
+                    </div>
+                    <p className="text-[11px] text-text-muted">
+                      Public Web Address: <code className="text-emerald-300 font-mono">https://{projectName || 'app'}.app.shanutechx.com</code>
+                    </p>
+                  </div>
+                )}
               </div>
 
               {isAdminOrDev && (
@@ -542,17 +562,88 @@ function DeployModal({
                     </button>
                   </div>
                   {Object.keys(envVars).length > 0 && (
-                    <div className="max-h-40 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-                      {Object.entries(envVars).map(([key, val]) => (
-                        <div key={key} className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-mono text-text-faint break-all">{key}</span>
-                          <input
-                            value={val}
-                            onChange={(e) => setEnvVars({ ...envVars, [key]: e.target.value })}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-surface text-xs text-text-primary border border-white/10 focus:outline-none focus:border-white/20"
-                          />
-                        </div>
-                      ))}
+                    <div className="max-h-52 overflow-y-auto space-y-2.5 pr-1 scrollbar-thin">
+                      {Object.entries(envVars).map(([key, val]) => {
+                        const isSecretKey = /PASSWORD|SECRET|KEY|TOKEN|PASS/i.test(key);
+                        const isMasked = maskedKeys[key] !== false;
+                        return (
+                          <div key={key} className="flex flex-col gap-1 p-2 rounded-lg bg-black/30 border border-white/[0.06]">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono font-semibold text-accent-cyan break-all flex items-center gap-1">
+                                {key}
+                                {isSecretKey && <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-sans">Secret</span>}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                {isSecretKey && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                                        const array = new Uint8Array(20);
+                                        crypto.getRandomValues(array);
+                                        const gen = Array.from(array, (b) => chars[b % chars.length]).join('');
+                                        setEnvVars({ ...envVars, [key]: gen });
+                                      }}
+                                      className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 hover:bg-white/20 text-white font-mono flex items-center gap-1"
+                                      title="Generate random secret password"
+                                    >
+                                      <svg className="w-3 h-3 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                      </svg>
+                                      <span>Generate</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setMaskedKeys((prev) => ({ ...prev, [key]: !isMasked }))}
+                                      className="px-1.5 py-0.5 rounded text-[10px] text-text-muted hover:text-white flex items-center gap-1"
+                                      title={isMasked ? 'Show password' : 'Hide password'}
+                                    >
+                                      {isMasked ? (
+                                        <>
+                                          <svg className="w-3 h-3 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                          </svg>
+                                          <span>Show</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <svg className="w-3 h-3 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858-5.908a10.025 10.025 0 0110.122 7c-.57 1.817-1.636 3.39-3.029 4.568m-4.568-4.568A3 3 0 1012 9a3 3 0 000 6z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+                                          </svg>
+                                          <span>Hide</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = { ...envVars };
+                                    delete updated[key];
+                                    setEnvVars(updated);
+                                  }}
+                                  className="text-red-400 hover:text-red-300 p-0.5"
+                                  title="Delete variable"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                            <input
+                              type={isSecretKey && isMasked ? 'password' : 'text'}
+                              value={val}
+                              onChange={(e) => setEnvVars({ ...envVars, [key]: e.target.value })}
+                              className="w-full px-2.5 py-1 rounded-md bg-surface text-xs text-text-primary border border-white/10 focus:outline-none focus:border-accent-cyan font-mono"
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -561,12 +652,12 @@ function DeployModal({
               {/* Add Custom Env Var */}
               {!fetchingYaml && (
                 <div className="space-y-2 border-t border-white/[0.06] pt-3">
-                  <label className="text-xs font-medium text-text-muted block">Custom Environment Variable</label>
+                  <label className="text-xs font-medium text-text-muted block">Add Environment Variable</label>
                   <div className="flex gap-2">
                     <input
                       value={customKey}
                       onChange={(e) => setCustomKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ''))}
-                      placeholder="KEY"
+                      placeholder="KEY (e.g. API_KEY)"
                       className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface text-xs text-text-primary border border-white/10 focus:outline-none font-mono"
                     />
                     <input

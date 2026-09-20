@@ -21,6 +21,8 @@ import {
   FileCode,
   Box,
   Rocket,
+  Zap,
+  Key,
 } from 'lucide-react';
 
 import { useAppUser } from '@/lib/AppUserContext';
@@ -345,7 +347,16 @@ export function DeploymentSetupWizard({ deploymentId, initialDeployment, connect
               <label className="text-xs font-medium text-text-muted block mb-1.5">Framework / Language Preset</label>
               <select
                 value={frameworkPreset}
-                onChange={(e) => setFrameworkPreset(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFrameworkPreset(val);
+                  let defaultPort = 3000;
+                  if (val === 'Python') defaultPort = 8000;
+                  else if (val === 'Static') defaultPort = 8080;
+                  else if (val === 'Node.js') defaultPort = 3000;
+                  setInternalPort(defaultPort);
+                  setEnvVars((prev) => prev.map((item) => (item.key === 'PORT' ? { ...item, value: String(defaultPort) } : item)));
+                }}
                 className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-accent-violet"
               >
                 <option value="Node.js">Node.js / Express / Next.js</option>
@@ -358,7 +369,10 @@ export function DeploymentSetupWizard({ deploymentId, initialDeployment, connect
             </div>
 
             <div>
-              <label className="text-xs font-medium text-text-muted block mb-1.5">Internal Container Port</label>
+              <label className="text-xs font-medium text-text-muted block mb-1.5 flex items-center justify-between">
+                <span>Internal Container Port</span>
+                <span className="text-[10px] font-mono text-accent-violet">Auto-detected</span>
+              </label>
               <input
                 type="number"
                 value={internalPort}
@@ -466,41 +480,77 @@ export function DeploymentSetupWizard({ deploymentId, initialDeployment, connect
             <h3 className="text-base font-semibold text-white flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-emerald-400" /> Step 3: Environment Variables & Vault Secrets
             </h3>
-            <Button size="sm" variant="secondary" onClick={addEnvVar}>
-              <Plus className="h-3.5 w-3.5 mr-1" /> Add Key
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  const presets = [
+                    { key: 'DATABASE_URL', value: 'postgresql://postgres:password@localhost:5432/dbname' },
+                    { key: 'API_KEY', value: crypto.randomUUID() },
+                    { key: 'JWT_SECRET', value: Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('') },
+                  ];
+                  setEnvVars((prev) => [...prev, ...presets]);
+                }}
+              >
+                <Sparkles className="h-3.5 w-3.5 mr-1 text-amber-400" /> Add Preset Keys
+              </Button>
+              <Button size="sm" variant="secondary" onClick={addEnvVar}>
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add Key
+              </Button>
+            </div>
           </div>
 
           <p className="text-xs text-text-muted">
             Environment variables are encrypted with AES-256-GCM vault security and injected at build & container launch time.
           </p>
 
-          <div className="space-y-3">
-            {envVars.map((env, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={env.key}
-                  onChange={(e) => updateEnvVar(i, e.target.value, env.value)}
-                  placeholder="KEY_NAME"
-                  className="w-1/3 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-accent-cyan uppercase"
-                />
-                <input
-                  type="text"
-                  value={env.value}
-                  onChange={(e) => updateEnvVar(i, env.key, e.target.value)}
-                  placeholder="value"
-                  className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-accent-cyan"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeEnvVar(i)}
-                  className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
+          <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+            {envVars.map((env, i) => {
+              const isSecretKey = /PASSWORD|SECRET|KEY|TOKEN|PASS/i.test(env.key);
+              return (
+                <div key={i} className="flex items-center gap-2 p-2 rounded-xl bg-black/40 border border-white/10">
+                  <input
+                    type="text"
+                    value={env.key}
+                    onChange={(e) => updateEnvVar(i, e.target.value.toUpperCase(), env.value)}
+                    placeholder="KEY_NAME"
+                    className="w-1/3 bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 text-xs font-mono text-accent-cyan focus:outline-none focus:border-accent-cyan uppercase"
+                  />
+                  <input
+                    type={isSecretKey ? 'password' : 'text'}
+                    value={env.value}
+                    onChange={(e) => updateEnvVar(i, env.key, e.target.value)}
+                    placeholder="value"
+                    className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-accent-cyan"
+                  />
+                  {isSecretKey && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                        const array = new Uint8Array(20);
+                        crypto.getRandomValues(array);
+                        const gen = Array.from(array, (b) => chars[b % chars.length]).join('');
+                        updateEnvVar(i, env.key, gen);
+                      }}
+                      className="px-2 py-1 rounded bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet text-[10px] font-mono whitespace-nowrap flex items-center gap-1"
+                      title="Generate strong random password"
+                    >
+                      <Zap className="h-3 w-3 text-amber-400" /> Gen Password
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeEnvVar(i)}
+                    className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all"
+                    title="Delete key"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           <div className="flex justify-between pt-4">
