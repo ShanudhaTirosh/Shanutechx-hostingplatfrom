@@ -1,10 +1,6 @@
 # Kong declarative config template for docker/supabase/docker-compose.yml.
 # Generated into a real kong.yml at container start by the kong-config
-# service (envsubst substitutes ${SUPABASE_ANON_KEY}/${SUPABASE_SERVICE_ROLE_KEY}),
-# since Kong itself doesn't interpolate env vars inside a declarative
-# config file — this is the same pattern Supabase's own official compose
-# setup uses (see docker/volumes/api/kong.yml + kong-entrypoint.sh in
-# their repo).
+# service (envsubst substitutes ${SUPABASE_ANON_KEY}/${SUPABASE_SERVICE_ROLE_KEY})
 _format_version: "2.1"
 
 services:
@@ -46,6 +42,20 @@ services:
       - name: functions-v1-all
         strip_path: true
         paths: ["/functions/v1/"]
+
+  - name: analytics-v1
+    url: http://logflare:4000
+    routes:
+      - name: analytics-v1-all
+        strip_path: true
+        paths: ["/analytics/v1/"]
+
+  - name: imgproxy-v1
+    url: http://imgproxy:5001
+    routes:
+      - name: imgproxy-v1-all
+        strip_path: true
+        paths: ["/render/v1/"]
 
   - name: meta
     url: http://meta:8080
