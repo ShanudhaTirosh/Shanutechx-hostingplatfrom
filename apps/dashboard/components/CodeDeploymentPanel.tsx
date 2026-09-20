@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { api } from '@/lib/api';
 import { Card, Button, Spinner, useToast } from '@/components/ui';
-import { UploadCloud, GitBranch, RefreshCw, Lock, Terminal, Shield, Play } from 'lucide-react';
+import { UploadCloud, GitBranch, RefreshCw, Lock, Terminal, Shield, Play, Download } from 'lucide-react';
 import { useAppUser } from '@/lib/AppUserContext';
 
 interface Props {
@@ -32,6 +32,7 @@ export function CodeDeploymentPanel({ deployment, onChanged }: Props) {
   const [redeploying, setRedeploying] = useState(false);
   const [redeployLogs, setRedeployLogs] = useState<string[]>([]);
   const [showRedeployLogs, setShowRedeployLogs] = useState(false);
+  const [downloadingZip, setDownloadingZip] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
@@ -117,6 +118,18 @@ export function CodeDeploymentPanel({ deployment, onChanged }: Props) {
     }
   }
 
+  async function handleDownloadZip() {
+    setDownloadingZip(true);
+    try {
+      await api.deployments.downloadZip(deployment.id, `${deployment.subdomain || `deployment-${deployment.id.slice(0, 8)}`}-backup.zip`);
+      toast('Workspace ZIP backup download initiated!', 'success');
+    } catch (err: any) {
+      toast(err.message || 'ZIP download failed', 'error');
+    } finally {
+      setDownloadingZip(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* CARD 1: Code Source & Deployment Pipeline */}
@@ -138,12 +151,18 @@ export function CodeDeploymentPanel({ deployment, onChanged }: Props) {
                 </span>
               </div>
             </div>
-            {deployment.repoUrl && (
-              <Button size="sm" variant="secondary" onClick={handleTriggerRedeploy} loading={redeploying}>
-                <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                Trigger Re-Deploy
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button size="sm" variant="secondary" onClick={handleDownloadZip} loading={downloadingZip}>
+                <Download className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />
+                Download ZIP Backup
               </Button>
-            )}
+              {deployment.repoUrl && (
+                <Button size="sm" variant="secondary" onClick={handleTriggerRedeploy} loading={redeploying}>
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                  Trigger Re-Deploy
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Option A: ZIP File Upload Dropzone */}

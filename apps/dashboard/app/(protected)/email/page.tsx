@@ -655,6 +655,30 @@ export default function RedesignedMailboxStudioPage() {
             </div>
           </div>
 
+          {/* Copyable App Environment Variable Snippet */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 font-mono">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-emerald-400">Application .env File Configuration</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  const envSnippet = `SMTP_HOST=${activeMailbox?.smtpHost || 'mail.shanutechx.com'}\nSMTP_PORT=587\nSMTP_SECURE=false\nSMTP_USER=${activeMailbox?.email || 'me@shanutechx.com'}\nSMTP_PASS=${revealedPassword || 'YOUR_PASSWORD'}`;
+                  copyToClipboard(envSnippet, 'Application .env Snippet');
+                }}
+                className="text-indigo-400 hover:text-indigo-300 font-bold text-xs bg-indigo-500/20 border border-indigo-500/30 px-3 py-1 rounded-xl"
+              >
+                Copy .env Snippet
+              </button>
+            </div>
+            <pre className="text-xs text-emerald-300 whitespace-pre-wrap bg-black/60 p-3 rounded-xl border border-white/10 select-text">
+{`SMTP_HOST=${activeMailbox?.smtpHost || 'mail.shanutechx.com'}
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=${activeMailbox?.email || 'me@shanutechx.com'}
+SMTP_PASS=${revealedPassword || '••••••••••••'}`}
+            </pre>
+          </div>
+
           {/* External Client Setup Instructions */}
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
             <h3 className="font-bold text-xs uppercase tracking-wider text-slate-900">Setup Guide for Email Clients</h3>

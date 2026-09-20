@@ -781,6 +781,23 @@ export const api = {
         }
       }
     },
+    downloadZipUrl: (id: string) => `/api/deployments/${id}/download-zip`,
+    downloadZip: async (id: string, filename?: string) => {
+      const res = await apiFetch(`/api/deployments/${id}/download-zip`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Download failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename || `deployment-${id.slice(0, 8)}-backup.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    },
   },
 
   domains: {
