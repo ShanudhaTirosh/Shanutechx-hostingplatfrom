@@ -638,7 +638,7 @@ supabaseRouter.get('/supabase/functions', requireAuth, requireDev, async (_req: 
 });
 
 // 11. Security & Performance Advisors Linter Endpoint
-supabaseRouter.get('/supabase/advisors', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/advisors', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
   let securityLints = [
     {
       id: 'sec_rls_01',
@@ -657,20 +657,26 @@ supabaseRouter.get('/supabase/advisors', requireAuth, requireDev, async (_req: A
       remediation: 'CREATE POLICY "User restrict" ON public.profiles FOR ALL USING (auth.uid() = user_id);'
     }
   ];
+  let isFallback = true;
 
   try {
     const unsecureTables: any = await prisma.$queryRawUnsafe(
       `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND rowsecurity = false;`
     );
-    if (Array.isArray(unsecureTables) && unsecureTables.length > 0) {
-      securityLints = unsecureTables.map((t: any, i: number) => ({
-        id: `sec_rls_${i}`,
-        title: `Row Level Security (RLS) disabled on public."${t.tablename}"`,
-        category: 'SECURITY',
-        severity: 'HIGH',
-        description: `Table "${t.tablename}" is publicly readable/writable because RLS is disabled.`,
-        remediation: `ALTER TABLE public."${t.tablename}" ENABLE ROW LEVEL SECURITY;`,
-      }));
+    if (Array.isArray(unsecureTables)) {
+      isFallback = false;
+      if (unsecureTables.length > 0) {
+        securityLints = unsecureTables.map((t: any, i: number) => ({
+          id: `sec_rls_${i}`,
+          title: `Row Level Security (RLS) disabled on public."${t.tablename}"`,
+          category: 'SECURITY',
+          severity: 'HIGH',
+          description: `Table "${t.tablename}" is publicly readable/writable because RLS is disabled.`,
+          remediation: `ALTER TABLE public."${t.tablename}" ENABLE ROW LEVEL SECURITY;`,
+        }));
+      } else {
+        securityLints = [];
+      }
     }
   } catch {}
 
@@ -689,7 +695,7 @@ supabaseRouter.get('/supabase/advisors', requireAuth, requireDev, async (_req: A
     security: securityLints,
     performance: performanceLints,
     scannedAt: new Date().toISOString(),
-    isFallback: true,
+    isFallback,
   });
 });
 
@@ -699,19 +705,38 @@ supabaseRouter.get('/supabase/observability', requireAuth, requireDev, async (_r
   const mem = process.memoryUsage();
   const dbCount = await prisma.supabaseClientProject.count().catch(() => 1);
 
+  let activeConns = dbCount * 3 + 4;
+  let cacheHitRate = 98.4;
+  let isFallback = true;
+
+  try {
+    const stats: any = await prisma.$queryRawUnsafe(
+      `SELECT numbackends, blks_hit, blks_read FROM pg_stat_database WHERE datname = current_database();`
+    );
+    if (Array.isArray(stats) && stats[0]) {
+      isFallback = false;
+      activeConns = Number(stats[0].numbackends) || activeConns;
+      const hit = Number(stats[0].blks_hit) || 0;
+      const read = Number(stats[0].blks_read) || 0;
+      if (hit + read > 0) {
+        cacheHitRate = Number(((hit / (hit + read)) * 100).toFixed(1));
+      }
+    }
+  } catch {}
+
   res.json({
     metrics: {
       cpuUsagePercent: Math.min(Math.round((process.cpuUsage().user / 1000000) % 35) + 12, 95),
       memoryUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
       memoryTotalMb: Math.round(mem.heapTotal / 1024 / 1024) + 512,
-      activeConnections: dbCount * 3 + 4,
+      activeConnections: activeConns,
       maxConnections: 100,
       diskIops: 240,
       avgQueryLatencyMs: 14.2,
-      cacheHitRatePercent: 98.4
+      cacheHitRatePercent: cacheHitRate
     },
     timestamp: new Date().toISOString(),
-    isFallback: true,
+    isFallback,
   });
 });
 

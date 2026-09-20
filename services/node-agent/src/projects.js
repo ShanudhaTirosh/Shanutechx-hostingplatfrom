@@ -64,16 +64,17 @@ async function provisionProject({ projectId, dbName, dbUsername, password }) {
   const encodedUser = encodeURIComponent(dbUsername);
   const encodedPass = encodeURIComponent(password);
   const pgrstConnStr = `postgres://${encodedUser}:${encodedPass}@${postgresHost}:5432/${dbName}`;
+  const jwtSecret = process.env.NODE_AGENT_SECRET || process.env.JWT_SECRET || 'shanutechx_secure_jwt_secret_min_32_chars';
 
   await execFileAsync('docker', [
     'run', '-d',
     '--name', containerName,
     '--network', 'shanutechx-internal',
-    '-p', `${apiPort}:3000`,
+    '-p', `127.0.0.1:${apiPort}:3000`,
     '-e', `PGRST_DB_URI=${pgrstConnStr}`,
     '-e', 'PGRST_DB_SCHEMA=public',
     '-e', `PGRST_DB_ANON_ROLE=${dbUsername}`,
-    '-e', `PGRST_JWT_SECRET=${process.env.NODE_AGENT_SECRET || ''}`,
+    '-e', `PGRST_JWT_SECRET=${jwtSecret}`,
     '--restart', 'unless-stopped',
     'postgrest/postgrest:latest'
   ]);

@@ -268,10 +268,18 @@ services:
     image: supabase/supavisor:1.1.8
     restart: unless-stopped
     ports:
-      - "6543:6543"
+      - "127.0.0.1:${SUPAVISOR_PORT:-6543}:6543"
     depends_on:
       db:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
     environment:
       PORT: 6543
       DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
@@ -279,6 +287,10 @@ services:
       VAULT_ENC_KEY: ${VAULT_ENC_KEY:-8e68967f28c72a03e66391a7d274955d}
       API_JWT_SECRET: ${JWT_SECRET}
       METRICS_JWT_SECRET: ${JWT_SECRET}
+      POOL_SIZE: ${SUPAVISOR_POOL_SIZE:-20}
+      RESERVE_POOL_SIZE: ${SUPAVISOR_RESERVE_POOL_SIZE:-5}
+      MAX_CLIENT_CONN: ${SUPAVISOR_MAX_CLIENT_CONN:-10000}
+      DEFAULT_POOL_SIZE: ${SUPAVISOR_DEFAULT_POOL_SIZE:-15}
 
   logflare:
     container_name: supabase-logflare
