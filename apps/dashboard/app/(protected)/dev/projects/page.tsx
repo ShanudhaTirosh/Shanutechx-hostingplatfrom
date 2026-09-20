@@ -1,7 +1,21 @@
-'use client';
-
 import { useState, useEffect } from 'react';
-import { Zap, Database, Globe, Settings, Key } from 'lucide-react';
+import {
+  Zap,
+  Database,
+  Globe,
+  Settings,
+  Key,
+  Code,
+  Users,
+  Folder,
+  ShieldAlert,
+  Activity,
+  Terminal,
+  RefreshCw,
+  Plus,
+  Trash2,
+  ExternalLink,
+} from 'lucide-react';
 import { api } from '@/lib/api';
 import { SupabaseClientProject, Node } from '@/lib/types';
 import { useAppUser } from '@/lib/AppUserContext';
@@ -23,23 +37,55 @@ export default function UnifiedDevProjectsPage() {
   // Selected Supabase Project for detailed configuration
   const setSelectedSupabaseProject_State = useState<SupabaseClientProject | null>(null);
   const [selectedSupabaseProject, setSelectedSupabaseProject] = setSelectedSupabaseProject_State;
-  
+
+  // Supabase Studio Sub-Tab navigation state
+  const [studioSubTab, setStudioSubTab] = useState<
+    'overview' | 'sql' | 'auth' | 'storage' | 'advisors' | 'observability' | 'settings'
+  >('overview');
+
+  // Interactive Project Studio Data State
+  const [projectSchemas, setProjectSchemas] = useState<any[]>([]);
+  const [projectTables, setProjectTables] = useState<any[]>([]);
+  const [sqlQuery, setSqlQuery] = useState('SELECT * FROM public.profiles LIMIT 50;');
+  const [sqlResult, setSqlResult] = useState<any | null>(null);
+  const [isExecutingSql, setIsExecutingSql] = useState(false);
+
+  const [authUsers, setAuthUsers] = useState<any[]>([]);
+  const [newAuthEmail, setNewAuthEmail] = useState('');
+  const [newAuthPass, setNewAuthPass] = useState('');
+  const [isCreatingAuthUser, setIsCreatingAuthUser] = useState(false);
+
+  const [storageBuckets, setStorageBuckets] = useState<any[]>([]);
+  const [newBucketId, setNewBucketId] = useState('');
+  const [newBucketName, setNewBucketName] = useState('');
+  const [newBucketPublic, setNewBucketPublic] = useState(true);
+  const [isCreatingBucket, setIsCreatingBucket] = useState(false);
+
+  const [advisorsData, setAdvisorsData] = useState<{ security: any[]; performance: any[] }>({
+    security: [],
+    performance: [],
+  });
+  const [metricsData, setMetricsData] = useState<any | null>(null);
+  const [logsData, setLogsData] = useState<any[]>([]);
+  const [logsServiceFilter, setLogsServiceFilter] = useState('all');
+  const [isLoadingStudioData, setIsLoadingStudioData] = useState(false);
+
   // Selected Database for Migration & Scaling modal
   const [selectedDbForScale, setSelectedDbForScale] = useState<any | null>(null);
 
   // New Provisioning Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createCategory, setCreateCategory] = useState<'supabase' | 'database'>('supabase');
-  
+
   // Supabase creation form
   const [supaName, setSupaName] = useState('');
   const [supaEmail, setSupaEmail] = useState('');
   const [supaNodeId, setSupaNodeId] = useState('');
-  
+
   // Database creation form
   const [dbName, setDbName] = useState('');
   const [dbType, setDbType] = useState<'postgres' | 'mysql' | 'redis' | 'mongodb'>('postgres');
-  
+
   const [isProvisioning, setIsProvisioning] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
@@ -61,9 +107,110 @@ export default function UnifiedDevProjectsPage() {
   const [isExposingPort, setIsExposingPort] = useState(false);
 
   useEffect(() => {
-    if (!isDev) return;
-    loadAllData();
-  }, [isDev]);
+    if (selectedSupabaseProject?.id) {
+      loadProjectStudioData(selectedSupabaseProject.id);
+    }
+  }, [selectedSupabaseProject?.id]);
+
+  async function loadProjectStudioData(projectId: string) {
+    if (!projectId) return;
+    setIsLoadingStudioData(true);
+    try {
+      const [schemasRes, tablesRes, bucketsRes, usersRes, advisorsRes, metricsRes, logsRes] = await Promise.all([
+        api.devSupabase.getSchemas(projectId).catch(() => ({ schemas: [] })),
+        api.devSupabase.getTables(projectId).catch(() => ({ tables: [] })),
+        api.devSupabase.getBuckets(projectId).catch(() => ({ buckets: [] })),
+        api.devSupabase.getAuthUsers(projectId).catch(() => ({ users: [], total: 0 })),
+        api.devSupabase.getAdvisors(projectId).catch(() => ({ security: [], performance: [] })),
+        api.devSupabase.getObservability(projectId).catch(() => ({ metrics: null })),
+        api.devSupabase.getLogs(logsServiceFilter, projectId).catch(() => ({ logs: [] })),
+      ]);
+
+      setProjectSchemas(schemasRes.schemas || []);
+      setProjectTables(tablesRes.tables || []);
+      setStorageBuckets(bucketsRes.buckets || []);
+      setAuthUsers(usersRes.users || []);
+      setAdvisorsData(advisorsRes || { security: [], performance: [] });
+      setMetricsData(metricsRes.metrics || null);
+      setLogsData(logsRes.logs || []);
+    } catch (err) {
+      console.error('Failed loading studio data for project', err);
+    } finally {
+      setIsLoadingStudioData(false);
+    }
+  }
+
+  async function handleExecuteSql(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!selectedSupabaseProject || !sqlQuery.trim()) return;
+    setIsExecutingSql(true);
+    try {
+      const res = await api.devSupabase.executeQuery(sqlQuery, selectedSupabaseProject.id);
+      setSqlResult(res);
+      setActionNotice(`Query executed successfully on project "${selectedSupabaseProject.name}"`);
+    } catch (err: any) {
+      setSqlResult({ error: err?.error || err?.message || 'SQL execution failed' });
+    } finally {
+      setIsExecutingSql(false);
+    }
+  }
+
+  async function handleCreateAuthUser(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedSupabaseProject || !newAuthEmail || !newAuthPass) return;
+    setIsCreatingAuthUser(true);
+    try {
+      await api.devSupabase.createAuthUser({
+        email: newAuthEmail,
+        password: newAuthPass,
+        projectId: selectedSupabaseProject.id,
+      });
+      const res = await api.devSupabase.getAuthUsers(selectedSupabaseProject.id);
+      setAuthUsers(res.users || []);
+      setNewAuthEmail('');
+      setNewAuthPass('');
+      setActionNotice(`Auth User "${newAuthEmail}" created for project "${selectedSupabaseProject.name}"`);
+    } catch (err: any) {
+      setActionNotice(`Failed to create Auth User: ${err?.error || err?.message || 'Error'}`);
+    } finally {
+      setIsCreatingAuthUser(false);
+    }
+  }
+
+  async function handleDeleteAuthUser(userId: string) {
+    if (!selectedSupabaseProject || !confirm('Are you sure you want to delete this auth user?')) return;
+    try {
+      await api.devSupabase.deleteAuthUser(userId, selectedSupabaseProject.id);
+      const res = await api.devSupabase.getAuthUsers(selectedSupabaseProject.id);
+      setAuthUsers(res.users || []);
+      setActionNotice('Auth User deleted successfully');
+    } catch (err: any) {
+      setActionNotice(`Failed deleting user: ${err?.error || err?.message || 'Error'}`);
+    }
+  }
+
+  async function handleCreateBucket(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedSupabaseProject || !newBucketId || !newBucketName) return;
+    setIsCreatingBucket(true);
+    try {
+      await api.devSupabase.createBucket({
+        id: newBucketId,
+        name: newBucketName,
+        isPublic: newBucketPublic,
+        projectId: selectedSupabaseProject.id,
+      });
+      const res = await api.devSupabase.getBuckets(selectedSupabaseProject.id);
+      setStorageBuckets(res.buckets || []);
+      setNewBucketId('');
+      setNewBucketName('');
+      setActionNotice(`Storage Bucket "${newBucketName}" created successfully!`);
+    } catch (err: any) {
+      setActionNotice(`Failed to create bucket: ${err?.error || err?.message || 'Error'}`);
+    } finally {
+      setIsCreatingBucket(false);
+    }
+  }
 
   async function loadAllData() {
     setLoading(true);
@@ -303,7 +450,7 @@ export default function UnifiedDevProjectsPage() {
         </div>
       ) : (
         <>
-          {/* TAB 1: SUPABASE STACKS */}
+          {/* TAB 1: SUPABASE STACKS & MULTI-PROJECT STUDIO */}
           {activeTab === 'supabase' && (
             <div className="space-y-6">
               {supabaseProjects.length === 0 ? (
@@ -326,180 +473,628 @@ export default function UnifiedDevProjectsPage() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* PROJECT LIST */}
-                  <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-4 space-y-3">
-                    <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider px-2">
-                      Active Supabase Projects
-                    </h3>
-                    <div className="space-y-2">
-                      {supabaseProjects.map((proj) => {
-                        const isSelected = selectedSupabaseProject?.id === proj.id;
-                        return (
-                          <div
-                            key={proj.id}
-                            onClick={() => setSelectedSupabaseProject(proj)}
-                            className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-                              isSelected
-                                ? 'bg-emerald-500/10 border-emerald-500/40 text-white'
-                                : 'bg-white/[0.02] border-white/10 hover:bg-white/5 text-text-muted'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-xs text-white">{proj.name}</span>
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                                {proj.status}
-                              </span>
-                            </div>
-                            <p className="text-[11px] font-mono text-text-muted mt-1 truncate">{proj.clientEmail}</p>
-                            <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mt-2 pt-2 border-t border-white/5">
-                              <span>Node: {proj.nodeIp || 'localhost'}</span>
-                              <span>Studio: :{proj.studioPort || 8000}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                <div className="space-y-6">
+                  {/* MULTI-PROJECT SWITCHER & TOP CONTROL BAR */}
+                  <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg">
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-bold">
+                        <Zap className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 md:w-80">
+                        <label className="block text-[10px] text-text-muted uppercase font-mono font-bold">Active Supabase Project / Tenant</label>
+                        <select
+                          value={selectedSupabaseProject?.id || ''}
+                          onChange={(e) => {
+                            const found = supabaseProjects.find((p) => p.id === e.target.value);
+                            if (found) setSelectedSupabaseProject(found);
+                          }}
+                          className="w-full bg-[#121324] border border-emerald-500/30 rounded-xl px-3 py-1.5 text-sm text-white font-bold font-mono focus:outline-none focus:border-emerald-500"
+                        >
+                          {supabaseProjects.map((proj) => (
+                            <option key={proj.id} value={proj.id}>
+                              {proj.name} ({proj.nodeIp || '127.0.0.1'}) - {proj.status}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
+
+                    {selectedSupabaseProject && (
+                      <div className="flex items-center gap-3 font-mono text-xs">
+                        <div className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-text-muted">
+                          <span>Node: </span>
+                          <span className="text-white font-bold">{selectedSupabaseProject.nodeIp || 'localhost'}</span>
+                        </div>
+                        <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                          <span>Status: </span>
+                          <span className="font-bold">{selectedSupabaseProject.status}</span>
+                        </div>
+                        <button
+                          onClick={() => selectedSupabaseProject?.id && loadProjectStudioData(selectedSupabaseProject.id)}
+                          disabled={isLoadingStudioData}
+                          className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold border border-white/10 transition-all flex items-center gap-1.5"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isLoadingStudioData ? 'animate-spin text-emerald-400' : ''}`} />
+                          <span>Sync Data</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  {/* PROJECT DETAILS & LAUNCHER */}
                   {selectedSupabaseProject && (
-                    <div className="lg:col-span-2 space-y-6">
-                      {/* LAUNCH STUDIO BANNER */}
-                      <div className="bg-[#0b0c16] border border-emerald-500/30 rounded-2xl p-6 relative overflow-hidden space-y-4 shadow-xl">
-                        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none text-emerald-400 font-mono text-8xl font-black">
-                          SUPABASE
-                        </div>
+                    <div className="space-y-6">
+                      {/* STUDIO SUB-TAB NAVIGATION BAR */}
+                      <div className="flex items-center gap-1.5 border-b border-white/10 pb-2 overflow-x-auto">
+                        <button
+                          onClick={() => setStudioSubTab('overview')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                            studioSubTab === 'overview'
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : 'text-text-muted hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>Overview & Launch</span>
+                        </button>
 
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-                          <div>
-                            <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-bold">
-                              Self-Hosted Supabase Stack
-                            </span>
-                            <h2 className="text-xl font-black text-white mt-0.5">{selectedSupabaseProject.name}</h2>
-                            <p className="text-xs text-text-muted font-mono mt-1">
-                              ID: {selectedSupabaseProject.id} | Host: {selectedSupabaseProject.nodeIp || '127.0.0.1'}
-                            </p>
-                          </div>
+                        <button
+                          onClick={() => setStudioSubTab('sql')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                            studioSubTab === 'sql'
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : 'text-text-muted hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <Code className="w-3.5 h-3.5" />
+                          <span>SQL Console</span>
+                        </button>
 
-                          {/* ACTUAL SUPABASE STUDIO LAUNCH BUTTON */}
-                          <a
-                            href={selectedSupabaseProject.studioUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.studioPort || 8000}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all"
-                          >
-                            <span>Open Supabase Studio UI</span>
-                            <span className="text-sm">↗</span>
-                          </a>
-                        </div>
+                        <button
+                          onClick={() => setStudioSubTab('auth')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                            studioSubTab === 'auth'
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : 'text-text-muted hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <Users className="w-3.5 h-3.5" />
+                          <span>Auth Users ({authUsers.length})</span>
+                        </button>
 
-                        {/* CONNECTION ENDPOINTS */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 relative z-10 font-mono">
-                          <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
-                            <label className="text-[10px] text-text-muted uppercase font-bold">Studio Dashboard URL</label>
-                            <div className="text-xs text-emerald-300 font-bold truncate">
-                              {selectedSupabaseProject.studioUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.studioPort || 8000}`}
-                            </div>
-                          </div>
+                        <button
+                          onClick={() => setStudioSubTab('storage')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                            studioSubTab === 'storage'
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : 'text-text-muted hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <Folder className="w-3.5 h-3.5" />
+                          <span>Storage Buckets ({storageBuckets.length})</span>
+                        </button>
 
-                          <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
-                            <label className="text-[10px] text-text-muted uppercase font-bold">Kong REST / Auth API Gateway</label>
-                            <div className="text-xs text-cyan-300 font-bold truncate">
-                              {selectedSupabaseProject.apiUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.apiPort || 8001}`}
-                            </div>
-                          </div>
+                        <button
+                          onClick={() => setStudioSubTab('advisors')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                            studioSubTab === 'advisors'
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : 'text-text-muted hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <ShieldAlert className="w-3.5 h-3.5" />
+                          <span>Advisors Linter</span>
+                        </button>
 
-                          <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
-                            <label className="text-[10px] text-text-muted uppercase font-bold">Supabase Meta / Admin API</label>
-                            <div className="text-xs text-violet-300 font-bold truncate">
-                              {selectedSupabaseProject.metaUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:8080`}
-                            </div>
-                          </div>
+                        <button
+                          onClick={() => setStudioSubTab('observability')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                            studioSubTab === 'observability'
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : 'text-text-muted hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <Activity className="w-3.5 h-3.5" />
+                          <span>Observability & Logs</span>
+                        </button>
 
-                          <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
-                            <label className="text-[10px] text-text-muted uppercase font-bold">PostgreSQL Direct Connection URI</label>
-                            <div className="text-xs text-amber-300 font-bold truncate">
-                              {selectedSupabaseProject.dbUrl || `postgresql://postgres:postgres@${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.dbPort || 5432}/${selectedSupabaseProject.dbName}`}
-                            </div>
-                          </div>
-                        </div>
+                        <button
+                          onClick={() => setStudioSubTab('settings')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                            studioSubTab === 'settings'
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : 'text-text-muted hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <Settings className="w-3.5 h-3.5" />
+                          <span>Settings & Keys</span>
+                        </button>
                       </div>
 
-                      {/* INLINE CONFIGURATION PANEL */}
-                      <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-6 space-y-6">
-                        <h3 className="text-sm font-bold text-white border-b border-white/10 pb-3 flex items-center gap-2">
-                          <Settings className="w-4 h-4 text-emerald-400" />
-                          <span>Supabase Stack Configuration & Settings</span>
-                        </h3>
+                      {/* SUB-TAB 1: OVERVIEW */}
+                      {studioSubTab === 'overview' && (
+                        <div className="space-y-6">
+                          <div className="bg-[#0b0c16] border border-emerald-500/30 rounded-2xl p-6 relative overflow-hidden space-y-4 shadow-xl">
+                            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none text-emerald-400 font-mono text-8xl font-black">
+                              SUPABASE
+                            </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono">
-                          <div className="space-y-1.5">
-                            <label className="text-xs text-text-muted">Anon Public Key</label>
-                            <input
-                              type="text"
-                              readOnly
-                              value={selectedSupabaseProject.anonKey}
-                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                            />
-                          </div>
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                              <div>
+                                <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-bold">
+                                  Self-Hosted Supabase Stack
+                                </span>
+                                <h2 className="text-xl font-black text-white mt-0.5">{selectedSupabaseProject.name}</h2>
+                                <p className="text-xs text-text-muted font-mono mt-1">
+                                  ID: {selectedSupabaseProject.id} | Host: {selectedSupabaseProject.nodeIp || '127.0.0.1'}
+                                </p>
+                              </div>
 
-                          <div className="space-y-1.5">
-                            <label className="text-xs text-text-muted">Service Role Key</label>
-                            <input
-                              type="text"
-                              readOnly
-                              value={selectedSupabaseProject.serviceKey}
-                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                            />
+                              <a
+                                href={selectedSupabaseProject.studioUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.studioPort || 8000}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all"
+                              >
+                                <span>Launch Studio UI</span>
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                            </div>
+
+                            {/* STATS SUMMARY GRID */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 relative z-10 font-mono">
+                              <div className="p-3 bg-white/[0.02] border border-white/10 rounded-xl">
+                                <span className="text-[10px] text-text-muted uppercase">Database Schemas</span>
+                                <div className="text-base font-bold text-white mt-1">{projectSchemas.length}</div>
+                              </div>
+                              <div className="p-3 bg-white/[0.02] border border-white/10 rounded-xl">
+                                <span className="text-[10px] text-text-muted uppercase">Public Tables</span>
+                                <div className="text-base font-bold text-white mt-1">{projectTables.length}</div>
+                              </div>
+                              <div className="p-3 bg-white/[0.02] border border-white/10 rounded-xl">
+                                <span className="text-[10px] text-text-muted uppercase">Auth Users</span>
+                                <div className="text-base font-bold text-white mt-1">{authUsers.length}</div>
+                              </div>
+                              <div className="p-3 bg-white/[0.02] border border-white/10 rounded-xl">
+                                <span className="text-[10px] text-text-muted uppercase">Storage Buckets</span>
+                                <div className="text-base font-bold text-white mt-1">{storageBuckets.length}</div>
+                              </div>
+                            </div>
+
+                            {/* CONNECTION ENDPOINTS */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 relative z-10 font-mono">
+                              <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
+                                <label className="text-[10px] text-text-muted uppercase font-bold">Studio Dashboard URL</label>
+                                <div className="text-xs text-emerald-300 font-bold truncate">
+                                  {selectedSupabaseProject.studioUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.studioPort || 8000}`}
+                                </div>
+                              </div>
+
+                              <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
+                                <label className="text-[10px] text-text-muted uppercase font-bold">Kong REST / Auth API Gateway</label>
+                                <div className="text-xs text-cyan-300 font-bold truncate">
+                                  {selectedSupabaseProject.apiUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.apiPort || 8001}`}
+                                </div>
+                              </div>
+
+                              <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
+                                <label className="text-[10px] text-text-muted uppercase font-bold">Supabase Meta / Admin API</label>
+                                <div className="text-xs text-violet-300 font-bold truncate">
+                                  {selectedSupabaseProject.metaUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:8080`}
+                                </div>
+                              </div>
+
+                              <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
+                                <label className="text-[10px] text-text-muted uppercase font-bold">PostgreSQL Direct Connection URI</label>
+                                <div className="text-xs text-amber-300 font-bold truncate">
+                                  {selectedSupabaseProject.dbUrl || `postgresql://postgres:postgres@${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.dbPort || 5432}/${selectedSupabaseProject.dbName}`}
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
+                      )}
 
-                        <div className="space-y-4 pt-4 border-t border-white/10">
-                          <h4 className="text-xs font-bold text-white">Update Security & Database Settings</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <label className="block text-xs text-text-muted mb-1">New DB Master Password</label>
+                      {/* SUB-TAB 2: SQL CONSOLE */}
+                      {studioSubTab === 'sql' && (
+                        <div className="space-y-4">
+                          <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-5 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-sm font-bold text-white flex items-center gap-2 font-mono">
+                                <Terminal className="w-4 h-4 text-emerald-400" />
+                                <span>Interactive SQL Editor ({selectedSupabaseProject.name})</span>
+                              </h3>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setSqlQuery('SELECT * FROM public.profiles LIMIT 50;')}
+                                  className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-text-muted"
+                                >
+                                  Preset: Profiles
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSqlQuery('SELECT tablename, schemaname FROM pg_tables WHERE schemaname=\'public\';')}
+                                  className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-text-muted"
+                                >
+                                  Preset: Tables
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSqlQuery('SELECT version();')}
+                                  className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-text-muted"
+                                >
+                                  Preset: Postgres Version
+                                </button>
+                              </div>
+                            </div>
+
+                            <form onSubmit={handleExecuteSql} className="space-y-3">
+                              <textarea
+                                rows={5}
+                                value={sqlQuery}
+                                onChange={(e) => setSqlQuery(e.target.value)}
+                                placeholder="Enter SQL query..."
+                                className="w-full bg-[#05060b] border border-white/10 rounded-xl p-3 text-xs text-emerald-300 font-mono focus:outline-none focus:border-emerald-500"
+                              />
+
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-text-muted font-mono">Target Database: {selectedSupabaseProject.dbName || 'postgres'}</span>
+                                <button
+                                  type="submit"
+                                  disabled={isExecutingSql}
+                                  className="px-4 py-2 rounded-xl bg-emerald-500 text-black font-bold text-xs hover:bg-emerald-400 disabled:opacity-50 transition-all flex items-center gap-2"
+                                >
+                                  {isExecutingSql ? 'Executing...' : 'Run Query ▶'}
+                                </button>
+                              </div>
+                            </form>
+                          </div>
+
+                          {/* QUERY RESULT */}
+                          {sqlResult && (
+                            <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-5 space-y-3 font-mono">
+                              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Query Output</h4>
+
+                              {sqlResult.error ? (
+                                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400">
+                                  Error: {sqlResult.error}
+                                </div>
+                              ) : Array.isArray(sqlResult) || Array.isArray(sqlResult.rows) ? (
+                                <div className="overflow-x-auto max-h-96 border border-white/10 rounded-xl">
+                                  <table className="w-full text-left text-xs">
+                                    <thead className="bg-white/5 text-text-muted uppercase text-[10px]">
+                                      <tr>
+                                        {Object.keys((Array.isArray(sqlResult) ? sqlResult : sqlResult.rows)[0] || {}).map((col) => (
+                                          <th key={col} className="p-2.5 border-b border-white/10">{col}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                      {(Array.isArray(sqlResult) ? sqlResult : sqlResult.rows).map((row: any, idx: number) => (
+                                        <tr key={idx} className="hover:bg-white/5 text-white">
+                                          {Object.values(row).map((val: any, vIdx: number) => (
+                                            <td key={vIdx} className="p-2.5 whitespace-nowrap max-w-xs truncate">
+                                              {typeof val === 'object' ? JSON.stringify(val) : String(val)}
+                                            </td>
+                                          ))}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <pre className="p-3 bg-black/40 rounded-xl text-xs text-emerald-300 overflow-x-auto">
+                                  {JSON.stringify(sqlResult, null, 2)}
+                                </pre>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* SUB-TAB 3: AUTH USERS */}
+                      {studioSubTab === 'auth' && (
+                        <div className="space-y-6">
+                          {/* CREATE AUTH USER FORM */}
+                          <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-5 space-y-4">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                              <Users className="w-4 h-4 text-emerald-400" />
+                              <span>GoTrue User Provisioner</span>
+                            </h3>
+
+                            <form onSubmit={handleCreateAuthUser} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <input
+                                type="email"
+                                placeholder="user@example.com"
+                                value={newAuthEmail}
+                                onChange={(e) => setNewAuthEmail(e.target.value)}
+                                required
+                                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                              />
                               <input
                                 type="password"
-                                placeholder="••••••••••••"
-                                value={editDbPass}
-                                onChange={(e) => setEditDbPass(e.target.value)}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                                placeholder="Password"
+                                value={newAuthPass}
+                                onChange={(e) => setNewAuthPass(e.target.value)}
+                                required
+                                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                              />
+                              <button
+                                type="submit"
+                                disabled={isCreatingAuthUser}
+                                className="py-2 px-4 rounded-xl bg-emerald-500 text-black font-bold text-xs hover:bg-emerald-400 disabled:opacity-50 transition-all"
+                              >
+                                {isCreatingAuthUser ? 'Creating...' : '+ Add Auth User'}
+                              </button>
+                            </form>
+                          </div>
+
+                          {/* USERS TABLE */}
+                          <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-5 space-y-4 font-mono">
+                            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Registered Auth Users</h4>
+
+                            {authUsers.length === 0 ? (
+                              <p className="text-xs text-text-muted py-4">No auth users created yet.</p>
+                            ) : (
+                              <div className="overflow-x-auto border border-white/10 rounded-xl">
+                                <table className="w-full text-left text-xs">
+                                  <thead className="bg-white/5 text-text-muted uppercase text-[10px]">
+                                    <tr>
+                                      <th className="p-2.5">User ID</th>
+                                      <th className="p-2.5">Email</th>
+                                      <th className="p-2.5">Role</th>
+                                      <th className="p-2.5">Created At</th>
+                                      <th className="p-2.5 text-right">Actions</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-white/5">
+                                    {authUsers.map((u: any) => (
+                                      <tr key={u.id} className="hover:bg-white/5 text-white">
+                                        <td className="p-2.5 font-bold text-emerald-400 truncate max-w-xs">{u.id}</td>
+                                        <td className="p-2.5">{u.email}</td>
+                                        <td className="p-2.5">{u.role || 'authenticated'}</td>
+                                        <td className="p-2.5 text-text-muted">{u.created_at ? new Date(u.created_at).toLocaleDateString() : 'N/A'}</td>
+                                        <td className="p-2.5 text-right">
+                                          <button
+                                            onClick={() => handleDeleteAuthUser(u.id)}
+                                            className="px-2 py-1 rounded text-red-400 hover:bg-red-500/10 text-xs font-bold"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5 inline" />
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SUB-TAB 4: STORAGE BUCKETS */}
+                      {studioSubTab === 'storage' && (
+                        <div className="space-y-6">
+                          <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-5 space-y-4">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                              <Folder className="w-4 h-4 text-emerald-400" />
+                              <span>Create Storage Bucket</span>
+                            </h3>
+
+                            <form onSubmit={handleCreateBucket} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                              <input
+                                type="text"
+                                placeholder="Bucket ID (e.g. avatars)"
+                                value={newBucketId}
+                                onChange={(e) => setNewBucketId(e.target.value)}
+                                required
+                                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Display Name"
+                                value={newBucketName}
+                                onChange={(e) => setNewBucketName(e.target.value)}
+                                required
+                                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                              />
+                              <div className="flex items-center gap-2">
+                                <label className="text-xs text-text-muted font-mono">Public:</label>
+                                <input
+                                  type="checkbox"
+                                  checked={newBucketPublic}
+                                  onChange={(e) => setNewBucketPublic(e.target.checked)}
+                                  className="w-4 h-4 rounded border-white/10 accent-emerald-500"
+                                />
+                              </div>
+                              <button
+                                type="submit"
+                                disabled={isCreatingBucket}
+                                className="py-2 px-4 rounded-xl bg-emerald-500 text-black font-bold text-xs hover:bg-emerald-400 disabled:opacity-50 transition-all"
+                              >
+                                {isCreatingBucket ? 'Creating...' : '+ Create Bucket'}
+                              </button>
+                            </form>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono">
+                            {storageBuckets.map((b: any) => (
+                              <div key={b.id} className="p-4 bg-[#0b0c16] border border-white/10 rounded-2xl space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-sm text-white">{b.name || b.id}</span>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${b.public ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                                    {b.public ? 'PUBLIC' : 'PRIVATE'}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-text-muted truncate">ID: {b.id}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SUB-TAB 5: ADVISORS LINTER */}
+                      {studioSubTab === 'advisors' && (
+                        <div className="space-y-6">
+                          <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-5 space-y-4">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                              <ShieldAlert className="w-4 h-4 text-emerald-400" />
+                              <span>Security & Performance Advisors</span>
+                            </h3>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
+                              <div className="p-4 bg-white/[0.02] border border-white/10 rounded-xl space-y-3">
+                                <h4 className="font-bold text-amber-400 uppercase text-[11px]">Security Linter Audit</h4>
+                                {advisorsData.security.length === 0 ? (
+                                  <p className="text-emerald-400 text-xs">✓ No critical security advisories detected.</p>
+                                ) : (
+                                  advisorsData.security.map((sec: any, idx: number) => (
+                                    <div key={idx} className="p-2.5 bg-black/40 rounded-lg border border-amber-500/20 text-text-muted">
+                                      <span className="text-white font-bold">{sec.name || sec.title}</span>
+                                      <p className="text-[10px] mt-1">{sec.detail || sec.description}</p>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+
+                              <div className="p-4 bg-white/[0.02] border border-white/10 rounded-xl space-y-3">
+                                <h4 className="font-bold text-cyan-400 uppercase text-[11px]">Performance Linter Audit</h4>
+                                {advisorsData.performance.length === 0 ? (
+                                  <p className="text-emerald-400 text-xs">✓ Database indexes & query plans optimized.</p>
+                                ) : (
+                                  advisorsData.performance.map((perf: any, idx: number) => (
+                                    <div key={idx} className="p-2.5 bg-black/40 rounded-lg border border-cyan-500/20 text-text-muted">
+                                      <span className="text-white font-bold">{perf.name || perf.title}</span>
+                                      <p className="text-[10px] mt-1">{perf.detail || perf.description}</p>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SUB-TAB 6: OBSERVABILITY & LOGS */}
+                      {studioSubTab === 'observability' && (
+                        <div className="space-y-6">
+                          <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-5 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                <Activity className="w-4 h-4 text-emerald-400" />
+                                <span>Real-time Observability & Service Logs</span>
+                              </h3>
+
+                              <select
+                                value={logsServiceFilter}
+                                onChange={(e) => {
+                                  setLogsServiceFilter(e.target.value);
+                                  if (selectedSupabaseProject?.id) loadProjectStudioData(selectedSupabaseProject.id);
+                                }}
+                                className="bg-[#121324] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white font-mono"
+                              >
+                                <option value="all">All Services</option>
+                                <option value="postgres">PostgreSQL Engine</option>
+                                <option value="auth">GoTrue Auth</option>
+                                <option value="storage">Storage API</option>
+                                <option value="kong">Kong API Gateway</option>
+                                <option value="pg-meta">Postgres Meta</option>
+                              </select>
+                            </div>
+
+                            <div className="p-4 bg-[#05060b] border border-white/10 rounded-xl font-mono max-h-96 overflow-y-auto space-y-1.5">
+                              {logsData.length === 0 ? (
+                                <p className="text-xs text-text-muted">No logs recorded for filter "{logsServiceFilter}".</p>
+                              ) : (
+                                logsData.map((log: any, idx: number) => (
+                                  <div key={idx} className="text-[11px] text-emerald-300 font-mono">
+                                    <span className="text-text-muted">[{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : 'LOG'}]:</span>{' '}
+                                    <span>{typeof log === 'string' ? log : log.event_message || JSON.stringify(log)}</span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SUB-TAB 7: SETTINGS & KEYS */}
+                      {studioSubTab === 'settings' && (
+                        <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-6 space-y-6">
+                          <h3 className="text-sm font-bold text-white border-b border-white/10 pb-3 flex items-center gap-2">
+                            <Settings className="w-4 h-4 text-emerald-400" />
+                            <span>Supabase Stack Configuration & Security Keys</span>
+                          </h3>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono">
+                            <div className="space-y-1.5">
+                              <label className="text-xs text-text-muted">Anon Public Key</label>
+                              <input
+                                type="text"
+                                readOnly
+                                value={selectedSupabaseProject.anonKey}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                               />
                             </div>
 
-                            <div>
-                              <label className="block text-xs text-text-muted mb-1">New Auth JWT Secret</label>
+                            <div className="space-y-1.5">
+                              <label className="text-xs text-text-muted">Service Role Key</label>
                               <input
-                                type="password"
-                                placeholder="••••••••••••"
-                                value={editJwtSecret}
-                                onChange={(e) => setEditJwtSecret(e.target.value)}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs text-text-muted mb-1">Storage Quota (MB)</label>
-                              <input
-                                type="number"
-                                value={editStorageMb}
-                                onChange={(e) => setEditStorageMb(Number(e.target.value))}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                                type="text"
+                                readOnly
+                                value={selectedSupabaseProject.serviceKey}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                               />
                             </div>
                           </div>
 
-                          <button
-                            onClick={handleSaveSupabaseConfig}
-                            disabled={isSavingSupabaseSettings}
-                            className="px-4 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold hover:bg-emerald-500/30 disabled:opacity-50 transition-all"
-                          >
-                            {isSavingSupabaseSettings ? 'Saving...' : 'Save Configuration Changes'}
-                          </button>
+                          <div className="space-y-4 pt-4 border-t border-white/10">
+                            <h4 className="text-xs font-bold text-white">Update Security & Database Settings</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div>
+                                <label className="block text-xs text-text-muted mb-1">New DB Master Password</label>
+                                <input
+                                  type="password"
+                                  placeholder="••••••••••••"
+                                  value={editDbPass}
+                                  onChange={(e) => setEditDbPass(e.target.value)}
+                                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs text-text-muted mb-1">New Auth JWT Secret</label>
+                                <input
+                                  type="password"
+                                  placeholder="••••••••••••"
+                                  value={editJwtSecret}
+                                  onChange={(e) => setEditJwtSecret(e.target.value)}
+                                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs text-text-muted mb-1">Storage Quota (MB)</label>
+                                <input
+                                  type="number"
+                                  value={editStorageMb}
+                                  onChange={(e) => setEditStorageMb(Number(e.target.value))}
+                                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                                />
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={handleSaveSupabaseConfig}
+                              disabled={isSavingSupabaseSettings}
+                              className="px-4 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold hover:bg-emerald-500/30 disabled:opacity-50 transition-all"
+                            >
+                              {isSavingSupabaseSettings ? 'Saving...' : 'Save Configuration Changes'}
+                            </button>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>

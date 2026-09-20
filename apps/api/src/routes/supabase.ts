@@ -132,14 +132,55 @@ export interface SmtpDeliveryLog {
 }
 
 
-async function fetchJson(url: string, options: RequestInit = {}) {
+async function resolveProjectContext(req: AuthedRequest): Promise<{
+  project: any;
+  metaUrl: string;
+  kongUrl: string;
+  serviceKey: string;
+}> {
+  const projectId =
+    (req.query.projectId as string) ||
+    (req.body?.projectId as string) ||
+    (req.headers['x-project-ref'] as string) ||
+    (req.headers['x-project-id'] as string) ||
+    undefined;
+
+  let project = null;
+  if (projectId) {
+    project = await prisma.supabaseClientProject.findUnique({ where: { id: projectId } });
+  }
+  if (!project) {
+    project = await prisma.supabaseClientProject.findFirst({ orderBy: { createdAt: 'desc' } });
+  }
+
+  let nodeIp = project?.nodeIp || null;
+  if (project?.nodeId && !nodeIp) {
+    const node = await prisma.node.findUnique({ where: { id: project.nodeId } });
+    if (node) nodeIp = node.ip;
+  }
+
+  const rootDomain = env.rootDomain || 'shanutechx.com';
+  const cleanSlug = project?.name
+    ? project.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '')
+    : 'default';
+  const hostSubdomain = `supabase-${cleanSlug}.${rootDomain}`;
+
+  const metaUrl = nodeIp ? `http://${hostSubdomain}:8080` : SUPABASE_META_URL;
+  const kongUrl = nodeIp ? `http://${hostSubdomain}:${project?.apiPort || 8001}` : SUPABASE_KONG_URL;
+  const serviceKey = project?.serviceKey || SUPABASE_SERVICE_ROLE_KEY;
+
+  return { project, metaUrl, kongUrl, serviceKey };
+}
+
+async function fetchJson(url: string, options: RequestInit = {}, serviceKeyOverride?: string) {
+  const apiKey = serviceKeyOverride || SUPABASE_SERVICE_ROLE_KEY;
   try {
     const res = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: apiKey,
+        Authorization: `Bearer ${apiKey}`,
         ...(options.headers || {}),
       },
     });
@@ -155,11 +196,12 @@ async function fetchJson(url: string, options: RequestInit = {}) {
 }
 
 // 1. Service Health & Status
-supabaseRouter.get('/supabase/health', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/health', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+  const ctx = await resolveProjectContext(req);
   const [kongRes, metaRes, realtimeRes] = await Promise.all([
-    fetchJson(`${SUPABASE_KONG_URL}/health`),
-    fetchJson(`${SUPABASE_META_URL}/health`),
-    fetchJson(`${SUPABASE_KONG_URL}/realtime/v1/health`),
+    fetchJson(`${ctx.kongUrl}/health`, {}, ctx.serviceKey),
+    fetchJson(`${ctx.metaUrl}/health`, {}, ctx.serviceKey),
+    fetchJson(`${ctx.kongUrl}/realtime/v1/health`, {}, ctx.serviceKey),
   ]);
 
   const services = {
@@ -239,6 +281,21 @@ supabaseRouter.post('/supabase/projects', requireAuth, requireDev, async (req: A
   });
 
   res.status(201).json({ project: serializeProject({ ...newProject, node: selectedNode }) });
+});
+
+supabaseRouter.get('/supabase/projects/:id', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+  const { id } = req.params;
+  const project = await prisma.supabaseClientProject.findUnique({ where: { id } });
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found' });
+  }
+
+  let node = null;
+  if (project.nodeId) {
+    node = await prisma.node.findUnique({ where: { id: project.nodeId } });
+  }
+
+  res.json({ project: serializeProject({ ...project, node }) });
 });
 
 supabaseRouter.delete('/supabase/projects/:id', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
@@ -431,8 +488,9 @@ supabaseRouter.get('/supabase/smtp/logs', requireAuth, requireDev, async (_req: 
 });
 
 // 7. GoTrue Auth User Management Endpoints
-supabaseRouter.get('/supabase/auth/users', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
-  const result = await fetchJson(`${SUPABASE_KONG_URL}/auth/v1/admin/users`);
+supabaseRouter.get('/supabase/auth/users', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+  const ctx = await resolveProjectContext(req);
+  const result = await fetchJson(`${ctx.kongUrl}/auth/v1/admin/users`, {}, ctx.serviceKey);
   if (!result.ok) {
     return res.json({
       users: [
@@ -462,10 +520,11 @@ supabaseRouter.post('/supabase/auth/users', requireAuth, requireDev, async (req:
     return res.status(400).json({ error: 'Password must be at least 6 characters long' });
   }
 
-  const result = await fetchJson(`${SUPABASE_KONG_URL}/auth/v1/admin/users`, {
+  const ctx = await resolveProjectContext(req);
+  const result = await fetchJson(`${ctx.kongUrl}/auth/v1/admin/users`, {
     method: 'POST',
     body: JSON.stringify({ email, password, email_confirm: true, user_metadata }),
-  });
+  }, ctx.serviceKey);
 
   if (!result.ok) {
     return res.status(result.status || 400).json({ error: result.error || 'Failed to create user in Auth service' });
@@ -477,9 +536,10 @@ supabaseRouter.delete('/supabase/auth/users/:id', requireAuth, requireDev, async
   const { id } = req.params;
   if (!id) return res.status(400).json({ error: 'User ID is required' });
 
-  const result = await fetchJson(`${SUPABASE_KONG_URL}/auth/v1/admin/users/${id}`, {
+  const ctx = await resolveProjectContext(req);
+  const result = await fetchJson(`${ctx.kongUrl}/auth/v1/admin/users/${id}`, {
     method: 'DELETE',
-  });
+  }, ctx.serviceKey);
 
   if (!result.ok) {
     return res.status(result.status || 404).json({ error: result.error || 'User not found or failed to delete' });
@@ -488,16 +548,18 @@ supabaseRouter.delete('/supabase/auth/users/:id', requireAuth, requireDev, async
 });
 
 // 8. Database Studio endpoints
-supabaseRouter.get('/supabase/db/schemas', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
-  const result = await fetchJson(`${SUPABASE_META_URL}/schemas`);
+supabaseRouter.get('/supabase/db/schemas', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+  const ctx = await resolveProjectContext(req);
+  const result = await fetchJson(`${ctx.metaUrl}/schemas`, {}, ctx.serviceKey);
   if (!result.ok) {
     return res.status(503).json({ error: 'Supabase Meta service is unreachable', isFallback: true, schemas: [] });
   }
   res.json({ schemas: result.data });
 });
 
-supabaseRouter.get('/supabase/db/tables', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
-  const result = await fetchJson(`${SUPABASE_META_URL}/tables`);
+supabaseRouter.get('/supabase/db/tables', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+  const ctx = await resolveProjectContext(req);
+  const result = await fetchJson(`${ctx.metaUrl}/tables`, {}, ctx.serviceKey);
   if (!result.ok) {
     return res.status(503).json({ error: 'Supabase Meta service is unreachable', isFallback: true, tables: [] });
   }
@@ -518,10 +580,11 @@ supabaseRouter.post('/supabase/db/query', requireAuth, requireDev, async (req: A
     }).catch(() => {});
   }
 
-  const result = await fetchJson(`${SUPABASE_META_URL}/query`, {
+  const ctx = await resolveProjectContext(req);
+  const result = await fetchJson(`${ctx.metaUrl}/query`, {
     method: 'POST',
     body: JSON.stringify({ query: sql }),
-  });
+  }, ctx.serviceKey);
 
   if (!result.ok) {
     return res.status(result.status || 503).json({ error: result.error || 'Supabase Meta query execution failed' });
@@ -530,8 +593,9 @@ supabaseRouter.post('/supabase/db/query', requireAuth, requireDev, async (req: A
 });
 
 // 9. Storage Buckets endpoints
-supabaseRouter.get('/supabase/storage/buckets', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
-  const result = await fetchJson(`${SUPABASE_KONG_URL}/storage/v1/bucket`);
+supabaseRouter.get('/supabase/storage/buckets', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+  const ctx = await resolveProjectContext(req);
+  const result = await fetchJson(`${ctx.kongUrl}/storage/v1/bucket`, {}, ctx.serviceKey);
   if (!result.ok) {
     return res.status(503).json({ error: 'Supabase Storage service is unreachable', isFallback: true, buckets: [] });
   }
@@ -545,10 +609,11 @@ supabaseRouter.post('/supabase/storage/buckets', requireAuth, requireDev, async 
     return res.status(400).json({ error: 'Bucket ID and name are required' });
   }
 
-  const result = await fetchJson(`${SUPABASE_KONG_URL}/storage/v1/bucket`, {
+  const ctx = await resolveProjectContext(req);
+  const result = await fetchJson(`${ctx.kongUrl}/storage/v1/bucket`, {
     method: 'POST',
     body: JSON.stringify({ id, name, public: !!isPublic }),
-  });
+  }, ctx.serviceKey);
 
   if (!result.ok) {
     const newBucket = {
@@ -698,6 +763,33 @@ supabaseRouter.get('/supabase/config', requireAuth, requireDev, async (_req: Aut
     studioUrl: `${supabaseUrl}/supabase`,
     smtpConfigured: !!process.env.SMTP_HOST
   });
+});
+
+// 16. Dynamic PG-Meta Proxy for Studio UI (/supabase/pg-meta/:projectRef/*)
+supabaseRouter.all('/supabase/pg-meta/:projectRef/*', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+  const { projectRef } = req.params;
+  const subPath = req.params[0] || '';
+
+  const ctx = await resolveProjectContext(req);
+  const targetUrl = `${ctx.metaUrl}/${subPath}${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`;
+
+  try {
+    const bodyStr = ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.stringify(req.body) : undefined;
+    const proxyRes = await fetch(targetUrl, {
+      method: req.method,
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: ctx.serviceKey,
+        Authorization: `Bearer ${ctx.serviceKey}`,
+      },
+      body: bodyStr,
+    });
+
+    const data = await proxyRes.json().catch(() => ({}));
+    res.status(proxyRes.status).json(data);
+  } catch (err: any) {
+    res.status(503).json({ error: `Failed to proxy to postgres-meta for project ${projectRef}: ${err.message}` });
+  }
 });
 
 

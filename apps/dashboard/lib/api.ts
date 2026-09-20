@@ -1950,12 +1950,14 @@ export const api = {
   },
 
   devSupabase: {
-    health: () =>
-      apiFetch('/api/supabase/health').then((r) =>
+    health: (projectId?: string) =>
+      apiFetch(`/api/supabase/health${projectId ? `?projectId=${projectId}` : ''}`).then((r) =>
         asJson<{ status: string; services: Record<string, string>; urls: Record<string, string> }>(r)
       ),
     listProjects: () =>
       apiFetch('/api/supabase/projects').then((r) => asJson<{ projects: SupabaseClientProject[]; total: number }>(r)),
+    getProject: (id: string) =>
+      apiFetch(`/api/supabase/projects/${id}`).then((r) => asJson<{ project: SupabaseClientProject }>(r)),
     createProject: (data: { name: string; clientEmail: string; region?: string; nodeId?: string }) =>
       apiFetch('/api/supabase/projects', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<{ project: SupabaseClientProject }>(r)
@@ -1968,27 +1970,37 @@ export const api = {
       apiFetch(`/api/supabase/projects/${id}/config`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) =>
         asJson<{ ok: boolean; project: SupabaseClientProject }>(r)
       ),
-    getSchemas: () => apiFetch('/api/supabase/db/schemas').then((r) => asJson<{ schemas: any[] }>(r)),
-    getTables: () => apiFetch('/api/supabase/db/tables').then((r) => asJson<{ tables: any[] }>(r)),
-    executeQuery: (sql: string) =>
-      apiFetch('/api/supabase/db/query', { method: 'POST', body: JSON.stringify({ sql }) }).then((r) => asJson<any>(r)),
-    getBuckets: () => apiFetch('/api/supabase/storage/buckets').then((r) => asJson<{ buckets: any[] }>(r)),
-    createBucket: (data: { id: string; name: string; isPublic?: boolean }) =>
+    getSchemas: (projectId?: string) =>
+      apiFetch(`/api/supabase/db/schemas${projectId ? `?projectId=${projectId}` : ''}`).then((r) => asJson<{ schemas: any[] }>(r)),
+    getTables: (projectId?: string) =>
+      apiFetch(`/api/supabase/db/tables${projectId ? `?projectId=${projectId}` : ''}`).then((r) => asJson<{ tables: any[] }>(r)),
+    executeQuery: (sql: string, projectId?: string) =>
+      apiFetch('/api/supabase/db/query', { method: 'POST', body: JSON.stringify({ sql, projectId }) }).then((r) => asJson<any>(r)),
+    getBuckets: (projectId?: string) =>
+      apiFetch(`/api/supabase/storage/buckets${projectId ? `?projectId=${projectId}` : ''}`).then((r) => asJson<{ buckets: any[] }>(r)),
+    createBucket: (data: { id: string; name: string; isPublic?: boolean; projectId?: string }) =>
       apiFetch('/api/supabase/storage/buckets', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<any>(r)
       ),
-    getAuthUsers: () => apiFetch('/api/supabase/auth/users').then((r) => asJson<{ users: any[]; total: number }>(r)),
-    createAuthUser: (data: { email: string; password: string; user_metadata?: any }) =>
+    getAuthUsers: (projectId?: string) =>
+      apiFetch(`/api/supabase/auth/users${projectId ? `?projectId=${projectId}` : ''}`).then((r) => asJson<{ users: any[]; total: number }>(r)),
+    createAuthUser: (data: { email: string; password: string; user_metadata?: any; projectId?: string }) =>
       apiFetch('/api/supabase/auth/users', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<any>(r)
       ),
-    deleteAuthUser: (id: string) =>
-      apiFetch(`/api/supabase/auth/users/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
-    getAdvisors: () =>
-      apiFetch('/api/supabase/advisors').then((r) => asJson<{ security: any[]; performance: any[] }>(r)),
-    getObservability: () => apiFetch('/api/supabase/observability').then((r) => asJson<{ metrics: any }>(r)),
-    getLogs: (service?: string) =>
-      apiFetch(`/api/supabase/logs${service ? `?service=${service}` : ''}`).then((r) => asJson<{ logs: any[] }>(r)),
+    deleteAuthUser: (id: string, projectId?: string) =>
+      apiFetch(`/api/supabase/auth/users/${id}${projectId ? `?projectId=${projectId}` : ''}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    getAdvisors: (projectId?: string) =>
+      apiFetch(`/api/supabase/advisors${projectId ? `?projectId=${projectId}` : ''}`).then((r) => asJson<{ security: any[]; performance: any[] }>(r)),
+    getObservability: (projectId?: string) =>
+      apiFetch(`/api/supabase/observability${projectId ? `?projectId=${projectId}` : ''}`).then((r) => asJson<{ metrics: any }>(r)),
+    getLogs: (service?: string, projectId?: string) => {
+      const params = new URLSearchParams();
+      if (service) params.set('service', service);
+      if (projectId) params.set('projectId', projectId);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      return apiFetch(`/api/supabase/logs${queryStr}`).then((r) => asJson<{ logs: any[] }>(r));
+    },
   },
 };
 
