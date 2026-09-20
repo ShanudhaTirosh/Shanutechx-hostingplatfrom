@@ -254,6 +254,56 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXP: ${JWT_EXPIRY:-3600}
 
+  imgproxy:
+    container_name: supabase-imgproxy
+    image: darthsim/imgproxy:v3.8.0
+    restart: unless-stopped
+    environment:
+      IMGPROXY_BIND: ":5001"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+      IMGPROXY_USE_ETAG: "true"
+
+  supavisor:
+    container_name: supabase-supavisor
+    image: supabase/supavisor:1.1.8
+    restart: unless-stopped
+    ports:
+      - "6543:6543"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 6543
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-postgres}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      VAULT_ENC_KEY: ${VAULT_ENC_KEY:-8e68967f28c72a03e66391a7d274955d}
+      API_JWT_SECRET: ${JWT_SECRET}
+      METRICS_JWT_SECRET: ${JWT_SECRET}
+
+  logflare:
+    container_name: supabase-logflare
+    image: supabase/logflare:v1.14.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      LOGFLARE_NODE_HOST: 127.0.0.1
+      DB_HOST: ${POSTGRES_HOST:-db}
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_DATABASE: _analytics
+      PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN:-jcKBNpbgWV+c7Y34PnYgFIWObKG/KWx5}
+      PRIVATE_ACCESS_TOKEN: ${LOGFLARE_PRIVATE_ACCESS_TOKEN:-47H1MKWk2l8csgsrfHJGrgUmA7899L96}
+
+  vector:
+    container_name: supabase-vector
+    image: timberio/vector:0.28.1-alpine
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
 volumes:
   supabase-db-data:
   supabase-kong-config:
