@@ -256,6 +256,9 @@ supabaseRouter.post('/supabase/projects', requireAuth, requireDev, async (req: A
   const cleanSlug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '');
   const id = `proj_${slug}_${Date.now().toString().slice(-4)}`;
 
+  const projJwtSecret = process.env.JWT_SECRET || (await import('crypto')).randomBytes(32).toString('hex');
+  const jwtSecretEnc = encryptSecret(projJwtSecret, env.secretsEncryptionKey);
+
   if (selectedNode?.ip) {
     const hostSubdomain = `supabase-${cleanSlug}`;
     // Pass false to create an unproxied Cloudflare A-record directly pointing to node IP
@@ -274,7 +277,9 @@ supabaseRouter.post('/supabase/projects', requireAuth, requireDev, async (req: A
       status: 'ACTIVE',
       anonKey: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.anon_${id}`,
       serviceKey: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.service_${id}`,
+      jwtSecretEnc,
       smtpConfigured: true,
+      poolerSettingsJson: { mode: 'transaction', poolSize: 20, reservePoolSize: 5, port: 6543 },
       nodeId: selectedNode?.id || null,
       nodeIp: selectedNode?.ip || null,
     },
