@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { api } from '@/lib/api';
 import { Card, Button, Spinner, useToast } from '@/components/ui';
 import { UploadCloud, GitBranch, RefreshCw, Lock, Terminal, Shield, Play } from 'lucide-react';
+import { useAppUser } from '@/lib/AppUserContext';
 
 interface Props {
   deployment: any;
@@ -11,6 +12,8 @@ interface Props {
 }
 
 export function CodeDeploymentPanel({ deployment, onChanged }: Props) {
+  const { apiUser } = useAppUser();
+  const isDevUser = apiUser?.role === 'dev';
   const [gitToken, setGitToken] = useState('');
   const [autoDeploy, setAutoDeploy] = useState<boolean>(deployment.autoDeploy ?? true);
   const [savingGit, setSavingGit] = useState(false);
