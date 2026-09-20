@@ -1029,6 +1029,223 @@ function ClientTeamTab() {
   );
 }
 
+// ── Tab 7: GitHub System Integration & Automated Backups Component ──
+function GithubSystemIntegrationTab() {
+  const [token, setToken] = useState('');
+  const [maskedToken, setMaskedToken] = useState('');
+  const [org, setOrg] = useState('');
+  const [configured, setConfigured] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<any | null>(null);
+  const [actionsEnabled, setActionsEnabled] = useState(true);
+  const { toast } = useToast();
+
+  function loadConfig() {
+    api.settings
+      .getGithubBackup()
+      .then((data) => {
+        setConfigured(data.configured);
+        setOrg(data.org || '');
+        setMaskedToken(data.maskedToken || '');
+      })
+      .catch((err) => toast(err.message, 'error'))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(loadConfig, []);
+
+  async function handleTest() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await api.settings.testGithubBackup(token.trim() || undefined, org.trim() || undefined);
+      setTestResult(res);
+      if (res.ok) {
+        toast(`Connected to GitHub as @${res.user.login}`, 'success');
+      }
+    } catch (err: any) {
+      setTestResult({ ok: false, error: err.message || 'Failed to connect to GitHub API' });
+      toast(err.message || 'GitHub API test failed', 'error');
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!token.trim() && !maskedToken) {
+      toast('Please enter a valid GitHub API Key or Personal Access Token', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await api.settings.saveGithubBackup(token.trim(), org.trim());
+      if (res.ok) {
+        toast('GitHub System credentials updated!', 'success');
+        setConfigured(true);
+        setMaskedToken(token.trim() ? `${token.trim().slice(0, 4)}...${token.trim().slice(-4)}` : maskedToken);
+        setToken('');
+        loadConfig();
+      }
+    } catch (err: any) {
+      toast(err.message || 'Failed to save GitHub credentials', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <Spinner label="Loading GitHub system settings..." />;
+
+  return (
+    <div className="space-y-6">
+      <Card className="border border-white/[0.06] p-6 space-y-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
+                <path d="M9 18c-4.51 2-5-2-7-2" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                Platform GitHub System Account &amp; Automation
+                {configured ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Active &amp; Connected
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    Not Configured
+                  </span>
+                )}
+              </h3>
+              <p className="text-xs text-text-muted mt-1">
+                Configure your platform's dedicated GitHub API key/PAT to create private shadow backup repos, run GitHub Actions CI/CD workflows, and automate deployment backups.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleSave} className="space-y-4 pt-2">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-text-primary flex items-center justify-between">
+              <span>GitHub Personal Access Token (PAT) / API Key</span>
+              {maskedToken && (
+                <span className="text-[11px] font-mono text-emerald-400">Current: {maskedToken}</span>
+              )}
+            </label>
+            <div className="relative flex items-center">
+              <input
+                type={showToken ? 'text' : 'password'}
+                placeholder={maskedToken ? 'Enter new token to update...' : 'ghp_xxxxxxxxxxxxxxxxxxxx or github_pat_xxxx'}
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowToken(!showToken)}
+                className="absolute right-3 text-text-muted hover:text-white transition-colors"
+              >
+                {showToken ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                )}
+              </button>
+            </div>
+            <p className="text-[11px] text-text-muted">
+              Required scopes: <code className="text-indigo-300 font-mono">repo</code>, <code className="text-indigo-300 font-mono">workflow</code>, <code className="text-indigo-300 font-mono">admin:org</code> (if using an Organization).
+            </p>
+          </div>
+
+          <Input
+            label="Target GitHub Organization or Username (Optional)"
+            placeholder="e.g. shanutechx-deploy-backups or your-username"
+            value={org}
+            onChange={(e) => setOrg(e.target.value)}
+          />
+
+          <div className="flex items-center justify-between p-4 glass rounded-xl border border-white/[0.06]">
+            <div>
+              <p className="text-xs font-semibold text-white">Enable GitHub Actions Automated CI/CD</p>
+              <p className="text-[11px] text-text-muted">Automatically inject <code className="font-mono text-indigo-300">.github/workflows/deploy.yml</code> into shadow backup repos for build verification.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActionsEnabled(!actionsEnabled)}
+              className={`w-11 h-6 rounded-full transition-colors relative p-0.5 ${actionsEnabled ? 'bg-indigo-600' : 'bg-white/10'}`}
+            >
+              <div className={`w-5 h-5 rounded-full bg-white transition-transform ${actionsEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleTest}
+              loading={testing}
+            >
+              Test GitHub Connection
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              loading={saving}
+              disabled={!token.trim() && !configured}
+            >
+              Save System Token
+            </Button>
+          </div>
+        </form>
+
+        {testResult && (
+          <div className={`p-4 rounded-xl border ${testResult.ok ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-red-950/20 border-red-500/30'} space-y-3`}>
+            <div className="flex items-center gap-2">
+              {testResult.ok ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-400"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              )}
+              <span className={`text-xs font-bold ${testResult.ok ? 'text-emerald-300' : 'text-red-300'}`}>
+                {testResult.message || testResult.error}
+              </span>
+            </div>
+
+            {testResult.ok && testResult.user && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1">
+                <div className="glass p-2.5 rounded-lg">
+                  <span className="text-[10px] text-text-muted block">Authenticated User</span>
+                  <span className="font-bold text-white font-mono">@{testResult.user.login}</span>
+                </div>
+                <div className="glass p-2.5 rounded-lg">
+                  <span className="text-[10px] text-text-muted block">Private Repositories</span>
+                  <span className="font-bold text-white font-mono">{testResult.user.totalPrivateRepos}</span>
+                </div>
+                <div className="glass p-2.5 rounded-lg">
+                  <span className="text-[10px] text-text-muted block">Target Org</span>
+                  <span className="font-bold text-white font-mono">{testResult.org ? `@${testResult.org.login}` : 'Personal Account'}</span>
+                </div>
+                <div className="glass p-2.5 rounded-lg">
+                  <span className="text-[10px] text-text-muted block">Token Scopes</span>
+                  <span className="font-bold text-emerald-300 font-mono text-[10px]">{testResult.scopes}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ── Main Page Component ──
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('webhooks');
@@ -1036,18 +1253,19 @@ export default function SettingsPage() {
   return (
     <PasswordLockGuard
       title="Protected Settings Vault"
-      description="System settings (Discord Webhooks, Database Backups, API Configs, Client Team RBAC, Security PIN) are password protected."
+      description="System settings (GitHub System Integration, Discord Webhooks, Database Backups, API Configs, Client Team RBAC, Security PIN) are password protected."
     >
       <div className="space-y-6 animate-fade-in max-w-4xl">
         <PageHeader
           title="System Settings"
-          description="Manage sensitive system alerts, client team invitations, automated database backups, API configurations, and security credentials."
+          description="Manage sensitive system alerts, client team invitations, GitHub system credentials, automated database backups, API configurations, and security credentials."
         />
 
         <Tabs
           tabs={[
             { label: 'Payment Config', value: 'payment' },
             { label: 'Team & RBAC', value: 'team' },
+            { label: 'GitHub System', value: 'github' },
             { label: 'Discord Webhooks', value: 'webhooks' },
             { label: 'Database Backups', value: 'backups' },
             { label: 'API Configs', value: 'configs' },
@@ -1059,6 +1277,7 @@ export default function SettingsPage() {
 
         {activeTab === 'payment' && <PaymentInfoTab />}
         {activeTab === 'team' && <ClientTeamTab />}
+        {activeTab === 'github' && <GithubSystemIntegrationTab />}
         {activeTab === 'webhooks' && <DiscordWebhooksTab />}
         {activeTab === 'backups' && <DatabaseBackupsTab />}
         {activeTab === 'configs' && <ApiConfigsTab />}
@@ -1067,3 +1286,4 @@ export default function SettingsPage() {
     </PasswordLockGuard>
   );
 }
+

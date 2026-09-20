@@ -1815,7 +1815,26 @@ export const api = {
             backups: { configured: boolean; lastBackup: any; totalRuns: number };
             smtpServer: { configured: boolean };
             r2Storage: { configured: boolean };
+            githubBackup?: { configured: boolean; org: string };
           };
+        }>(r)
+      ),
+    getGithubBackup: () =>
+      apiFetch('/api/settings/github-backup').then((r) =>
+        asJson<{ configured: boolean; org: string; maskedToken: string }>(r)
+      ),
+    saveGithubBackup: (token: string, org?: string) =>
+      apiFetch('/api/settings/github-backup', { method: 'POST', body: JSON.stringify({ token, org }) }).then((r) =>
+        asJson<{ ok: boolean; message: string; configured: boolean; org: string }>(r)
+      ),
+    testGithubBackup: (token?: string, org?: string) =>
+      apiFetch('/api/settings/github-backup/test', { method: 'POST', body: JSON.stringify({ token, org }) }).then((r) =>
+        asJson<{
+          ok: boolean;
+          user: { login: string; name: string | null; publicRepos: number; totalPrivateRepos: number; avatarUrl?: string };
+          scopes: string;
+          org?: { login: string; name: string | null; publicRepos: number; totalPrivateRepos: number } | null;
+          message: string;
         }>(r)
       ),
   },
