@@ -136,9 +136,9 @@ services:
     env_file: ../../apps/api/.env
     environment:
       # These four override whatever's in apps/api/.env, pointing the API
-      # at the in-stack MinIO/Supabase/Postal services by their Docker
+      # at the in-stack MinIO/Supabase/WildDuck services by their Docker
       # network hostnames. Comment these out (and set the real values in
-      # apps/api/.env instead) if you're using external R2/Supabase/Postal
+      # apps/api/.env instead) if you're using external R2/Supabase/WildDuck
       # instead of the self-hosted versions in this compose file.
       - R2_ENDPOINT=http://minio:9000
       - R2_ACCESS_KEY_ID=${MINIO_ROOT_USER}
@@ -149,9 +149,6 @@ services:
       - SUPABASE_STUDIO_URL=https://studio.${ROOT_DOMAIN}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - POSTAL_API_URL=http://postal-web:5000
-      - POSTAL_API_KEY=${POSTAL_API_KEY}
-      - POSTAL_FROM_ADDRESS=${POSTAL_FROM_ADDRESS:-no-reply@${ROOT_DOMAIN}}
       - WILDDUCK_API_URL=http://wildduck-api:8080
       - WILDDUCK_API_KEY=${WILDDUCK_API_KEY}
     depends_on:
@@ -398,7 +395,7 @@ services:
       # First-boot defaults only — once the stack is up, set real outbound
       # mail settings through the dashboard's Supabase panel (SMTP
       # Settings), which persists to Postgres and takes over from these.
-      GOTRUE_SMTP_HOST: postal-web
+      GOTRUE_SMTP_HOST: haraka
       GOTRUE_SMTP_PORT: 25
       GOTRUE_SMTP_SENDER_NAME: ShanuTechX
       GOTRUE_MAILER_AUTOCONFIRM: "true"
