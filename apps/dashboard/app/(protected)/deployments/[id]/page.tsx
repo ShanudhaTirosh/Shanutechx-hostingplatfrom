@@ -22,6 +22,7 @@ import { CodeDeploymentPanel } from '@/components/CodeDeploymentPanel';
 import { FileManagerPanel } from '@/components/FileManagerPanel';
 import { DeployWebhookPanel } from '@/components/DeployWebhookPanel';
 import { RoutingFirewallPanel } from '@/components/RoutingFirewallPanel';
+import { DeploymentBackupsPanel } from '@/components/DeploymentBackupsPanel';
 import { DeploymentSetupWizard } from '@/components/DeploymentSetupWizard';
 import { useAppUser } from '@/lib/AppUserContext';
 
@@ -48,7 +49,7 @@ interface DatabaseInfo {
   connectionString?: string;
 }
 
-type TabType = 'console' | 'files' | 'databases' | 'network' | 'startup' | 'activity';
+type TabType = 'console' | 'files' | 'databases' | 'network' | 'startup' | 'backups' | 'activity';
 
 export default function DeploymentDetailPage() {
   const params = useParams();
@@ -432,6 +433,17 @@ export default function DeploymentDetailPage() {
           label="Startup & Env"
         />
         <TabButton
+          id="backups"
+          active={activeTab}
+          onClick={setActiveTab}
+          icon={
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+          }
+          label="Backups"
+        />
+        <TabButton
           id="activity"
           active={activeTab}
           onClick={setActiveTab}
@@ -621,6 +633,12 @@ export default function DeploymentDetailPage() {
           <CodeDeploymentPanel deployment={deployment} onChanged={loadDeployment} />
           <EnvVarsPanel deploymentId={deploymentId} isRunning={deployment?.status === 'running'} />
         </div>
+      )}
+
+      {/* TAB: BACKUPS (GitHub) */}
+      {activeTab === 'backups' && (
+        // The API requires the deployment's subdomain (or its id when it has none) to confirm a restore.
+        <DeploymentBackupsPanel deploymentId={deploymentId} confirmName={deployment.subdomain || deploymentId} />
       )}
 
       {/* TAB 6: ACTIVITY & WEBHOOKS */}

@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { Client as SshClient, ConnectConfig } from 'ssh2';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
+import { PortError } from '../lib/portExposure';
+import { closeNodePort, createExposureDeps, exposeNodePort, type ExposureDeps } from '../lib/nodePortExposure';
 import { env } from '../env';
 import { encryptSecret } from '../lib/secretsVault';
 import { verifySharedSecret } from '../lib/gateAuth';
@@ -343,80 +345,52 @@ nodesRouter.get('/nodes/:id/ports/exposures', async (req: AuthedRequest, res: Re
     orderBy: { port: 'asc' },
   });
   res.json({
-    exposures: exposures.map((e) => ({
-      ...e,
-      domain: `${e.subdomain}.${env.rootDomain}`,
-      url: `${e.protocol}://${e.subdomain}.${env.rootDomain}`,
-    })),
+    exposures: exposures.map((e) => ({ ...e, ...exposureJson(e) })),
   });
 });
 
 const exposePortSchema = z.object({
   port: z.number().int().min(1).max(65535),
-  subdomain: z.string().optional(),
+  subdomain: z.string().max(63).optional(),
   protocol: z.enum(['http', 'https', 'tcp']).default('http'),
-  label: z.string().optional(),
+  label: z.string().max(100).optional(),
 });
+
+// DNS-only: this creates a record pointing the hostname at the node; nothing routes the hostname to `port`.
+const exposureJson = (e: { subdomain: string; protocol: string }) => ({
+  domain: `${e.subdomain}.${env.rootDomain}`,
+  url: `${e.protocol}://${e.subdomain}.${env.rootDomain}`,
+  routed: false,
+  note: 'DNS record only: nothing routes this hostname to the port.',
+});
+
+let exposureDepsPromise: Promise<ExposureDeps> | null = null;
+const getExposureDeps = () => (exposureDepsPromise ??= createExposureDeps());
+
+function exposureError(res: Response, err: unknown, ctx: Record<string, unknown>) {
+  if (err instanceof PortError) return res.status(err.status).json({ error: err.message, code: err.code });
+  logger.error({ err, ...ctx }, 'Unexpected error handling a node port exposure request');
+  return res.status(500).json({ error: 'Something went wrong while handling the port exposure.', code: 'internal' });
+}
 
 nodesRouter.post('/nodes/:id/ports/expose', async (req: AuthedRequest, res: Response) => {
   const parsed = exposePortSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-
-  const node = await prisma.node.findUnique({ where: { id: req.params.id } });
-  if (!node) return res.status(404).json({ error: 'Node not found' });
-
-  const { port, protocol, label } = parsed.data;
-  const cleanNodeLabel = node.label.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '') || node.id.slice(-6);
-  const rawSubdomain = parsed.data.subdomain?.trim() || `${cleanNodeLabel}-port-${port}`;
-  const subdomain = rawSubdomain.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '');
-
-  let cfRecordId: string | null = null;
   try {
-    const cf = await createSubdomainRecord(subdomain, node.ip);
-    cfRecordId = cf.recordId;
-  } catch (err: any) {
-    logger.warn({ err, subdomain, nodeIp: node.ip }, 'Failed to create Cloudflare DNS record for port exposure');
+    const { exposure, warnings } = await exposeNodePort(req.params.id, parsed.data, req.user!.id, await getExposureDeps());
+    res.status(201).json({ exposure: { ...exposure, ...exposureJson(exposure) }, warnings });
+  } catch (err) {
+    exposureError(res, err, { route: 'expose', nodeId: req.params.id });
   }
-
-  const exposure = await prisma.nodePortExposure.upsert({
-    where: { nodeId_port: { nodeId: node.id, port } },
-    create: {
-      nodeId: node.id,
-      port,
-      protocol,
-      subdomain,
-      cfDnsRecordId: cfRecordId,
-      label: label || `Port ${port} (${protocol.toUpperCase()})`,
-    },
-    update: {
-      protocol,
-      subdomain,
-      cfDnsRecordId: cfRecordId || undefined,
-      label: label || `Port ${port} (${protocol.toUpperCase()})`,
-    },
-  });
-
-  res.status(201).json({
-    exposure: {
-      ...exposure,
-      domain: `${subdomain}.${env.rootDomain}`,
-      url: `${protocol}://${subdomain}.${env.rootDomain}`,
-    },
-  });
 });
 
 nodesRouter.delete('/nodes/:id/ports/exposures/:exposureId', async (req: AuthedRequest, res: Response) => {
-  const exposure = await prisma.nodePortExposure.findUnique({ where: { id: req.params.exposureId } });
-  if (!exposure || exposure.nodeId !== req.params.id) {
-    return res.status(404).json({ error: 'Port exposure not found' });
+  try {
+    const result = await closeNodePort(req.params.id, req.params.exposureId, req.user!.id, await getExposureDeps());
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    exposureError(res, err, { route: 'close-exposure', nodeId: req.params.id });
   }
-
-  if (exposure.subdomain) {
-    await deleteSubdomainRecord(exposure.subdomain).catch(() => {});
-  }
-
-  await prisma.nodePortExposure.delete({ where: { id: exposure.id } });
-  res.json({ ok: true });
 });
 
 const connectSSHSchema = z.object({

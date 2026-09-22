@@ -84,6 +84,11 @@ export const env = {
   // Dedicated Platform Shadow Backup GitHub Account/Token
   backupGithubToken: process.env.BACKUP_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN ?? '',
   backupGithubOrg: process.env.BACKUP_GITHUB_ORG ?? 'shanutechx-deploy-backups',
+  // Deployment backups (GitHub Releases API, see docs/GITHUB_BACKUPS.md). Either "owner/repo" or just "repo"
+  // (then BACKUP_GITHUB_ORG is the owner). The repo is created private on first use if the token may create it.
+  backupGithubRepo: process.env.BACKUP_GITHUB_REPO || 'deployment-backups',
+  // Per-component ceiling. GitHub caps a single release asset at 2 GiB, so stay safely under it.
+  backupMaxSizeMb: Math.min(1900, Math.max(1, Number(process.env.BACKUP_MAX_SIZE_MB) || 1500)),
 
   // Uptime Kuma & Grafana Monitoring Integrations
   uptimeKumaUrl: process.env.UPTIME_KUMA_URL ?? '',

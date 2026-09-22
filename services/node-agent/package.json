@@ -8,10 +8,11 @@
   },
   "dependencies": {
     "dockerode": "^4.0.2",
-    "express": "^4.19.2",
     "dotenv": "^16.4.5",
-    "systeminformation": "^5.23.5",
+    "express": "^4.19.2",
     "js-yaml": "^4.1.0",
-    "pino": "^9.5.0"
+    "pino": "^9.5.0",
+    "systeminformation": "^5.23.5",
+    "tar": "^7.5.22"
   }
 }

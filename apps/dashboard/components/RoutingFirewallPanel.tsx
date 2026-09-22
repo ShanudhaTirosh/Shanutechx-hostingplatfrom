@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { api } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { api, ApiError, DeploymentExposure, ExposureModeUi } from '@/lib/api';
 import { Card, Button, Badge, useToast } from '@/components/ui';
 import { IconShield, IconTerminal, IconUnlock } from '@/components/Icons';
 
-export type RoutingMode = 'proxied' | 'direct' | 'no_ssl';
+export type RoutingMode = ExposureModeUi;
 
 export interface FirewallRule {
   id: string;
@@ -18,18 +18,20 @@ export interface FirewallRule {
 
 interface Props {
   deploymentId: string;
-  currentRoutingMode?: RoutingMode;
-  currentPort?: number;
 }
 
-export function RoutingFirewallPanel({
-  deploymentId,
-  currentRoutingMode = 'proxied',
-  currentPort = 8080,
-}: Props) {
-  const [routingMode, setRoutingMode] = useState<RoutingMode>(currentRoutingMode);
-  const [publishedPort, setPublishedPort] = useState<number>(currentPort);
+const MIN_PORT = 1024;
+const MODE_LABEL: Record<ExposureModeUi, string> = { proxied: 'Proxied (HTTPS)', direct_port: 'Direct port', internal: 'Internal only' };
+
+export function RoutingFirewallPanel({ deploymentId }: Props) {
+  const [current, setCurrent] = useState<DeploymentExposure | null>(null);
+  const [canEdit, setCanEdit] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [routingMode, setRoutingMode] = useState<ExposureModeUi>('proxied');
+  const [publishedPort, setPublishedPort] = useState('');
+  const [confirmText, setConfirmText] = useState('');
   const [updatingRouting, setUpdatingRouting] = useState(false);
+  const [pendingRedeploy, setPendingRedeploy] = useState(false);
 
   // Firewall Rules
   const [rules, setRules] = useState<FirewallRule[]>([
@@ -47,25 +49,59 @@ export function RoutingFirewallPanel({
 
   const { toast } = useToast();
 
+  async function loadExposure() {
+    try {
+      const r = await api.exposure.get(deploymentId);
+      setCurrent(r.exposure);
+      setCanEdit(r.canEdit);
+      setRoutingMode(r.exposure.mode);
+      setPublishedPort(r.exposure.publishedPort ? String(r.exposure.publishedPort) : '');
+      setConfirmText('');
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Could not load the current exposure.');
+    }
+  }
+
+  useEffect(() => {
+    void loadExposure();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deploymentId]);
+
+  const portNumber = publishedPort.trim() === '' ? null : Number(publishedPort);
+  const portError =
+    routingMode !== 'direct_port'
+      ? null
+      : portNumber === null
+      ? 'Choose a port.'
+      : !Number.isInteger(portNumber) || portNumber < MIN_PORT || portNumber > 65535
+      ? `Use a whole number between ${MIN_PORT} and 65535.`
+      : null;
+  const changed = current !== null && (routingMode !== current.mode || (routingMode === 'direct_port' && portNumber !== current.publishedPort));
+  const closesSomething = current !== null && changed && ((current.mode === 'direct_port' && routingMode !== 'direct_port') || (current.mode === 'proxied' && routingMode !== 'proxied'));
+  const needsConfirm = Boolean(current?.requiresConfirm) && changed;
+  const confirmOk = !needsConfirm || confirmText.trim() === current?.confirmName;
+
   async function handleSaveRouting(e: React.FormEvent) {
     e.preventDefault();
+    if (!current || !changed || portError || !confirmOk) return;
     setUpdatingRouting(true);
     try {
-      const mode = routingMode === 'direct' ? 'raw_tcp' : routingMode === 'no_ssl' ? 'internal_only' : 'ssl_with_proxy';
-      await api.deployments.updateConfig(deploymentId, {
-        exposureMode: mode,
-        internalPort: publishedPort,
+      const res = await api.exposure.update(deploymentId, {
+        mode: routingMode,
+        publishedPort: routingMode === 'direct_port' ? portNumber : null,
+        confirm: needsConfirm ? confirmText.trim() : undefined,
       });
+      setPendingRedeploy(res.requiresRedeploy);
       toast(
-        routingMode === 'direct'
-          ? `Direct Mode enabled! Bound container to host port ${publishedPort}`
-          : routingMode === 'no_ssl'
-          ? 'HTTP-Only Mode enabled (No SSL redirect).'
-          : 'Proxied Mode enabled! Traffic routed via secure HTTPS proxy.',
+        res.requiresRedeploy
+          ? 'Saved. The running container keeps its current routing until you redeploy it.'
+          : 'Saved.',
         'success'
       );
-    } catch (err: any) {
-      toast(err.message || 'Failed to update routing mode', 'error');
+      await loadExposure();
+    } catch (err) {
+      toast(err instanceof ApiError || err instanceof Error ? err.message : 'Failed to update exposure', 'error');
     } finally {
       setUpdatingRouting(false);
     }
@@ -82,109 +118,132 @@ export function RoutingFirewallPanel({
       description,
     };
     setRules((prev) => [newRule, ...prev]);
-    toast(`Firewall rule added: ${action} ${protocol}:${port}`, 'success');
+    toast(`Added to this preview list only (${action} ${protocol}:${port}). It is not saved or enforced.`, 'info');
     setShowAddRuleModal(false);
     setDescription('');
   }
 
   function handleDeleteRule(ruleId: string) {
     setRules((prev) => prev.filter((r) => r.id !== ruleId));
-    toast('Firewall rule deleted.', 'info');
+    toast('Removed from the preview list. Nothing was changed on the node.', 'info');
   }
 
   return (
     <div className="space-y-6">
-      {/* Routing Mode Selector */}
-      <Card title="Traffic Routing Mode & Network Ports" description="Select how inbound traffic is routed to your server container.">
+      {/* Exposure */}
+      <Card title="How this deployment is reachable" description="Choose how traffic reaches your container. A change is saved now and takes effect when the deployment is redeployed.">
+        {loadError && <p className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">{loadError}</p>}
+        {current && (
+          <p className="mb-4 text-xs text-text-muted">
+            Currently: <span className="font-semibold text-white">{MODE_LABEL[current.mode]}</span>
+            {current.mode === 'proxied' && current.url && <> at <code className="font-mono text-accent-cyan">{current.url}</code></>}
+            {current.mode === 'direct_port' && current.hostPort && <> on host port <code className="font-mono text-accent-cyan">{current.hostPort}</code></>}
+          </p>
+        )}
+        {current?.issues.map((i) => (
+          <p key={i.code + i.message} className={`mb-2 rounded-xl border p-3 text-xs ${i.severity === 'error' ? 'border-red-500/30 bg-red-500/10 text-red-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-200'}`}>
+            {i.message}
+          </p>
+        ))}
+        {pendingRedeploy && (
+          <p className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+            Saved, but not applied yet: the running container still uses its previous routing. Redeploy to apply it.
+          </p>
+        )}
+        {!canEdit && current && <p className="mb-4 text-xs text-text-muted">Only dev superusers can change how a deployment is exposed.</p>}
+
         <form onSubmit={handleSaveRouting} className="space-y-6">
-          <div className="grid md:grid-cols-3 gap-4">
-            {/* Option 1: Proxied */}
+          <fieldset disabled={!canEdit || !current} className="grid md:grid-cols-3 gap-4 disabled:opacity-60">
             <div
               onClick={() => setRoutingMode('proxied')}
-              className={`p-4 border rounded-2xl cursor-pointer transition-all space-y-2 ${
-                routingMode === 'proxied'
-                  ? 'bg-accent-cyan/15 border-accent-cyan text-white shadow-lg'
-                  : 'bg-white/[0.02] border-white/10 text-text-muted hover:bg-white/[0.04]'
-              }`}
+              className={`p-4 border rounded-2xl cursor-pointer transition-all space-y-2 ${routingMode === 'proxied' ? 'bg-accent-cyan/15 border-accent-cyan text-white shadow-lg' : 'bg-white/[0.02] border-white/10 text-text-muted hover:bg-white/[0.04]'}`}
             >
               <div className="flex items-center justify-between">
                 <IconShield size={22} className="text-accent-cyan" />
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
-                  Recommended
-                </span>
+                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">Recommended</span>
               </div>
-              <h4 className="text-xs font-semibold text-white">Proxied (Auto SSL)</h4>
-              <p className="text-[11px] text-text-muted leading-relaxed">
-                Reverse proxied automatically. Free automatic HTTPS certificates and DDoS protection.
-              </p>
+              <h4 className="text-xs font-semibold text-white">Proxied (HTTPS)</h4>
+              <p className="text-[11px] text-text-muted leading-relaxed">Public HTTPS address through the reverse proxy, with automatic certificates.</p>
             </div>
 
-            {/* Option 2: Direct */}
             <div
-              onClick={() => setRoutingMode('direct')}
-              className={`p-4 border rounded-2xl cursor-pointer transition-all space-y-2 ${
-                routingMode === 'direct'
-                  ? 'bg-accent-violet/15 border-accent-violet text-white shadow-lg'
-                  : 'bg-white/[0.02] border-white/10 text-text-muted hover:bg-white/[0.04]'
-              }`}
+              onClick={() => setRoutingMode('direct_port')}
+              className={`p-4 border rounded-2xl cursor-pointer transition-all space-y-2 ${routingMode === 'direct_port' ? 'bg-accent-violet/15 border-accent-violet text-white shadow-lg' : 'bg-white/[0.02] border-white/10 text-text-muted hover:bg-white/[0.04]'}`}
             >
               <div className="flex items-center justify-between">
                 <IconTerminal size={22} className="text-accent-violet" />
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-accent-violet/20 text-accent-violet">
-                  Raw TCP / UDP
-                </span>
+                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-accent-violet/20 text-accent-violet">Raw TCP / UDP</span>
               </div>
-              <h4 className="text-xs font-semibold text-white">Direct (Non-Proxied)</h4>
-              <p className="text-[11px] text-text-muted leading-relaxed">
-                Direct host port mapping without proxying. Ideal for game servers (Minecraft, CS:GO), database listeners, or raw sockets.
-              </p>
+              <h4 className="text-xs font-semibold text-white">Direct port</h4>
+              <p className="text-[11px] text-text-muted leading-relaxed">A port on the node, bypassing the proxy. For game servers, database listeners and raw sockets. The port is open to the internet.</p>
             </div>
 
-            {/* Option 3: No SSL */}
             <div
-              onClick={() => setRoutingMode('no_ssl')}
-              className={`p-4 border rounded-2xl cursor-pointer transition-all space-y-2 ${
-                routingMode === 'no_ssl'
-                  ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg'
-                  : 'bg-white/[0.02] border-white/10 text-text-muted hover:bg-white/[0.04]'
-              }`}
+              onClick={() => setRoutingMode('internal')}
+              className={`p-4 border rounded-2xl cursor-pointer transition-all space-y-2 ${routingMode === 'internal' ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg' : 'bg-white/[0.02] border-white/10 text-text-muted hover:bg-white/[0.04]'}`}
             >
               <div className="flex items-center justify-between">
                 <IconUnlock size={22} className="text-amber-400" />
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
-                  HTTP Only
-                </span>
+                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">Private</span>
               </div>
-              <h4 className="text-xs font-semibold text-white">No SSL (HTTP Only)</h4>
-              <p className="text-[11px] text-text-muted leading-relaxed">
-                Plain HTTP proxying without SSL redirect or TLS certificate provisioning.
-              </p>
+              <h4 className="text-xs font-semibold text-white">Internal only</h4>
+              <p className="text-[11px] text-text-muted leading-relaxed">No public address and no open port. Use this to close public access.</p>
             </div>
-          </div>
+          </fieldset>
 
-          {/* Direct Port Binding Field */}
-          {routingMode === 'direct' && (
+          {routingMode === 'direct_port' && (
             <div className="p-4 border border-accent-violet/30 rounded-2xl bg-accent-violet/10 space-y-2">
-              <label className="text-xs font-semibold text-white block">Host Published Port</label>
+              <label className="text-xs font-semibold text-white block" htmlFor="published-port">Host port</label>
               <div className="flex items-center gap-2 max-w-xs">
                 <input
+                  id="published-port"
                   type="number"
+                  min={MIN_PORT}
+                  max={65535}
+                  disabled={!canEdit}
                   value={publishedPort}
-                  onChange={(e) => setPublishedPort(parseInt(e.target.value) || 8080)}
+                  onChange={(e) => setPublishedPort(e.target.value)}
                   placeholder="25565"
-                  className="flex-1 bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-accent-violet"
+                  className="flex-1 bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
                 />
                 <span className="text-xs font-mono text-text-muted">TCP/UDP</span>
               </div>
-              <p className="text-[11px] text-text-muted">
-                External clients connect to: <code className="text-accent-cyan font-mono">YOUR_NODE_IP:{publishedPort}</code>
-              </p>
+              {portError ? (
+                <p className="text-[11px] text-red-300">{portError}</p>
+              ) : (
+                <p className="text-[11px] text-text-muted">
+                  Clients connect to: <code className="text-accent-cyan font-mono">YOUR_NODE_IP:{publishedPort || '…'}</code>. This is separate from the port your app listens on inside the container.
+                </p>
+              )}
+            </div>
+          )}
+
+          {closesSomething && current && (
+            <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+              {current.mode === 'direct_port'
+                ? `This closes host port ${current.hostPort ?? ''}. Anything connected to it is disconnected when the deployment is redeployed.`
+                : 'This removes the public HTTPS address when the deployment is redeployed.'}
+            </p>
+          )}
+
+          {needsConfirm && current && (
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-white block" htmlFor="confirm-exposure">
+                This deployment is running. Type <code className="font-mono text-accent-cyan">{current.confirmName}</code> to confirm.
+              </label>
+              <input
+                id="confirm-exposure"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                autoComplete="off"
+                className="w-full max-w-xs bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none"
+              />
             </div>
           )}
 
           <div className="flex justify-end border-t border-white/10 pt-4">
-            <Button type="submit" size="sm" loading={updatingRouting}>
-              Save Routing Settings
+            <Button type="submit" size="sm" loading={updatingRouting} disabled={!canEdit || !changed || Boolean(portError) || !confirmOk}>
+              Save exposure
             </Button>
           </div>
         </form>
@@ -192,8 +251,8 @@ export function RoutingFirewallPanel({
 
       {/* Firewall Rules Manager */}
       <Card
-        title="Firewall Access Rules"
-        description="Configure port access and IP whitelist/blacklist security rules for your node container."
+        title="Firewall Access Rules (preview, not enforced)"
+        description="These rules are a local sketch. They are not saved and are not applied to the node, so they do not restrict any traffic."
         action={<Button size="sm" onClick={() => setShowAddRuleModal(true)}>+ Add Rule</Button>}
       >
         <div className="overflow-x-auto">

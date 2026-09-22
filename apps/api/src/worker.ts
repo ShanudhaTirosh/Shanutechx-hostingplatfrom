@@ -12,6 +12,8 @@ import {
   workspaceCleanupQueue,
   NodeFailoverSweepJob,
   nodeFailoverQueue,
+  BackupSweepJob,
+  backupSweepQueue,
   PushReceiptJob,
 } from './lib/queue';
 import { executeSSLRenewalJob } from './jobs/ssl-renewal';
@@ -21,6 +23,7 @@ import { executeWorkspaceCleanupJob } from './jobs/workspace-cleanup';
 import { checkMetricAlerts } from './lib/alerts';
 import { checkNodeHealthAndFailover } from './lib/nodeMonitor';
 import { executePushReceiptJob } from './jobs/push-receipt';
+import { executeBackupSweepJob } from './jobs/backup-sweep';
 import { logger } from './lib/logger';
 
 
@@ -184,6 +187,20 @@ nodeFailoverWorker.on('failed', (job, err) => {
   logger.error({ jobId: job?.id, err }, 'Node failover watchdog job failed');
 });
 
+// Scheduled deployment backups (GitHub). Concurrency 1: backups are heavy (archive + multi-GB upload).
+const backupSweepWorker = new Worker<BackupSweepJob>(
+  'backup-sweep',
+  async (job) => {
+    const res = await executeBackupSweepJob();
+    if (res.ran > 0) logger.info({ jobId: job.id, ...res }, 'Scheduled backup sweep completed');
+  },
+  { connection: redisConnectionOptions, concurrency: 1 }
+);
+
+backupSweepWorker.on('failed', (job, err) => {
+  logger.error({ jobId: job?.id, err }, 'Scheduled backup sweep failed');
+});
+
 const pushReceiptWorker = new Worker<PushReceiptJob>(
   'push-receipt',
   async (job) => {
@@ -198,7 +215,7 @@ pushReceiptWorker.on('failed', (job, err) => {
   logger.error({ jobId: job?.id, err }, 'Push receipt check job failed');
 });
 
-[sslRenewalWorker, workspaceCleanupWorker, billingSweepWorker, uptimeSweepWorker, nodeFailoverWorker, pushReceiptWorker].forEach((w) => {
+[sslRenewalWorker, workspaceCleanupWorker, billingSweepWorker, uptimeSweepWorker, nodeFailoverWorker, backupSweepWorker, pushReceiptWorker].forEach((w) => {
   w.on('error', (err) => {
     logger.warn({ err: err.message, worker: w.name }, 'Worker Redis connection error caught');
   });
@@ -225,6 +242,19 @@ pushReceiptWorker.on('failed', (job, err) => {
   }
 })();
 
+(async () => {
+  try {
+    await backupSweepQueue.add(
+      'backup-sweep-recurring',
+      {},
+      { repeat: { every: 5 * 60 * 1000 }, jobId: 'backup-sweep-recurring' }
+    );
+    logger.info({ msg: 'Backup sweep scheduled successfully', interval: '5 minutes' });
+  } catch (error) {
+    logger.error({ msg: 'Failed to schedule backup sweep job', error: error instanceof Error ? error.message : String(error) });
+  }
+})();
+
 async function gracefulWorkerShutdown(signal: string) {
   logger.info({ signal }, 'Worker process received termination signal. Closing workers cleanly...');
   try {
@@ -234,6 +264,7 @@ async function gracefulWorkerShutdown(signal: string) {
       billingSweepWorker.close(),
       uptimeSweepWorker.close(),
       nodeFailoverWorker.close(),
+      backupSweepWorker.close(),
       pushReceiptWorker.close(),
     ]);
     logger.info('All BullMQ workers shut down gracefully.');

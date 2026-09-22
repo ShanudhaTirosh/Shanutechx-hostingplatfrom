@@ -5,7 +5,6 @@ import { api } from '@/lib/api';
 import { Button, Card, Spinner, useToast } from '@/components/ui';
 import {
   GitBranch,
-  UploadCloud,
   Layers,
   Terminal,
   ShieldCheck,
@@ -47,14 +46,12 @@ export function DeploymentSetupWizard({ deploymentId, initialDeployment, connect
   const { apiUser } = useAppUser();
   const isDevUser = apiUser?.role === 'dev';
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [sourceType, setSourceType] = useState<'git' | 'zip' | 'template'>('git');
+  const [sourceType, setSourceType] = useState<'git' | 'template'>('git');
   
   // Step 1 State
   const [repoUrl, setRepoUrl] = useState(initialDeployment?.repoUrl || '');
   const [branch, setBranch] = useState(initialDeployment?.branch || 'main');
-  const [zipFile, setZipFile] = useState<File | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('node-express');
-  const [uploadingZip, setUploadingZip] = useState(false);
 
   // Step 2 State
   const [frameworkPreset, setFrameworkPreset] = useState(initialDeployment?.frameworkPreset || 'Node.js');
@@ -99,37 +96,12 @@ export function DeploymentSetupWizard({ deploymentId, initialDeployment, connect
     setEnvVars((prev) => prev.filter((_, i) => i !== index));
   }
 
-  async function handleZipUpload() {
-    if (!zipFile) return null;
-    setUploadingZip(true);
-    try {
-      const arrayBuffer = await zipFile.arrayBuffer();
-      const base64Content = Buffer.from(arrayBuffer).toString('base64');
-      await api.fs.uploadBinary(deploymentId, zipFile.name, base64Content);
-      await api.fs.extractArchive(deploymentId, zipFile.name);
-      toast(`Successfully uploaded and extracted ${zipFile.name}!`, 'success');
-      return `upload://${zipFile.name}`;
-    } catch (err: any) {
-      toast(err.message || 'Failed to upload ZIP archive', 'error');
-      return null;
-    } finally {
-      setUploadingZip(false);
-    }
-  }
-
   async function handleFinalDeploy() {
     setDeploying(true);
     try {
       let finalRepoUrl = repoUrl;
 
-      if (sourceType === 'zip') {
-        if (zipFile) {
-          const uploadedUrl = await handleZipUpload();
-          if (uploadedUrl) finalRepoUrl = uploadedUrl;
-        } else if (!initialDeployment?.repoUrl) {
-          finalRepoUrl = `upload://workspace-${deploymentId}.zip`;
-        }
-      } else if (sourceType === 'template') {
+      if (sourceType === 'template') {
         finalRepoUrl = `template://${selectedTemplate}`;
       }
 
@@ -141,7 +113,7 @@ export function DeploymentSetupWizard({ deploymentId, initialDeployment, connect
 
       // Update deployment config & trigger build
       await api.deployments.updateConfig(deploymentId, {
-        repoUrl: finalRepoUrl || `upload://workspace-${deploymentId}.zip`,
+        repoUrl: finalRepoUrl,
         branch,
         frameworkPreset,
         startCommand,
@@ -213,10 +185,9 @@ export function DeploymentSetupWizard({ deploymentId, initialDeployment, connect
           </h3>
 
           {/* Source Type Selector */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             {[
               { id: 'git', title: 'Git Repository', desc: 'Connect GitHub/GitLab or public Git URL', icon: GitBranch },
-              { id: 'zip', title: 'ZIP Archive Upload', desc: 'Upload project zip file from local computer', icon: UploadCloud },
               { id: 'template', title: 'App Catalog Template', desc: 'Deploy 1-click pre-configured stack template', icon: Layers },
             ].map((t) => {
               const isSel = sourceType === t.id;
@@ -270,33 +241,6 @@ export function DeploymentSetupWizard({ deploymentId, initialDeployment, connect
                   <span className="font-mono text-accent-cyan">@{connectedAccounts[0].username} ({connectedAccounts[0].provider})</span>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* ZIP Source Options */}
-          {sourceType === 'zip' && (
-            <div className="space-y-4 pt-4 border-t border-white/[0.06]">
-              <label className="text-xs font-medium text-text-muted block mb-1.5">Upload Project ZIP Archive</label>
-              <div className="border-2 border-dashed border-white/10 rounded-2xl p-8 text-center bg-black/30 hover:border-accent-cyan transition-all space-y-3">
-                <UploadCloud className="h-10 w-10 text-accent-cyan mx-auto opacity-80" />
-                <div className="space-y-1">
-                  <p className="text-sm text-white font-medium">Drag & drop your project ZIP file here</p>
-                  <p className="text-xs text-text-muted">Supports .zip archives containing root package.json or app entrypoint</p>
-                </div>
-                <input
-                  type="file"
-                  accept=".zip"
-                  onChange={(e) => setZipFile(e.target.files?.[0] || null)}
-                  className="hidden"
-                  id="zip-wizard-upload"
-                />
-                <label
-                  htmlFor="zip-wizard-upload"
-                  className="inline-block px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-mono text-white cursor-pointer transition-all"
-                >
-                  {zipFile ? `Selected: ${zipFile.name}` : 'Browse Computer'}
-                </label>
-              </div>
             </div>
           )}
 

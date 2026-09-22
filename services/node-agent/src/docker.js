@@ -1,4 +1,5 @@
 const Docker = require('dockerode');
+const { resolveExposure } = require('./exposure');
 
 const docker = new Docker({ socketPath: '/var/run/docker.sock' });
 
@@ -7,11 +8,8 @@ const PUBLIC_NETWORK = process.env.AGENT_PUBLIC_NETWORK || 'shanutechx-public';
 /**
  * Runs a built image as a container.
  *
- * Supports three routing modes:
- * 1. 'proxied' (Default): Routed via Traefik reverse proxy over `PUBLIC_NETWORK` with
- *    automatic Let's Encrypt TLS certificate generation.
- * 2. 'direct': Non-proxied raw host port mapping (for game servers, DB listeners, TCP/UDP sockets).
- * 3. 'no_ssl': Plain HTTP proxying via Traefik on port 80 without TLS redirect.
+ * How the container is exposed (Traefik, raw host port, or not at all) is decided by exposure.js; see the mode list
+ * there. `routingMode` is the legacy way of asking for a direct host port and is kept for compatibility.
  */
 async function runContainer({
   deploymentId,
@@ -38,41 +36,22 @@ async function runContainer({
   const networks = [];
   const portBindings = {};
 
-  const isBotProcess = ['nodejs_bot', 'python_bot', 'whatsapp_baileys'].includes(frameworkPreset);
-
-  // Resolve effective exposure mode ('no_ssl', 'ssl_direct', 'ssl_with_proxy')
-  const effectiveMode = exposureMode || (routingMode === 'direct' ? 'no_ssl' : 'ssl_with_proxy');
-
-  if (effectiveMode === 'no_ssl' || routingMode === 'direct' || (isBotProcess && publishedPort)) {
-    // Raw Host Port Mapping — bypass Traefik proxy for direct TCP/UDP (e.g. Lavalink or bot on direct port)
-    if (publishedPort || internalPort) {
-      const hostPort = String(publishedPort || internalPort);
-      portBindings[`${internalPort}/tcp`] = [{ HostPort: hostPort }];
-      portBindings[`${internalPort}/udp`] = [{ HostPort: hostPort }];
-    }
-  } else if (!isBotProcess || subdomain) {
-    // Proxied Routing via Traefik (web services or bots with an HTTP management interface)
-    const activeSubdomain = subdomain || `app-${deploymentId.slice(0, 8)}`;
-    const routerName = `deploy-${deploymentId}`;
-    const targetPort = internalPort && Number(internalPort) > 0 ? Number(internalPort) : 3000;
-    const effectiveZone = deploymentsRootDomain || rootDomain || process.env.DEPLOYMENTS_ROOT_DOMAIN || process.env.ROOT_DOMAIN || 'shanutechx.com';
-
-    labels['traefik.enable'] = 'true';
+  // Routing (Traefik labels / host port bindings) is decided in exposure.js.
+  const exposure = resolveExposure({
+    deploymentId,
+    internalPort,
+    subdomain,
+    rootDomain,
+    deploymentsRootDomain,
+    routingMode,
+    exposureMode,
+    frameworkPreset,
+    publishedPort,
+  });
+  Object.assign(labels, exposure.labels);
+  Object.assign(portBindings, exposure.portBindings);
+  if (exposure.joinPublicNetwork) {
     labels['traefik.docker.network'] = PUBLIC_NETWORK;
-    labels[`traefik.http.routers.${routerName}.rule`] = `Host(\`${activeSubdomain}.${effectiveZone}\`)`;
-    labels[`traefik.http.services.${routerName}.loadbalancer.server.port`] = String(targetPort);
-
-    if (effectiveMode === 'ssl_direct') {
-      labels[`traefik.http.routers.${routerName}.entrypoints`] = 'websecure';
-      labels[`traefik.http.routers.${routerName}.tls`] = 'true';
-      labels[`traefik.http.routers.${routerName}.middlewares`] = 'gzip-compress@file';
-    } else {
-      // Default: ssl_with_proxy — Proxied + TLS Let's Encrypt
-      labels[`traefik.http.routers.${routerName}.entrypoints`] = 'websecure';
-      labels[`traefik.http.routers.${routerName}.tls.certresolver`] = 'le';
-      labels[`traefik.http.routers.${routerName}.middlewares`] = 'security-headers@file,rate-limit@file,gzip-compress@file';
-    }
-
     networks.push(PUBLIC_NETWORK);
   }
 

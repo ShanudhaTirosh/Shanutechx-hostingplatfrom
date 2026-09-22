@@ -1433,7 +1433,104 @@ app.get('/agent/compose/:project/logs', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, BIND_HOST, () => {
+// ─────────────────────────────────────────────────
+// Deployment backups. File work lives in ./backup.js; the API owns GitHub credentials and orchestration,
+// so this agent never sees a GitHub token. See docs/GITHUB_BACKUPS.md.
+// ─────────────────────────────────────────────────
+const backup = require('./backup');
+
+function sendBackupError(res, err, ctx) {
+  if (res.headersSent || res.destroyed) return;
+  if (err instanceof backup.BackupError) {
+    if (err.status >= 500) logger.error({ err, ...ctx }, 'Backup operation failed');
+    else logger.warn({ code: err.code, ...ctx }, err.message);
+    return res.status(err.status).json({ error: err.message, code: err.code });
+  }
+  logger.error({ err, ...ctx }, 'Unexpected backup error');
+  return res.status(500).json({ error: 'Unexpected error while handling backup', code: 'internal' });
+}
+
+// Lets the API tell "this agent predates backups" (404 here) from "backups are broken".
+app.get('/agent/backups/capabilities', (_req, res) => {
+  res.json({ backups: 1, restore: 1 });
+});
+
+app.post('/agent/deployments/:deploymentId/backup/create', async (req, res) => {
+  const { deploymentId } = req.params;
+  const { backupId, volumes, includeWorkspace, maxBytes } = req.body || {};
+  try {
+    if (volumes !== undefined && (!Array.isArray(volumes) || volumes.length > 50)) {
+      throw new backup.BackupError('volumes must be an array of at most 50 items', 'invalid_volumes', 400);
+    }
+    const result = await backup.createBackup({
+      deploymentId,
+      backupId,
+      volumes: (volumes || []).map((v) => ({ name: String(v && v.name), hostPath: String(v && v.hostPath) })),
+      includeWorkspace: includeWorkspace !== false,
+      maxBytes: Number.isFinite(Number(maxBytes)) && Number(maxBytes) > 0 ? Number(maxBytes) : undefined,
+    });
+    logger.info({ deploymentId, backupId, components: result.components.length, skipped: result.skipped.length }, 'Backup archives created');
+    res.json(result);
+  } catch (err) {
+    sendBackupError(res, err, { deploymentId, backupId });
+  }
+});
+
+app.get('/agent/backups/:backupId/files/:file', async (req, res) => {
+  const { backupId, file } = req.params;
+  try {
+    const { stream, size } = await backup.openBackupFile(backupId, file);
+    res.setHeader('Content-Type', 'application/gzip');
+    res.setHeader('Content-Length', String(size));
+    stream.on('error', (err) => {
+      logger.error({ err, backupId, file }, 'Backup file stream failed');
+      res.destroy(err);
+    });
+    res.on('close', () => stream.destroy());
+    stream.pipe(res);
+  } catch (err) {
+    sendBackupError(res, err, { backupId, file });
+  }
+});
+
+app.delete('/agent/backups/:backupId', async (req, res) => {
+  try {
+    await backup.removeBackup(req.params.backupId);
+    res.json({ ok: true });
+  } catch (err) {
+    sendBackupError(res, err, { backupId: req.params.backupId });
+  }
+});
+
+// Body = the raw tar.gz (Content-Type: application/gzip), NOT JSON, so express.json() leaves it alone.
+app.post('/agent/deployments/:deploymentId/backup/restore', async (req, res) => {
+  const { deploymentId } = req.params;
+  const { kind, name, hostPath, sha256, maxBytes } = req.query;
+  try {
+    const result = await backup.restoreComponent({
+      deploymentId,
+      kind: String(kind || ''),
+      name: name ? String(name) : undefined,
+      hostPath: hostPath ? String(hostPath) : undefined,
+      sha256: String(sha256 || ''),
+      maxBytes: Number.isFinite(Number(maxBytes)) && Number(maxBytes) > 0 ? Number(maxBytes) : undefined,
+      stream: req,
+    });
+    logger.info({ deploymentId, kind, name, sizeBytes: result.sizeBytes, warnings: result.warnings.length }, 'Backup component restored');
+    res.json(result);
+  } catch (err) {
+    // NOTE: do not test req.destroyed here. Node marks a request destroyed as soon as its body has been fully
+    // read, which is exactly when checksum/archive errors are detected, so that check would swallow the response
+    // and hang the caller. The client is only really gone if the socket is.
+    if (req.aborted || (req.socket && req.socket.destroyed)) {
+      logger.warn({ deploymentId, kind }, 'Restore upload was interrupted; nothing was changed');
+      return;
+    }
+    sendBackupError(res, err, { deploymentId, kind });
+  }
+});
+
+const httpServer = app.listen(PORT, BIND_HOST, () => {
   logger.info({ port: PORT, host: BIND_HOST }, 'node-agent listening');
   if (BIND_HOST === '0.0.0.0' && ALLOWED_IPS.length === 0) {
     logger.warn(
@@ -1466,5 +1563,16 @@ app.listen(PORT, BIND_HOST, () => {
     }, 60_000);
   }
 });
+
+// A multi-GB backup restore streams in over one request; Node's default 5-minute requestTimeout would cut it off.
+httpServer.requestTimeout = 30 * 60 * 1000;
+
+// Orphaned backup spool directories (an API job that died before cleanup) must not fill the disk.
+backup.pruneStaleSpool().then(
+  (n) => n && logger.info({ removed: n }, 'Pruned stale backup spool directories'),
+  (err) => logger.warn({ err }, 'Could not prune backup spool')
+);
+setInterval(() => backup.pruneStaleSpool().catch(() => {}), 60 * 60 * 1000).unref();
+
 
 

@@ -40,6 +40,83 @@ async function asJson<T>(res: Response): Promise<T> {
   return res.json();
 }
 
+/** Error that keeps the server's machine-readable `code` (asJson drops it and shows string errors with quote marks). */
+export class ApiError extends Error {
+  constructor(message: string, public status: number, public code?: string) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+async function asJsonWithCode<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const message = typeof body.error === 'string' ? body.error : body.error ? JSON.stringify(body.error) : `Request failed (${res.status})`;
+    throw new ApiError(message, res.status, typeof body.code === 'string' ? body.code : undefined);
+  }
+  return res.json();
+}
+
+export type ExposureModeUi = 'proxied' | 'direct_port' | 'internal';
+export interface PortIssueUi {
+  severity: 'error' | 'warning' | 'info';
+  code: string;
+  message: string;
+  deploymentId?: string;
+  exposureId?: string;
+}
+export interface DeploymentExposure {
+  mode: ExposureModeUi;
+  storedMode: string | null;
+  publishedPort: number | null;
+  hostPort: number | null;
+  internalPort: number | null;
+  url: string | null;
+  status: string;
+  requiresConfirm: boolean;
+  confirmName: string;
+  issues: PortIssueUi[];
+}
+export type BackupTriggerUi = 'manual' | 'schedule' | 'pre-restore';
+export interface BackupItem {
+  id: string;
+  trigger: BackupTriggerUi;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  phase: string | null;
+  repoFullName: string | null;
+  releaseUrl: string | null;
+  releaseTag: string | null;
+  components: Array<{ kind: 'workspace' | 'volume'; name: string; sizeBytes: number }>;
+  sizeBytes: number | null;
+  error: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  restore: { status: 'in_progress' | 'completed' | 'failed'; phase: string | null; error: string | null; startedAt: string | null; finishedAt: string | null } | null;
+}
+export interface BackupPolicyUi {
+  enabled: boolean;
+  intervalHours: number;
+  retention: number;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  lastStatus: string | null;
+  consecutiveFailures: number;
+}
+
+export interface PortsOverview {
+  nodes: Array<{
+    node: { id: string; label: string; ip: string; isActive: boolean };
+    deployments: Array<{
+      id: string; userId: string; subdomain: string | null; status: string; mode: ExposureModeUi; storedMode: string | null;
+      internalPort: number | null; publishedPort: number | null; hostPort: number | null; url: string | null; isPreview: boolean; issues: PortIssueUi[];
+    }>;
+    exposures: Array<{ id: string; port: number; protocol: string; subdomain: string; domain: string; label: string | null; routed: boolean; note: string; issues: PortIssueUi[] }>;
+    issues: PortIssueUi[];
+  }>;
+  summary: { nodes: number; deployments: number; directPorts: number; nodeExposures: number; errors: number; warnings: number };
+  reservedPorts: number[];
+}
+
 export const api = {
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || '',
   get: <T = any>(path: string) => apiFetch(path).then((r) => asJson<T>(r)),
@@ -50,6 +127,26 @@ export const api = {
   delete: <T = any>(path: string) => apiFetch(path, { method: 'DELETE' }).then((r) => asJson<T>(r)),
   patch: <T = any>(path: string, body?: any) =>
     apiFetch(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }).then((r) => asJson<T>(r)),
+  /** Exposure of one deployment, and the validated way to change it. A change is stored, not applied: redeploy to apply. */
+  exposure: {
+    get: (id: string) => apiFetch(`/api/deployments/${id}/exposure`).then((r) => asJsonWithCode<{ exposure: DeploymentExposure; canEdit: boolean; minPublishedPort: number }>(r)),
+    update: (id: string, body: { mode: ExposureModeUi; publishedPort?: number | null; confirm?: string }) =>
+      apiFetch(`/api/deployments/${id}/exposure`, { method: 'PUT', body: JSON.stringify(body) }).then((r) =>
+        asJsonWithCode<{ changed: boolean; requiresRedeploy: boolean }>(r)
+      ),
+  },
+  /** Per-deployment backups to GitHub. Backup and restore run in the background: start one, then poll `list`/`get`. */
+  deploymentBackups: {
+    list: (id: string) =>
+      apiFetch(`/api/deployments/${id}/backups`).then((r) => asJsonWithCode<{ configured: boolean; maxComponentMb: number; policy: BackupPolicyUi; backups: BackupItem[] }>(r)),
+    create: (id: string) => apiFetch(`/api/deployments/${id}/backups`, { method: 'POST' }).then((r) => asJsonWithCode<{ backup: BackupItem }>(r)),
+    restore: (id: string, backupId: string, body: { confirm: string; components?: string[]; skipSafetyBackup?: boolean }) =>
+      apiFetch(`/api/deployments/${id}/backups/${backupId}/restore`, { method: 'POST', body: JSON.stringify(body) }).then((r) => asJsonWithCode<{ backup: BackupItem }>(r)),
+    remove: (id: string, backupId: string) => apiFetch(`/api/deployments/${id}/backups/${backupId}`, { method: 'DELETE' }).then((r) => asJsonWithCode<{ ok: boolean }>(r)),
+    setPolicy: (id: string, body: { enabled: boolean; intervalHours: number; retention: number }) =>
+      apiFetch(`/api/deployments/${id}/backup-policy`, { method: 'PUT', body: JSON.stringify(body) }).then((r) => asJsonWithCode<{ policy: BackupPolicyUi }>(r)),
+  },
+  portsOverview: () => apiFetch('/api/ports/overview').then((r) => asJsonWithCode<PortsOverview>(r)),
   me: () => apiFetch('/api/me').then((r) => asJson<{ user: ApiUser; rootDomain: string }>(r)),
 
 
@@ -749,38 +846,6 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }).then((r) => asJson<{ deployment: Deployment }>(r)),
-    uploadZip: async (
-      id: string,
-      file: File,
-      onEvent: (event: BuildEvent) => void
-    ): Promise<void> => {
-      const formData = new FormData();
-      formData.append('zipFile', file);
-      const res = await apiFetch(`/api/deployments/${id}/upload-zip`, {
-        method: 'POST',
-        body: formData,
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}: ${res.statusText}` }));
-        throw new Error(errData.error || errData.message || `HTTP ${res.status}`);
-      }
-      if (!res.body) throw new Error('No response stream from server');
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffered = '';
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffered += decoder.decode(value, { stream: true });
-        const lines = buffered.split('\n');
-        buffered = lines.pop() ?? '';
-        for (const line of lines) {
-          if (line.trim()) onEvent(JSON.parse(line));
-        }
-      }
-    },
     downloadZipUrl: (id: string) => `/api/deployments/${id}/download-zip`,
     downloadZip: async (id: string, filename?: string) => {
       const res = await apiFetch(`/api/deployments/${id}/download-zip`);

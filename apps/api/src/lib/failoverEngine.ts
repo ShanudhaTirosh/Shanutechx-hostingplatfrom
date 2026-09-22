@@ -3,6 +3,7 @@ import { prisma } from './prisma';
 import { selectNodeForDeployment } from './nodeSelector';
 import { buildAndRun, provisionDatabaseContainer, registerLiveKitKey } from './nodeAgentClient';
 import { createSubdomainRecord } from './cloudflare';
+import { createExposureDeps, moveExposureToNode } from './nodePortExposure';
 import { decryptSecret, encryptSecret } from './secretsVault';
 import { env } from '../env';
 import { logger } from './logger';
@@ -274,19 +275,19 @@ export async function evacuateNodeWorkloads(failedNodeId: string): Promise<Failo
     where: { nodeId: failedNodeId },
   });
 
+  const exposureDeps = exposures.length > 0 ? await createExposureDeps() : null;
   for (const exp of exposures) {
     try {
       const targetPortNode = await prisma.node.findFirst({
         where: { isActive: true, id: { not: failedNodeId } },
       });
 
-      if (targetPortNode && exp.subdomain) {
-        await createSubdomainRecord(exp.subdomain, targetPortNode.ip).catch(() => {});
-        await prisma.nodePortExposure.update({
-          where: { id: exp.id },
-          data: { nodeId: targetPortNode.id },
-        });
-        result.portsMigrated++;
+      if (targetPortNode && exp.subdomain && exposureDeps) {
+        // Creates the record on the new node, repoints the row, and deletes the dead node's record. If DNS cannot be
+        // updated the exposure stays where it is (before: it was moved in the database regardless).
+        const moved = await moveExposureToNode(exp as any, { id: targetPortNode.id, label: targetPortNode.label, ip: targetPortNode.ip }, exposureDeps);
+        if (moved) result.portsMigrated++;
+        else result.errors.push(`Port exposure ${exp.id}: DNS could not be updated; left on the failed node`);
       }
     } catch (err: any) {
       logger.error({ err, exposureId: exp.id }, 'Port exposure failover failed');

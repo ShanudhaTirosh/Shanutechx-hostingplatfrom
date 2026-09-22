@@ -15,6 +15,9 @@ import { deleteShadowRepo } from '../lib/shadowBackup';
 import { env } from '../env';
 import { validateCustomSubdomain } from '../lib/subdomain';
 import { getProvider } from '../lib/gitProviders';
+import { sanitizeRepoUrlForStorage, stripRepoCredentials } from '../lib/gitAuth';
+import { modeFromStored } from '../lib/portExposure';
+import { createDefaultDeps as createDefaultBackupDeps, purgeDeletedDeploymentBackups } from '../lib/deploymentBackup';
 import { logger } from '../lib/logger';
 import { redactRepoUrl } from '../lib/redact';
 
@@ -107,33 +110,37 @@ deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
     });
   }
 
+  // Private repositories: the credential is NOT written into repoUrl. A connected account is verified here and a fresh
+  // scoped token is minted at every build; a pasted token is stored encrypted. See lib/gitAuth.ts.
+  let gitAccountId: string | undefined;
+  let gitProvider: string | undefined;
+  let gitTokenEncrypted: string | undefined;
   if (data.repoUrl && data.gitAccountId && (data.gitProvider === 'github' || data.gitProvider === 'gitlab')) {
     const adapter = getProvider(data.gitProvider);
     if (!adapter) {
-      return res.status(400).json({ error: `Git provider "${data.gitProvider}" is not available` });
+      return res.status(400).json({ error: `Git provider \"${data.gitProvider}\" is not available` });
     }
     const accounts = await adapter.listConnectedAccounts(req.user!.id);
     const owned = accounts.find((a) => a.id === data.gitAccountId);
     if (!owned) {
       return res.status(403).json({ error: 'That connected Git account does not belong to you' });
     }
-    data.gitToken = await adapter.getScopedToken(data.gitAccountId, data.repoUrl);
-  }
-
-  // Format repoUrl with private git token if provided
-  if (data.repoUrl && data.gitToken) {
     try {
-      const urlObj = new URL(data.repoUrl);
-      if (data.gitProvider === 'github' || urlObj.hostname.includes('github.com')) {
-        data.repoUrl = `https://x-access-token:${data.gitToken}@${urlObj.hostname}${urlObj.pathname}`;
-      } else if (data.gitProvider === 'gitlab' || urlObj.hostname.includes('gitlab.com')) {
-        data.repoUrl = `https://oauth2:${data.gitToken}@${urlObj.hostname}${urlObj.pathname}`;
-      } else {
-        data.repoUrl = `https://${encodeURIComponent(data.gitToken)}@${urlObj.hostname}${urlObj.pathname}`;
-      }
+      // Fail now, with a clear message, if the connection is broken, rather than during the build.
+      await adapter.getScopedToken(data.gitAccountId, stripRepoCredentials(data.repoUrl));
     } catch {
-      // Keep original repoUrl if invalid URL object
+      return res.status(400).json({ error: `Could not get access through your ${data.gitProvider} connection. Reconnect it and try again.` });
     }
+    gitAccountId = data.gitAccountId;
+    gitProvider = data.gitProvider;
+  } else if (data.repoUrl && data.gitToken) {
+    gitTokenEncrypted = encryptSecret(data.gitToken, env.secretsEncryptionKey);
+  }
+  if (data.repoUrl) {
+    // A URL pasted with credentials in it ("https://token@host/...") is converted the same way.
+    const safe = sanitizeRepoUrlForStorage(data.repoUrl, (t) => encryptSecret(t, env.secretsEncryptionKey));
+    data.repoUrl = safe.repoUrl;
+    if (!gitAccountId && !gitTokenEncrypted) gitTokenEncrypted = safe.githubTokenEncrypted;
   }
 
   if (data.templateId) {
@@ -216,6 +223,9 @@ deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
         userId: req.user!.id,
         nodeId: node.id,
         repoUrl: data.repoUrl || null,
+        gitAccountId: gitAccountId ?? null,
+        gitProvider: gitProvider ?? null,
+        githubTokenEncrypted: gitTokenEncrypted ?? null,
         branch: data.branch || 'main',
         subdomain,
         internalPort: data.internalPort || 3000,
@@ -267,6 +277,9 @@ deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
       frameworkPreset: data.frameworkPreset,
       exposureMode: data.exposureMode,
       publishedPort: data.publishedPort,
+      gitAccountId,
+      gitProvider,
+      gitTokenEncrypted,
       onEvent: (event) => res.write(JSON.stringify(event) + '\n'),
     });
 
@@ -513,36 +526,14 @@ deploymentsRouter.get('/deployments/:id/logs/stream', async (req: AuthedRequest,
   }
 });
 
-deploymentsRouter.patch('/deployments/:id/routing', async (req: AuthedRequest, res) => {
-  const deployment = await loadOwnedDeployment(req, req.params.id);
-  if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
-
-  if (req.user!.role !== 'dev') {
-    return res.status(403).json({ error: 'Only dev superusers can modify network routing mode directly. All client deployments are permanently exposed via SSL Reverse Proxy (ssl_with_proxy).' });
-  }
-
-  const schema = z.object({
-    routingMode: z.enum(['proxied', 'direct', 'no_ssl']),
-    publishedPort: z.number().optional(),
+// Removed: this endpoint accepted routingMode/publishedPort but ignored both (it only cleared `subdomain` for "direct")
+// while answering success. Use PUT /api/deployments/:id/exposure.
+deploymentsRouter.patch('/deployments/:id/routing', async (_req: AuthedRequest, res) => {
+  return res.status(410).json({
+    error: 'This endpoint no longer exists. Use PUT /api/deployments/:id/exposure to change how a deployment is exposed.',
+    code: 'gone',
   });
-
-  const parse = schema.safeParse(req.body);
-  if (!parse.success) {
-    return res.status(400).json({ error: 'Invalid routing data', details: parse.error.format() });
-  }
-
-  // Update in database / memory
-  const updated = await prisma.deployment.update({
-    where: { id: deployment.id },
-    data: {
-      subdomain: parse.data.routingMode === 'direct' ? null : deployment.subdomain,
-    },
-  });
-
-  logger.info({ deploymentId: deployment.id, routingMode: parse.data.routingMode }, 'Updated routing mode');
-  res.json({ deployment: { ...updated, repoUrl: redactRepoUrl(updated.repoUrl) }, routingMode: parse.data.routingMode, publishedPort: parse.data.publishedPort || deployment.internalPort });
 });
-
 
 deploymentsRouter.get('/deployments/:id', async (req: AuthedRequest, res) => {
   const deployment = await loadOwnedDeployment(req, req.params.id);
@@ -636,14 +627,30 @@ deploymentsRouter.patch('/deployments/:id/config', async (req: AuthedRequest, re
   }
 
   const callerIsDev = req.user!.role === 'dev';
-  const effectiveExposureMode = callerIsDev
-    ? (exposureMode !== undefined ? exposureMode : deployment.exposureMode)
-    : 'ssl_with_proxy';
+  // Exposure used to be overwritten with 'ssl_with_proxy' on EVERY config save by a non-dev user, silently resetting a
+  // bot or direct-port deployment. It is now preserved. Changing it on a real deployment goes through
+  // PUT /deployments/:id/exposure (validated for port conflicts, confirmed and audited); a draft has no container yet,
+  // so the wizard may still set it here.
+  let effectiveExposureMode = deployment.exposureMode;
+  if (callerIsDev && exposureMode !== undefined && modeFromStored(exposureMode) !== modeFromStored(deployment.exposureMode)) {
+    if (deployment.status !== 'pending_configuration') {
+      return res.status(400).json({
+        error: 'Exposure is changed with PUT /api/deployments/:id/exposure, which checks port conflicts and asks for confirmation. Nothing was saved.',
+        code: 'use_exposure_endpoint',
+      });
+    }
+    effectiveExposureMode = exposureMode;
+  }
+
+  // Never persist a token inside repoUrl; a pasted "https://token@host/..." is split into a clean URL + encrypted token.
+  const safeRepo = repoUrl !== undefined ? sanitizeRepoUrlForStorage(repoUrl, (t) => encryptSecret(t, env.secretsEncryptionKey)) : null;
 
   const updated = await prisma.deployment.update({
     where: { id: deployment.id },
     data: {
-      repoUrl: repoUrl !== undefined ? repoUrl : deployment.repoUrl,
+      repoUrl: safeRepo ? safeRepo.repoUrl : deployment.repoUrl,
+      // An explicit new token replaces any connected-account link, which would otherwise take precedence over it.
+      ...(safeRepo?.githubTokenEncrypted ? { githubTokenEncrypted: safeRepo.githubTokenEncrypted, gitAccountId: null, gitProvider: null } : {}),
       branch: branch !== undefined ? branch : deployment.branch,
       frameworkPreset: frameworkPreset !== undefined ? frameworkPreset : deployment.frameworkPreset,
       startCommand: startCommand !== undefined ? startCommand : deployment.startCommand,
@@ -729,6 +736,12 @@ deploymentsRouter.delete('/deployments/:id', async (req: AuthedRequest, res) => 
       where: { id: deployment.id },
       data: { status: 'deleted' },
     });
+
+    // Its backups are customer data: remove them (and their GitHub releases) too. Best effort here; the backup sweep
+    // retries anything that fails or was still running, so nothing is left behind by a GitHub outage.
+    void createDefaultBackupDeps()
+      .then((d) => purgeDeletedDeploymentBackups(d, { deploymentId: deployment.id }))
+      .catch((err) => logger.warn({ err, deploymentId: deployment.id }, 'Could not purge backups of a deleted deployment (the sweep will retry)'));
     res.json({ ok: true, message: 'Deployment deleted successfully' });
   } catch (err: any) {
     logger.error({ err, deploymentId: req.params.id }, 'Failed to delete deployment');
@@ -1376,6 +1389,12 @@ deploymentsRouter.patch('/deployments/:id/git-settings', async (req: AuthedReque
     dataToUpdate.githubTokenEncrypted = parsed.data.gitToken
       ? encryptSecret(parsed.data.gitToken, env.secretsEncryptionKey)
       : null;
+    // A connected-account link takes precedence when building, so saving a token explicitly must clear it or the
+    // new token would be silently ignored.
+    if (parsed.data.gitToken) {
+      dataToUpdate.gitAccountId = null;
+      dataToUpdate.gitProvider = null;
+    }
   }
 
   const updated = await prisma.deployment.update({
@@ -1436,7 +1455,8 @@ deploymentsRouter.post('/deployments/bot-hosting', async (req: AuthedRequest, re
     data: {
       userId: req.user!.id,
       nodeId: node.id,
-      repoUrl: repoUrl || null,
+      repoUrl: repoUrl ? sanitizeRepoUrlForStorage(repoUrl, (t) => encryptSecret(t, env.secretsEncryptionKey)).repoUrl : null,
+      githubTokenEncrypted: repoUrl ? sanitizeRepoUrlForStorage(repoUrl, (t) => encryptSecret(t, env.secretsEncryptionKey)).githubTokenEncrypted ?? null : null,
       branch,
       subdomain: null, // Bots do not consume public subdomains
       internalPort: 3000,

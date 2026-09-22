@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { api } from '@/lib/api';
 import { Card, Button, Spinner, useToast } from '@/components/ui';
-import { UploadCloud, GitBranch, RefreshCw, Lock, Terminal, Shield, Play, Download } from 'lucide-react';
+import { GitBranch, RefreshCw, Lock, Terminal, Shield, Play, Download } from 'lucide-react';
 import { useAppUser } from '@/lib/AppUserContext';
 
 interface Props {
@@ -24,17 +24,11 @@ export function CodeDeploymentPanel({ deployment, onChanged }: Props) {
   const [exposureMode, setExposureMode] = useState<string>(deployment.exposureMode || 'ssl_with_proxy');
   const [savingConfig, setSavingConfig] = useState(false);
 
-  const [zipFile, setZipFile] = useState<File | null>(null);
-  const [deployingZip, setDeployingZip] = useState(false);
-  const [zipLogs, setZipLogs] = useState<string[]>([]);
-  const [showZipLogs, setShowZipLogs] = useState(false);
-
   const [redeploying, setRedeploying] = useState(false);
   const [redeployLogs, setRedeployLogs] = useState<string[]>([]);
   const [showRedeployLogs, setShowRedeployLogs] = useState(false);
   const [downloadingZip, setDownloadingZip] = useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
 
   async function handleSaveGitSettings(e: React.FormEvent) {
@@ -74,31 +68,6 @@ export function CodeDeploymentPanel({ deployment, onChanged }: Props) {
     }
   }
 
-  async function handleZipUploadAndDeploy() {
-    if (!zipFile) {
-      toast('Please select a .zip archive file to upload.', 'error');
-      return;
-    }
-    setDeployingZip(true);
-    setZipLogs([]);
-    setShowZipLogs(true);
-    try {
-      await api.deployments.uploadZip(deployment.id, zipFile, (event) => {
-        if (event.message) {
-          setZipLogs((prev) => [...prev, `[${event.phase?.toUpperCase() || 'INFO'}] ${event.message}`]);
-        }
-      });
-      toast('ZIP archive successfully uploaded & deployed!', 'success');
-      setZipFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      onChanged();
-    } catch (err: any) {
-      toast(err.message || 'ZIP deployment failed', 'error');
-    } finally {
-      setDeployingZip(false);
-    }
-  }
-
   async function handleTriggerRedeploy() {
     setRedeploying(true);
     setRedeployLogs([]);
@@ -135,7 +104,7 @@ export function CodeDeploymentPanel({ deployment, onChanged }: Props) {
       {/* CARD 1: Code Source & Deployment Pipeline */}
       <Card
         title="Code Source & Build Trigger"
-        description="Choose how your deployment container retrieves its application source code (Git repository or ZIP archive)."
+        description="Manage the Git repository your deployment builds from."
       >
         <div className="space-y-6">
           {/* Current Source Status */}
@@ -165,39 +134,6 @@ export function CodeDeploymentPanel({ deployment, onChanged }: Props) {
             </div>
           </div>
 
-          {/* Option A: ZIP File Upload Dropzone */}
-          <div className="space-y-3 p-4 rounded-xl border border-white/10 bg-black/40">
-            <div className="flex items-center gap-2 text-white text-xs font-semibold">
-              <UploadCloud className="w-4 h-4 text-accent-violet" />
-              <span>Upload ZIP Project Archive</span>
-            </div>
-            <p className="text-xs text-text-muted">
-              Upload a compressed project source archive (<code className="text-emerald-400 font-mono">.zip</code> up to 100MB). Railpack will auto-detect the framework (Node.js, Python, Static HTML, Docker) and build your container.
-            </p>
-            <div className="flex items-center gap-3 flex-wrap pt-1">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".zip"
-                onChange={(e) => setZipFile(e.target.files?.[0] || null)}
-                className="block text-xs text-text-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white hover:file:bg-white/20 cursor-pointer"
-              />
-              {zipFile && (
-                <Button size="sm" onClick={handleZipUploadAndDeploy} loading={deployingZip}>
-                  Deploy ZIP ({Math.round(zipFile.size / 1024)} KB)
-                </Button>
-              )}
-            </div>
-
-            {showZipLogs && zipLogs.length > 0 && (
-              <div className="mt-3 space-y-1">
-                <span className="text-[10px] uppercase font-mono text-text-muted">ZIP Deployment Output Log</span>
-                <pre className="bg-black/90 border border-white/10 rounded-xl p-3 text-xs font-mono text-emerald-400 h-40 overflow-y-auto whitespace-pre-wrap select-text">
-                  {zipLogs.join('\n')}
-                </pre>
-              </div>
-            )}
-          </div>
 
           {/* Option B: Git Repository & Token Settings */}
           <form onSubmit={handleSaveGitSettings} className="space-y-4 p-4 rounded-xl border border-white/10 bg-black/40">

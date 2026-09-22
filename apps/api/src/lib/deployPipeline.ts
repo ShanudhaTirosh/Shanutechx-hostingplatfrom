@@ -6,6 +6,7 @@ import { buildAndRun, BuildEvent } from './nodeAgentClient';
 import { notifyCustomer } from './notifications';
 import { fireWebhook } from './webhooks';
 import { encryptSecret } from './secretsVault';
+import { extractEmbeddedToken, stripRepoCredentials } from './gitAuth';
 import { env } from '../env';
 
 const SERVICE_TYPE_TO_TAG: Record<string, string> = {
@@ -42,6 +43,11 @@ interface DeployParams {
   frameworkPreset?: string;
   exposureMode?: string;
   publishedPort?: number;
+  /** Connected Git account the credential is minted from at build time (see lib/gitAuth.ts). */
+  gitAccountId?: string;
+  gitProvider?: string;
+  /** Already-encrypted personal access token for a private repo. */
+  gitTokenEncrypted?: string;
   onEvent?: (event: BuildEvent) => void;
 }
 
@@ -99,12 +105,39 @@ export async function deployService(params: DeployParams) {
     ? encryptSecret(JSON.stringify(envVars), env.secretsEncryptionKey)
     : null;
 
+  // Credentials never live in the stored repoUrl: a token there sat in the database in plaintext and, for GitHub App
+  // tokens, expired within the hour. The URL is stored clean; the credential is resolved fresh at build time from
+  // the account link or the encrypted token recorded here (see lib/gitAuth.ts).
+  let gitAccountId = params.gitAccountId ?? null;
+  let gitProvider = params.gitProvider ?? null;
+  let githubTokenEncrypted = params.gitTokenEncrypted ?? null;
+  const embeddedToken = extractEmbeddedToken(repoUrl);
+  if (embeddedToken && !githubTokenEncrypted && !gitAccountId) {
+    githubTokenEncrypted = encryptSecret(embeddedToken, env.secretsEncryptionKey);
+  }
+  if (parentDeploymentId && !gitAccountId && !githubTokenEncrypted) {
+    // A preview builds the same private repo as its production deployment, so it inherits that deployment's access
+    // (only when the same user owns both).
+    const parent = await prisma.deployment.findUnique({
+      where: { id: parentDeploymentId },
+      select: { userId: true, gitAccountId: true, gitProvider: true, githubTokenEncrypted: true },
+    });
+    if (parent && parent.userId === userId) {
+      gitAccountId = parent.gitAccountId ?? null;
+      gitProvider = parent.gitProvider ?? null;
+      githubTokenEncrypted = parent.githubTokenEncrypted ?? null;
+    }
+  }
+
   const deployment = await prisma.deployment.create({
     data: {
       userId,
       nodeId: node.id,
       isAdminDeployment: Boolean(isAdminDeployment),
-      repoUrl,
+      repoUrl: stripRepoCredentials(repoUrl),
+      gitAccountId,
+      gitProvider,
+      githubTokenEncrypted,
       runtime: null,
       subdomain,
       internalPort,

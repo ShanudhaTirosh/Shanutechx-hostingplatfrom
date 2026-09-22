@@ -1,10 +1,7 @@
 import crypto from 'crypto';
 import { prisma } from './prisma';
 
-const RESERVED = new Set([
-  'www', 'api', 'app', 'admin', 'mail', 'smtp', 'ftp', 'cdn', 'status',
-  'blog', 'docs', 'support', 'help', 'dashboard', 'grafana', 'prometheus', 'loki', 'traefik',
-]);
+import { RESERVED_SUBDOMAINS as RESERVED } from './reservedSubdomains';
 
 function slugify(input: string): string {
   return input

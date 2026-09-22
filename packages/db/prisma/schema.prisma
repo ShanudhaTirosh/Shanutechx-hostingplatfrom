@@ -517,6 +517,10 @@ model Deployment {
 
   // GitHub private repository & auto-deployment commit metadata fields
   githubTokenEncrypted String? // Encrypted GitHub Personal Access Token (PAT) for private repos
+  // Connected Git account (GitHubInstallation.id / GitLabConnection.id) this deployment pulls with.
+  // Lets the API mint a FRESH short-lived token at every build instead of persisting one in repoUrl.
+  gitAccountId String?
+  gitProvider  String? // github | gitlab
   gitCommitHash        String? // Latest deployed git commit SHA
   gitCommitMessage     String? // Latest deployed git commit message
   autoDeploy           Boolean @default(true) // Autonomous deploy on git push
@@ -544,6 +548,8 @@ model Deployment {
   customDomains CustomDomain[]
   wafRules      WafRule[]
   volumes       DeploymentVolume[]
+  backups       DeploymentBackup[]
+  backupPolicy  DeploymentBackupPolicy?
 
   @@index([userId])
   @@index([teamId])
@@ -577,6 +583,62 @@ model DeploymentVolume {
   createdAt     DateTime   @default(now())
 
   @@index([deploymentId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Per-deployment backups pushed to GitHub through the REST API (Releases +
+// release assets) — see apps/api/src/lib/githubBackup.ts and
+// apps/api/src/lib/deploymentBackup.ts. One row = one GitHub release; each
+// backed-up component (workspace / volume) is one asset on that release.
+// status: pending | in_progress | completed | failed
+// trigger: manual | schedule | pre-restore
+// ─────────────────────────────────────────────────────────────────────────
+model DeploymentBackup {
+  id           String     @id @default(cuid())
+  deploymentId String
+  deployment   Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  trigger      String     @default("manual")
+  status       String     @default("pending")
+  phase        String? // human-readable current step, shown by the UI while running
+  repoFullName String? // owner/repo holding the release
+  releaseId    String? // GitHub release id (string: ids can exceed 32 bits)
+  releaseTag   String?
+  releaseUrl   String?
+  // [{ kind: 'workspace'|'volume', name, assetId, assetName, sizeBytes, sha256 }]
+  components   Json?
+  sizeBytes    BigInt?
+  error        String?
+  createdById  String?
+  createdAt    DateTime   @default(now())
+  completedAt  DateTime?
+  // Restore-from-this-backup progress. Restore can take minutes, which exceeds proxy request limits, so it runs in
+  // the background and the UI polls these fields. restoreStatus: null | in_progress | completed | failed
+  restoreStatus String?
+  restorePhase  String?
+  restoreError  String?
+  restoreStartedAt DateTime?
+  restoredAt    DateTime?
+
+  @@index([deploymentId, createdAt])
+  @@index([status])
+}
+
+// Scheduling is a simple "due" scan (see jobs/backup-sweep.ts): the worker
+// looks for enabled policies whose nextRunAt has passed, so there is no
+// per-policy repeatable job to create/cancel when a customer edits a schedule.
+model DeploymentBackupPolicy {
+  deploymentId        String     @id
+  deployment          Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  enabled             Boolean    @default(false)
+  intervalHours       Int        @default(24)
+  retention           Int        @default(7) // completed backups to keep; older ones are pruned from GitHub
+  lastRunAt           DateTime?
+  nextRunAt           DateTime?
+  lastStatus          String? // completed | failed
+  consecutiveFailures Int        @default(0)
+  updatedAt           DateTime   @updatedAt
+
+  @@index([enabled, nextRunAt])
 }
 
 // One-click app templates — pre-filled repo URL, runtime, and default env

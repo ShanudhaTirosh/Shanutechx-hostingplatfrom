@@ -17,7 +17,6 @@ flowchart TD
     subgraph ControlPlane ["ShanuTechX API (Port 4000)"]
         CatalogRoute["/api/catalog/deploy"]
         DeployRoute["/api/deployments"]
-        ZipRoute["/api/deployments/upload-zip"]
         AbuseScanner["Automated Abuse Scanner"]
         SecretsVault["Secrets Vault (AES-256-GCM)"]
         NodeSelector["Node Selector & DNS Engine"]
@@ -40,8 +39,7 @@ flowchart TD
     end
 
     UserDashboard -->|1. Submit Deployment Request| CatalogRoute
-    UserDashboard -->|1. Submit Custom Git/ZIP| DeployRoute
-    DeployRoute --> ZipRoute
+    UserDashboard -->|1. Submit Custom Git Repo| DeployRoute
     CatalogRoute --> AbuseScanner
     AbuseScanner -->|Passed| SecretsVault
     SecretsVault --> NodeSelector

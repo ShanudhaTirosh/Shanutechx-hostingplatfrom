@@ -1,4 +1,6 @@
 import { env } from '../env';
+import { resolveRepoUrlForBuild } from './gitAuth';
+import { resolveExposureForBuild } from './exposureDefaults';
 
 interface Node {
   id: string;
@@ -73,8 +75,16 @@ export async function buildAndRun(
   params: BuildAndRunParams,
   onEvent: (event: BuildEvent) => void
 ): Promise<BuildEvent> {
+  // The stored repoUrl carries no credentials; resolve a fresh one here, the single point every build passes through
+  // (create, redeploy, webhook, failover, previews), so a token is never persisted or stale.
+  const repoUrl = await resolveRepoUrlForBuild(params.deploymentId, params.repoUrl);
+  // Likewise for exposure: rebuilds that do not pass publishedPort/exposureMode must keep what the deployment has.
+  const exposure = await resolveExposureForBuild(params.deploymentId, { exposureMode: params.exposureMode, publishedPort: params.publishedPort });
   const payload = {
     ...params,
+    repoUrl,
+    exposureMode: exposure.exposureMode,
+    publishedPort: exposure.publishedPort,
     deploymentsRootDomain: params.deploymentsRootDomain || env.deploymentsRootDomain,
     rootDomain: params.rootDomain || env.rootDomain,
   };
@@ -626,3 +636,109 @@ export async function notifyAgentWafSync(node: Node, deploymentId: string): Prom
 }
 
 
+
+
+// ─────────────────────────────────────────────────────────────────────────
+// Deployment backups. The wire protocol is implemented by
+// services/node-agent/src/backup.js + the /agent/backups and
+// /agent/deployments/:id/backup/* routes. The API owns the GitHub token, so
+// the agent only ever produces / consumes archives, never talks to GitHub.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface AgentBackupComponent {
+  kind: 'workspace' | 'volume';
+  name: string;
+  file: string;
+  sizeBytes: number;
+  sha256: string;
+}
+
+export interface AgentCreateBackupResult {
+  components: AgentBackupComponent[];
+  skipped: { kind: string; name: string; reason: string }[];
+  warnings: string[];
+}
+
+/** Error from a backup-related agent call. `code` mirrors the agent's BackupError.code when it sent one. */
+export class AgentBackupError extends Error {
+  constructor(message: string, public readonly status: number, public readonly code?: string) {
+    super(message);
+    this.name = 'AgentBackupError';
+  }
+}
+
+async function agentBackupFailure(res: Response, what: string): Promise<AgentBackupError> {
+  let message = '';
+  let code: string | undefined;
+  try {
+    const j = (await res.json()) as { error?: string; code?: string };
+    message = j.error || '';
+    code = j.code;
+  } catch {
+    /* non-JSON error body */
+  }
+  return new AgentBackupError(message || `Node agent failed to ${what} (${res.status})`, res.status, code);
+}
+
+/** False for an agent that predates backups (404). Network failures propagate so the caller reports "node unreachable". */
+export async function agentSupportsBackups(node: Node): Promise<boolean> {
+  const res = await fetch(agentUrl(node, '/agent/backups/capabilities'), { headers: agentHeaders(), signal: AbortSignal.timeout(10_000) });
+  if (res.status === 404) return false;
+  if (!res.ok) throw await agentBackupFailure(res, 'check backup support');
+  return true;
+}
+
+export async function agentCreateBackup(
+  node: Node,
+  deploymentId: string,
+  params: { backupId: string; volumes: { name: string; hostPath: string }[]; includeWorkspace: boolean; maxBytes?: number }
+): Promise<AgentCreateBackupResult> {
+  const res = await fetch(agentUrl(node, `/agent/deployments/${deploymentId}/backup/create`), {
+    method: 'POST',
+    headers: agentHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(params),
+    // Archiving a large workspace/volume can legitimately take a while.
+    signal: AbortSignal.timeout(30 * 60_000),
+  });
+  if (!res.ok) throw await agentBackupFailure(res, 'create the backup archives');
+  return (await res.json()) as AgentCreateBackupResult;
+}
+
+export async function agentOpenBackupFile(node: Node, backupId: string, file: string): Promise<{ body: ReadableStream<Uint8Array>; size: number }> {
+  const res = await fetch(agentUrl(node, `/agent/backups/${backupId}/files/${encodeURIComponent(file)}`), {
+    headers: agentHeaders(),
+    signal: AbortSignal.timeout(30 * 60_000),
+  });
+  if (!res.ok || !res.body) throw await agentBackupFailure(res, 'read the backup archive');
+  const size = Number(res.headers.get('content-length'));
+  if (!Number.isFinite(size) || size <= 0) throw new AgentBackupError('Node agent did not report the archive size', 502);
+  return { body: res.body, size };
+}
+
+/** Best effort by design: a leftover spool dir is pruned by the agent after 6h, so callers may ignore failures. */
+export async function agentDeleteBackup(node: Node, backupId: string): Promise<void> {
+  const res = await fetch(agentUrl(node, `/agent/backups/${backupId}`), { method: 'DELETE', headers: agentHeaders(), signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) throw await agentBackupFailure(res, 'clean up the backup spool');
+}
+
+export async function agentRestoreComponent(
+  node: Node,
+  deploymentId: string,
+  comp: { kind: 'workspace' | 'volume'; name: string; hostPath?: string; sha256: string; sizeBytes: number; maxBytes?: number },
+  body: ReadableStream<Uint8Array>
+): Promise<{ warnings: string[] }> {
+  const q = new URLSearchParams({ kind: comp.kind, name: comp.name, sha256: comp.sha256 });
+  if (comp.hostPath) q.set('hostPath', comp.hostPath);
+  if (comp.maxBytes) q.set('maxBytes', String(comp.maxBytes));
+  const res = await fetch(agentUrl(node, `/agent/deployments/${deploymentId}/backup/restore?${q.toString()}`), {
+    method: 'POST',
+    headers: agentHeaders({ 'Content-Type': 'application/gzip', 'Content-Length': String(comp.sizeBytes) }),
+    body: body as unknown as RequestInit['body'],
+    // Required by undici when streaming a request body.
+    duplex: 'half',
+    signal: AbortSignal.timeout(30 * 60_000),
+  } as RequestInit);
+  if (!res.ok) throw await agentBackupFailure(res, 'restore the backup archive');
+  const j = (await res.json()) as { warnings?: string[] };
+  return { warnings: j.warnings ?? [] };
+}

@@ -73,6 +73,7 @@ export interface BillingSweepJob {}
 export interface UptimeSweepJob {}
 export interface WorkspaceCleanupJob {}
 export interface NodeFailoverSweepJob {}
+export interface BackupSweepJob {}
 
 export const billingSweepQueue = new Queue<BillingSweepJob>('billing-sweep', {
   connection: redisConnectionOptions,
@@ -110,6 +111,19 @@ export const nodeFailoverQueue = new Queue<NodeFailoverSweepJob>('node-failover'
     attempts: 3,
     backoff: { type: 'exponential', delay: 30000 },
     removeOnComplete: { age: 60 * 60 * 24 * 3 },
+    removeOnFail: { age: 60 * 60 * 24 * 7 },
+  },
+});
+
+/**
+ * Scheduled deployment backups (see lib/deploymentBackup.ts runDueBackups). attempts is 1 on purpose: the next
+ * tick re-scans for due policies, and retrying a half-finished sweep could run the same backup twice.
+ */
+export const backupSweepQueue = new Queue<BackupSweepJob>('backup-sweep', {
+  connection: redisConnectionOptions,
+  defaultJobOptions: {
+    attempts: 1,
+    removeOnComplete: { age: 60 * 60 * 24 },
     removeOnFail: { age: 60 * 60 * 24 * 7 },
   },
 });

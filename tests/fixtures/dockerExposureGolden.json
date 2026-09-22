@@ -1,0 +1,2814 @@
+{
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {},
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {},
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_with_proxy\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls": "true",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls": "true",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls": "true",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls": "true",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls": "true",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls": "true",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls": "true",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls": "true",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls": "true",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls": "true",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {},
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {},
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"ssl_direct\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"no_ssl\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {},
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {},
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":null,\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {},
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {},
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"raw_tcp\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`app-cdep0000.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "3000",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {
+   "traefik.enable": "true",
+   "traefik.docker.network": "shanutechx-public",
+   "traefik.http.routers.deploy-cdep0000000001.rule": "Host(`myapp.apps.example.com`)",
+   "traefik.http.services.deploy-cdep0000000001.loadbalancer.server.port": "8080",
+   "traefik.http.routers.deploy-cdep0000000001.entrypoints": "websecure",
+   "traefik.http.routers.deploy-cdep0000000001.tls.certresolver": "le",
+   "traefik.http.routers.deploy-cdep0000000001.middlewares": "security-headers@file,rate-limit@file,gzip-compress@file"
+  },
+  "PortBindings": {},
+  "NetworkMode": "shanutechx-public"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {},
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {},
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"proxied\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"auto\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "3000"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "3000"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":null,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "8080"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "8080"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":\"myapp\",\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":3000}": {
+  "Labels": {},
+  "PortBindings": {
+   "3000/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "3000/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ },
+ "{\"exposureMode\":\"internal_only\",\"routingMode\":\"direct\",\"frameworkPreset\":\"nodejs_bot\",\"publishedPort\":25565,\"subdomain\":null,\"internalPort\":8080}": {
+  "Labels": {},
+  "PortBindings": {
+   "8080/tcp": [
+    {
+     "HostPort": "25565"
+    }
+   ],
+   "8080/udp": [
+    {
+     "HostPort": "25565"
+    }
+   ]
+  },
+  "NetworkMode": "bridge"
+ }
+}

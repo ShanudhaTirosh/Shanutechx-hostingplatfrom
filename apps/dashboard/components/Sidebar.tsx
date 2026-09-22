@@ -252,6 +252,7 @@ const SPACES: Record<SpaceKey, PanelSpace> = {
         ],
       },
       { href: "/dev/reverse-proxy", label: "Reverse Proxy", icon: "proxy" },
+      { href: "/dev/ports", label: "Exposed Ports", icon: "proxy" },
       { href: "/dev/monitoring", label: "Monitoring", icon: "monitoring" },
       { href: "/dev/logs", label: "Logs", icon: "logs" },
       { href: "/admin/vps-plans", label: "VPS Plans & Pricing", icon: "vps" },

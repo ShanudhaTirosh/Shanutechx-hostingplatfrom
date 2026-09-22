@@ -78,3 +78,18 @@ export async function deleteSubdomainRecord(subdomain: string) {
   }
 }
 
+
+/**
+ * Deletes only the A records for `<subdomain>.<root>` that point at `ip`. Unlike deleteSubdomainRecord (which removes
+ * every record with that name), this cannot delete another owner's record that happens to share the hostname.
+ * Returns how many records were deleted; throws on API failure so callers can retry instead of assuming success.
+ */
+export async function deleteDnsRecordsByNameAndIp(subdomain: string, ip: string): Promise<number> {
+  const url = `${CF_API_BASE}/zones/${env.cloudflareZoneId}/dns_records?name=${encodeURIComponent(`${subdomain}.${env.rootDomain}`)}&type=A&content=${encodeURIComponent(ip)}`;
+  const res = await fetch(url, { headers: headers() });
+  const data = (await res.json()) as { success: boolean; result?: Array<{ id: string }>; errors?: unknown };
+  if (!data.success) throw new CloudflareError(`Failed to list DNS records: ${JSON.stringify(data.errors)}`);
+  const records = data.result ?? [];
+  for (const rec of records) await deleteDnsRecord(rec.id);
+  return records.length;
+}
