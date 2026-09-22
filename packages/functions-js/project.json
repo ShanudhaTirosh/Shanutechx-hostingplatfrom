@@ -1,8 +1,0 @@
-{
-  "name": "@shanutechx/functions-js",
-  "targets": {
-    "test:ci": {
-      "cache": false
-    }
-  }
-}

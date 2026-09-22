@@ -12,27 +12,28 @@ Defect audit report & vulnerability fixes: see [`BUG_AUDIT.md`](file:///c:/Users
 ShanuTechX integrates full-lifecycle cloud hosting, container builds, managed infrastructure, and customer management:
 
 ### 1. Core Hosting & Container Provisioning
-- **Unified Dev Studio & Databases Hub:** Consolidated management of Self-Hosted Supabase Stacks, Managed Databases (PostgreSQL 16, MySQL 8, Redis 7, MongoDB), and custom projects with target VPS host node selection and direct Launch Studio UI button (`http://<nodeIp>:<studioPort>`).
+- **Unified Dev Studio & Databases Hub:** Consolidated management of Self-Hosted Supabase Stacks (powered by official `@supabase/supabase-js`), Managed Databases (PostgreSQL 16, MySQL 8, Redis 7, MongoDB), and custom projects with target VPS host node selection and direct Launch Studio UI button (`http://<nodeIp>:<studioPort>`).
 - **Global Compute Node Registration & Auto-DNS:** Registering a VPS host node defaults to global hosting capabilities without requiring manual usage tag configuration, automatically creating a Cloudflare DNS A-record (`node-<label>.<rootDomain>`) pointing to the node IP.
 - **Node Port Exposure Engine:** Expose any container/node port to an auto-created platform subdomain (e.g. `http://node1-port-8080.shanutechx.com`) backed by Cloudflare DNS and tracked via `NodePortExposure`.
 - **Git Push-to-Deploy & Zip Uploads:** Automated container building via Dockerfile or framework presets (Node.js, Python, Static Web) with automatic build log streaming via Server-Sent Events (SSE).
 - **One-Click App Catalog:** Deploy 15+ pre-configured stacks (WordPress + MySQL, N8N, Grafana, Hermes AI Agent, PostgreSQL, MinIO, Redis, etc.) using Docker Compose templates from [`templates/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/templates).
-- **Interactive In-Browser SSH Terminal:** Real-time PTY terminal gateway ([`sshTerminalGateway.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/sshTerminalGateway.ts)) over WebSockets with xterm.js support.
-- **Webmail & Shared SMTP Hosting:** Automated postal org/mailbox creation with webmail studio integration ([`smtpProvisioner.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/smtpProvisioner.ts)).
+- **Interactive In-Browser SSH & Container Exec Terminal:** Real-time PTY terminal gateway ([`sshTerminalGateway.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/sshTerminalGateway.ts)) and container exec stream gateway ([`containerExecGateway.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/containerExecGateway.ts)) over WebSockets with xterm.js support.
+- **Webmail & Shared SMTP Hosting:** Automated postal org/mailbox creation with webmail studio integration ([`webmail.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/routes/webmail.ts), [`smtpProvisioner.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/smtpProvisioner.ts)).
 - **LiveKit WebRTC Infrastructure:** Real-time audio/video room key generation and node registration ([`livekit.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/livekit.ts)).
 - **Leaseweb VPS Management:** Bare-metal server integration, automated IP allocation, operating system reinstallations, and status tracking.
 
 ### 2. Multi-Channel Operations & Notification Gateways
-- **Discord Bot Daemon:** Ticket management, `/server` monitoring, payment review queue notifications, and automated billing alerts ([`services/discord-bot`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/discord-bot)).
+- **Discord Bot Daemon:** Ticket management (`/ticket`), server monitoring, payment review queue notifications, and automated billing alerts ([`services/discord-bot`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/discord-bot)).
 - **WhatsApp Baileys Bot:** Customer account status queries, order updates, and automated WhatsApp notifications ([`services/whatsapp-bot`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/whatsapp-bot)).
-- **Mobile Admin App:** Standalone Expo / React Native Android & iOS application ([`apps/mobile-admin`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/mobile-admin)) for payment proof approvals, metric charts, and customer management.
+- **Mobile Admin App:** Standalone Expo / React Native Android & iOS application ([`apps/mobile-admin`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/mobile-admin)) for payment proof approvals, metric charts, push notifications, and customer management.
 
-### 3. Security, Billing & Storage Infrastructure
-- **Single Sign-On (SSO) Enforcement:** OAuth authentication exclusively via Google, GitHub, and Discord. Direct password input forms are disabled across client applications.
+### 3. Security, Billing, Resilience & Storage Infrastructure
+- **Single Sign-On (SSO) Enforcement:** OAuth authentication exclusively via Google, GitHub, and Discord (`Authorization: Bearer <idToken>`). Direct password input forms are disabled across client applications.
 - **Dev Superuser Role:** The `dev` user role (`role: 'dev'`) possesses complete, unrestricted superuser access to every part of the platform, bypassing resource ownership limits while non-dev users (`customer`, `support`, `admin`) remain strictly restricted.
 - **Secrets Vault:** AES-256-GCM authenticated secret encryption ([`secretsVault.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/secretsVault.ts)) with SHA-256 key derivation.
-- **Cloudflare R2 Storage Backups:** Automatic database snapshot backups and file storage integration ([`r2Storage.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/r2Storage.ts)).
+- **Multi-Layer Backups & Storage:** Cloudflare R2 backup integration ([`r2Storage.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/r2Storage.ts)), GitHub repository backups ([`githubBackup.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/githubBackup.ts)), and automated container snapshot pipelines ([`deploymentBackup.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/deploymentBackup.ts)).
 - **Automated Billing Sweeps & Dunning:** Daily automated checks ([`billing.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/billing.ts)) for past-due subscriptions, graceful grace periods, and container suspension via BullMQ.
+- **Node Health & Automated Failover Engine:** Uptime monitoring ([`uptimeMonitor.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/uptimeMonitor.ts)) and failover traffic rerouting ([`failoverEngine.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/failoverEngine.ts)).
 - **Abuse & Fraud Detection:** Instant account suspension and deployment teardown pipeline ([`abuseDetector.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/abuseDetector.ts)).
 
 ---
@@ -42,20 +43,18 @@ ShanuTechX integrates full-lifecycle cloud hosting, container builds, managed in
 ```text
 shanutechx/
 ├── apps/
-│   ├── api/             # Core REST API (Express + Prisma + PostgreSQL + BullMQ)
+│   ├── api/             # Core REST API (Express + Prisma 5.22 + PostgreSQL 16 + BullMQ)
 │   ├── dashboard/       # Control Panel Studio (Next.js 14 App Router)
 │   ├── web/             # Public Dark-Theme Marketing & Landing Site (Next.js 14 App Router)
 │   └── mobile-admin/    # Standalone Mobile Admin App (Expo / React Native)
 ├── packages/
-│   ├── db/              # Prisma 5.22 Schema & Database Migrations Ledger
-│   ├── client/          # @shanutechx/client Developer TypeScript SDK
-│   ├── catalog/         # One-Click App Catalog Templates Engine
-│   ├── deployments/     # Shared deployment type definitions and build helpers
-│   ├── node-agent/      # Node agent client interfaces
-│   ├── auth/            # Auth middleware SDK helpers
-│   ├── types/           # Shared TypeScript types
-│   ├── tracing/         # OpenTelemetry tracing wrappers
-│   └── supabase-js/     # Derived Supabase Client SDK Suite (+ auth-js, functions-js, postgrest-js, realtime-js, storage-js)
+│   ├── db/              # Prisma 5.22 Schema & Database Migrations Ledger (@shanutechx/db)
+│   ├── client/          # Developer REST API TypeScript SDK (@shanutechx/client)
+│   ├── catalog/         # One-Click App Catalog Templates Engine (@shanutechx/catalog)
+│   ├── deployments/     # Shared deployment type definitions and build helpers (@shanutechx/deployments)
+│   ├── node-agent/      # Node agent RPC client interfaces (@shanutechx/node-agent)
+│   ├── auth/            # Auth middleware SDK helpers (@shanutechx/auth)
+│   └── types/           # Shared TypeScript types (@shanutechx/types)
 ├── services/
 │   ├── node-agent/      # Plain JS (.js) VPS container control agent & telemetry daemon
 │   ├── discord-bot/     # Discord notification and ticket management bot
@@ -73,6 +72,7 @@ shanutechx/
 - **Express API Backend:** `npm run dev:api` (port 4000)
 - **Next.js Dashboard:** `npm run dev:dashboard` (port 3001)
 - **Storefront Web:** `npm run dev:web` (port 3000)
+- **BullMQ Worker Daemon:** `npm run dev:worker`
 - **Node Agent Engine:** `npm run dev:node-agent`
 - **WhatsApp Service:** `npm run dev:whatsapp`
 - **Discord Service:** `npm run dev:discord`

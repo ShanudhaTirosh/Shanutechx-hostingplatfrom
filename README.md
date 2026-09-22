@@ -14,7 +14,7 @@
 [![Bot Discord](https://img.shields.io/badge/Bot-Discord.js-5865F2.svg?logo=discord)](https://discord.js.org/)
 [![Bot WhatsApp](https://img.shields.io/badge/Bot-Baileys%20WhatsApp-25D366.svg?logo=whatsapp)](https://github.com/WhiskeySockets/Baileys)
 
-> A modern, end-to-end cloud platform featuring **Automatic Container Provisioning**, **Automated Git Deploy on Push**, **Free Cloud Database Backups (Cloudflare R2)**, **OAuth SSO Enforcement**, **Node Port Exposure Engine**, **Unified Dev Studio & Databases Hub**, **Hostinger Mail-Inspired Webmail Studio**, **React Native / Expo Android & iOS Mobile Admin App**, **Unified Discord Webhooks**, and **WhatsApp Bot Integration**.
+> A modern, end-to-end cloud platform featuring **Automatic Container Provisioning**, **Automated Git Deploy on Push**, **Cloud Database Backups (Cloudflare R2)**, **OAuth SSO Enforcement**, **Node Port Exposure Engine**, **Unified Dev Studio & Databases Hub**, **Hostinger Mail-Inspired Webmail Studio**, **React Native / Expo Android & iOS Mobile Admin App**, **Unified Discord Webhooks**, and **WhatsApp Bot Integration**.
 
 Operational Quick-Start: see [`AGENTS.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/AGENTS.md)  
 Platform Architecture & Technical Guide: see [`CLAUDE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/CLAUDE.md)  
@@ -26,7 +26,7 @@ Defect Audit & Vulnerability Report: see [`BUG_AUDIT.md`](file:///c:/Users/tiros
 ## ⚡ Core Platform Capabilities
 
 ### 1. 🤖 Fully Automated Provisioning Pipeline & Unified Dev Studio Hub
-- **Unified Dev Studio & Databases Hub**: Centralized workspace ([`apps/dashboard/app/(protected)/dev/projects/page.tsx`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard/app/(protected)/dev/projects/page.tsx)) for Self-Hosted Supabase Stacks, Managed Databases, and Node Port Exposures with target VPS node selection and direct Launch Studio UI button (`http://<nodeIp>:<studioPort>`).
+- **Unified Dev Studio & Databases Hub**: Centralized workspace ([`apps/dashboard/app/(protected)/dev/projects/page.tsx`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard/app/(protected)/dev/projects/page.tsx)) for Self-Hosted Supabase Stacks (powered by official `@supabase/supabase-js`), Managed Databases (PostgreSQL 16, MySQL 8, Redis 7, MongoDB), and Node Port Exposures with target VPS node selection and direct Launch Studio UI button (`http://<nodeIp>:<studioPort>`).
 - **Global Compute Node Registration**: Automatic Cloudflare DNS A-record (`node-<label>.<rootDomain>`) creation upon host node registration without requiring manual usage tag setup.
 - **Node Port Exposure Engine**: Instant mapping of container/node ports to auto-created Cloudflare DNS subdomains (`node-label-port-8080.shanutechx.com`).
 - **Zero-Touch Fulfillment**: Manual payment review or auto-approval provisions purchased hosting/databases/LiveKit, encrypts & delivers credentials, and registers automatic Git deployment webhooks (`deployWebhookSecret`).
@@ -52,20 +52,18 @@ Defect Audit & Vulnerability Report: see [`BUG_AUDIT.md`](file:///c:/Users/tiros
 ```text
 shanutechx/
 ├── apps/
-│   ├── api/             # Core REST API (Express + Prisma v5.22 + PostgreSQL)
-│   ├── dashboard/       # Control Panel Dashboard Studio (Next.js 14)
-│   ├── web/             # Dark-Theme Marketing & Documentation Site (Next.js 14)
+│   ├── api/             # Core REST API (Express + Prisma v5.22 + PostgreSQL 16 + BullMQ)
+│   ├── dashboard/       # Control Panel Dashboard Studio (Next.js 14 App Router)
+│   ├── web/             # Dark-Theme Marketing & Documentation Site (Next.js 14 App Router)
 │   └── mobile-admin/    # Expo React Native Mobile Admin App for Android & iOS
 ├── packages/
-│   ├── db/              # Prisma 5.22 Schema & Database Migrations Ledger
-│   ├── client/          # @shanutechx/client Developer TypeScript SDK
-│   ├── catalog/         # One-Click App Catalog Templates Manager
-│   ├── deployments/     # Shared deployment type definitions and build helpers
-│   ├── node-agent/      # Node agent client interfaces
-│   ├── auth/            # Auth middleware SDK helpers
-│   ├── types/           # Core Shared TypeScript Type Definitions
-│   ├── tracing/         # OpenTelemetry tracing wrappers
-│   └── supabase-js/     # Supabase Client SDK Suite (auth-js, functions-js, postgrest-js, realtime-js, storage-js)
+│   ├── db/              # Prisma 5.22 Schema & Database Migrations Ledger (@shanutechx/db)
+│   ├── client/          # @shanutechx/client Developer REST API TypeScript SDK
+│   ├── catalog/         # One-Click App Catalog Templates Manager (@shanutechx/catalog)
+│   ├── deployments/     # Shared deployment type definitions and build helpers (@shanutechx/deployments)
+│   ├── node-agent/      # Node agent RPC client interfaces (@shanutechx/node-agent)
+│   ├── auth/            # Auth middleware SDK helpers (@shanutechx/auth)
+│   └── types/           # Core Shared TypeScript Type Definitions (@shanutechx/types)
 ├── services/
 │   ├── node-agent/      # Node Agent VPS Container Control & Telemetry Daemon
 │   ├── discord-bot/     # Discord Bot for Ticket Management & Alerts
