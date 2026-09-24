@@ -59,6 +59,10 @@ app.get('/agent/health', (_req, res) => {
 // layer of defense, not the only one. See BIND_HOST below and the
 // deployment docs for enforcing that at the network level too.
 app.use((req, res, next) => {
+  // Traefik's forwardAuth calls this one path with the secret in the query string (Traefik cannot be told to send a
+  // custom header via labels alone), never as x-agent-secret. Same secret, same timing-safe check, just read from
+  // wherever this particular caller can put it.
+  const isWafCheck = req.path.startsWith('/agent/waf-check/');
   if (ALLOWED_IPS.length > 0) {
     // Use only the real TCP peer address — never x-forwarded-for, which is
     // trivially spoofable by the client and must not be used for access control
@@ -70,7 +74,7 @@ app.use((req, res, next) => {
     }
   }
   // Timing-safe comparison. HMAC both sides first so this works safely.
-  const submitted = req.headers['x-agent-secret'];
+  const submitted = isWafCheck ? req.query.secret : req.headers['x-agent-secret'];
   const key = 'shanutechx-node-agent-gate';
   const isValid =
     typeof submitted === 'string' &&
@@ -514,6 +518,8 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
       startCommand: startCommand || null,
       frameworkPreset: frameworkPreset || 'auto',
       publishedPort: publishedPort ?? null,
+      agentPort: PORT,
+      agentSecret: AGENT_SECRET,
     });
 
 
@@ -687,10 +693,72 @@ app.post('/agent/livekit/keys', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────
+// WAF enforcement. The API is the source of truth for rules (in Postgres); this agent only ever holds the current
+// snapshot for each deployment in memory, refreshed by /waf/sync on every rule change. See ./waf.js for the actual
+// matching and rate-limiting logic (matchType "country" and action "turnstile_challenge" are rejected by the API
+// before they ever get here, since neither is enforced).
+// ─────────────────────────────────────────────────
+const waf = require('./waf');
+const bcrypt = require('bcryptjs');
+const wafStateByDeployment = new Map(); // deploymentId -> { rules: WafRule[], protectionPasswordHash: string|null }
+const wafLimiter = new waf.RateLimiter();
+const passwordGate = new waf.PasswordGate((password, hash) => bcrypt.compare(password, hash));
+setInterval(() => wafLimiter.sweep(), 5 * 60 * 1000).unref();
+
 app.post('/agent/deployments/:deploymentId/waf/sync', async (req, res) => {
   const { deploymentId } = req.params;
-  logger.info({ deploymentId }, 'WAF & Edge rules synced on node agent');
+  const rules = Array.isArray(req.body && req.body.rules) ? req.body.rules : [];
+  const protectionPasswordHash = typeof (req.body && req.body.protectionPasswordHash) === 'string' ? req.body.protectionPasswordHash : null;
+  wafStateByDeployment.set(deploymentId, { rules, protectionPasswordHash });
+  // A password that changed or was removed must stop matching a cached (now stale, or now nonexistent) credential
+  // immediately -- without this the OLD password would keep working until the cache entry happened to fall out.
+  passwordGate.invalidate(deploymentId);
+  logger.info({ deploymentId, rules: rules.length, passwordProtected: Boolean(protectionPasswordHash) }, 'WAF rules synced on node agent');
   res.json({ ok: true, syncedAt: new Date().toISOString() });
+});
+
+// Traefik forwardAuth target: called once per request, BEFORE it reaches the container, for every proxied
+// deployment (see exposure.js). A 2xx response lets the request through; anything else is returned to the browser
+// instead of the app. Order matters: a blocked/rate-limited IP is rejected before it ever sees the password prompt.
+app.all('/agent/waf-check/:deploymentId', async (req, res) => {
+  const { deploymentId } = req.params;
+  const state = wafStateByDeployment.get(deploymentId);
+  if (!state || (state.rules.length === 0 && !state.protectionPasswordHash)) return res.status(200).end();
+
+  // Traefik's forwardAuth sends the ORIGINAL request's details in these headers, not in the forwarded request itself.
+  const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+  const checkReq = {
+    ip,
+    path: String(req.headers['x-forwarded-uri'] || '/').split('?')[0],
+    userAgent: String(req.headers['x-forwarded-user-agent'] || req.headers['user-agent'] || ''),
+    headers: Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k.toLowerCase(), Array.isArray(v) ? v[0] : String(v || '')])),
+  };
+
+  if (state.rules.length > 0) {
+    const result = waf.evaluate(state.rules, checkReq, wafLimiter);
+    if (result.decision === 'block') {
+      logger.info({ deploymentId, ip, ruleId: result.ruleId, path: checkReq.path }, 'WAF blocked a request');
+      return res.status(403).type('text/plain').end('Forbidden');
+    }
+    if (result.decision === 'rate_limited') {
+      return res.status(429).type('text/plain').end('Too Many Requests');
+    }
+  }
+
+  if (state.protectionPasswordHash) {
+    // Rate-limit FAILED attempts per IP before ever calling bcrypt, so hammering the prompt cannot burn CPU on the
+    // node -- a correct, cached credential is cheap (see waf.js), but a wrong guess still costs one real compare.
+    const budgetKey = `pwauth:${deploymentId}:${ip}`;
+    if (!wafLimiter.hit(budgetKey, 20)) return res.status(429).type('text/plain').end('Too Many Requests');
+    const outcome = await passwordGate.check(deploymentId, state.protectionPasswordHash, checkReq.headers['authorization']);
+    if (!outcome.ok) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="Protected"');
+      return res.status(401).type('text/plain').end('Authentication required');
+    }
+  }
+
+  res.status(200).end();
 });
 
 app.post('/agent/deployments/:deploymentId/domains', async (req, res) => {

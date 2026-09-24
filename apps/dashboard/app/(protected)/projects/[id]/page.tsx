@@ -1419,7 +1419,7 @@ function ConnectionPanel({ project }: { project: Project }) {
   ];
 
   // Code snippet templates
-  const jsSdkCode = `import { createClient } from '@supabase/supabase-js'
+  const jsSdkCode = `import { createClient } from '@shanutechx/supabase-js'
 
 // Initialize the isomorphic JS client
 const supabase = createClient(

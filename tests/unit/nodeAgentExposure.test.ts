@@ -46,6 +46,18 @@ async function build(k: { exposureMode: string | null; routingMode: string; fram
   return { Labels: c.Labels, PortBindings: c.HostConfig.PortBindings, NetworkMode: c.HostConfig.NetworkMode };
 }
 
+async function buildWithAgent(k: Parameters<typeof build>[0], agentPort = 5000, agentSecret = 'topsecret') {
+  created.length = 0;
+  await runContainer({
+    deploymentId: 'cdep0000000001', imageTag: 'img:1', internalPort: k.internalPort, subdomain: k.subdomain ?? undefined,
+    rootDomain: 'example.com', deploymentsRootDomain: 'apps.example.com', routingMode: k.routingMode,
+    ...(k.exposureMode === null ? {} : { exposureMode: k.exposureMode }), frameworkPreset: k.frameworkPreset, publishedPort: k.publishedPort,
+    agentPort, agentSecret,
+  });
+  const c = created[0];
+  return { Labels: c.Labels as Record<string, string>, PortBindings: c.HostConfig.PortBindings };
+}
+
 const keys = Object.keys(golden).map((s) => ({ raw: s, k: JSON.parse(s) }));
 
 test('exposure: pre-existing modes are unchanged (characterization vs original docker.js)', async () => {
@@ -94,4 +106,49 @@ test('exposure: invalid ports fail early with a clear message instead of an opaq
   assert.deepEqual(unset.PortBindings, { '3000/tcp': [{ HostPort: '3000' }], '3000/udp': [{ HostPort: '3000' }] });
   await assert.doesNotReject(build({ ...base, publishedPort: 65535 }));
   await assert.doesNotReject(build({ ...base, publishedPort: 1 }));
+});
+
+
+test('exposure: WAF forwardAuth middleware', async (t) => {
+  const proxiedCases = keys.filter(({ k }) => (k.exposureMode === null || k.exposureMode === 'ssl_with_proxy' || k.exposureMode === 'ssl_direct'));
+
+  await t.test('is attached to every deployment that actually gets a Traefik router when agentPort/agentSecret are supplied (bots with no subdomain get no router at all, so nothing to check)', async () => {
+    let sawARouter = false;
+    for (const { k } of proxiedCases) {
+      const c = await buildWithAgent(k, 5000, 's3cret');
+      const router = `deploy-cdep0000000001`;
+      const hasRouter = c.Labels['traefik.enable'] === 'true';
+      if (!hasRouter) continue; // e.g. a bot preset with no subdomain: no router, nothing to attach to
+      sawARouter = true;
+      assert.equal(c.Labels[`traefik.http.middlewares.${router}-waf.forwardauth.address`], `http://127.0.0.1:5000/agent/waf-check/cdep0000000001?secret=s3cret`, JSON.stringify(k));
+      assert.equal(c.Labels[`traefik.http.middlewares.${router}-waf.forwardauth.trustForwardHeader`], 'true');
+      assert.match(c.Labels[`traefik.http.routers.${router}.middlewares`], new RegExp(`(^|,)${router}-waf@docker(,|$)`), JSON.stringify(k));
+    }
+    assert.ok(sawARouter, 'the proxied case set should include at least one combination that gets a router');
+  });
+
+  await t.test('a secret with URL-special characters is percent-encoded in the address', async () => {
+    const c = await buildWithAgent({ exposureMode: 'ssl_with_proxy', routingMode: 'proxied', frameworkPreset: 'auto', publishedPort: null, subdomain: 'x', internalPort: 3000 }, 5000, 'a&b=c?d');
+    assert.equal(c.Labels['traefik.http.middlewares.deploy-cdep0000000001-waf.forwardauth.address'], 'http://127.0.0.1:5000/agent/waf-check/cdep0000000001?secret=a%26b%3Dc%3Fd');
+  });
+
+  await t.test('is never attached to direct_port or internal_only deployments (no HTTP router exists to attach it to)', async () => {
+    for (const mode of ['no_ssl', 'raw_tcp', 'internal_only']) {
+      const c = await buildWithAgent({ exposureMode: mode, routingMode: 'proxied', frameworkPreset: 'auto', publishedPort: 4000, subdomain: 'x', internalPort: 3000 });
+      assert.equal(Object.keys(c.Labels).some((l) => l.includes('-waf.forwardauth')), false, mode);
+    }
+  });
+
+  await t.test('is omitted when agentPort/agentSecret are not supplied (backward compatible default)', async () => {
+    const c = await build({ exposureMode: 'ssl_with_proxy', routingMode: 'proxied', frameworkPreset: 'auto', publishedPort: null, subdomain: 'x', internalPort: 3000 });
+    assert.equal(Object.keys(c.Labels).some((l) => l.includes('-waf.forwardauth')), false);
+  });
+
+  await t.test('existing router middlewares (security headers, rate limit, gzip) are preserved alongside the WAF middleware', async () => {
+    const c = await buildWithAgent({ exposureMode: 'ssl_with_proxy', routingMode: 'proxied', frameworkPreset: 'auto', publishedPort: null, subdomain: 'x', internalPort: 3000 });
+    const mw = c.Labels['traefik.http.routers.deploy-cdep0000000001.middlewares'];
+    assert.match(mw, /security-headers@file/);
+    assert.match(mw, /rate-limit@file/);
+    assert.match(mw, /gzip-compress@file/);
+  });
 });

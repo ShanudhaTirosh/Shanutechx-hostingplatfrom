@@ -1,4 +1,5 @@
 import { env } from '../env';
+import { logger } from './logger';
 import { resolveRepoUrlForBuild } from './gitAuth';
 import { resolveExposureForBuild } from './exposureDefaults';
 
@@ -627,11 +628,27 @@ export async function getNodeDockerDf(node: Node): Promise<any> {
   return callNodeAgent(node, '/agent/system/df', 'GET');
 }
 
-export async function notifyAgentWafSync(node: Node, deploymentId: string): Promise<void> {
+export interface WafSyncRule {
+  id: string;
+  action: 'allow' | 'block' | 'rate_limit';
+  matchType: 'ip' | 'ip_range' | 'header' | 'path' | 'user_agent';
+  matchValue: string;
+  rateLimitPerMinute: number | null;
+  isEnabled: boolean;
+}
+
+/**
+ * Pushes the deployment's CURRENT full rule set (and password-protection hash, if any) to the node, which is what
+ * actually enforces them (see services/node-agent/src/waf.js). Non-blocking for the caller by design -- a rule save
+ * should not fail just because a node is briefly unreachable -- but a failure here means the change did NOT take
+ * effect, so it is logged loudly rather than swallowed, which is what silently discarded every WAF rule saved on
+ * this platform before this function actually sent anything.
+ */
+export async function notifyAgentWafSync(node: Node, deploymentId: string, rules: WafSyncRule[], protectionPasswordHash: string | null): Promise<void> {
   try {
-    await callNodeAgent(node, `/agent/deployments/${deploymentId}/waf/sync`, 'POST');
-  } catch {
-    // Non-blocking warning if agent sync fails silently
+    await callNodeAgent(node, `/agent/deployments/${deploymentId}/waf/sync`, 'POST', { rules, protectionPasswordHash });
+  } catch (err) {
+    logger.error({ err, deploymentId, nodeId: node.id }, 'Failed to sync WAF rules to the node agent -- the saved rule(s) are NOT being enforced until this succeeds');
   }
 }
 

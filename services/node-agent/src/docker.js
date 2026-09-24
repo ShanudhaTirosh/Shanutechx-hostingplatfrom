@@ -26,6 +26,8 @@ async function runContainer({
   startCommand = null,
   frameworkPreset = 'auto',
   publishedPort = null,
+  agentPort = undefined,
+  agentSecret = undefined,
 }) {
   const containerName = `deploy-${deploymentId}`;
 
@@ -47,6 +49,8 @@ async function runContainer({
     exposureMode,
     frameworkPreset,
     publishedPort,
+    agentPort,
+    agentSecret,
   });
   Object.assign(labels, exposure.labels);
   Object.assign(portBindings, exposure.portBindings);

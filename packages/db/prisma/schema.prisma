@@ -537,7 +537,8 @@ model Deployment {
   edgeRules Json? // Custom rewrites, redirects, response headers, and scheduled crons
 
   // Security, WAF & Cloudflare Turnstile Challenge Protection
-  deploymentProtectionPassword String?  // Encrypted HTTP Basic Auth password for URL protection
+  deploymentProtectionPassword String? // legacy, reversibly-encrypted; superseded by the hash below, kept only so a migration script can read old values
+  deploymentProtectionPasswordHash String? // bcrypt hash; this is what the node agent's WAF gateway actually enforces
   wafTurnstileEnabled          Boolean  @default(false) // Trigger Cloudflare Turnstile challenge on suspicious requests
 
   // App Sleeping (scale to zero when idle)
@@ -568,6 +569,8 @@ model WafRule {
   description  String?
   isEnabled    Boolean    @default(true)
   createdAt    DateTime   @default(now())
+  // Only used when action = "rate_limit": requests allowed per IP per minute before the excess is rejected.
+  rateLimitPerMinute Int?
 
   @@index([deploymentId, isEnabled])
 }

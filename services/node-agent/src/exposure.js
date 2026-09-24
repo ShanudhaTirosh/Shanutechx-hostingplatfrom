@@ -34,6 +34,10 @@ function resolveExposure({
   exposureMode = 'ssl_with_proxy',
   frameworkPreset = 'auto',
   publishedPort = null,
+  // Needed only to attach the WAF forwardAuth middleware (see waf.js / the /agent/waf-check route in index.js).
+  // Left undefined in tests that don't care about WAF; the label is simply omitted then.
+  agentPort = undefined,
+  agentSecret = undefined,
 }) {
   const labels = {};
   const portBindings = {};
@@ -76,6 +80,19 @@ function resolveExposure({
       labels[`traefik.http.routers.${routerName}.middlewares`] = 'security-headers@file,rate-limit@file,gzip-compress@file';
     }
     joinPublicNetwork = true;
+
+    // Every proxied request is checked against this deployment's WAF rules before Traefik forwards it. The check
+    // itself is a fast local call (in-memory rule lookup on the same host) and returns instantly when there are no
+    // rules, so this is attached unconditionally rather than only when rules exist -- that way turning a rule on
+    // takes effect immediately, with no redeploy required, instead of only protecting deployments created after the
+    // first rule was added. WAF only applies here: direct_port/internal_only bypass Traefik entirely, so there is no
+    // HTTP request for a forwardAuth check to intercept.
+    if (agentPort && agentSecret) {
+      labels[`traefik.http.middlewares.${routerName}-waf.forwardauth.address`] = `http://127.0.0.1:${agentPort}/agent/waf-check/${deploymentId}?secret=${encodeURIComponent(agentSecret)}`;
+      labels[`traefik.http.middlewares.${routerName}-waf.forwardauth.trustForwardHeader`] = 'true';
+      const existing = labels[`traefik.http.routers.${routerName}.middlewares`];
+      labels[`traefik.http.routers.${routerName}.middlewares`] = existing ? `${routerName}-waf@docker,${existing}` : `${routerName}-waf@docker`;
+    }
   }
 
   return { effectiveMode, labels, portBindings, joinPublicNetwork };

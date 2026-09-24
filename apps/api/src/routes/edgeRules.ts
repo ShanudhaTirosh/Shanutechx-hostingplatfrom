@@ -3,8 +3,6 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { canAccessResource } from '../middleware/rbac';
-import { logger } from '../lib/logger';
-import { notifyAgentWafSync } from '../lib/nodeAgentClient';
 
 export const edgeRulesRouter = Router();
 
@@ -84,10 +82,8 @@ edgeRulesRouter.put('/deployments/:id/edge-rules', async (req: AuthedRequest, re
     data: { edgeRules: parsed.data as any },
   });
 
-  // Sync edge rules to node agent proxy
-  void notifyAgentWafSync(deployment.node, deployment.id).catch((err) => {
-    logger.warn({ err, deploymentId: deployment.id }, 'Edge rules sync warning');
-  });
-
-  res.json({ ok: true, edgeRules: updated.edgeRules });
+  // NOTE: these are saved but not yet enforced anywhere -- there is no node-side mechanism (Traefik middleware,
+  // cron scheduler, ...) wired up to read this configuration. Reporting `enforced: false` honestly rather than
+  // pretending a "sync" call that used to be a no-op made any of this take effect.
+  res.json({ ok: true, edgeRules: updated.edgeRules, enforced: false });
 });
