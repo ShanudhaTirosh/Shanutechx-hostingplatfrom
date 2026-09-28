@@ -163,11 +163,19 @@ pushReceiptQueue.on('error', () => {
 });
 
 
-// Safely attach event listeners without unhandled promise rejections
+// Safely attach event listeners without unhandled promise rejections.
+// FIX: The 'connect'/'ready' events can fire before this IIFE runs (async race),
+// leaving isRedisConnected permanently false even when Redis is healthy.
+// Check the client status synchronously first before wiring event listeners.
 (async () => {
   try {
     const queueClient = await sslRenewalQueue.client.catch(() => null);
     if (queueClient) {
+      // If Redis was already connected by the time this runs, set the flag now.
+      if (queueClient.status === 'ready') {
+        logger.info('Redis already connected at queue health listener attach time');
+        isRedisConnected = true;
+      }
       queueClient.on('connect', () => {
         logger.info('Redis connected for queue system');
         isRedisConnected = true;

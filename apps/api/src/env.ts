@@ -102,6 +102,8 @@ export const env = {
   lokiUrl: process.env.LOKI_URL ?? '',
   lokiOrgId: process.env.LOKI_ORG_ID ?? '',
 
-  // Single-Email Whitelist Restriction for Supabase Studio SSO
-  allowedAdminEmails: process.env.ALLOWED_ADMIN_EMAILS ?? 'tiroshbrot123@gmail.com',
+  // Single-Email Whitelist Restriction for Supabase Studio SSO.
+  // IMPORTANT: Set ALLOWED_ADMIN_EMAILS to a comma-separated list of admin emails in production.
+  // An empty string means no emails are whitelisted (access denied to all until configured).
+  allowedAdminEmails: process.env.ALLOWED_ADMIN_EMAILS ?? '',
 };

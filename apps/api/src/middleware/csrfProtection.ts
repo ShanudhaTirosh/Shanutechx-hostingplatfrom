@@ -12,16 +12,25 @@ import { logger } from '../lib/logger';
  * requests to our API if a user is logged into the dashboard.
  */
 
+// Additional origins can be injected at runtime for staging or other environments
+// without a code change (e.g. EXTRA_ALLOWED_ORIGINS=https://staging.shanutechx.com)
+const extraOrigins = process.env.EXTRA_ALLOWED_ORIGINS
+  ? process.env.EXTRA_ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+  : [];
+
 const ALLOWED_ORIGINS = [
-  // Production domains (update these with your actual production URLs)
+  // Production domains
   'https://app.shanutechx.com',
   'https://shanutechx.com',
   'https://www.shanutechx.com',
-  
-  // Development/local origins
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://127.0.0.1:3000',
+
+  // Development/local origins — excluded in production to avoid expanding the attack surface.
+  // Set NODE_ENV=production on all production servers.
+  ...(process.env.NODE_ENV !== 'production'
+    ? ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000']
+    : []),
+
+  ...extraOrigins,
 ];
 
 /**

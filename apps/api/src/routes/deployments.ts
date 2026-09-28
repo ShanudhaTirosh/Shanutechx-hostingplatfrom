@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { requireAuth, AuthedRequest } from '../middleware/auth';
+import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 import { ownedResourceWhere, canAccessResource } from '../middleware/rbac';
 import { deployService } from '../lib/deployPipeline';
 import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
@@ -20,6 +20,7 @@ import { modeFromStored } from '../lib/portExposure';
 import { createDefaultDeps as createDefaultBackupDeps, purgeDeletedDeploymentBackups } from '../lib/deploymentBackup';
 import { logger } from '../lib/logger';
 import { redactRepoUrl } from '../lib/redact';
+import { deploymentCreateLimiter } from '../middleware/rateLimit';
 
 import { scanTextForAbuse, banUserAndTeardownResources } from '../lib/abuseDetector';
 
@@ -85,7 +86,7 @@ const createDeploymentSchema = z.object({
   message: 'Either templateId, isPendingConfig, or both repoUrl and internalPort are required',
 });
 
-deploymentsRouter.post('/deployments', async (req: AuthedRequest, res) => {
+deploymentsRouter.post('/deployments', deploymentCreateLimiter, async (req: AuthedRequest, res) => {
   const parsed = createDeploymentSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -934,15 +935,9 @@ const updateSubdomainSchema = z.object({
  * Updates a deployment's primary subdomain under ROOT_DOMAIN.
  * Validates availability, creates new Cloudflare DNS record, and restarts container with new Traefik labels.
  */
-deploymentsRouter.patch('/deployments/:id/subdomain', async (req: AuthedRequest, res) => {
+deploymentsRouter.patch('/deployments/:id/subdomain', requireAdminOrDev, async (req: AuthedRequest, res) => {
   const deployment = await loadOwnedDeployment(req, req.params.id);
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
-
-  if (req.user?.role !== 'admin' && req.user?.role !== 'dev') {
-    return res.status(403).json({
-      error: 'Subdomains can only be set once during application creation and cannot be modified later by customers.',
-    });
-  }
 
   const parsed = updateSubdomainSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });

@@ -67,12 +67,17 @@ export async function banUserAndTeardownResources({
 
     let stoppedCount = 0;
     for (const dep of runningDeployments) {
-      if (dep.node) {
+      // FIX: dep.containerId is the Docker container ID; dep.id is the DB UUID.
+      // Passing dep.id to stopDeployment always fails silently because the node-agent
+      // has no container with that name. Guard against null containerId too.
+      if (dep.node && dep.containerId) {
         try {
-          await stopDeployment(dep.node, dep.id);
+          await stopDeployment(dep.node, dep.containerId);
         } catch (err: any) {
-          logger.error({ err, deploymentId: dep.id }, 'Failed to stop deployment container during user ban');
+          logger.error({ err, deploymentId: dep.id, containerId: dep.containerId }, 'Failed to stop deployment container during user ban');
         }
+      } else if (dep.node && !dep.containerId) {
+        logger.warn({ deploymentId: dep.id }, 'Skipping container stop during ban — no containerId recorded for this deployment');
       }
       await prisma.deployment.update({
         where: { id: dep.id },

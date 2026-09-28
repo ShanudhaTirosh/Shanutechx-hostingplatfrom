@@ -119,7 +119,15 @@ export async function buildAndRun(
 
     for (const line of lines) {
       if (!line.trim()) continue;
-      const event: BuildEvent = JSON.parse(line);
+      // FIX: JSON.parse throws on malformed / partial lines from the node-agent.
+      // A crash here leaves the deployment stuck in 'building'. Skip and log bad lines.
+      let event: BuildEvent;
+      try {
+        event = JSON.parse(line) as BuildEvent;
+      } catch {
+        logger.warn({ deploymentId: params.deploymentId, line }, 'Skipping unparseable build event line from node-agent');
+        continue;
+      }
       onEvent(event);
       if (event.phase === 'done' || event.phase === 'error') {
         finalEvent = event;

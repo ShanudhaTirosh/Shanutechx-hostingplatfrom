@@ -1,7 +1,16 @@
 import { prisma } from './prisma';
 import { logger } from './logger';
+import { buildAndRun, BuildEvent } from './nodeAgentClient';
 
-export type RailpackStage = 'source' | 'build' | 'test' | 'image' | 'deploy' | 'health_check' | 'live' | 'failed';
+export type RailpackStage =
+  | 'source'
+  | 'build'
+  | 'test'
+  | 'image'
+  | 'deploy'
+  | 'health_check'
+  | 'live'
+  | 'failed';
 
 export interface RailpackPipelineOptions {
   deploymentId: string;
@@ -9,6 +18,10 @@ export interface RailpackPipelineOptions {
   branch?: string;
   onStageChange?: (stage: RailpackStage, logs: string) => void;
   healthCheckUrl?: string;
+  /** The node where the deployment lives — required to actually run the build. */
+  node: { id: string; ip: string };
+  internalPort: number;
+  envVars?: Record<string, string>;
 }
 
 export interface PipelineResult {
@@ -16,16 +29,27 @@ export interface PipelineResult {
   pipelineRunId: string;
   finalStage: RailpackStage;
   error?: string;
+  containerId?: string;
 }
 
 /**
  * Railpack Unified Build & Deployment Pipeline Engine
- * Executes multi-stage builds: Source -> Build -> Test -> Image -> Deploy -> Health Check -> Live
+ * Executes multi-stage builds by delegating to buildAndRun on the target
+ * node-agent. Each build event from the agent is mapped to a Railpack stage
+ * and persisted in PipelineRun for dashboard visibility.
+ *
+ * Previously this was a stub that only wrote log strings without performing
+ * any real work, causing every pipeline run to silently report success.
  */
-export async function executeRailpackPipeline(options: RailpackPipelineOptions): Promise<PipelineResult> {
+export async function executeRailpackPipeline(
+  options: RailpackPipelineOptions,
+): Promise<PipelineResult> {
   const startTime = Date.now();
-  const stages: RailpackStage[] = ['source', 'build', 'test', 'image', 'deploy', 'health_check', 'live'];
-  const stageLogs: Record<string, string> = {};
+  const stageLogs: Partial<Record<RailpackStage, string>> = {};
+
+  if (!options.repoUrl) {
+    throw new Error('repoUrl is required to execute a Railpack pipeline');
+  }
 
   const pipelineRun = await prisma.pipelineRun.create({
     data: {
@@ -38,53 +62,70 @@ export async function executeRailpackPipeline(options: RailpackPipelineOptions):
   async function updateStage(stage: RailpackStage, logText: string, failed = false) {
     stageLogs[stage] = logText;
     options.onStageChange?.(stage, logText);
-
     await prisma.pipelineRun.update({
       where: { id: pipelineRun.id },
       data: {
         currentStage: failed ? 'failed' : stage,
-        failedStage: failed ? stage : null,
-        stageLogs,
+        ...(failed ? { failedStage: stage } : { failedStage: null }),
+        stageLogs: stageLogs as any,
       },
     });
   }
 
   try {
-    // Stage 1: Source
-    await updateStage('source', `[Source] Pulling repository source from ${options.repoUrl || 'workspace'} (branch: ${options.branch || 'main'})`);
+    await updateStage(
+      'source',
+      `[Source] Pulling repository source from ${options.repoUrl} (branch: ${options.branch || 'main'})`,
+    );
 
-    // Stage 2: Build
-    await updateStage('build', '[Build] Detecting framework & executing Railpack build pipeline...');
+    // Map node-agent BuildEvent phases to Railpack stages for progress tracking.
+    const PHASE_TO_STAGE: Partial<Record<string, RailpackStage>> = {
+      fetch: 'source',
+      build: 'build',
+      run: 'deploy',
+      done: 'live',
+    };
 
-    // Stage 3: Test
-    await updateStage('test', '[Test] Running test suite & static assertions...');
+    let lastContainerId: string | undefined;
 
-    // Stage 4: Image
-    await updateStage('image', '[Image] Creating container OCI image layer & tagging artifact...');
+    const finalEvent = await buildAndRun(
+      options.node,
+      {
+        deploymentId: options.deploymentId,
+        repoUrl: options.repoUrl,
+        branch: options.branch,
+        internalPort: options.internalPort,
+        envVars: options.envVars,
+      },
+      async (event: BuildEvent) => {
+        if (event.containerId) lastContainerId = event.containerId;
+        const stage = PHASE_TO_STAGE[event.phase];
+        if (stage) {
+          const logText = event.log ?? event.message ?? `[${stage}] In progress...`;
+          // Best-effort stage update — don't let a DB error abort the build stream.
+          await updateStage(stage, logText).catch((err) =>
+            logger.warn({ deploymentId: options.deploymentId, err }, 'Failed to persist pipeline stage update'),
+          );
+        }
+      },
+    );
 
-    // Stage 5: Deploy
-    await updateStage('deploy', '[Deploy] Starting container deployment on compute node...');
+    if (finalEvent.phase === 'error') {
+      throw new Error(finalEvent.message ?? 'Build failed on node agent');
+    }
 
-    // Stage 6: Health Check
-    await updateStage('health_check', `[Health Check] Verifying HTTP endpoint response at ${options.healthCheckUrl || '/'}...`);
-
-    // Stage 7: Live
     const durationMs = Date.now() - startTime;
     await updateStage('live', `[Live] Deployment live & operational. Pipeline duration: ${durationMs}ms`);
-
     await prisma.pipelineRun.update({
       where: { id: pipelineRun.id },
-      data: {
-        currentStage: 'live',
-        durationMs,
-        completedAt: new Date(),
-      },
+      data: { currentStage: 'live', durationMs, completedAt: new Date() },
     });
 
     return {
       ok: true,
       pipelineRunId: pipelineRun.id,
       finalStage: 'live',
+      containerId: lastContainerId,
     };
   } catch (err: any) {
     const durationMs = Date.now() - startTime;
