@@ -28,6 +28,8 @@ async function runContainer({
   publishedPort = null,
   agentPort = undefined,
   agentSecret = undefined,
+  privateNetworkName = undefined,
+  containerAlias = undefined,
 }) {
   const containerName = `deploy-${deploymentId}`;
 
@@ -59,6 +61,17 @@ async function runContainer({
     networks.push(PUBLIC_NETWORK);
   }
 
+  // Private project environment network
+  if (privateNetworkName && typeof privateNetworkName === 'string') {
+    try {
+      const net = docker.getNetwork(privateNetworkName);
+      await net.inspect().catch(async () => {
+        await docker.createNetwork({ Name: privateNetworkName, Driver: 'bridge' }).catch(() => {});
+      });
+      networks.push(privateNetworkName);
+    } catch (_err) {}
+  }
+
   const containerConfig = {
     name: containerName,
     Image: imageTag,
@@ -79,6 +92,20 @@ async function runContainer({
   }
 
   const container = await docker.createContainer(containerConfig);
+
+  // Connect additional networks beyond the primary NetworkMode
+  for (let i = 1; i < networks.length; i++) {
+    const netName = networks[i];
+    try {
+      const net = docker.getNetwork(netName);
+      await net.connect({
+        Container: container.id,
+        EndpointConfig: {
+          Aliases: containerAlias ? [containerAlias, containerName] : [containerName],
+        },
+      });
+    } catch (_e) {}
+  }
 
   await container.start();
 
