@@ -161,6 +161,10 @@ app.use(
 // CSRF Protection: Validate Origin header for state-changing requests
 app.use(csrfProtection);
 
+import { previewToolbarRouter } from './routes/previewToolbar';
+import { edgeConfigRouter } from './routes/edgeConfig';
+import { speedInsightsRouter } from './routes/speedInsights';
+
 app.use('/api', healthRouter);
 app.use('/api', meRouter);
 app.use('/api', authRouter);
@@ -226,6 +230,9 @@ app.use('/api', edgeRulesRouter);
 app.use('/api', nixpacksRouter);
 app.use('/api', volumesRouter);
 app.use('/api', notificationsRouter);
+app.use('/api', previewToolbarRouter);
+app.use('/api', edgeConfigRouter);
+app.use('/api', speedInsightsRouter);
 
 
 // Catches any request that didn't match a route above. Without this,

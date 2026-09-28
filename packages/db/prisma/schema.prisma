@@ -1979,3 +1979,172 @@ model NotificationChannel {
   @@index([userId, isEnabled])
 }
 
+// Content-Addressed Storage (CAS) File Blobs
+model CasFileBlob {
+  id         String   @id @default(cuid())
+  sha        String   @unique // SHA-1 hex digest
+  sizeBytes  Int
+  mimeType   String?
+  storageKey String?  // S3 / R2 storage key or local file ref
+  createdAt  DateTime @default(now())
+
+  @@index([sha])
+}
+
+// Sub-Second Deployment Target Pointer (Rollback Engine)
+model DeploymentPointer {
+  id           String   @id @default(cuid())
+  projectId    String
+  subdomain    String   @unique
+  deploymentId String
+  targetIp     String
+  targetPort   Int
+  weight       Int      @default(100) // Traffic percentage (Rolling Release)
+  isProduction Boolean  @default(true)
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  @@index([projectId])
+  @@index([subdomain])
+}
+
+// Preview Toolbar Visual Comments & Feedback
+model PreviewComment {
+  id           String   @id @default(cuid())
+  deploymentId String
+  userId       String
+  userName     String?
+  xPct         Float    // Relative DOM X position percentage
+  yPct         Float    // Relative DOM Y position percentage
+  elementPath  String?  // CSS selector or DOM path
+  commentText  String
+  isResolved   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([deploymentId])
+}
+
+// Edge Config Global Key-Value Store
+model EdgeConfigStore {
+  id          String           @id @default(cuid())
+  userId      String
+  slug        String           @unique
+  name        String
+  description String?
+  items       EdgeConfigItem[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([userId])
+}
+
+model EdgeConfigItem {
+  id        String          @id @default(cuid())
+  storeId   String
+  store     EdgeConfigStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  key       String
+  valueJson Json
+  updatedAt DateTime        @updatedAt
+
+  @@unique([storeId, key])
+  @@index([storeId])
+}
+
+// Speed Insights Core Web Vitals RUM Telemetry
+model SpeedInsightMetric {
+  id           String   @id @default(cuid())
+  deploymentId String
+  routePath    String
+  metricName   String   // LCP | INP | CLS | FCP | TTFB
+  metricValue  Float
+  rating       String   // good | needs_improvement | poor
+  deviceType   String?  // desktop | mobile | tablet
+  country      String?
+  createdAt    DateTime @default(now())
+
+  @@index([deploymentId, routePath])
+}
+
+// Environment-scoped Project Architecture
+enum EnvironmentName {
+  development
+  preview
+  staging
+  production
+}
+
+model Environment {
+  id          String          @id @default(cuid())
+  projectId   String
+  name        EnvironmentName @default(production)
+  isDefault   Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+
+  variables   ProjectVariable[]
+  networks    InternalNetwork[]
+
+  @@unique([projectId, name])
+}
+
+// Hierarchical Variables & Secrets
+enum VariableScope {
+  service
+  shared
+  project
+}
+
+model ProjectVariable {
+  id             String        @id @default(cuid())
+  projectId      String
+  environmentId  String?
+  environment    Environment?  @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  serviceId      String?
+  key            String
+  valueEncrypted String        // AES-256-GCM encrypted value
+  isSecret       Boolean       @default(false)
+  isReference    Boolean       @default(false) // e.g. ${{Postgres.DATABASE_URL}}
+  referenceRaw   String?       // Raw reference template string
+  scope          VariableScope @default(service)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([projectId])
+  @@index([serviceId])
+}
+
+// Railpack Deployment Pipeline Run Tracking
+enum PipelineStage {
+  source
+  build
+  test
+  image
+  deploy
+  health_check
+  live
+  failed
+}
+
+model PipelineRun {
+  id           String        @id @default(cuid())
+  deploymentId String
+  currentStage PipelineStage @default(source)
+  stageLogs    Json          // { source: "...", build: "...", test: "...", health_check: "..." }
+  failedStage  PipelineStage?
+  errorMessage String?
+  durationMs   Int?
+  createdAt    DateTime      @default(now())
+  completedAt  DateTime?
+
+  @@index([deploymentId])
+}
+
+// Private Internal Docker Network per Project Environment
+model InternalNetwork {
+  id            String      @id @default(cuid())
+  environmentId String
+  environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  networkName   String      @unique // e.g. stx-net-proj123-prod
+  driver        String      @default("bridge")
+  createdAt     DateTime    @default(now())
+}
+

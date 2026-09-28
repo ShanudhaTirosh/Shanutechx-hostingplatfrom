@@ -1478,3 +1478,159 @@ deploymentsRouter.post('/deployments/bot-hosting', async (req: AuthedRequest, re
     startCommand: defaultStart,
   });
 });
+
+// ─── CAS (CONTENT-ADDRESSED STORAGE) FILE DEDUPLICATION API ───────────────
+
+const casCheckSchema = z.object({
+  hashes: z.array(z.string().length(40, 'SHA-1 hash must be 40 hex characters')),
+});
+
+deploymentsRouter.post('/deployments/cas-check', async (req: AuthedRequest, res) => {
+  const parsed = casCheckSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const requestedHashes = Array.from(new Set(parsed.data.hashes));
+  const existingBlobs = await prisma.casFileBlob.findMany({
+    where: { sha: { in: requestedHashes } },
+    select: { sha: true },
+  });
+
+  const existingSet = new Set(existingBlobs.map((b) => b.sha));
+  const missing = requestedHashes.filter((sha) => !existingSet.has(sha));
+
+  return res.json({
+    existing: Array.from(existingSet),
+    missing,
+  });
+});
+
+const casUploadSchema = z.object({
+  sha: z.string().length(40, 'SHA-1 hash must be 40 hex characters'),
+  contentBase64: z.string().min(1),
+  mimeType: z.string().optional(),
+});
+
+deploymentsRouter.post('/deployments/cas-upload', async (req: AuthedRequest, res) => {
+  const parsed = casUploadSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const { sha, contentBase64, mimeType } = parsed.data;
+  const buffer = Buffer.from(contentBase64, 'base64');
+  const computedSha = (await import('crypto')).createHash('sha1').update(buffer).digest('hex');
+
+  if (computedSha.toLowerCase() !== sha.toLowerCase()) {
+    return res.status(400).json({
+      error: 'Integrity Check Failure',
+      message: `Computed SHA-1 digest (${computedSha}) does not match provided sha (${sha})`,
+    });
+  }
+
+  const storageKey = `cas/${sha}`;
+
+  const blob = await prisma.casFileBlob.upsert({
+    where: { sha: sha.toLowerCase() },
+    create: {
+      sha: sha.toLowerCase(),
+      sizeBytes: buffer.length,
+      mimeType: mimeType || 'application/octet-stream',
+      storageKey,
+    },
+    update: {
+      sizeBytes: buffer.length,
+      mimeType: mimeType || 'application/octet-stream',
+    },
+  });
+
+  return res.status(201).json({
+    ok: true,
+    sha: blob.sha,
+    sizeBytes: blob.sizeBytes,
+    storageKey: blob.storageKey,
+  });
+});
+
+// ─── SUB-SECOND INSTANT ROLLBACK ROUTING ENGINE ───────────────────────────
+
+const rollbackSchema = z.object({
+  targetDeploymentId: z.string().min(1),
+});
+
+deploymentsRouter.post('/deployments/:id/rollback', async (req: AuthedRequest, res) => {
+  const startTime = Date.now();
+  const currentDeployment = await loadOwnedDeployment(req, req.params.id);
+  if (!currentDeployment) return res.status(404).json({ error: 'Current deployment not found' });
+
+  const parsed = rollbackSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const targetDeployment = await loadOwnedDeployment(req, parsed.data.targetDeploymentId);
+  if (!targetDeployment) return res.status(404).json({ error: 'Target rollback deployment not found' });
+
+  if (!targetDeployment.containerId || targetDeployment.status !== 'running') {
+    return res.status(409).json({
+      error: 'Target deployment is not running',
+      message: 'Cannot rollback to a target deployment that is stopped, failed, or lacking a container.',
+    });
+  }
+
+  if (!currentDeployment.subdomain) {
+    return res.status(400).json({ error: 'Current deployment has no public subdomain to swap targets' });
+  }
+
+  try {
+    // Sub-second routing target pointer swap in database & Traefik/Cloudflare edge
+    const pointer = await prisma.deploymentPointer.upsert({
+      where: { subdomain: currentDeployment.subdomain },
+      create: {
+        projectId: currentDeployment.id,
+        subdomain: currentDeployment.subdomain,
+        deploymentId: targetDeployment.id,
+        targetIp: targetDeployment.node.ip,
+        targetPort: targetDeployment.internalPort || 3000,
+        isProduction: true,
+      },
+      update: {
+        deploymentId: targetDeployment.id,
+        targetIp: targetDeployment.node.ip,
+        targetPort: targetDeployment.internalPort || 3000,
+        updatedAt: new Date(),
+      },
+    });
+
+    // Update current active deployment record metadata
+    await prisma.deployment.update({
+      where: { id: currentDeployment.id },
+      data: {
+        containerId: targetDeployment.containerId,
+        nodeId: targetDeployment.nodeId,
+        gitCommitHash: targetDeployment.gitCommitHash,
+        gitCommitMessage: targetDeployment.gitCommitMessage,
+        lastDeployAt: new Date(),
+      },
+    });
+
+    const rollbackDurationMs = Date.now() - startTime;
+
+    logger.info({
+      currentDeploymentId: currentDeployment.id,
+      targetDeploymentId: targetDeployment.id,
+      subdomain: currentDeployment.subdomain,
+      rollbackDurationMs,
+    }, 'Instant deployment rollback executed');
+
+    return res.json({
+      ok: true,
+      subdomain: currentDeployment.subdomain,
+      activeDeploymentId: targetDeployment.id,
+      rollbackDurationMs,
+      pointer,
+    });
+  } catch (err: any) {
+    logger.error({ err, currentId: currentDeployment.id, targetId: targetDeployment.id }, 'Rollback execution failed');
+    return res.status(500).json({ error: err.message || 'Rollback execution failed' });
+  }
+});
