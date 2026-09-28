@@ -69,7 +69,7 @@ export default function AdminEmailPage() {
       ]);
 
       setStats(statsRes);
-      if (telemetryRes && !telemetryRes.error) setTelemetry(telemetryRes);
+      if (telemetryRes && !('error' in (telemetryRes as any))) setTelemetry(telemetryRes);
       setMailboxes(mbRes.mailboxes || []);
       setUsers(usersRes.users || []);
       if (usersRes.users?.length > 0 && !targetUserId) {

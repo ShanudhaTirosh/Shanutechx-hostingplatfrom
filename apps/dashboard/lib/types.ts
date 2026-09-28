@@ -314,6 +314,7 @@ export interface CatalogTemplate {
   tags: string[];
   logo: string;
   port: number | null;
+  recommendedExposureMode?: 'ssl_with_proxy' | 'internal_only' | 'raw_tcp' | string | null;
 }
 
 export type VpsPlanCategory = 'web_hosting' | 'app_server' | 'database_server' | 'storage_server';
