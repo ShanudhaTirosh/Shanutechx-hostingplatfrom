@@ -2,27 +2,8 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import { Button, Card, Spinner, useToast } from '@/components/ui';
-import {
-  GitBranch,
-  Layers,
-  Terminal,
-  ShieldCheck,
-  CheckCircle2,
-  ArrowRight,
-  ArrowLeft,
-  Sparkles,
-  Lock,
-  Globe,
-  Radio,
-  Plus,
-  Trash2,
-  FileCode,
-  Box,
-  Rocket,
-  Zap,
-  Key,
-} from 'lucide-react';
+import { Button, Card, useToast } from '@/components/ui';
+import { GitBranch, Layers, Terminal, Lock, Globe, Radio, Plus, Trash2, FileCode, Box, Zap, ChevronDown } from 'lucide-react';
 
 import { useAppUser } from '@/lib/AppUserContext';
 
@@ -34,43 +15,43 @@ interface Props {
 }
 
 const TEMPLATE_PRESETS = [
-  { id: 'node-express', name: 'Node.js / Express API', icon: FileCode, framework: 'Node.js', startCmd: 'npm start', port: 3000, exposure: 'ssl_with_proxy' },
-  { id: 'nextjs', name: 'Next.js App Router', icon: Box, framework: 'Next.js', startCmd: 'npm run start', port: 3000, exposure: 'ssl_with_proxy' },
-  { id: 'python-fastapi', name: 'Python FastAPI App', icon: Terminal, framework: 'Python', startCmd: 'uvicorn main:app --host 0.0.0.0 --port 8000', port: 8000, exposure: 'ssl_with_proxy' },
-  { id: 'static-html', name: 'Static HTML / Web Hosting', icon: Globe, framework: 'Static', startCmd: 'npx serve -s . -p 8080', port: 8080, exposure: 'ssl_with_proxy' },
-  { id: 'discord-bot', name: 'Discord Bot Daemon', icon: Radio, framework: 'Node.js', startCmd: 'node index.js', port: 3000, exposure: 'ssl_with_proxy' },
-  { id: 'whatsapp-bot', name: 'WhatsApp Messaging Bot', icon: Radio, framework: 'Node.js', startCmd: 'npm start', port: 3000, exposure: 'ssl_with_proxy' },
+  { id: 'node-express', name: 'Node.js / Express', icon: FileCode, framework: 'Node.js', startCmd: 'npm start', port: 3000, exposure: 'ssl_with_proxy' },
+  { id: 'nextjs', name: 'Next.js', icon: Box, framework: 'Next.js', startCmd: 'npm run start', port: 3000, exposure: 'ssl_with_proxy' },
+  { id: 'python-fastapi', name: 'Python / FastAPI', icon: Terminal, framework: 'Python', startCmd: 'uvicorn main:app --host 0.0.0.0 --port 8000', port: 8000, exposure: 'ssl_with_proxy' },
+  { id: 'static-html', name: 'Static site', icon: Globe, framework: 'Static', startCmd: 'npx serve -s . -p 8080', port: 8080, exposure: 'ssl_with_proxy' },
+  { id: 'discord-bot', name: 'Discord bot', icon: Radio, framework: 'Node.js', startCmd: 'node index.js', port: 3000, exposure: 'ssl_with_proxy' },
+  { id: 'whatsapp-bot', name: 'WhatsApp bot', icon: Radio, framework: 'Node.js', startCmd: 'npm start', port: 3000, exposure: 'ssl_with_proxy' },
 ];
 
+/**
+ * One page, top to bottom: pick a source, confirm the settings we filled in for you, deploy. Advanced settings
+ * (network exposure, custom subdomain) and environment variables are collapsed by default -- most deployments never
+ * need to touch them, so they shouldn't be mandatory steps in the way.
+ */
 export function DeploymentSetupWizard({ deploymentId, initialDeployment, connectedAccounts = [], onComplete }: Props) {
   const { apiUser } = useAppUser();
   const isDevUser = apiUser?.role === 'dev';
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const { toast } = useToast();
+
   const [sourceType, setSourceType] = useState<'git' | 'template'>('git');
-  
-  // Step 1 State
   const [repoUrl, setRepoUrl] = useState(initialDeployment?.repoUrl || '');
   const [branch, setBranch] = useState(initialDeployment?.branch || 'main');
   const [selectedTemplate, setSelectedTemplate] = useState<string>('node-express');
 
-  // Step 2 State
   const [frameworkPreset, setFrameworkPreset] = useState(initialDeployment?.frameworkPreset || 'Node.js');
   const [startCommand, setStartCommand] = useState(initialDeployment?.startCommand || 'npm start');
   const [internalPort, setInternalPort] = useState<number>(initialDeployment?.internalPort || 3000);
-  const [exposureMode, setExposureMode] = useState<'ssl_with_proxy' | 'raw_tcp' | 'internal_only'>(
-    initialDeployment?.exposureMode || 'ssl_with_proxy'
-  );
+  const [exposureMode, setExposureMode] = useState<'ssl_with_proxy' | 'raw_tcp' | 'internal_only'>(initialDeployment?.exposureMode || 'ssl_with_proxy');
   const [subdomain, setSubdomain] = useState(initialDeployment?.subdomain || `app-${deploymentId.slice(0, 8)}`);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Step 3 State
   const [envVars, setEnvVars] = useState<Array<{ key: string; value: string }>>([
     { key: 'NODE_ENV', value: 'production' },
     { key: 'PORT', value: String(internalPort) },
   ]);
+  const [showEnvVars, setShowEnvVars] = useState(false);
 
-  // Step 4 Deploying State
   const [deploying, setDeploying] = useState(false);
-  const { toast } = useToast();
 
   function handleSelectTemplate(tplId: string) {
     setSelectedTemplate(tplId);
@@ -82,6 +63,18 @@ export function DeploymentSetupWizard({ deploymentId, initialDeployment, connect
       setExposureMode(found.exposure as any);
       setEnvVars((prev) => prev.map((e) => (e.key === 'PORT' ? { ...e, value: String(found.port) } : e)));
     }
+  }
+
+  function handleFrameworkChange(val: string) {
+    setFrameworkPreset(val);
+    const defaultPort = val === 'Python' ? 8000 : val === 'Static' ? 8080 : 3000;
+    setInternalPort(defaultPort);
+    setEnvVars((prev) => prev.map((item) => (item.key === 'PORT' ? { ...item, value: String(defaultPort) } : item)));
+  }
+
+  function handlePortChange(p: number) {
+    setInternalPort(p);
+    setEnvVars((prev) => prev.map((item) => (item.key === 'PORT' ? { ...item, value: String(p) } : item)));
   }
 
   function addEnvVar() {
@@ -96,22 +89,25 @@ export function DeploymentSetupWizard({ deploymentId, initialDeployment, connect
     setEnvVars((prev) => prev.filter((_, i) => i !== index));
   }
 
-  async function handleFinalDeploy() {
+  function generatePassword(index: number, key: string) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const array = new Uint8Array(20);
+    crypto.getRandomValues(array);
+    updateEnvVar(index, key, Array.from(array, (b) => chars[b % chars.length]).join(''));
+  }
+
+  const canDeploy = sourceType === 'template' || repoUrl.trim().length > 0;
+
+  async function handleDeploy() {
     setDeploying(true);
     try {
-      let finalRepoUrl = repoUrl;
+      const finalRepoUrl = sourceType === 'template' ? `template://${selectedTemplate}` : repoUrl;
 
-      if (sourceType === 'template') {
-        finalRepoUrl = `template://${selectedTemplate}`;
-      }
-
-      // Convert envVars array to object
       const envObj: Record<string, string> = {};
       envVars.forEach(({ key, value }) => {
         if (key.trim()) envObj[key.trim()] = value;
       });
 
-      // Update deployment config & trigger build
       await api.deployments.updateConfig(deploymentId, {
         repoUrl: finalRepoUrl,
         branch,
@@ -124,433 +120,256 @@ export function DeploymentSetupWizard({ deploymentId, initialDeployment, connect
       });
 
       await api.deployments.redeploy(deploymentId);
-      toast('Deployment configured & build initiated successfully!', 'success');
+      toast('Deployment started.', 'success');
       onComplete();
     } catch (err: any) {
-      toast(err.message || 'Failed to configure deployment', 'error');
+      toast(err.message || 'Failed to start the deployment', 'error');
     } finally {
       setDeploying(false);
     }
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto py-6 space-y-8">
-      {/* Header Banner */}
-      <div className="text-center space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-violet/10 border border-accent-violet/20 text-accent-violet text-xs font-mono">
-          <Sparkles className="h-3.5 w-3.5" /> Instance Slot Configuration Wizard
+    <div className="mx-auto w-full max-w-2xl space-y-6 py-6">
+      <div>
+        <h1 className="text-xl font-semibold text-white">New deployment</h1>
+        <p className="mt-1 text-sm text-text-muted">Connect a repository or pick a template. We'll fill in the settings below -- change anything you need to, then deploy.</p>
+      </div>
+
+      {/* Source */}
+      <Card className="space-y-4 p-5">
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { id: 'git', title: 'Git repository', desc: 'GitHub, GitLab, or a public URL', icon: GitBranch },
+            { id: 'template', title: 'Template', desc: 'A ready-made stack', icon: Layers },
+          ].map((t) => {
+            const isSel = sourceType === t.id;
+            const Icon = t.icon;
+            return (
+              <button
+                type="button"
+                key={t.id}
+                onClick={() => setSourceType(t.id as any)}
+                className={`space-y-1 rounded-xl border p-3.5 text-left transition-colors ${
+                  isSel ? 'border-accent-cyan bg-white/[0.06] text-white' : 'border-white/[0.08] bg-black/20 text-text-muted hover:border-white/20'
+                }`}
+              >
+                <Icon className={`h-5 w-5 ${isSel ? 'text-accent-cyan' : 'text-text-muted'}`} />
+                <h4 className="text-sm font-medium">{t.title}</h4>
+                <p className="text-xs text-text-faint">{t.desc}</p>
+              </button>
+            );
+          })}
         </div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">Configure & Launch Your Purchased Instance</h1>
-        <p className="text-sm text-text-muted max-w-xl mx-auto">
-          Complete the step-by-step wizard below to connect your code, set runtime options, configure environment variables, and launch your instance container.
-        </p>
-      </div>
 
-      {/* Wizard Progress Bar */}
-      <div className="grid grid-cols-4 gap-2">
-        {[
-          { num: 1, title: '1. Code Source' },
-          { num: 2, title: '2. Runtime & Network' },
-          { num: 3, title: '3. Environment Vars' },
-          { num: 4, title: '4. Launch Instance' },
-        ].map((s) => {
-          const isActive = step === s.num;
-          const isDone = step > s.num;
-          return (
-            <div
-              key={s.num}
-              onClick={() => { if (isDone) setStep(s.num as any); }}
-              className={`p-3 rounded-xl border font-mono text-xs text-center transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-accent-violet/20 border-accent-violet text-white font-semibold shadow-lg shadow-accent-violet/10'
-                  : isDone
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : 'bg-black/20 border-white/[0.06] text-text-faint'
-              }`}
-            >
-              <div className="flex items-center justify-center gap-1.5">
-                {isDone ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : null}
-                <span>{s.title}</span>
-              </div>
+        {sourceType === 'git' && (
+          <div className="space-y-3 border-t border-white/[0.06] pt-4">
+            <div>
+              <label className="mb-1.5 block text-xs text-text-muted">Repository URL</label>
+              <input
+                type="text"
+                value={repoUrl}
+                onChange={(e) => setRepoUrl(e.target.value)}
+                placeholder="https://github.com/username/repo.git"
+                className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 font-mono text-xs text-white focus:border-accent-cyan focus:outline-none"
+              />
             </div>
-          );
-        })}
-      </div>
+            <div>
+              <label className="mb-1.5 block text-xs text-text-muted">Branch</label>
+              <input
+                type="text"
+                value={branch}
+                onChange={(e) => setBranch(e.target.value)}
+                placeholder="main"
+                className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 font-mono text-xs text-white focus:border-accent-cyan focus:outline-none"
+              />
+            </div>
+            {connectedAccounts.length > 0 && (
+              <p className="text-xs text-text-muted">
+                Using your connected account: <span className="font-mono text-accent-cyan">@{connectedAccounts[0].username}</span> ({connectedAccounts[0].provider})
+              </p>
+            )}
+          </div>
+        )}
 
-      {/* Step 1: Code Source */}
-      {step === 1 && (
-        <Card className="p-6 space-y-6">
-          <h3 className="text-base font-semibold text-white flex items-center gap-2">
-            <GitBranch className="h-5 w-5 text-accent-cyan" /> Step 1: Select Code Source
-          </h3>
-
-          {/* Source Type Selector */}
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { id: 'git', title: 'Git Repository', desc: 'Connect GitHub/GitLab or public Git URL', icon: GitBranch },
-              { id: 'template', title: 'App Catalog Template', desc: 'Deploy 1-click pre-configured stack template', icon: Layers },
-            ].map((t) => {
-              const isSel = sourceType === t.id;
-              const Icon = t.icon;
+        {sourceType === 'template' && (
+          <div className="grid grid-cols-2 gap-2 border-t border-white/[0.06] pt-4">
+            {TEMPLATE_PRESETS.map((tpl) => {
+              const isSel = selectedTemplate === tpl.id;
+              const Icon = tpl.icon;
               return (
-                <div
-                  key={t.id}
-                  onClick={() => setSourceType(t.id as any)}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer space-y-2 ${
-                    isSel
-                      ? 'bg-white/[0.08] border-accent-cyan text-white shadow-md'
-                      : 'bg-black/30 border-white/[0.06] text-text-muted hover:border-white/20'
+                <button
+                  type="button"
+                  key={tpl.id}
+                  onClick={() => handleSelectTemplate(tpl.id)}
+                  className={`flex items-center gap-2.5 rounded-lg border p-3 text-left transition-colors ${
+                    isSel ? 'border-accent-cyan bg-white/[0.06] text-white' : 'border-white/[0.08] bg-black/20 text-text-muted hover:border-white/20'
                   }`}
                 >
-                  <Icon className={`h-6 w-6 ${isSel ? 'text-accent-cyan' : 'text-text-muted'}`} />
-                  <h4 className="font-semibold text-sm">{t.title}</h4>
-                  <p className="text-xs text-text-faint">{t.desc}</p>
-                </div>
+                  <Icon className={`h-4 w-4 shrink-0 ${isSel ? 'text-accent-cyan' : 'text-text-muted'}`} />
+                  <span className="text-xs font-medium">{tpl.name}</span>
+                </button>
               );
             })}
           </div>
+        )}
+      </Card>
 
-          {/* Git Source Options */}
-          {sourceType === 'git' && (
-            <div className="space-y-4 pt-4 border-t border-white/[0.06]">
-              <div>
-                <label className="text-xs font-medium text-text-muted block mb-1.5">Git Repository URL</label>
-                <input
-                  type="text"
-                  value={repoUrl}
-                  onChange={(e) => setRepoUrl(e.target.value)}
-                  placeholder="https://github.com/username/repo-name.git"
-                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-accent-cyan"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-text-muted block mb-1.5">Branch</label>
-                <input
-                  type="text"
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
-                  placeholder="main"
-                  className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-accent-cyan"
-                />
-              </div>
-
-              {connectedAccounts.length > 0 && (
-                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between text-xs text-text-muted">
-                  <span>Connected Git Account:</span>
-                  <span className="font-mono text-accent-cyan">@{connectedAccounts[0].username} ({connectedAccounts[0].provider})</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Template Source Options */}
-          {sourceType === 'template' && (
-            <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/[0.06]">
-              {TEMPLATE_PRESETS.map((tpl) => {
-                const isSel = selectedTemplate === tpl.id;
-                const Icon = tpl.icon;
-                return (
-                  <div
-                    key={tpl.id}
-                    onClick={() => handleSelectTemplate(tpl.id)}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
-                      isSel
-                        ? 'bg-accent-violet/20 border-accent-violet text-white font-semibold'
-                        : 'bg-black/30 border-white/[0.06] text-text-muted hover:border-white/20'
-                    }`}
-                  >
-                    <Icon className={`h-5 w-5 ${isSel ? 'text-accent-violet' : 'text-text-muted'}`} />
-                    <div>
-                      <h4 className="text-xs font-semibold text-white">{tpl.name}</h4>
-                      <p className="text-[10px] font-mono text-text-faint">{tpl.startCmd}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="flex justify-end pt-4">
-            <Button size="sm" onClick={() => setStep(2)}>
-              Next: Runtime Setup <ArrowRight className="h-4 w-4 ml-1.5" />
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Step 2: Runtime & Network */}
-      {step === 2 && (
-        <Card className="p-6 space-y-6">
-          <h3 className="text-base font-semibold text-white flex items-center gap-2">
-            <Terminal className="h-5 w-5 text-accent-violet" /> Step 2: Runtime & Network Exposure
-          </h3>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-medium text-text-muted block mb-1.5">Framework / Language Preset</label>
-              <select
-                value={frameworkPreset}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setFrameworkPreset(val);
-                  let defaultPort = 3000;
-                  if (val === 'Python') defaultPort = 8000;
-                  else if (val === 'Static') defaultPort = 8080;
-                  else if (val === 'Node.js') defaultPort = 3000;
-                  setInternalPort(defaultPort);
-                  setEnvVars((prev) => prev.map((item) => (item.key === 'PORT' ? { ...item, value: String(defaultPort) } : item)));
-                }}
-                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-accent-violet"
-              >
-                <option value="Node.js">Node.js / Express / Next.js</option>
-                <option value="Python">Python (FastAPI, Flask, Django)</option>
-                <option value="Static">Static Web Hosting (HTML/CSS/JS)</option>
-                <option value="Dockerfile">Custom Dockerfile</option>
-                <option value="Go">Go Web Service</option>
-                <option value="Rust">Rust App</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-text-muted block mb-1.5 flex items-center justify-between">
-                <span>Internal Container Port</span>
-                <span className="text-[10px] font-mono text-accent-violet">Auto-detected</span>
-              </label>
-              <input
-                type="number"
-                value={internalPort}
-                onChange={(e) => {
-                  const p = Number(e.target.value);
-                  setInternalPort(p);
-                  setEnvVars((prev) => prev.map((item) => (item.key === 'PORT' ? { ...item, value: String(p) } : item)));
-                }}
-                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-accent-violet"
-              />
-            </div>
-          </div>
-
+      {/* Build settings -- pre-filled, visible and editable inline; no separate "next step" needed to see or change them */}
+      <Card className="space-y-4 p-5">
+        <h3 className="text-sm font-medium text-white">Build settings</h3>
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-medium text-text-muted block mb-1.5">Start Command</label>
+            <label className="mb-1.5 block text-xs text-text-muted">Framework</label>
+            <select
+              value={frameworkPreset}
+              onChange={(e) => handleFrameworkChange(e.target.value)}
+              className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-xs text-white focus:border-accent-cyan focus:outline-none"
+            >
+              <option value="Node.js">Node.js</option>
+              <option value="Python">Python</option>
+              <option value="Static">Static site</option>
+              <option value="Dockerfile">Dockerfile</option>
+              <option value="Go">Go</option>
+              <option value="Rust">Rust</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs text-text-muted">Port</label>
             <input
-              type="text"
-              value={startCommand}
-              onChange={(e) => setStartCommand(e.target.value)}
-              placeholder="npm start"
-              className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-accent-violet"
+              type="number"
+              value={internalPort}
+              onChange={(e) => handlePortChange(Number(e.target.value))}
+              className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 font-mono text-xs text-white focus:border-accent-cyan focus:outline-none"
             />
           </div>
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs text-text-muted">Start command</label>
+          <input
+            type="text"
+            value={startCommand}
+            onChange={(e) => setStartCommand(e.target.value)}
+            placeholder="npm start"
+            className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 font-mono text-xs text-white focus:border-accent-cyan focus:outline-none"
+          />
+        </div>
+      </Card>
 
-          {/* Network Exposure Mode */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-text-muted block">Network Exposure Mode</label>
-              {!isDevUser && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                  <Lock className="h-3 w-3" /> SSL Reverse Proxy (System Default)
-                </span>
-              )}
-            </div>
+      {/* Advanced: network exposure + subdomain. Collapsed by default -- most deployments use the default (a public
+          HTTPS subdomain) and never need this. */}
+      <Card className="p-0">
+        <button type="button" onClick={() => setShowAdvanced((v) => !v)} className="flex w-full items-center justify-between p-5 text-left">
+          <div>
+            <h3 className="text-sm font-medium text-white">Advanced</h3>
+            <p className="text-xs text-text-muted">Network exposure and subdomain</p>
+          </div>
+          <ChevronDown className={`h-4 w-4 text-text-muted transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+        </button>
+        {showAdvanced && (
+          <div className="space-y-4 border-t border-white/[0.06] p-5">
             {isDevUser ? (
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {[
-                  { id: 'ssl_with_proxy', title: 'HTTPS Subdomain', desc: 'Expose with automatic SSL & domain routing', icon: Globe },
-                  { id: 'raw_tcp', title: 'Direct TCP Port', desc: 'Direct container port mapping (Databases, Games)', icon: Radio },
-                  { id: 'internal_only', title: 'Private / Bot Mode', desc: 'Internal service only (Discord / WhatsApp Bots)', icon: Lock },
+                  { id: 'ssl_with_proxy', title: 'HTTPS subdomain', icon: Globe },
+                  { id: 'raw_tcp', title: 'Direct port', icon: Radio },
+                  { id: 'internal_only', title: 'Internal only', icon: Lock },
                 ].map((m) => {
                   const isSel = exposureMode === m.id;
                   const Icon = m.icon;
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={m.id}
                       onClick={() => setExposureMode(m.id as any)}
-                      className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-1.5 ${
-                        isSel
-                          ? 'bg-accent-violet/20 border-accent-violet text-white font-semibold'
-                          : 'bg-black/30 border-white/[0.06] text-text-muted hover:border-white/20'
+                      className={`space-y-1 rounded-lg border p-3 text-left transition-colors ${
+                        isSel ? 'border-accent-cyan bg-white/[0.06] text-white' : 'border-white/[0.08] bg-black/20 text-text-muted hover:border-white/20'
                       }`}
                     >
-                      <Icon className={`h-5 w-5 ${isSel ? 'text-accent-violet' : 'text-text-muted'}`} />
-                      <h4 className="text-xs font-semibold">{m.title}</h4>
-                      <p className="text-[10px] text-text-faint">{m.desc}</p>
-                    </div>
+                      <Icon className={`h-4 w-4 ${isSel ? 'text-accent-cyan' : 'text-text-muted'}`} />
+                      <p className="text-xs font-medium">{m.title}</p>
+                    </button>
                   );
                 })}
               </div>
             ) : (
-              <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Globe className="h-5 w-5 text-emerald-400" />
-                  <div>
-                    <h4 className="text-xs font-semibold text-white">SSL Reverse Proxy / Cloudflare Tunnel</h4>
-                    <p className="text-[10px] text-text-muted">Automatic free SSL certificate, DDoS protection, and subdomain routing.</p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/20 px-2 py-1 rounded">Active System Default</span>
-              </div>
+              <p className="flex items-center gap-2 text-xs text-text-muted">
+                <Lock className="h-3.5 w-3.5" /> This deployment gets a public HTTPS subdomain with automatic SSL.
+              </p>
             )}
-          </div>
 
-          {exposureMode === 'ssl_with_proxy' && (
-            <div>
-              <label className="text-xs font-medium text-text-muted block mb-1.5">Subdomain</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={subdomain}
-                  onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-accent-violet"
-                />
-                <span className="text-xs font-mono text-text-muted">.shanutechx.app</span>
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-between pt-4">
-            <Button size="sm" variant="secondary" onClick={() => setStep(1)}>
-              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
-            </Button>
-            <Button size="sm" onClick={() => setStep(3)}>
-              Next: Environment Vars <ArrowRight className="h-4 w-4 ml-1.5" />
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Step 3: Environment Variables */}
-      {step === 3 && (
-        <Card className="p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-semibold text-white flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-emerald-400" /> Step 3: Environment Variables & Vault Secrets
-            </h3>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => {
-                  const presets = [
-                    { key: 'DATABASE_URL', value: 'postgresql://postgres:password@localhost:5432/dbname' },
-                    { key: 'API_KEY', value: crypto.randomUUID() },
-                    { key: 'JWT_SECRET', value: Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('') },
-                  ];
-                  setEnvVars((prev) => [...prev, ...presets]);
-                }}
-              >
-                <Sparkles className="h-3.5 w-3.5 mr-1 text-amber-400" /> Add Preset Keys
-              </Button>
-              <Button size="sm" variant="secondary" onClick={addEnvVar}>
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Key
-              </Button>
-            </div>
-          </div>
-
-          <p className="text-xs text-text-muted">
-            Environment variables are encrypted with AES-256-GCM vault security and injected at build & container launch time.
-          </p>
-
-          <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-            {envVars.map((env, i) => {
-              const isSecretKey = /PASSWORD|SECRET|KEY|TOKEN|PASS/i.test(env.key);
-              return (
-                <div key={i} className="flex items-center gap-2 p-2 rounded-xl bg-black/40 border border-white/10">
+            {exposureMode === 'ssl_with_proxy' && (
+              <div>
+                <label className="mb-1.5 block text-xs text-text-muted">Subdomain</label>
+                <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    value={env.key}
-                    onChange={(e) => updateEnvVar(i, e.target.value.toUpperCase(), env.value)}
-                    placeholder="KEY_NAME"
-                    className="w-1/3 bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 text-xs font-mono text-accent-cyan focus:outline-none focus:border-accent-cyan uppercase"
+                    value={subdomain}
+                    onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    className="flex-1 rounded-lg border border-white/10 bg-black/50 px-3 py-2 font-mono text-xs text-white focus:border-accent-cyan focus:outline-none"
                   />
-                  <input
-                    type={isSecretKey ? 'password' : 'text'}
-                    value={env.value}
-                    onChange={(e) => updateEnvVar(i, env.key, e.target.value)}
-                    placeholder="value"
-                    className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-accent-cyan"
-                  />
-                  {isSecretKey && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-                        const array = new Uint8Array(20);
-                        crypto.getRandomValues(array);
-                        const gen = Array.from(array, (b) => chars[b % chars.length]).join('');
-                        updateEnvVar(i, env.key, gen);
-                      }}
-                      className="px-2 py-1 rounded bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet text-[10px] font-mono whitespace-nowrap flex items-center gap-1"
-                      title="Generate strong random password"
-                    >
-                      <Zap className="h-3 w-3 text-amber-400" /> Gen Password
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeEnvVar(i)}
-                    className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all"
-                    title="Delete key"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <span className="font-mono text-xs text-text-muted">.shanutechx.app</span>
                 </div>
-              );
-            })}
-          </div>
-
-          <div className="flex justify-between pt-4">
-            <Button size="sm" variant="secondary" onClick={() => setStep(2)}>
-              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
-            </Button>
-            <Button size="sm" onClick={() => setStep(4)}>
-              Review & Launch <ArrowRight className="h-4 w-4 ml-1.5" />
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Step 4: Review & Deploy */}
-      {step === 4 && (
-        <Card className="p-6 space-y-6">
-          <h3 className="text-base font-semibold text-white flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-emerald-400" /> Step 4: Final Instance Review
-          </h3>
-
-          <div className="grid grid-cols-2 gap-4 p-4 rounded-2xl bg-black/40 border border-white/[0.06] text-xs font-mono space-y-2">
-            <div>
-              <span className="text-text-muted">Instance ID:</span> <span className="text-white">{deploymentId}</span>
-            </div>
-            <div>
-              <span className="text-text-muted">Code Source:</span> <span className="text-accent-cyan">{sourceType.toUpperCase()}</span>
-            </div>
-            <div>
-              <span className="text-text-muted">Runtime:</span> <span className="text-white">{frameworkPreset}</span>
-            </div>
-            <div>
-              <span className="text-text-muted">Start Cmd:</span> <span className="text-white">{startCommand}</span>
-            </div>
-            <div>
-              <span className="text-text-muted">Port:</span> <span className="text-white">{internalPort}</span>
-            </div>
-            <div>
-              <span className="text-text-muted">Exposure Mode:</span> <span className="text-emerald-400">{exposureMode}</span>
-            </div>
-            {exposureMode === 'ssl_with_proxy' && (
-              <div className="col-span-2">
-                <span className="text-text-muted">Assigned Domain:</span> <span className="text-accent-violet">https://{subdomain}.shanutechx.app</span>
               </div>
             )}
           </div>
+        )}
+      </Card>
 
-          <div className="flex justify-between pt-4">
-            <Button size="sm" variant="secondary" onClick={() => setStep(3)}>
-              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
-            </Button>
-            <Button size="sm" onClick={handleFinalDeploy} loading={deploying}>
-              {deploying ? 'Deploying Container...' : <span className="flex items-center gap-1.5"><Rocket className="h-4 w-4" /> Launch Deployment Instance</span>}
+      {/* Environment variables. Collapsed by default. */}
+      <Card className="p-0">
+        <button type="button" onClick={() => setShowEnvVars((v) => !v)} className="flex w-full items-center justify-between p-5 text-left">
+          <div>
+            <h3 className="text-sm font-medium text-white">Environment variables</h3>
+            <p className="text-xs text-text-muted">{envVars.length} set</p>
+          </div>
+          <ChevronDown className={`h-4 w-4 text-text-muted transition-transform ${showEnvVars ? 'rotate-180' : ''}`} />
+        </button>
+        {showEnvVars && (
+          <div className="space-y-3 border-t border-white/[0.06] p-5">
+            <div className="max-h-60 space-y-2 overflow-y-auto pr-1">
+              {envVars.map((env, i) => {
+                const isSecretKey = /PASSWORD|SECRET|KEY|TOKEN|PASS/i.test(env.key);
+                return (
+                  <div key={i} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/40 p-2">
+                    <input
+                      type="text"
+                      value={env.key}
+                      onChange={(e) => updateEnvVar(i, e.target.value.toUpperCase(), env.value)}
+                      placeholder="KEY_NAME"
+                      className="w-1/3 rounded-md border border-white/10 bg-black/50 px-2.5 py-1.5 font-mono text-xs text-accent-cyan focus:border-accent-cyan focus:outline-none"
+                    />
+                    <input
+                      type={isSecretKey ? 'password' : 'text'}
+                      value={env.value}
+                      onChange={(e) => updateEnvVar(i, env.key, e.target.value)}
+                      placeholder="value"
+                      className="flex-1 rounded-md border border-white/10 bg-black/50 px-2.5 py-1.5 font-mono text-xs text-white focus:border-accent-cyan focus:outline-none"
+                    />
+                    {isSecretKey && (
+                      <button type="button" onClick={() => generatePassword(i, env.key)} title="Generate a random value" className="rounded-md bg-white/5 p-1.5 text-text-muted hover:bg-white/10 hover:text-white">
+                        <Zap className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <button type="button" onClick={() => removeEnvVar(i)} title="Remove" className="rounded-md bg-white/5 p-1.5 text-text-muted hover:bg-red-500/20 hover:text-red-400">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <Button type="button" size="sm" variant="secondary" onClick={addEnvVar}>
+              <Plus className="mr-1 h-3.5 w-3.5" /> Add variable
             </Button>
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
+
+      <div className="flex justify-end pt-2">
+        <Button size="md" onClick={handleDeploy} loading={deploying} disabled={!canDeploy}>
+          {deploying ? 'Deploying...' : 'Deploy'}
+        </Button>
+      </div>
     </div>
   );
 }

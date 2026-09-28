@@ -77,22 +77,25 @@ export default function SupabaseAuthPage() {
   }
 
 
-  async function handleSendResetPassword(userEmail: string) {
+  async function handleSendResetPassword(user: AuthUser) {
     try {
-      toast(`Sent password reset link to ${userEmail}`, 'info');
+      const res = await supabaseAdmin.auth.sendResetPassword(user.id, user.email);
+      toast(res.message || `Password reset link dispatched to ${user.email}`, 'info');
     } catch (err: any) {
-      toast(err.message, 'error');
+      toast(err.message || 'Failed to send reset link', 'error');
     }
   }
 
   async function handleToggleBan(user: AuthUser) {
     try {
-      toast(user.banned ? `Unbanned user ${user.email}` : `Banned user ${user.email}`, 'info');
+      const nextBannedState = !user.banned;
+      await supabaseAdmin.auth.updateUser(user.id, { banned: nextBannedState });
+      toast(nextBannedState ? `Banned user ${user.email}` : `Unbanned user ${user.email}`, 'info');
       setUsers((prev) =>
-        prev.map((u) => (u.id === user.id ? { ...u, banned: !u.banned } : u))
+        prev.map((u) => (u.id === user.id ? { ...u, banned: nextBannedState } : u))
       );
     } catch (err: any) {
-      toast(err.message, 'error');
+      toast(err.message || 'Failed to update user ban state', 'error');
     }
   }
 
@@ -167,7 +170,7 @@ export default function SupabaseAuthPage() {
                     <td className="p-3 text-text-muted">{new Date(u.createdAt).toLocaleDateString()}</td>
                     <td className="p-3 text-text-muted">{u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleDateString() : '—'}</td>
                     <td className="p-3 text-right space-x-2">
-                      <Button size="sm" variant="ghost" onClick={() => handleSendResetPassword(u.email)}>
+                      <Button size="sm" variant="ghost" onClick={() => handleSendResetPassword(u)}>
                         Reset Pwd
                       </Button>
                       <Button size="sm" variant="secondary" onClick={() => handleToggleBan(u)}>

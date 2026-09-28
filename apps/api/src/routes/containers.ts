@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
-import { listNodeContainers, containerAction, getContainerLogs, removeNodeContainer } from '../lib/nodeAgentClient';
+import { listNodeContainers, containerAction, getContainerLogs, removeNodeContainer, streamNodeAgentSSE } from '../lib/nodeAgentClient';
+import { logger } from '../lib/logger';
 
 /**
  * Dev/admin-only: see and manage every container on every registered node —
@@ -61,6 +62,16 @@ containersRouter.get('/nodes/:nodeId/containers/:containerId/logs', async (req: 
   } catch (err: any) {
     res.status(502).json({ error: err.message });
   }
+});
+
+/**
+ * GET /nodes/:nodeId/containers/:containerId/logs/stream
+ * Tails a container's logs live over Server-Sent Events, instead of the one-shot snapshot GET .../logs returns.
+ */
+containersRouter.get('/nodes/:nodeId/containers/:containerId/logs/stream', async (req: AuthedRequest, res) => {
+  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+  await streamNodeAgentSSE(node, `/agent/deployments/${req.params.containerId}/logs/stream`, req, res);
 });
 
 /**

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { streamAuthedEvents, logLineFromEvent, StreamHandle } from '@/lib/sse';
 import { filterLogs, formatLogLine, type LogLevel } from '@/lib/logUtils';
 import {
   Card,
@@ -66,7 +67,7 @@ export default function DeploymentDetailPage() {
 
   const [logs, setLogs] = useState<string>('');
   const [isStreamingLogs, setIsStreamingLogs] = useState(false);
-  const [eventSource, setEventSource] = useState<EventSource | null>(null);
+  const [eventSource, setEventSource] = useState<StreamHandle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingLogs, setLoadingLogs] = useState(false);
   
@@ -143,31 +144,36 @@ export default function DeploymentDetailPage() {
   }, [deploymentId]);
 
   useEffect(() => {
-    let source: EventSource | null = null;
+    // Native EventSource cannot send this app's Authorization header, so it never actually connected here (every
+    // request 401'd instantly and looked like "Log stream disconnected."). streamAuthedEvents reads the same
+    // endpoint with fetch instead, which can carry the token.
+    let handle: StreamHandle | null = null;
 
     if (isStreamingLogs) {
-      const streamUrl = `${api.baseURL}/api/deployments/${deploymentId}/logs/stream`;
-      source = new EventSource(streamUrl);
-      setEventSource(source);
-
-      source.onmessage = (event) => {
-        setLogs((prevLogs) => (prevLogs ? `${prevLogs}\n${event.data}` : event.data));
-      };
-
-      source.onerror = () => {
-        toast('Log stream disconnected.', 'error');
-        setIsStreamingLogs(false);
-        source?.close();
-      };
-    } else {
-      if (eventSource) {
-        eventSource.close();
-        setEventSource(null);
-      }
+      handle = streamAuthedEvents(
+        `/api/deployments/${deploymentId}/logs/stream`,
+        (raw) => {
+          const { line, error } = logLineFromEvent(raw);
+          if (error) {
+            toast(error, 'error');
+            return;
+          }
+          if (line !== null) setLogs((prevLogs) => (prevLogs ? `${prevLogs}\n${line}` : line));
+        },
+        () => {
+          toast('Log stream disconnected.', 'error');
+          setIsStreamingLogs(false);
+        },
+        { baseUrl: api.baseURL }
+      );
+      setEventSource(handle);
+    } else if (eventSource) {
+      eventSource.close();
+      setEventSource(null);
     }
 
     return () => {
-      if (source) source.close();
+      if (handle) handle.close();
     };
   }, [isStreamingLogs, deploymentId]);
 

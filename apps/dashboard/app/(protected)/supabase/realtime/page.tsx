@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PageHeader, Card, Button, Badge, useToast } from '@/components/ui';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 interface RealtimeEvent {
   id: string;
@@ -40,11 +41,16 @@ export default function SupabaseRealtimePage() {
 
   const { toast } = useToast();
 
-  function handleSendBroadcast(e: React.FormEvent) {
+  async function handleSendBroadcast(e: React.FormEvent) {
     e.preventDefault();
     setSending(true);
     try {
       const parsed = JSON.parse(broadcastPayload);
+      await supabaseAdmin.realtime.broadcast({
+        channel: broadcastTopic,
+        event: broadcastEvent,
+        payload: parsed,
+      });
       const newEvt: RealtimeEvent = {
         id: `evt-${Date.now()}`,
         channel: broadcastTopic,
@@ -55,7 +61,7 @@ export default function SupabaseRealtimePage() {
       setEvents((prev) => [newEvt, ...prev]);
       toast(`Broadcasted "${broadcastEvent}" to channel "${broadcastTopic}"!`, 'success');
     } catch (err: any) {
-      toast('Invalid JSON payload format', 'error');
+      toast(err.message || 'Invalid JSON payload format', 'error');
     } finally {
       setSending(false);
     }

@@ -146,6 +146,14 @@ export const supabaseAdmin = {
       apiFetch('/api/supabase/auth/users', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<SupabaseAuthUser>(r)
       ),
+    sendResetPassword: (id: string, email?: string) =>
+      apiFetch(`/api/supabase/auth/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ email }) }).then((r) =>
+        asJson<{ ok: boolean; message: string }>(r)
+      ),
+    updateUser: (id: string, data: { banned?: boolean; role?: string; user_metadata?: Record<string, any> }) =>
+      apiFetch(`/api/supabase/auth/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ ok: boolean; user?: SupabaseAuthUser }>(r)
+      ),
     deleteUser: (id: string) =>
       apiFetch(`/api/supabase/auth/users/${id}`, { method: 'DELETE' }).then((r) =>
         asJson<{ ok: boolean; deletedId: string }>(r)
@@ -171,6 +179,21 @@ export const supabaseAdmin = {
 
   functions: {
     list: () => apiFetch('/api/supabase/functions').then((r) => asJson<{ functions: SupabaseEdgeFunction[] }>(r)),
+    create: (data: { name: string; code?: string }) =>
+      apiFetch('/api/supabase/functions', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ function: SupabaseEdgeFunction }>(r)
+      ),
+    invoke: (name: string, payload: any) =>
+      apiFetch(`/api/supabase/functions/${name}/invoke`, { method: 'POST', body: JSON.stringify(payload) }).then((r) =>
+        asJson<{ status: number; ok: boolean; executionTimeMs: number; response: any }>(r)
+      ),
+  },
+
+  realtime: {
+    broadcast: (data: { channel: string; event: string; payload: any }) =>
+      apiFetch('/api/supabase/realtime/broadcast', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ ok: boolean; channel: string; event: string; dispatchedAt: string }>(r)
+      ),
   },
 
   advisors: () =>

@@ -964,6 +964,7 @@ export const api = {
       apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/logs?tail=${tail}`).then((r) => asJson<{ logs: string }>(r)),
     stats: (nodeId: string, containerId: string) =>
       apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/stats`).then((r) => asJson<any>(r)),
+    logsStreamPath: (nodeId: string, containerId: string) => `/api/nodes/${nodeId}/containers/${containerId}/logs/stream`,
     execTicket: (nodeId: string, containerId: string) =>
       apiFetch(`/api/nodes/${nodeId}/containers/${containerId}/exec-ticket`, { method: 'POST' }).then((r) => asJson<any>(r)),
     remove: (nodeId: string, containerId: string) =>

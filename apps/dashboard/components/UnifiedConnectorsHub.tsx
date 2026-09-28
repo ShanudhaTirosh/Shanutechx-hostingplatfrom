@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Node } from '@/lib/types';
+import { streamAuthedEvents, logLineFromEvent, StreamHandle } from '@/lib/sse';
 import {
   Card,
   Button,
@@ -17,6 +18,7 @@ import {
   Input,
   MetricCard,
   ProgressBar,
+  ConfirmDialog,
 } from '@/components/ui';
 import { NodeEngineControlPanel } from '@/components/NodeEngineControlPanel';
 
@@ -831,6 +833,17 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB 2: DOCKER CONTAINERS VIEW
 // ─────────────────────────────────────────────────────────────────────────────
+function ContainerUsage({ stats }: { stats: { cpuPercent: number; memUsedMb: number; memLimitMb: number | null } | 'error' | undefined }) {
+  if (stats === undefined) return <span>CPU / RAM: <span className="text-text-muted">loading...</span></span>;
+  if (stats === 'error') return <span>CPU / RAM: <span className="text-text-muted">unavailable</span></span>;
+  const mem = stats.memLimitMb ? `${Math.round(stats.memUsedMb)} / ${Math.round(stats.memLimitMb)} MB` : `${Math.round(stats.memUsedMb)} MB`;
+  return (
+    <span>
+      CPU: <span className="text-text-primary">{stats.cpuPercent.toFixed(1)}%</span> RAM: <span className="text-text-primary">{mem}</span>
+    </span>
+  );
+}
+
 function ContainersTabView({ nodeId }: { nodeId: string | null }) {
   const [containers, setContainers] = useState<NodeContainer[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -846,6 +859,10 @@ function ContainersTabView({ nodeId }: { nodeId: string | null }) {
   const [changesTarget, setChangesTarget] = useState<NodeContainer | null>(null);
   const [changesData, setChangesData] = useState<any[] | null>(null);
   const [inspectTarget, setInspectTarget] = useState<NodeContainer | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<NodeContainer | null>(null);
+  const [containerStats, setContainerStats] = useState<Record<string, { cpuPercent: number; memUsedMb: number; memLimitMb: number | null } | 'error'>>({});
+  const logsStreamRef = useRef<StreamHandle | null>(null);
+  const [logsLive, setLogsLive] = useState(false);
 
   const { toast } = useToast();
 
@@ -860,6 +877,39 @@ function ContainersTabView({ nodeId }: { nodeId: string | null }) {
   useEffect(() => {
     if (nodeId) loadContainers(nodeId);
   }, [nodeId]);
+
+  // Leaving the page must not leave a live log connection open against the node.
+  useEffect(() => () => logsStreamRef.current?.close(), []);
+
+  // CPU/RAM for running containers only, refreshed periodically. Docker's own stats call is relatively expensive
+  // (it reads cgroup counters), so this polls rather than streams, and only for containers actually visible and
+  // running -- a stopped container has nothing to report.
+  useEffect(() => {
+    if (!nodeId || !containers) return;
+    const runningIds = containers.filter((c) => c.state === 'running').map((c) => c.id);
+    if (runningIds.length === 0) return;
+
+    let cancelled = false;
+    const fetchAll = () => {
+      runningIds.forEach((id) => {
+        api.containers
+          .stats(nodeId, id)
+          .then((s: any) => {
+            if (cancelled) return;
+            setContainerStats((prev) => ({ ...prev, [id]: { cpuPercent: s.cpuUsagePercent ?? 0, memUsedMb: s.memoryUsedMb ?? 0, memLimitMb: s.memoryLimitMb ?? null } }));
+          })
+          .catch(() => {
+            if (!cancelled) setContainerStats((prev) => ({ ...prev, [id]: 'error' }));
+          });
+      });
+    };
+    fetchAll();
+    const interval = setInterval(fetchAll, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [nodeId, containers]);
 
   const stats = useMemo(() => {
     if (!containers) return { total: 0, running: 0, paused: 0, stopped: 0 };
@@ -914,8 +964,20 @@ function ContainersTabView({ nodeId }: { nodeId: string | null }) {
     }
   }
 
+  function stopLogsStream() {
+    logsStreamRef.current?.close();
+    logsStreamRef.current = null;
+    setLogsLive(false);
+  }
+
+  function closeLogs() {
+    stopLogsStream();
+    setLogsTarget(null);
+  }
+
   async function handleViewLogs(container: NodeContainer) {
     if (!nodeId) return;
+    stopLogsStream();
     setLogsTarget(container);
     setLogs('Loading logs...');
     try {
@@ -923,7 +985,29 @@ function ContainersTabView({ nodeId }: { nodeId: string | null }) {
       setLogs(res.logs || '(no log output)');
     } catch (err: any) {
       setLogs(`Failed to load logs: ${err.message}`);
+      return;
     }
+    // A stopped container will not produce more output, so only a running one is followed live.
+    if (container.state !== 'running') return;
+    // Following from now on would repeat the tail already shown, so the live stream only appends what comes next:
+    // the agent's stream starts at "now", not at the beginning of the log.
+    logsStreamRef.current = streamAuthedEvents(
+      api.containers.logsStreamPath(nodeId, container.id),
+      (raw) => {
+        const { line, error } = logLineFromEvent(raw);
+        if (error) {
+          toast(error, 'error');
+          return;
+        }
+        if (line !== null) setLogs((prev) => `${prev}\n${line}`);
+      },
+      () => {
+        setLogsLive(false);
+        toast('Live log stream ended.', 'info');
+      },
+      { baseUrl: api.baseURL }
+    );
+    setLogsLive(true);
   }
 
   async function handleViewTop(container: NodeContainer) {
@@ -1048,6 +1132,7 @@ function ContainersTabView({ nodeId }: { nodeId: string | null }) {
                     <span>ID: <span className="text-text-primary">{c.id.slice(0, 12)}</span></span>
                     <span>Image: <span className="text-accent-violet-light">{c.image}</span></span>
                     <span>Status: <span className="text-text-primary">{c.status}</span></span>
+                    {isRunning && <ContainerUsage stats={containerStats[c.id]} />}
                   </div>
                   {c.ports && c.ports.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 pt-1">
@@ -1096,7 +1181,7 @@ function ContainersTabView({ nodeId }: { nodeId: string | null }) {
                     </Button>
                   )}
 
-                  <Button size="xs" variant="danger" loading={isBusy} onClick={() => handleAction(c, 'remove')}>
+                  <Button size="xs" variant="danger" loading={isBusy} onClick={() => setRemoveTarget(c)}>
                     Remove
                   </Button>
                 </div>
@@ -1107,8 +1192,24 @@ function ContainersTabView({ nodeId }: { nodeId: string | null }) {
       </div>
 
       {/* Logs Modal */}
+      <ConfirmDialog
+        open={removeTarget !== null}
+        onClose={() => setRemoveTarget(null)}
+        onConfirm={async () => {
+          if (removeTarget) await handleAction(removeTarget, 'remove');
+        }}
+        title="Remove this container?"
+        danger
+        confirmLabel="Remove container"
+        message={
+          removeTarget
+            ? `"${removeTarget.name}" will be permanently deleted${removeTarget.state === 'running' ? ' (it is running right now and will be force-stopped first)' : ''}. Data stored inside the container that is not on a volume is lost. This cannot be undone.`
+            : ''
+        }
+      />
+
       {logsTarget && (
-        <Modal open title={`Logs: ${logsTarget.name}`} onClose={() => setLogsTarget(null)}>
+        <Modal open title={`Logs: ${logsTarget.name}${logsLive ? ' (live)' : ''}`} onClose={closeLogs}>
           <pre className="bg-black/80 border border-white/10 rounded-xl p-4 font-mono text-xs text-emerald-400 max-h-96 overflow-y-auto whitespace-pre-wrap leading-relaxed select-all">
             {logs}
           </pre>

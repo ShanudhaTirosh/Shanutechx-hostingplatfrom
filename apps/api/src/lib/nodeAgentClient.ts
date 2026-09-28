@@ -525,6 +525,49 @@ export async function getContainerLogs(node: Node, containerId: string, tail = 2
   return data.logs;
 }
 
+/**
+ * Proxies a Server-Sent-Events stream from the node agent straight through to an Express response. The generic
+ * container log stream and the per-container stats stream both use this: same headers, same "forward chunks
+ * verbatim, clean up on disconnect" shape, so it is written once and reused rather than copy-pasted per route.
+ */
+export async function streamNodeAgentSSE(node: Node, agentPath: string, req: import('express').Request, res: import('express').Response): Promise<void> {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(agentUrl(node, agentPath), { headers: agentHeaders() });
+  } catch (err) {
+    res.write(`data: ${JSON.stringify({ type: 'error', message: err instanceof Error ? err.message : 'Could not reach the node' })}\n\n`);
+    res.end();
+    return;
+  }
+  if (!upstream.ok || !upstream.body) {
+    res.write(`data: ${JSON.stringify({ type: 'error', message: `Node returned ${upstream.status}` })}\n\n`);
+    res.end();
+    return;
+  }
+
+  const reader = upstream.body.getReader();
+  const decoder = new TextDecoder();
+  req.on('close', () => reader.cancel().catch(() => {}));
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(decoder.decode(value, { stream: true }));
+    }
+  } catch (err) {
+    logger.warn({ err, agentPath }, 'SSE proxy stream from node agent ended with an error');
+  } finally {
+    res.end();
+  }
+}
+
 export async function pauseContainer(node: Node, containerId: string): Promise<void> {
   await callNodeAgent(node, `/agent/containers/${containerId}/pause`, 'POST');
 }

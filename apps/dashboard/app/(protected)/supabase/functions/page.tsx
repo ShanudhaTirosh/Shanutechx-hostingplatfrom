@@ -119,49 +119,47 @@ export default function SupabaseFunctionsPage() {
     setInvoking(true);
     setTestResult(null);
     try {
-      // Simulate Deno Edge Execution
-      await new Promise((r) => setTimeout(r, 600));
-      const parsed = JSON.parse(testPayload);
-      const res = {
-        status: 200,
-        ok: true,
-        executionTimeMs: 42,
-        response: {
-          message: `Hello ${parsed.name || 'World'} from Deno Edge Function!`,
-          timestamp: new Date().toISOString(),
-          region: 'cmbo-us1',
-        },
-      };
+      let parsed = {};
+      try {
+        parsed = JSON.parse(testPayload);
+      } catch {}
+
+      const res = await supabaseAdmin.functions.invoke(selectedFunc.slug, parsed);
       setTestResult(JSON.stringify(res, null, 2));
-      toast('Edge Function executed successfully!', 'success');
+      toast(`Executed function "${selectedFunc.slug}" in ${res.executionTimeMs}ms`, 'success');
     } catch (err: any) {
-      setTestResult(JSON.stringify({ error: err.message }, null, 2));
+      setTestResult(JSON.stringify({ error: err.message || 'Invocation failed' }, null, 2));
       toast('Invocation error', 'error');
     } finally {
       setInvoking(false);
     }
   }
 
-  function handleCreateFunction(e: React.FormEvent) {
+  async function handleCreateFunction(e: React.FormEvent) {
     e.preventDefault();
     if (!newSlug.trim()) return;
     const slug = newSlug.toLowerCase().replace(/[^a-z0-9-]/g, '');
-    const newFn: EdgeFunction = {
-      id: `fn-${Date.now()}`,
-      slug,
-      name: slug,
-      runtime: 'deno',
-      invocations: 0,
-      status: 'active',
-      code: `import { serve } from "https://deno.land/std@0.168.0/http/server.ts";\n\nserve(async (req) => {\n  return new Response("Hello from ${slug}!");\n});`,
-      updatedAt: new Date().toISOString(),
-    };
-    setFunctions((prev) => [...prev, newFn]);
-    setSelectedFunc(newFn);
-    setCode(newFn.code);
-    setShowCreateModal(false);
-    setNewSlug('');
-    toast(`Created function "${slug}"!`, 'success');
+    try {
+      const res = await supabaseAdmin.functions.create({ name: slug });
+      const newFn: EdgeFunction = {
+        id: res.function.id || `fn-${Date.now()}`,
+        slug,
+        name: slug,
+        runtime: 'deno',
+        invocations: 0,
+        status: 'active',
+        code: `import { serve } from "https://deno.land/std@0.168.0/http/server.ts";\n\nserve(async (req) => {\n  return new Response("Hello from ${slug}!");\n});`,
+        updatedAt: new Date().toISOString(),
+      };
+      setFunctions((prev) => [...prev, newFn]);
+      setSelectedFunc(newFn);
+      setCode(newFn.code);
+      setShowCreateModal(false);
+      setNewSlug('');
+      toast(`Created function "${slug}"!`, 'success');
+    } catch (err: any) {
+      toast(err.message || 'Failed to create function', 'error');
+    }
   }
 
   return (
