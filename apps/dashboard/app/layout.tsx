@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import MeshBackground from '@/components/MeshBackground';
+import { ThemeScript } from '@/components/ThemeProvider';
 
 export const metadata: Metadata = {
   title: 'STX HOSTING Control Panel',
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#7c3aed',
+  themeColor: '#2563eb',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
@@ -28,11 +28,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Anti-flash theme script: must be first in <head> */}
+        <ThemeScript />
         <link rel="preconnect" href="https://api.shanutechx.com" />
         <link rel="dns-prefetch" href="https://api.shanutechx.com" />
       </head>
       <body suppressHydrationWarning className="relative min-h-screen">
-        <MeshBackground />
         <div className="relative z-10">
           {children}
         </div>
