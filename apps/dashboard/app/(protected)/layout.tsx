@@ -120,6 +120,20 @@ function GatedLayoutContent({
 
     const userRole = apiUser.role;
 
+    // Direct role landing: redirect to dedicated dashboard when landing on /dashboard
+    if (pathname === '/dashboard') {
+      if (userRole === 'dev') {
+        router.replace('/dev');
+        return;
+      } else if (userRole === 'admin') {
+        router.replace('/admin');
+        return;
+      } else if (userRole === 'support') {
+        router.replace('/support');
+        return;
+      }
+    }
+
     if (userRole === 'customer') {
       if (
         pathname.startsWith('/admin') ||
@@ -132,11 +146,11 @@ function GatedLayoutContent({
       }
     } else if (userRole === 'support') {
       if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/tickets') && !pathname.startsWith('/admin/chat')) {
-        router.replace('/admin/tickets');
+        router.replace('/support');
         return;
       }
       if (pathname.startsWith('/dev') || pathname.startsWith('/settings') || pathname.startsWith('/projects')) {
-        router.replace('/admin/tickets');
+        router.replace('/support');
         return;
       }
     }

@@ -2,19 +2,19 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, ReactNode } from "react";
 import { signOut } from "firebase/auth";
 import { firebaseAuth } from "@/lib/firebaseClient";
 import { useAppUser } from "@/lib/AppUserContext";
 import { ThemeToggle } from "@/components/ThemeProvider";
 
-// ── Inline SVG icon primitive ──────────────────────────────────────────────
+// ── Icon primitive ───────────────────────────────────────────────────────────
 function Icon({
   d,
   viewBox = "0 0 24 24",
   size = 15,
 }: {
-  d: string | React.ReactNode;
+  d: string | ReactNode;
   viewBox?: string;
   size?: number;
 }) {
@@ -35,7 +35,6 @@ function Icon({
   );
 }
 
-// ── ChevronDown ──────────────────────────────────────────────────────────────
 function ChevronDown({ className = "" }: { className?: string }) {
   return (
     <svg
@@ -54,7 +53,8 @@ function ChevronDown({ className = "" }: { className?: string }) {
   );
 }
 
-const ICONS: Record<string, React.ReactNode> = {
+// ── Icon Registry ────────────────────────────────────────────────────────────
+const ICONS: Record<string, ReactNode> = {
   overview:     <Icon d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />,
   services:     <Icon d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />,
   cart:         <Icon d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />,
@@ -90,163 +90,151 @@ const ICONS: Record<string, React.ReactNode> = {
   bots:         <Icon d="M12 2a2 2 0 012 2v2a2 2 0 01-2 2 2 2 0 01-2-2V4a2 2 0 012-2zM4 11a2 2 0 012-2h12a2 2 0 012 2v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7zm5 3h.01M15 14h.01" />,
 };
 
-type SpaceKey = "customer" | "admin" | "dev" | "support";
-
-interface SidebarSubLink {
+export interface SidebarSubLink {
   href: string;
   label: string;
   icon?: keyof typeof ICONS;
 }
 
-interface SidebarLink {
+export interface SidebarLink {
   href: string;
   label: string;
   icon: keyof typeof ICONS;
   children?: SidebarSubLink[];
 }
 
-interface PanelSpace {
-  key: SpaceKey;
-  label: string;
+export interface DashboardConfig {
+  role: 'customer' | 'admin' | 'dev' | 'support';
+  title: string;
   badge: string;
+  badgeStyle: { color: string; bg: string; border: string };
   defaultHref: string;
   links: SidebarLink[];
 }
 
-const SPACES: Record<SpaceKey, PanelSpace> = {
-  customer: {
-    key: "customer",
-    label: "Customer",
-    badge: "Client",
-    defaultHref: "/dashboard",
-    links: [
-      { href: "/dashboard",            label: "Overview",               icon: "overview" },
-      { href: "/services",             label: "Services",               icon: "services" },
-      { href: "/orders?tab=cart",      label: "Shopping Cart",          icon: "cart" },
-      { href: "/orders?tab=subscriptions", label: "Subscriptions",     icon: "billing" },
-      { href: "/deployments",          label: "Deployments",            icon: "deployments" },
-      { href: "/email",                label: "Business Email",         icon: "smtp" },
-      { href: "/vps",                  label: "VPS",                    icon: "vps" },
-      { href: "/tickets",              label: "Support",                icon: "tickets" },
-      { href: "/knowledgebase",        label: "Knowledge Base",         icon: "knowledgebase" },
-      { href: "/catalog",              label: "App Catalog",            icon: "catalog" },
-      { href: "/profile",              label: "Profile",                icon: "profile" },
-    ],
+// ═════════════════════════════════════════════════════════════════════════════
+// 1. CUSTOMER DASHBOARD SIDEBAR CONFIG
+// ═════════════════════════════════════════════════════════════════════════════
+export const CUSTOMER_DASHBOARD: DashboardConfig = {
+  role: 'customer',
+  title: 'CUSTOMER PORTAL',
+  badge: 'CLIENT',
+  badgeStyle: {
+    color: 'var(--color-success)',
+    bg: 'var(--color-success-bg)',
+    border: 'var(--color-success-border)',
   },
-  admin: {
-    key: "admin",
-    label: "Admin",
-    badge: "Admin",
-    defaultHref: "/admin",
-    links: [
-      { href: "/admin",                label: "Admin Dashboard",        icon: "overview" },
-      { href: "/admin/bots",           label: "Bot Studio",             icon: "bots" },
-      { href: "/admin/observability",  label: "Observability",          icon: "monitoring" },
-      { href: "/admin/vps-plans",      label: "VPS Plans & Pricing",    icon: "vps" },
-      { href: "/admin/vps",            label: "Global VPS Fleet",       icon: "vps" },
-      { href: "/admin/review-queue",   label: "Payment Review",         icon: "review" },
-      { href: "/admin/customers",      label: "Customers",              icon: "customers" },
-      { href: "/admin/services",       label: "Products & Plans",       icon: "services" },
-      { href: "/admin/email",          label: "Business Email & Host",  icon: "smtp" },
-      { href: "/admin/staff",          label: "Staff Directory",        icon: "staff" },
-      { href: "/admin/analytics",      label: "Analytics",              icon: "analytics" },
-      { href: "/admin/cms",            label: "Site Content",           icon: "cms" },
-      { href: "/admin/audit-log",      label: "Audit Log",              icon: "audit" },
-      { href: "/admin/knowledgebase",  label: "Knowledge Base Mgr",     icon: "knowledgebase" },
-      { href: "/admin/catalog",        label: "Catalog Manager",        icon: "catalog" },
-      { href: "/settings",             label: "Platform Settings",      icon: "settings" },
-    ],
-  },
-  dev: {
-    key: "dev",
-    label: "Dev",
-    badge: "Dev",
-    defaultHref: "/dev",
-    links: [
-      { href: "/dev",                  label: "Dev Dashboard",          icon: "infra" },
-      { href: "/dev/deploy",           label: "Deploy Hub",             icon: "deployments" },
-      { href: "/dev/projects",         label: "Projects & Managed DBs", icon: "projects" },
-      {
-        href: "/dev/containers",
-        label: "Containers & Docker",
-        icon: "containers",
-        children: [
-          { href: "/dev/containers?tab=containers", label: "Containers Hub",         icon: "containers" },
-          { href: "/dev/containers?tab=nodes",      label: "Compute Host Nodes",     icon: "nodes" },
-          { href: "/admin/vps",                     label: "Global VPS Fleet",       icon: "vps" },
-          { href: "/dev/containers?tab=images",     label: "Docker Images",          icon: "containers" },
-          { href: "/dev/containers?tab=volumes",    label: "Docker Volumes",         icon: "containers" },
-          { href: "/dev/containers?tab=networks",   label: "Docker Networks",        icon: "proxy" },
-          { href: "/dev/containers?tab=system",     label: "Docker System & Engine", icon: "infra" },
-        ],
-      },
-      { href: "/dev/reverse-proxy",    label: "Reverse Proxy",          icon: "proxy" },
-      { href: "/dev/ports",            label: "Exposed Ports",          icon: "proxy" },
-      { href: "/dev/monitoring",       label: "Monitoring",             icon: "monitoring" },
-      { href: "/dev/logs",             label: "Logs",                   icon: "logs" },
-      { href: "/admin/vps-plans",      label: "VPS Plans & Pricing",    icon: "vps" },
-      { href: "/dev/catalog",          label: "Catalog Inspector",      icon: "catalog" },
-      { href: "/admin/review-queue",   label: "Payment Review",         icon: "review" },
-      { href: "/admin/customers",      label: "Customers",              icon: "customers" },
-      { href: "/admin/staff",          label: "Staff Directory",        icon: "staff" },
-      { href: "/admin/analytics",      label: "Analytics",              icon: "analytics" },
-      { href: "/admin/cms",            label: "Site Content",           icon: "cms" },
-      { href: "/admin/audit-log",      label: "Audit Log",              icon: "audit" },
-      { href: "/settings",             label: "Platform Settings",      icon: "settings" },
-      { href: "/dev/docs",             label: "Dev & API Docs",         icon: "knowledgebase" },
-    ],
-  },
-  support: {
-    key: "support",
-    label: "Support",
-    badge: "Support",
-    defaultHref: "/support",
-    links: [
-      { href: "/support",              label: "Support Operations",     icon: "overview" },
-      { href: "/support/kb",           label: "Support Runbooks",       icon: "knowledgebase" },
-      { href: "/admin/tickets",        label: "Ticket Queue",           icon: "tickets" },
-      { href: "/admin/chat",           label: "Live Support Chat",      icon: "chat" },
-    ],
-  },
+  defaultHref: '/dashboard',
+  links: [
+    { href: '/dashboard',            label: 'Overview',               icon: 'overview' },
+    { href: '/services',             label: 'Services & Products',    icon: 'services' },
+    { href: '/orders?tab=cart',      label: 'Shopping Cart',          icon: 'cart' },
+    { href: '/orders?tab=subscriptions', label: 'Subscriptions',     icon: 'billing' },
+    { href: '/deployments',          label: 'Deployments',            icon: 'deployments' },
+    { href: '/email',                label: 'Business Email',         icon: 'smtp' },
+    { href: '/vps',                  label: 'VPS Instances',          icon: 'vps' },
+    { href: '/tickets',              label: 'Support Tickets',        icon: 'tickets' },
+    { href: '/knowledgebase',        label: 'Knowledge Base',         icon: 'knowledgebase' },
+    { href: '/catalog',              label: 'App Catalog',            icon: 'catalog' },
+    { href: '/profile',              label: 'Account Profile',        icon: 'profile' },
+  ],
 };
 
-// ── Space color mapping ──────────────────────────────────────────────────────
-const SPACE_COLORS: Record<SpaceKey, { badge: string; dot: string }> = {
-  customer: { badge: "text-[var(--color-success)]",  dot: "bg-[var(--color-success)]" },
-  admin:    { badge: "text-[var(--color-warning)]",  dot: "bg-[var(--color-warning)]" },
-  dev:      { badge: "text-[var(--color-accent)]",   dot: "bg-[var(--color-accent)]" },
-  support:  { badge: "text-[var(--color-info)]",     dot: "bg-[var(--color-info)]" },
+// ═════════════════════════════════════════════════════════════════════════════
+// 2. ADMIN DASHBOARD SIDEBAR CONFIG
+// ═════════════════════════════════════════════════════════════════════════════
+export const ADMIN_DASHBOARD: DashboardConfig = {
+  role: 'admin',
+  title: 'ADMIN CONTROL PANEL',
+  badge: 'ADMIN',
+  badgeStyle: {
+    color: 'var(--color-warning)',
+    bg: 'var(--color-warning-bg)',
+    border: 'var(--color-warning-border)',
+  },
+  defaultHref: '/admin',
+  links: [
+    { href: '/admin',                label: 'Admin Overview',         icon: 'overview' },
+    { href: '/admin/bots',           label: 'Bot Studio',             icon: 'bots' },
+    { href: '/admin/observability',  label: 'Observability',          icon: 'monitoring' },
+    { href: '/admin/vps-plans',      label: 'VPS Plans & Pricing',    icon: 'vps' },
+    { href: '/admin/vps',            label: 'Global VPS Fleet',       icon: 'vps' },
+    { href: '/admin/review-queue',   label: 'Payment Review',         icon: 'review' },
+    { href: '/admin/customers',      label: 'Customers Directory',    icon: 'customers' },
+    { href: '/admin/services',       label: 'Products & Catalog',     icon: 'services' },
+    { href: '/admin/email',          label: 'Business Email Host',    icon: 'smtp' },
+    { href: '/admin/staff',          label: 'Staff Directory',        icon: 'staff' },
+    { href: '/admin/analytics',      label: 'Platform Analytics',     icon: 'analytics' },
+    { href: '/admin/cms',            label: 'Site Content (CMS)',     icon: 'cms' },
+    { href: '/admin/audit-log',      label: 'Audit Log',              icon: 'audit' },
+    { href: '/admin/knowledgebase',  label: 'Knowledge Base Mgr',     icon: 'knowledgebase' },
+    { href: '/admin/catalog',        label: 'Catalog Manager',        icon: 'catalog' },
+    { href: '/settings',             label: 'Platform Settings',      icon: 'settings' },
+  ],
 };
 
-function isPathInSpace(pathname: string, spaceKey: SpaceKey): boolean {
-  const space = SPACES[spaceKey];
-  if (!space) return false;
-  return space.links.some((link) => {
-    const [linkPath] = link.href.split("?");
-    return (
-      pathname === linkPath ||
-      (linkPath !== "/dashboard" &&
-        linkPath !== "/admin" &&
-        linkPath !== "/dev" &&
-        linkPath !== "/support" &&
-        pathname.startsWith(linkPath))
-    );
-  });
-}
+// ═════════════════════════════════════════════════════════════════════════════
+// 3. DEV STUDIO DASHBOARD SIDEBAR CONFIG
+// ═════════════════════════════════════════════════════════════════════════════
+export const DEV_DASHBOARD: DashboardConfig = {
+  role: 'dev',
+  title: 'DEV STUDIO HUB',
+  badge: 'DEV',
+  badgeStyle: {
+    color: 'var(--color-accent)',
+    bg: 'var(--color-accent-subtle)',
+    border: 'var(--color-accent-border)',
+  },
+  defaultHref: '/dev',
+  links: [
+    { href: '/dev',                  label: 'Dev Studio Overview',    icon: 'infra' },
+    { href: '/dev/deploy',           label: 'Deploy Pipeline',        icon: 'deployments' },
+    { href: '/dev/projects',         label: 'Projects & Managed DBs', icon: 'projects' },
+    {
+      href: '/dev/containers',
+      label: 'Containers & Docker',
+      icon: 'containers',
+      children: [
+        { href: '/dev/containers?tab=containers', label: 'Containers Hub',         icon: 'containers' },
+        { href: '/dev/containers?tab=nodes',      label: 'Compute Host Nodes',     icon: 'nodes' },
+        { href: '/admin/vps',                     label: 'Global VPS Fleet',       icon: 'vps' },
+        { href: '/dev/containers?tab=images',     label: 'Docker Images',          icon: 'containers' },
+        { href: '/dev/containers?tab=volumes',    label: 'Docker Volumes',         icon: 'containers' },
+        { href: '/dev/containers?tab=networks',   label: 'Docker Networks',        icon: 'proxy' },
+        { href: '/dev/containers?tab=system',     label: 'Docker System & Engine', icon: 'infra' },
+      ],
+    },
+    { href: '/dev/reverse-proxy',    label: 'Reverse Proxy',          icon: 'proxy' },
+    { href: '/dev/ports',            label: 'Exposed Node Ports',     icon: 'proxy' },
+    { href: '/dev/monitoring',       label: 'System Monitoring',      icon: 'monitoring' },
+    { href: '/dev/logs',             label: 'Platform Telemetry Logs',icon: 'logs' },
+    { href: '/admin/vps-plans',      label: 'VPS Plans & Pricing',    icon: 'vps' },
+    { href: '/dev/catalog',          label: 'Catalog Inspector',      icon: 'catalog' },
+    { href: '/dev/docs',             label: 'Dev & API Docs',         icon: 'knowledgebase' },
+  ],
+};
 
-function getSpaceFromPathname(pathname: string): SpaceKey {
-  if (
-    pathname.startsWith("/dev") ||
-    pathname.startsWith("/admin/projects") ||
-    pathname.startsWith("/admin/nodes") ||
-    pathname.startsWith("/admin/databases") ||
-    pathname.startsWith("/vps-plans")
-  ) return "dev";
-  if (pathname.startsWith("/admin/catalog")) return "admin";
-  if (pathname.startsWith("/support") || pathname.startsWith("/admin/tickets") || pathname.startsWith("/admin/chat")) return "support";
-  if (pathname.startsWith("/admin") || pathname.startsWith("/settings")) return "admin";
-  return "customer";
-}
+// ═════════════════════════════════════════════════════════════════════════════
+// 4. SUPPORT OPERATIONS DASHBOARD SIDEBAR CONFIG
+// ═════════════════════════════════════════════════════════════════════════════
+export const SUPPORT_DASHBOARD: DashboardConfig = {
+  role: 'support',
+  title: 'SUPPORT OPERATIONS',
+  badge: 'SUPPORT',
+  badgeStyle: {
+    color: 'var(--color-info)',
+    bg: 'var(--color-info-bg)',
+    border: 'var(--color-info-border)',
+  },
+  defaultHref: '/support',
+  links: [
+    { href: '/support',              label: 'Support Dashboard',      icon: 'overview' },
+    { href: '/admin/tickets',        label: 'Ticket Queue',           icon: 'tickets' },
+    { href: '/admin/chat',           label: 'Live Customer Chat',     icon: 'chat' },
+    { href: '/support/kb',           label: 'Support Runbooks',       icon: 'knowledgebase' },
+    { href: '/admin/customers',      label: 'Customer Directory',     icon: 'customers' },
+  ],
+};
 
 function isSidebarLinkActive(
   linkHref: string,
@@ -275,78 +263,29 @@ function isSidebarLinkActive(
     if (pathname === "/orders" && activeTabParam !== "cart") return true;
     return false;
   }
-  if (linkHref === "/dashboard" || linkHref === "/admin" || linkHref === "/dev") {
+  if (linkHref === "/dashboard" || linkHref === "/admin" || linkHref === "/dev" || linkHref === "/support") {
     return pathname === linkHref;
   }
   return pathname === linkPath || pathname.startsWith(linkPath);
 }
 
-export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  return (
-    <Suspense fallback={null}>
-      <SidebarContent onNavigate={onNavigate} />
-    </Suspense>
-  );
-}
-
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+// ── Generic Sidebar View Component ──────────────────────────────────────────
+export function DashboardSidebarView({
+  config,
+  onNavigate,
+}: {
+  config: DashboardConfig;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { apiUser, loading, switchRole } = useAppUser();
+  const { apiUser, switchRole } = useAppUser();
   const [signingOut, setSigningOut] = useState(false);
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
 
   function toggleDropdown(href: string) {
     setOpenDropdowns((prev) => ({ ...prev, [href]: !prev[href] }));
-  }
-
-  const isDev     = apiUser?.role === "dev";
-  const isAdmin   = apiUser?.role === "admin";
-  const isSupport = apiUser?.role === "support";
-
-  const allowedSpaces: SpaceKey[] = [];
-  if (loading || !apiUser || isDev || isAdmin) {
-    allowedSpaces.push("admin", "dev", "support", "customer");
-  } else if (isSupport) {
-    allowedSpaces.push("support", "customer");
-  } else {
-    allowedSpaces.push("customer");
-  }
-
-  const [selectedSpace, setSelectedSpace] = useState<SpaceKey>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("shanutechx_active_space") as SpaceKey;
-        if (saved && allowedSpaces.includes(saved) && isPathInSpace(pathname, saved)) return saved;
-      } catch {}
-    }
-    const detected = getSpaceFromPathname(pathname);
-    return allowedSpaces.includes(detected) ? detected : allowedSpaces[0] || "customer";
-  });
-
-  useEffect(() => {
-    if (loading || !apiUser) return;
-    if (isPathInSpace(pathname, selectedSpace) && allowedSpaces.includes(selectedSpace)) return;
-    const spaceForPath = getSpaceFromPathname(pathname);
-    if (allowedSpaces.includes(spaceForPath)) {
-      setSelectedSpace(spaceForPath);
-      try { localStorage.setItem("shanutechx_active_space", spaceForPath); } catch {}
-    } else if (!allowedSpaces.includes(selectedSpace)) {
-      const fallback = allowedSpaces[0] || "customer";
-      setSelectedSpace(fallback);
-      try { localStorage.setItem("shanutechx_active_space", fallback); } catch {}
-    }
-  }, [pathname, loading, apiUser, isDev, isAdmin, isSupport, selectedSpace]);
-
-  const activePanel = SPACES[selectedSpace] || SPACES.customer;
-
-  function handleSpaceSwitch(spaceKey: SpaceKey) {
-    if (!allowedSpaces.includes(spaceKey)) return;
-    setSelectedSpace(spaceKey);
-    try { localStorage.setItem("shanutechx_active_space", spaceKey); } catch {}
-    const spaceObj = SPACES[spaceKey];
-    if (!isPathInSpace(pathname, spaceKey) && spaceObj) router.push(spaceObj.defaultHref);
   }
 
   const initials = apiUser?.email ? apiUser.email.slice(0, 2).toUpperCase() : "??";
@@ -355,6 +294,12 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     setSigningOut(true);
     await signOut(firebaseAuth);
   }
+
+  // Dashboard role quick switcher for admins / devs / support staff
+  const userRole = apiUser?.role || 'customer';
+  const canAccessAdmin = userRole === 'admin' || userRole === 'dev';
+  const canAccessDev = userRole === 'dev' || userRole === 'admin';
+  const canAccessSupport = userRole === 'support' || userRole === 'admin' || userRole === 'dev';
 
   return (
     <aside className="stx-sidebar w-[var(--sidebar-width)] shrink-0 flex flex-col h-screen overflow-y-auto">
@@ -370,47 +315,28 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </span>
       </div>
 
-      {/* ── Panel Space Switcher (staff only, >1 spaces) ── */}
-      {allowedSpaces.length > 1 && (
-        <div className="px-3 pt-4 pb-2 shrink-0">
-          <p className="px-2 mb-2 text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-faint)]">
-            WORKSPACE
-          </p>
-          <div className={`grid gap-1 ${allowedSpaces.length <= 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
-            {allowedSpaces.map((spaceKey) => {
-              const space = SPACES[spaceKey];
-              const isActive = selectedSpace === spaceKey;
-              const colors = SPACE_COLORS[spaceKey];
-              return (
-                <button
-                  key={spaceKey}
-                  onClick={() => handleSpaceSwitch(spaceKey)}
-                  title={space.label}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all ${
-                    isActive
-                      ? `bg-[var(--color-surface-2)] ${colors.badge} ring-1 ring-[var(--color-border)]`
-                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]'
-                  }`}
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isActive ? colors.dot : 'bg-[var(--color-text-faint)]'}`} />
-                  <span className="truncate">{space.badge}</span>
-                </button>
-              );
-            })}
-          </div>
+      {/* ── Role Dashboard Badge Header ── */}
+      <div className="px-5 pt-4 pb-2 shrink-0 border-b border-[var(--color-border-subtle)]">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-faint)]">
+            {config.title}
+          </span>
+          <span
+            className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border"
+            style={{
+              color: config.badgeStyle.color,
+              background: config.badgeStyle.bg,
+              borderColor: config.badgeStyle.border,
+            }}
+          >
+            {config.badge}
+          </span>
         </div>
-      )}
-
-      {/* ── Active Panel Label ── */}
-      <div className="px-5 pt-5 pb-1.5 shrink-0">
-        <p className="text-[10.5px] font-semibold uppercase tracking-widest text-[var(--color-text-faint)]">
-          {activePanel.label}
-        </p>
       </div>
 
       {/* ── Navigation Links ── */}
-      <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto px-3 pb-3">
-        {activePanel.links.map((link) => {
+      <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto px-3 py-3">
+        {config.links.map((link) => {
           const hasChildren = Boolean(link.children?.length);
           const isChildActive = hasChildren && link.children!.some(c => isSidebarLinkActive(c.href, pathname, searchParams));
           const isActive = isSidebarLinkActive(link.href, pathname, searchParams) || isChildActive;
@@ -470,11 +396,70 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         })}
       </nav>
 
-      {/* ── Footer: user info + sign out + theme toggle ── */}
-      <div className="border-t border-[var(--color-border-subtle)] px-4 py-3 shrink-0 space-y-2">
+      {/* ── Footer: Dashboard Switcher + User Info + Sign Out ── */}
+      <div className="border-t border-[var(--color-border-subtle)] px-4 py-3 shrink-0 space-y-2.5">
+        {/* Quick Dashboard Switcher (if staff/dev) */}
+        {(canAccessAdmin || canAccessSupport) && (
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border-subtle)]">
+            <span className="text-[10px] font-semibold text-[var(--color-text-faint)] px-1 uppercase">Go To:</span>
+            <div className="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-none">
+              <Link
+                href="/dashboard"
+                onClick={() => onNavigate?.()}
+                className={`text-[10.5px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+                  config.role === 'customer'
+                    ? 'bg-[var(--color-bg)] text-[var(--color-text-primary)] shadow-sm'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
+                }`}
+              >
+                Client
+              </Link>
+              {canAccessSupport && (
+                <Link
+                  href="/support"
+                  onClick={() => onNavigate?.()}
+                  className={`text-[10.5px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+                    config.role === 'support'
+                      ? 'bg-[var(--color-bg)] text-[var(--color-text-primary)] shadow-sm'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
+                  }`}
+                >
+                  Support
+                </Link>
+              )}
+              {canAccessAdmin && (
+                <Link
+                  href="/admin"
+                  onClick={() => onNavigate?.()}
+                  className={`text-[10.5px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+                    config.role === 'admin'
+                      ? 'bg-[var(--color-bg)] text-[var(--color-text-primary)] shadow-sm'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
+                  }`}
+                >
+                  Admin
+                </Link>
+              )}
+              {canAccessDev && (
+                <Link
+                  href="/dev"
+                  onClick={() => onNavigate?.()}
+                  className={`text-[10.5px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+                    config.role === 'dev'
+                      ? 'bg-[var(--color-bg)] text-[var(--color-text-primary)] shadow-sm'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
+                  }`}
+                >
+                  Dev
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* User Info */}
         {apiUser && (
           <div className="flex items-center gap-2.5">
-            {/* Avatar */}
             <div className="h-8 w-8 rounded-full bg-[var(--color-accent)] flex items-center justify-center text-white text-[11px] font-semibold shrink-0">
               {initials}
             </div>
@@ -485,9 +470,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               <div className="flex items-center gap-1 mt-0.5">
                 {apiUser.role === "dev" ? (
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-accent)] bg-[var(--color-accent-subtle)] border border-[var(--color-accent-border)] rounded px-1.5 py-0.5">
-                    Dev · Protected
+                    Dev · Superuser
                   </span>
-                ) : isAdmin ? (
+                ) : userRole === "admin" ? (
                   <select
                     value={apiUser.role}
                     onChange={async (e) => {
@@ -510,7 +495,6 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         )}
 
         <div className="flex items-center justify-between">
-          {/* Sign out */}
           <button
             onClick={handleSignOut}
             disabled={signingOut}
@@ -523,10 +507,65 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             </svg>
             {signingOut ? "Signing out…" : "Sign out"}
           </button>
-          {/* Theme toggle */}
           <ThemeToggle />
         </div>
       </div>
     </aside>
   );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// EXPORTED DEDICATED SIDEBAR COMPONENTS FOR EACH DASHBOARD
+// ═════════════════════════════════════════════════════════════════════════════
+export function CustomerSidebar({ onNavigate }: { onNavigate?: () => void }) {
+  return <DashboardSidebarView config={CUSTOMER_DASHBOARD} onNavigate={onNavigate} />;
+}
+
+export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
+  return <DashboardSidebarView config={ADMIN_DASHBOARD} onNavigate={onNavigate} />;
+}
+
+export function DevSidebar({ onNavigate }: { onNavigate?: () => void }) {
+  return <DashboardSidebarView config={DEV_DASHBOARD} onNavigate={onNavigate} />;
+}
+
+export function SupportSidebar({ onNavigate }: { onNavigate?: () => void }) {
+  return <DashboardSidebarView config={SUPPORT_DASHBOARD} onNavigate={onNavigate} />;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// AUTO-DETECT SIDEBAR (Default export: automatically renders correct sidebar)
+// ═════════════════════════════════════════════════════════════════════════════
+export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <Suspense fallback={null}>
+      <AutoSidebarContent onNavigate={onNavigate} />
+    </Suspense>
+  );
+}
+
+function AutoSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  const pathname = usePathname();
+  const { apiUser } = useAppUser();
+
+  // Determine dashboard sidebar strictly based on current route & user access
+  if (
+    pathname.startsWith("/dev") ||
+    pathname.startsWith("/admin/projects") ||
+    pathname.startsWith("/admin/nodes") ||
+    pathname.startsWith("/admin/databases") ||
+    pathname.startsWith("/vps-plans")
+  ) {
+    return <DevSidebar onNavigate={onNavigate} />;
+  }
+
+  if (pathname.startsWith("/support") || (pathname.startsWith("/admin/tickets") && apiUser?.role === "support")) {
+    return <SupportSidebar onNavigate={onNavigate} />;
+  }
+
+  if (pathname.startsWith("/admin") || pathname.startsWith("/settings")) {
+    return <AdminSidebar onNavigate={onNavigate} />;
+  }
+
+  return <CustomerSidebar onNavigate={onNavigate} />;
 }

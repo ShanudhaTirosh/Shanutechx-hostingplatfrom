@@ -1080,9 +1080,16 @@ export function StatCard({
   value: string | number;
   icon?: ReactNode;
   trend?: { value: string; up: boolean };
-  color?: 'accent' | 'success' | 'warning' | 'danger';
+  color?: 'accent' | 'success' | 'warning' | 'danger' | 'violet' | 'teal' | 'orange' | 'green' | 'blue';
   className?: string;
 }) {
+  const colorKey = (
+    color === 'violet' || color === 'blue' ? 'accent' :
+    color === 'green' ? 'success' :
+    color === 'orange' ? 'warning' :
+    color === 'teal' ? 'accent' : color
+  );
+
   const iconColors: Record<string, React.CSSProperties> = {
     accent:  { background: 'var(--color-accent-subtle)',  color: 'var(--color-accent)' },
     success: { background: 'var(--color-success-bg)',     color: 'var(--color-success)' },
@@ -1102,7 +1109,7 @@ export function StatCard({
       {icon && (
         <div
           className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105"
-          style={iconColors[color]}
+          style={iconColors[colorKey]}
         >
           {icon}
         </div>
