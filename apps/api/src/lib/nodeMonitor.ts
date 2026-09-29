@@ -51,11 +51,15 @@ export async function checkNodeHealthAndFailover(): Promise<{ audited: number; f
   // Circuit Breaker: If ALL active nodes in a multi-node cluster are unreachable simultaneously,
   // it indicates a network partition or central API connectivity issue, not individual node hardware failures.
   // Suppress automated evacuation to prevent cascade-deactivating all nodes in the cluster.
-  if (nodesToEvacuate.length > 0 && nodesToEvacuate.length >= activeNodes.length && activeNodes.length > 1) {
+  if (nodesToEvacuate.length > 0 && nodesToEvacuate.length >= activeNodes.length) {
     logger.error(
       { unreachableCount: nodesToEvacuate.length, totalNodes: activeNodes.length },
-      'Circuit Breaker Tripped: All compute nodes are unreachable simultaneously. Suppressing automated failover to prevent total cluster cascade.'
+      'Circuit Breaker Tripped / All Nodes Down: All compute nodes are unreachable simultaneously. Suppressing automated failover.'
     );
+    void notifyDiscordChannel('cluster_offline', {
+      'Unreachable Nodes': `${nodesToEvacuate.length}/${activeNodes.length}`,
+      'Action': 'Failover suppressed to prevent total cluster cascade. Ops intervention required.',
+    });
     return { audited, failedOver: 0 };
   }
 

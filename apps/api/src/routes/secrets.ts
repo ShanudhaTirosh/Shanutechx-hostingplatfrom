@@ -227,7 +227,8 @@ secretsRouter.delete('/secrets/projects/:id/secrets/:key', requireAuth, requireA
   const project = await prisma.secretProject.findUnique({ where: { id } });
   if (!project) return res.status(404).json({ error: 'Project not found' });
 
-  await prisma.secretItem.deleteMany({ where: { projectId: id, key } });
+  const deleted = await prisma.secretItem.deleteMany({ where: { projectId: id, key } });
+  if (deleted.count === 0) return res.status(404).json({ error: 'Secret key not found' });
   await logAudit(id, 'DELETE', req.user!.id, key);
 
   res.json({ ok: true, deletedKey: key });

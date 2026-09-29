@@ -86,7 +86,7 @@ vpsRouter.post('/vps-provisions/test-connection', requireAdminOrDev, async (req:
 vpsRouter.post('/vps-provisions/:id/test-connection', async (req: AuthedRequest, res: Response) => {
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision || !provision.credentialRef) return res.status(404).json({ error: 'VPS provision or credentials not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (req.user!.role !== 'admin' && req.user!.role !== 'dev' && provision.userId !== req.user!.id) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -117,7 +117,7 @@ vpsRouter.post('/vps-provisions', requireAdminOrDev, async (req: AuthedRequest, 
   }
 
   const { password, ...rest } = parsed.data;
-  const credentialRef = encryptSecret(password || '', env.secretsEncryptionKey);
+  const credentialRef = password ? encryptSecret(password, env.secretsEncryptionKey) : null;
 
   const provision = await prisma.vpsProvision.create({
     data: {

@@ -221,7 +221,7 @@ export async function fireWebhook(
 ): Promise<void> {
   const webhooks = await prisma.webhook.findMany({ where: { userId, event, isActive: true } });
 
-  await Promise.all(
+  const results = await Promise.allSettled(
     webhooks.map(async (webhook: { id: string; url: string; secret: string }) => {
       // SSRF initial security check
       const safeCheck = await isSafeWebhookUrl(webhook.url);
@@ -288,6 +288,12 @@ export async function fireWebhook(
       });
     })
   );
+
+  for (const res of results) {
+    if (res.status === 'rejected') {
+      logger.error({ err: res.reason, event }, 'Unexpected error during webhook dispatch execution');
+    }
+  }
 }
 
 export { rateLimiter };

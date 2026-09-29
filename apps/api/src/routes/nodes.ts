@@ -595,16 +595,19 @@ nodesRouter.post('/nodes/connect', async (req: AuthedRequest, res: Response) => 
       sshKeyRef = `ssh://${username}@${ip}:${port}`;
     }
 
-    // Upsert the node record
-    const existing = await prisma.node.findFirst({ where: { OR: [{ ip: detectedIp }, { label }] } });
-    const node = existing
-      ? await prisma.node.update({
+    // Upsert the node record atomically inside a Serializable transaction (BUG S01 FIX)
+    const node = await prisma.$transaction(async (tx) => {
+      const existing = await tx.node.findFirst({ where: { OR: [{ ip: detectedIp }, { label }] } });
+      if (existing) {
+        return tx.node.update({
           where: { id: existing.id },
           data: { label, ip: detectedIp, sshKeyRef, cpuCores, ramMb, diskGb, roleTags, isActive: true, lastSeenAt: new Date() },
-        })
-      : await prisma.node.create({
-          data: { label, ip: detectedIp, sshKeyRef, cpuCores, ramMb, diskGb, roleTags, isActive: true, lastSeenAt: new Date() },
         });
+      }
+      return tx.node.create({
+        data: { label, ip: detectedIp, sshKeyRef, cpuCores, ramMb, diskGb, roleTags, isActive: true, lastSeenAt: new Date() },
+      });
+    }, { isolationLevel: 'Serializable' });
 
     await prisma.auditLog.create({
       data: { adminId: req.user!.id, action: 'node.ssh_provision', target: node.id },
@@ -755,10 +758,19 @@ nodesRouter.post('/nodes/connect/stream', async (req: AuthedRequest, res: Respon
       sshKeyRef = `ssh://${username}@${ip}:${port}`;
     }
 
-    const existing = await prisma.node.findFirst({ where: { OR: [{ ip: detectedIp }, { label }] } });
-    const node = existing
-      ? await prisma.node.update({ where: { id: existing.id }, data: { label, ip: detectedIp, sshKeyRef, cpuCores, ramMb, diskGb, roleTags, isActive: true, lastSeenAt: new Date() } })
-      : await prisma.node.create({ data: { label, ip: detectedIp, sshKeyRef, cpuCores, ramMb, diskGb, roleTags, isActive: true, lastSeenAt: new Date() } });
+    // BUG S02 FIX: Atomically upsert inside a Serializable transaction
+    const node = await prisma.$transaction(async (tx) => {
+      const existing = await tx.node.findFirst({ where: { OR: [{ ip: detectedIp }, { label }] } });
+      if (existing) {
+        return tx.node.update({
+          where: { id: existing.id },
+          data: { label, ip: detectedIp, sshKeyRef, cpuCores, ramMb, diskGb, roleTags, isActive: true, lastSeenAt: new Date() },
+        });
+      }
+      return tx.node.create({
+        data: { label, ip: detectedIp, sshKeyRef, cpuCores, ramMb, diskGb, roleTags, isActive: true, lastSeenAt: new Date() },
+      });
+    }, { isolationLevel: 'Serializable' });
 
     await prisma.auditLog.create({ data: { adminId: req.user!.id, action: 'node.ssh_provision', target: node.id } });
     done(node);

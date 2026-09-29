@@ -68,57 +68,68 @@ export async function activateOrExtendSubscription(orderItemId: string, db: Pris
  * grace period.
  */
 export async function runBillingChecks(): Promise<{ markedPastDue: number; cancelled: number }> {
-  const subscriptions = await prisma.subscription.findMany({
-    where: { status: { in: ['active', 'past_due'] } },
-    include: { user: true, orderItem: { include: { deployment: true } } },
-  });
-
   let markedPastDue = 0;
   let cancelled = 0;
+  let cursor: string | undefined;
 
-  for (const sub of subscriptions) {
-    try {
-      const action = decideSweepAction(sub.status, sub.currentPeriodEnd, sub.pastDueAt);
+  while (true) {
+    const subscriptions = await prisma.subscription.findMany({
+      where: { status: { in: ['active', 'past_due'] } },
+      include: { user: true, orderItem: { include: { deployment: true } } },
+      take: 100,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
+    });
 
-      if (action === 'mark_past_due') {
-        const updated = await prisma.subscription.updateMany({
-          where: { id: sub.id, status: sub.status },
-          data: { status: 'past_due', pastDueAt: new Date() },
-        });
-        if (updated.count > 0) {
-          void notifyCustomer(
-            sub.user,
-            `Your subscription payment is due. Please renew within 7 days to avoid suspension.`
-          );
-          markedPastDue += 1;
-        }
-      } else if (action === 'cancel') {
-        const updated = await prisma.subscription.updateMany({
-          where: { id: sub.id, status: sub.status },
-          data: { status: 'cancelled', cancelledAt: new Date() },
-        });
+    if (subscriptions.length === 0) break;
+    cursor = subscriptions[subscriptions.length - 1].id;
 
-        if (updated.count > 0) {
-          const deployment = sub.orderItem.deployment;
-          if (deployment?.containerId && deployment.status === 'running') {
-            try {
-              await stopDeployment(
-                await prisma.node.findUniqueOrThrow({ where: { id: deployment.nodeId } }),
-                deployment.containerId
-              );
-              await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'stopped' } });
-            } catch (err) {
-              logger.error({ deploymentId: deployment.id, err }, 'Failed to suspend deployment for cancelled subscription');
-            }
+    for (const sub of subscriptions) {
+      try {
+        const action = decideSweepAction(sub.status, sub.currentPeriodEnd, sub.pastDueAt);
+
+        if (action === 'mark_past_due') {
+          const updated = await prisma.subscription.updateMany({
+            where: { id: sub.id, status: sub.status },
+            data: { status: 'past_due', pastDueAt: new Date() },
+          });
+          if (updated.count > 0) {
+            void notifyCustomer(
+              sub.user,
+              `Your subscription payment is due. Please renew within 7 days to avoid suspension.`
+            );
+            markedPastDue += 1;
           }
+        } else if (action === 'cancel') {
+          const updated = await prisma.subscription.updateMany({
+            where: { id: sub.id, status: sub.status },
+            data: { status: 'cancelled', cancelledAt: new Date() },
+          });
 
-          void notifyCustomer(sub.user, `Your subscription has been cancelled due to non-payment.`);
-          void notifyAdmins(`Subscription ${sub.id} for ${sub.user.email} cancelled (non-payment).`);
-          cancelled += 1;
+          if (updated.count > 0) {
+            const deployment = sub.orderItem.deployment;
+            if (deployment?.containerId && deployment.status === 'running') {
+              try {
+                const node = await prisma.node.findUnique({ where: { id: deployment.nodeId } });
+                if (!node) {
+                  logger.warn({ deploymentId: deployment.id }, 'Cannot stop deployment: node not found (already deleted?)');
+                } else {
+                  await stopDeployment(node, deployment.containerId);
+                }
+                await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'stopped' } });
+              } catch (err) {
+                logger.error({ deploymentId: deployment.id, err }, 'Failed to suspend deployment for cancelled subscription');
+              }
+            }
+
+            void notifyCustomer(sub.user, `Your subscription has been cancelled due to non-payment.`);
+            void notifyAdmins(`Subscription ${sub.id} for ${sub.user.email} cancelled (non-payment).`);
+            cancelled += 1;
+          }
         }
+      } catch (subErr) {
+        logger.error({ subId: sub.id, err: subErr }, 'Failed processing subscription during billing sweep');
       }
-    } catch (subErr) {
-      logger.error({ subId: sub.id, err: subErr }, 'Failed processing subscription during billing sweep');
     }
   }
 

@@ -16,7 +16,8 @@ export type NotificationEvent =
   | 'new_ticket'
   | 'deployment_failed'
   | 'deployment_recovered'
-  | 'vps_assigned';
+  | 'vps_assigned'
+  | 'cluster_offline';
 
 const EVENT_COLOR: Record<NotificationEvent, number> = {
   new_payment_submitted: 0xf5a623, // amber
@@ -27,6 +28,7 @@ const EVENT_COLOR: Record<NotificationEvent, number> = {
   deployment_failed: 0xe74c3c, // red
   deployment_recovered: 0x2ecc71, // green
   vps_assigned: 0x2ecc71, // green
+  cluster_offline: 0xe74c3c, // red
 };
 
 const EVENT_TITLE: Record<NotificationEvent, string> = {
@@ -38,6 +40,7 @@ const EVENT_TITLE: Record<NotificationEvent, string> = {
   deployment_failed: 'Deployment Failed',
   deployment_recovered: 'Deployment Recovered',
   vps_assigned: 'VPS Instance Assigned',
+  cluster_offline: '🚨 CLUSTER OFFLINE ALERT',
 };
 
 function buildEmbed(event: NotificationEvent, payload: Record<string, unknown>) {
@@ -74,7 +77,7 @@ export async function notifyDiscordChannel(
 
     // 2. Per-event DB configs
     const configs = await prisma.discordWebhookConfig.findMany({
-      where: { event, isActive: true },
+      where: { event: event as any, isActive: true },
     });
 
     for (const c of configs) {

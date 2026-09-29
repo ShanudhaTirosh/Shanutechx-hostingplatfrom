@@ -149,8 +149,8 @@ billingRouter.post('/subscriptions/:id/renew', requireAuth, async (req: AuthedRe
  * Extend a subscription's currentPeriodEnd by its billing period.
  * Called from payments.ts when a renewal payment is approved.
  */
-export async function extendSubscription(subscriptionId: string): Promise<void> {
-  const sub = await prisma.subscription.findUnique({
+export async function extendSubscription(subscriptionId: string, db: any = prisma): Promise<void> {
+  const sub = await db.subscription.findUnique({
     where: { id: subscriptionId },
     include: { orderItem: { include: { plan: true } } },
   });
@@ -180,7 +180,7 @@ export async function extendSubscription(subscriptionId: string): Promise<void> 
   const months = monthsToAdd[billingType] ?? 1;
   const newEnd = addCalendarMonths(base, months);
 
-  await prisma.subscription.update({
+  await db.subscription.update({
     where: { id: subscriptionId },
     data: { currentPeriodEnd: newEnd, status: 'active', pastDueAt: null },
   });

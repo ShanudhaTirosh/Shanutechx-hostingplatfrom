@@ -183,7 +183,7 @@ paymentsRouter.post('/payments/:id/review', requireAdmin, async (req: AuthedRequ
           const config = item.configJson as { renewalSubscriptionId?: string } | null;
           if (config?.renewalSubscriptionId) {
             isRenewal = true;
-            await extendSubscription(config.renewalSubscriptionId);
+            await extendSubscription(config.renewalSubscriptionId, tx);
           }
         }
       }

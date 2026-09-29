@@ -231,7 +231,11 @@ ordersRouter.post('/cart/checkout', idempotent, async (req: AuthedRequest, res) 
     });
 
     await activateSubscriptionsForOrder(order.id);
-    await fulfillOrder(order.id);
+    try {
+      await fulfillOrder(order.id);
+    } catch (fulfillErr: any) {
+      logger.error({ fulfillErr, orderId: order.id }, 'Free-order fulfillment error — manual retry required');
+    }
     void fireWebhook(req.user!.id, 'order_paid', { orderId: order.id, total, currency: currency ?? 'LKR' });
     void notifyDiscordChannel('new_order', { 'Order': order.id, 'Customer': req.user!.email, 'Total': formatCurrency(total, currency ?? 'LKR'), 'Status': 'paid (free)' });
 

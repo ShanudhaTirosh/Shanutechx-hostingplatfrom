@@ -55,7 +55,7 @@ export async function evacuateNodeWorkloads(failedNodeId: string): Promise<Failo
   const deployments = await prisma.deployment.findMany({
     where: {
       nodeId: failedNodeId,
-      status: { in: ['running', 'pending', 'building'] },
+      status: { in: ['running', 'pending', 'building', 'stopped'] },
     },
   });
 
