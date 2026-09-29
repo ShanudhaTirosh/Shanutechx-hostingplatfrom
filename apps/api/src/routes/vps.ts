@@ -576,6 +576,9 @@ vpsRouter.get('/vps-provisions/:id/sftp/list', async (req: AuthedRequest, res: R
 /**
  * GET /api/vps-provisions/:id/sftp/download
  * Download a file from VPS over SFTP.
+ *
+ * S17 FIX: Streams the SFTP read-stream directly into the HTTP response rather than
+ * buffering the entire file in the Node.js heap (which could spike up to 50 MB).
  */
 vpsRouter.get('/vps-provisions/:id/sftp/download', async (req: AuthedRequest, res: Response) => {
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
@@ -587,14 +590,21 @@ vpsRouter.get('/vps-provisions/:id/sftp/download', async (req: AuthedRequest, re
   const remotePath = req.query.path as string;
   if (!remotePath) return res.status(400).json({ error: 'File path query parameter is required' });
 
+  const filename = remotePath.split('/').pop() || 'download';
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
   try {
-    const buffer = await sftpDownloadFile(provision, remotePath);
-    const filename = remotePath.split('/').pop() || 'download';
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(buffer);
+    // Pass `res` as the destination writable — sftpDownloadFile pipes directly into it
+    await sftpDownloadFile(provision, remotePath, res);
   } catch (err: any) {
-    res.status(502).json({ error: `SFTP download failed: ${err.message}` });
+    // Only attempt to send an error response if headers have not been flushed yet
+    if (!res.headersSent) {
+      res.status(502).json({ error: `SFTP download failed: ${err.message}` });
+    } else {
+      // Headers already sent — destroy the connection to signal failure to the client
+      res.destroy();
+    }
   }
 });
 
@@ -774,7 +784,8 @@ vpsRouter.get('/vps-provisions/:id/sftp/read-file', async (req: AuthedRequest, r
 
   try {
     const buffer = await sftpDownloadFile(provision, remotePath);
-    const content = buffer.toString('utf-8');
+    if (!buffer) return res.status(500).json({ error: 'Unexpected empty buffer from SFTP' });
+    const content = (buffer as Buffer).toString('utf-8');
     res.json({ path: remotePath, content });
   } catch (err: any) {
     res.status(502).json({ error: `Read file failed: ${err.message}` });

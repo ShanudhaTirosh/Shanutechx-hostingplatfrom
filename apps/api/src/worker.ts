@@ -52,15 +52,11 @@ logger.info('SSL renewal worker started');
 
 (async () => {
   try {
-    await sslRenewalQueue.add(
-      'ssl-renewal-check',
-      {},
-      {
-        repeat: { pattern: '0 0 * * *' },
-        jobId: 'ssl-renewal-daily',
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-      }
+    // S13 FIX: upsertJobScheduler is idempotent across restarts and replaces stale repeat entries.
+    await sslRenewalQueue.upsertJobScheduler(
+      'ssl-renewal-daily',
+      { pattern: '0 0 * * *' },
+      { name: 'ssl-renewal-check', data: {}, opts: { attempts: 3, backoff: { type: 'exponential', delay: 1000 } } }
     );
   } catch (error) {
     logger.error({ msg: 'Failed to schedule SSL renewal job', error: String(error) });
@@ -84,15 +80,10 @@ workspaceCleanupWorker.on('failed', (job, err) => {
 
 (async () => {
   try {
-    await workspaceCleanupQueue.add(
+    await workspaceCleanupQueue.upsertJobScheduler(
       'workspace-cleanup-hourly',
-      {},
-      {
-        repeat: { pattern: '0 * * * *' }, // Every hour
-        jobId: 'workspace-cleanup-hourly',
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-      }
+      { pattern: '0 * * * *' },
+      { name: 'workspace-cleanup-hourly', data: {}, opts: { attempts: 3, backoff: { type: 'exponential', delay: 1000 } } }
     );
     logger.info({ msg: 'Workspace retention cleanup job scheduled successfully', pattern: '0 * * * *' });
   } catch (error) {
@@ -117,15 +108,10 @@ billingSweepWorker.on('failed', (job, err) => {
 
 (async () => {
   try {
-    await billingSweepQueue.add(
+    await billingSweepQueue.upsertJobScheduler(
       'billing-sweep-daily',
-      {},
-      {
-        repeat: { pattern: '0 1 * * *' }, // Daily at 01:00, after SSL renewal
-        jobId: 'billing-sweep-daily',
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-      }
+      { pattern: '0 1 * * *' }, // Daily at 01:00, after SSL renewal
+      { name: 'billing-sweep-daily', data: {}, opts: { attempts: 3, backoff: { type: 'exponential', delay: 1000 } } }
     );
     logger.info({ msg: 'Billing sweep job scheduled successfully', pattern: '0 1 * * *' });
   } catch (error) {
@@ -152,15 +138,10 @@ uptimeSweepWorker.on('failed', (job, err) => {
 
 (async () => {
   try {
-    await uptimeSweepQueue.add(
+    await uptimeSweepQueue.upsertJobScheduler(
       'uptime-sweep-recurring',
-      {},
-      {
-        repeat: { every: 5 * 60 * 1000 }, // Every 5 minutes
-        jobId: 'uptime-sweep-recurring',
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-      }
+      { every: 5 * 60 * 1000 }, // Every 5 minutes
+      { name: 'uptime-sweep-recurring', data: {}, opts: { attempts: 3, backoff: { type: 'exponential', delay: 1000 } } }
     );
     logger.info({ msg: 'Uptime sweep job scheduled successfully', interval: '5 minutes' });
   } catch (error) {
@@ -223,15 +204,10 @@ pushReceiptWorker.on('failed', (job, err) => {
 
 (async () => {
   try {
-    await nodeFailoverQueue.add(
-      'node-failover-watchdog-recurring',
-      {},
-      {
-        repeat: { every: 60 * 1000 }, // Every 60 seconds
-        jobId: 'node-failover-recurring',
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-      }
+    await nodeFailoverQueue.upsertJobScheduler(
+      'node-failover-recurring',
+      { every: 60 * 1000 }, // Every 60 seconds
+      { name: 'node-failover-watchdog-recurring', data: {}, opts: { attempts: 3, backoff: { type: 'exponential', delay: 1000 } } }
     );
     logger.info({ msg: 'Node failover watchdog scheduled successfully', interval: '1 minute' });
   } catch (error) {
@@ -244,10 +220,10 @@ pushReceiptWorker.on('failed', (job, err) => {
 
 (async () => {
   try {
-    await backupSweepQueue.add(
+    await backupSweepQueue.upsertJobScheduler(
       'backup-sweep-recurring',
-      {},
-      { repeat: { every: 5 * 60 * 1000 }, jobId: 'backup-sweep-recurring' }
+      { every: 5 * 60 * 1000 }, // Every 5 minutes
+      { name: 'backup-sweep-recurring', data: {} }
     );
     logger.info({ msg: 'Backup sweep scheduled successfully', interval: '5 minutes' });
   } catch (error) {

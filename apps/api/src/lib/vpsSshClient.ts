@@ -208,8 +208,18 @@ export async function sftpListFiles(provision: VpsProvision, remotePath: string 
 
 /**
  * SFTP File Download.
+ *
+ * Two calling conventions:
+ *  - `sftpDownloadFile(provision, path)` → resolves with the full Buffer (small files only).
+ *  - `sftpDownloadFile(provision, path, writable)` → streams directly into `writable` and
+ *    resolves when the pipe finishes. Use this for large files to avoid holding the entire
+ *    file in the Node.js heap (S17 fix).
  */
-export async function sftpDownloadFile(provision: VpsProvision, remotePath: string): Promise<Buffer> {
+export async function sftpDownloadFile(
+  provision: VpsProvision,
+  remotePath: string,
+  destination?: import('stream').Writable
+): Promise<Buffer | void> {
   const conn = await connectVpsSsh(provision);
   return new Promise((resolve, reject) => {
     conn.sftp((err, sftp) => {
@@ -217,17 +227,37 @@ export async function sftpDownloadFile(provision: VpsProvision, remotePath: stri
         conn.end();
         return reject(err);
       }
-      const chunks: Buffer[] = [];
       const readStream = sftp.createReadStream(remotePath);
-      readStream.on('data', (chunk: Buffer) => chunks.push(chunk));
-      readStream.on('error', (readErr: any) => {
-        conn.end();
-        reject(readErr);
-      });
-      readStream.on('end', () => {
-        conn.end();
-        resolve(Buffer.concat(chunks));
-      });
+
+      if (destination) {
+        // Streaming path — no Buffer accumulation in heap
+        readStream.pipe(destination, { end: true });
+        readStream.on('error', (readErr: any) => {
+          conn.end();
+          destination.destroy(readErr);
+          reject(readErr);
+        });
+        destination.on('error', (writeErr: any) => {
+          conn.end();
+          reject(writeErr);
+        });
+        destination.on('finish', () => {
+          conn.end();
+          resolve();
+        });
+      } else {
+        // Buffer path — kept for callers that genuinely need the full blob
+        const chunks: Buffer[] = [];
+        readStream.on('data', (chunk: Buffer) => chunks.push(chunk));
+        readStream.on('error', (readErr: any) => {
+          conn.end();
+          reject(readErr);
+        });
+        readStream.on('end', () => {
+          conn.end();
+          resolve(Buffer.concat(chunks));
+        });
+      }
     });
   });
 }

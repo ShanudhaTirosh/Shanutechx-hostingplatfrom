@@ -288,6 +288,14 @@ export async function evacuateNodeWorkloads(failedNodeId: string): Promise<Failo
         const moved = await moveExposureToNode(exp as any, { id: targetPortNode.id, label: targetPortNode.label, ip: targetPortNode.ip }, exposureDeps);
         if (moved) result.portsMigrated++;
         else result.errors.push(`Port exposure ${exp.id}: DNS could not be updated; left on the failed node`);
+      } else if (!exp.subdomain) {
+        // S14 FIX: Raw-TCP / no-subdomain exposures cannot be migrated automatically.
+        // Previously these were silently skipped — operators had no way to know they were missed.
+        const errMsg = `Port exposure ${exp.id} (port ${exp.port}): has no subdomain and cannot be migrated automatically. Manual reconfiguration required.`;
+        logger.warn({ exposureId: exp.id, port: exp.port, nodeId: failedNodeId }, errMsg);
+        result.errors.push(errMsg);
+      } else if (!targetPortNode) {
+        result.errors.push(`Port exposure ${exp.id}: no available target node for migration`);
       }
     } catch (err: any) {
       logger.error({ err, exposureId: exp.id }, 'Port exposure failover failed');
