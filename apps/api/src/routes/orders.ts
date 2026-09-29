@@ -22,10 +22,21 @@ ordersRouter.use(requireAuth);
 async function getOrCreateDraftOrder(userId: string) {
   const existing = await prisma.order.findFirst({
     where: { userId, status: 'draft' },
+    orderBy: { createdAt: 'desc' },
   });
   if (existing) return existing;
 
-  return prisma.order.create({ data: { userId, status: 'draft', total: 0, totalLkr: 0 } });
+  try {
+    return await prisma.order.create({ data: { userId, status: 'draft', total: 0, totalLkr: 0 } });
+  } catch {
+    // If a concurrent request created a draft order at the exact same millisecond, return it
+    const created = await prisma.order.findFirst({
+      where: { userId, status: 'draft' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (created) return created;
+    throw new Error('Failed to create or retrieve draft order');
+  }
 }
 
 /**
@@ -142,7 +153,10 @@ ordersRouter.post('/cart/items', async (req: AuthedRequest, res) => {
   const item = existingItem
     ? await prisma.orderItem.update({
         where: { id: existingItem.id },
-        data: { quantity: existingItem.quantity + parsed.data.quantity },
+        data: {
+          quantity: existingItem.quantity + parsed.data.quantity,
+          ...(parsed.data.configJson ? { configJson: parsed.data.configJson as any } : {}),
+        },
       })
     : await prisma.orderItem.create({
         data: {

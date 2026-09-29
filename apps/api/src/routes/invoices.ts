@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { existsSync } from 'fs';
 import { mkdir, writeFile, readFile } from 'fs/promises';
 import path from 'path';
 import { prisma } from '../lib/prisma';
@@ -37,7 +38,7 @@ invoicesRouter.get('/orders/:orderId/invoice', async (req: AuthedRequest, res) =
 
   let invoice = order.invoice;
 
-  if (!invoice || !invoice.pdfUrl) {
+  if (!invoice || !invoice.pdfUrl || !existsSync(invoice.pdfUrl)) {
     const pdfBytes = await generateInvoicePdf({
       invoiceId: order.id,
       issuedAt: new Date(),

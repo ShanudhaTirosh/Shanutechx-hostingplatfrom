@@ -309,54 +309,37 @@ async function proxyToAgent(
 
 projectsRouter.get('/projects/:id/tables/:table/rows', async (req: AuthedRequest, res) => {
   const { page = '1', limit = '50' } = req.query as Record<string, string>;
-  const proj = await loadOwnedProject(req, req.params.id);
-  if (!proj) return res.status(404).json({ error: 'Project not found' });
-  const node = await prisma.node.findUnique({ where: { id: proj.nodeId } });
-  if (!node) return res.status(500).json({ error: 'Node not found' });
-
-  try {
-    const { env } = await import('../env');
-    const url = `http://${node.ip}:${env.nodeAgentPort}/agent/projects/${proj.id}/tables/${req.params.table}/rows?page=${page}&limit=${limit}&dbName=${proj.dbName}`;
-    const agentRes = await fetch(url, { headers: { 'x-agent-secret': env.nodeAgentSecret } });
-    const data = await agentRes.json().catch(() => ({}));
-    res.status(agentRes.ok ? 200 : agentRes.status || 500).json(data);
-  } catch (err: any) {
-    res.status(502).json({ error: err.message || 'Failed to communicate with node agent' });
-  }
+  const table = encodeURIComponent(req.params.table);
+  await proxyToAgent(
+    req, res, 'GET',
+    `/agent/projects/${req.params.id}/tables/${table}/rows?page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`
+  );
 });
 
 projectsRouter.post('/projects/:id/tables/:table/rows', async (req: AuthedRequest, res) => {
-  // Verify ownership before proxying
-  const proj = await loadOwnedProject(req, req.params.id);
-  if (!proj) return res.status(404).json({ error: 'Project not found' });
-  
+  const table = encodeURIComponent(req.params.table);
   await proxyToAgent(
     req, res, 'POST',
-    `/agent/projects/${req.params.id}/tables/${req.params.table}/rows`,
+    `/agent/projects/${req.params.id}/tables/${table}/rows`,
     req.body
   );
 });
 
 projectsRouter.patch('/projects/:id/tables/:table/rows/:pk', async (req: AuthedRequest, res) => {
-  // Verify ownership before proxying
-  const proj = await loadOwnedProject(req, req.params.id);
-  if (!proj) return res.status(404).json({ error: 'Project not found' });
-  
+  const table = encodeURIComponent(req.params.table);
+  const pk = encodeURIComponent(req.params.pk);
   await proxyToAgent(
     req, res, 'PATCH',
-    `/agent/projects/${req.params.id}/tables/${req.params.table}/rows/${req.params.pk}`,
+    `/agent/projects/${req.params.id}/tables/${table}/rows/${pk}`,
     req.body
   );
 });
 
 projectsRouter.delete('/projects/:id/tables/:table/rows/:pk', async (req: AuthedRequest, res) => {
-  // Verify ownership before proxying
-  const proj = await loadOwnedProject(req, req.params.id);
-  if (!proj) return res.status(404).json({ error: 'Project not found' });
-  
+  const table = encodeURIComponent(req.params.table);
+  const pk = encodeURIComponent(req.params.pk);
   await proxyToAgent(
     req, res, 'DELETE',
-    `/agent/projects/${req.params.id}/tables/${req.params.table}/rows/${req.params.pk}`,
-    undefined
+    `/agent/projects/${req.params.id}/tables/${table}/rows/${pk}`
   );
 });

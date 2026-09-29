@@ -308,6 +308,9 @@ const downloadZipHandler = async (req: AuthedRequest, res: any) => {
       }
     } catch (err: any) {
       logger.warn({ err, deploymentId }, 'Failed to stream zipball from GitHub shadow repo');
+      if (res.headersSent) {
+        return res.end();
+      }
     }
   }
 
