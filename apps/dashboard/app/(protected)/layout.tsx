@@ -13,7 +13,7 @@ import { ThemeProvider, ThemeToggle } from '@/components/ThemeProvider';
 // ── Loading spinner ─────────────────────────────────────────────────────────
 function LoadingSpinner({ message = 'Loading...' }: { message?: string }) {
   return (
-    <main
+    <div
       className="min-h-screen flex items-center justify-center"
       style={{ background: 'var(--color-bg)' }}
     >
@@ -27,7 +27,7 @@ function LoadingSpinner({ message = 'Loading...' }: { message?: string }) {
         />
         <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{message}</span>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -49,7 +49,7 @@ function DashboardSkeleton() {
 // ── Error state ──────────────────────────────────────────────────────────────
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <main
+    <div
       className="min-h-screen flex items-center justify-center p-4"
       style={{ background: 'var(--color-bg)' }}
     >
@@ -94,7 +94,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
           </button>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -120,20 +120,6 @@ function GatedLayoutContent({
 
     const userRole = apiUser.role;
 
-    // Direct role landing: redirect to dedicated dashboard when landing on /dashboard
-    if (pathname === '/dashboard') {
-      if (userRole === 'dev') {
-        router.replace('/dev');
-        return;
-      } else if (userRole === 'admin') {
-        router.replace('/admin');
-        return;
-      } else if (userRole === 'support') {
-        router.replace('/support');
-        return;
-      }
-    }
-
     if (userRole === 'customer') {
       if (
         pathname.startsWith('/admin') ||
@@ -145,7 +131,12 @@ function GatedLayoutContent({
         return;
       }
     } else if (userRole === 'support') {
-      if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/tickets') && !pathname.startsWith('/admin/chat')) {
+      if (
+        pathname.startsWith('/admin') &&
+        !pathname.startsWith('/admin/tickets') &&
+        !pathname.startsWith('/admin/chat') &&
+        !pathname.startsWith('/admin/customers')
+      ) {
         router.replace('/support');
         return;
       }
