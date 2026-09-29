@@ -52,14 +52,34 @@ export async function checkNodeHealthAndFailover(): Promise<{ audited: number; f
   // it indicates a network partition or central API connectivity issue, not individual node hardware failures.
   // Suppress automated evacuation to prevent cascade-deactivating all nodes in the cluster.
   if (nodesToEvacuate.length > 0 && nodesToEvacuate.length >= activeNodes.length) {
-    logger.error(
-      { unreachableCount: nodesToEvacuate.length, totalNodes: activeNodes.length },
-      'Circuit Breaker Tripped / All Nodes Down: All compute nodes are unreachable simultaneously. Suppressing automated failover.'
-    );
-    void notifyDiscordChannel('cluster_offline', {
-      'Unreachable Nodes': `${nodesToEvacuate.length}/${activeNodes.length}`,
-      'Action': 'Failover suppressed to prevent total cluster cascade. Ops intervention required.',
-    });
+    // S07 FIX: Distinguish single-node cluster outage from multi-node partition.
+    // A single-node cluster has nowhere to evacuate to — this needs a louder, more specific alert.
+    const isSingleNodeCluster = activeNodes.length === 1;
+
+    if (isSingleNodeCluster) {
+      const offlineNode = nodesToEvacuate[0];
+      logger.error(
+        { nodeId: offlineNode.id, nodeLabel: offlineNode.label },
+        'SINGLE-NODE CLUSTER OFFLINE: The only compute node is unreachable. No failover target exists. Manual intervention required.'
+      );
+      void notifyDiscordChannel('cluster_offline', {
+        '🚨 Alert Type': 'SINGLE-NODE CLUSTER OFFLINE',
+        'Node Label': offlineNode.label,
+        'Node IP': offlineNode.ip,
+        'Last Heartbeat': offlineNode.lastSeenAt ? offlineNode.lastSeenAt.toISOString() : 'Never',
+        'Action': '⛔ No failover possible — there are no other healthy nodes. Immediate ops intervention required.',
+        'Impact': 'All platform services on this node are OFFLINE.',
+      });
+    } else {
+      logger.error(
+        { unreachableCount: nodesToEvacuate.length, totalNodes: activeNodes.length },
+        'Circuit Breaker Tripped / All Nodes Down: All compute nodes are unreachable simultaneously. Suppressing automated failover.'
+      );
+      void notifyDiscordChannel('cluster_offline', {
+        'Unreachable Nodes': `${nodesToEvacuate.length}/${activeNodes.length}`,
+        'Action': 'Failover suppressed to prevent total cluster cascade. Ops intervention required.',
+      });
+    }
     return { audited, failedOver: 0 };
   }
 

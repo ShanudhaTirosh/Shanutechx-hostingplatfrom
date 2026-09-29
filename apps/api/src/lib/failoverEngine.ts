@@ -8,6 +8,7 @@ import { decryptSecret, encryptSecret } from './secretsVault';
 import { env } from '../env';
 import { logger } from './logger';
 import { fireWebhook } from './webhooks';
+import { resolveRepoUrlForBuild } from './gitAuth';
 
 export interface FailoverResult {
   failedNodeId: string;
@@ -105,19 +106,27 @@ export async function evacuateNodeWorkloads(failedNodeId: string): Promise<Failo
         });
       }
 
-      // Source URL fallback (Git repo or backup archive)
+      // Source URL: credential-free stored URL → fresh token resolved at build time (S06 fix).
+      // resolveRepoUrlForBuild mints a fresh short-lived OAuth token (or decrypts the stored PAT)
+      // so expired GitHub App installation tokens no longer cause failover rebuilds to 401-fail.
       const sourceRepo = dep.repoUrl || (dep.backupRepoFullName ? `https://github.com/${dep.backupRepoFullName}.git` : undefined);
 
       if (!sourceRepo) {
         throw new Error(`Deployment ${dep.id} has no source repository or shadow backup repository URL`);
       }
 
+      // Resolve fresh credentials — falls back to the bare URL gracefully if no git account is linked
+      const authedRepoUrl = await resolveRepoUrlForBuild(dep.id, sourceRepo).catch((authErr) => {
+        logger.warn({ authErr: authErr instanceof Error ? authErr.message : String(authErr), deploymentId: dep.id }, 'Git credential resolution failed during failover; using stored URL as-is');
+        return sourceRepo;
+      });
+
       // Re-trigger build and container launch on target node
       const buildResult = await buildAndRun(
         targetNode,
         {
           deploymentId: dep.id,
-          repoUrl: sourceRepo,
+          repoUrl: authedRepoUrl,
           branch: dep.branch ?? undefined,
           subdomain: dep.subdomain ?? undefined,
           internalPort: dep.internalPort ?? 3000,
