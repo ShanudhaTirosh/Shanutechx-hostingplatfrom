@@ -386,34 +386,49 @@ teamsRouter.post('/teams/invites/accept/:token', async (req: AuthedRequest, res)
   }
 
   // Create member record, granular resource permissions (if specified), and mark invite as accepted
-  const member = await prisma.$transaction(async (tx) => {
-    const newMember = await tx.teamMember.create({
-      data: {
-        teamId: invite.teamId,
-        userId,
-        role: invite.role,
-      },
-    });
-
-    const rawPermissions = (invite as any).resourcePermissions;
-    if (rawPermissions && Array.isArray(rawPermissions)) {
-      await tx.resourcePermission.createMany({
-        data: (rawPermissions as any[]).map((p) => ({
-          teamMemberId: newMember.id,
-          resourceType: p.resourceType,
-          resourceId: p.resourceId,
-          permission: p.permission,
-        })),
+  let member;
+  try {
+    member = await prisma.$transaction(async (tx) => {
+      const newMember = await tx.teamMember.create({
+        data: {
+          teamId: invite.teamId,
+          userId,
+          role: invite.role,
+        },
       });
-    }
 
-    await tx.teamInvite.update({
-      where: { id: invite.id },
-      data: { status: 'accepted' },
+      const rawPermissions = (invite as any).resourcePermissions;
+      if (rawPermissions && Array.isArray(rawPermissions)) {
+        await tx.resourcePermission.createMany({
+          data: (rawPermissions as any[]).map((p) => ({
+            teamMemberId: newMember.id,
+            resourceType: p.resourceType,
+            resourceId: p.resourceId,
+            permission: p.permission,
+          })),
+        });
+      }
+
+      await tx.teamInvite.update({
+        where: { id: invite.id },
+        data: { status: 'accepted' },
+      });
+
+      return newMember;
     });
-
-    return newMember;
-  });
+  } catch (err: any) {
+    if (err.code === 'P2002') {
+      const member = await prisma.teamMember.findUnique({
+        where: { teamId_userId: { teamId: invite.teamId, userId } },
+      });
+      await prisma.teamInvite.update({
+        where: { id: invite.id },
+        data: { status: 'accepted' },
+      }).catch(() => {});
+      return res.json({ ok: true, member, message: 'You are already a member of this team.' });
+    }
+    throw err;
+  }
 
   res.json({ ok: true, member });
 });

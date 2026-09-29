@@ -162,20 +162,6 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
   // the response.
   res.status(202).json({ accepted: true, branch: pushedBranch ?? '(default)', commitHash });
 
-  // Resolve private git repo token if present
-  let effectiveRepoUrl = deployment.repoUrl!;
-  if (deployment.githubTokenEncrypted) {
-    try {
-      const { decryptSecret } = await import('../lib/secretsVault');
-      const { env } = await import('../env');
-      const decryptedToken = decryptSecret(deployment.githubTokenEncrypted, env.secretsEncryptionKey);
-      const urlObj = new URL(deployment.repoUrl!);
-      effectiveRepoUrl = `https://x-access-token:${decryptedToken}@${urlObj.hostname}${urlObj.pathname}`;
-    } catch (tokenErr) {
-      logger.warn({ deploymentId: deployment.id, err: tokenErr }, 'Failed to decrypt github token for webhook deployment');
-    }
-  }
-
   // Fire the actual rebuild in the background.
   void (async () => {
     await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'building' } });
@@ -184,7 +170,7 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
         deployment.node,
         {
           deploymentId: deployment.id,
-          repoUrl: effectiveRepoUrl,
+          repoUrl: deployment.repoUrl!,
           branch: pushedBranch,
           subdomain: deployment.subdomain ?? undefined,
           internalPort: deployment.internalPort!,

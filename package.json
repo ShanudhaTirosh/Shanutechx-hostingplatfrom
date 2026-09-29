@@ -26,6 +26,7 @@
   "devDependencies": {
     "@changesets/cli": "^2.27.11",
     "fast-check": "^4.9.0",
+    "tar": "^7.5.22",
     "tsup": "^8.5.1",
     "tsx": "^4.23.0"
   }

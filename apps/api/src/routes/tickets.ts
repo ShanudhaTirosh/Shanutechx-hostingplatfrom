@@ -22,6 +22,13 @@ ticketsRouter.post('/tickets', async (req: AuthedRequest, res) => {
   const parsed = createTicketSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
+  if (parsed.data.orderId) {
+    const order = await prisma.order.findUnique({ where: { id: parsed.data.orderId } });
+    if (!order || (req.user!.role !== 'admin' && req.user!.role !== 'dev' && order.userId !== req.user!.id)) {
+      return res.status(404).json({ error: 'Referenced order not found' });
+    }
+  }
+
   const ticket = await prisma.ticket.create({
     data: {
       userId: req.user!.id,

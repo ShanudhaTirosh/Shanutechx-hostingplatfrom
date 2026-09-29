@@ -107,7 +107,7 @@ export async function runBillingChecks(): Promise<{ markedPastDue: number; cance
           });
 
           if (updated.count > 0) {
-            const deployment = sub.orderItem.deployment;
+            const deployment = sub.orderItem?.deployment;
             if (deployment?.containerId && deployment.status === 'running') {
               try {
                 const node = await prisma.node.findUnique({ where: { id: deployment.nodeId } });

@@ -68,10 +68,11 @@ async function listDir(deploymentId, relPath = '') {
   const items = await Promise.all(
     entries.map(async (e) => {
       const stats = await fs.stat(path.join(target, e.name)).catch(() => null);
+      const isDir = stats ? stats.isDirectory() : e.isDirectory();
       return {
         name: e.name,
-        type: e.isDirectory() ? 'dir' : 'file',
-        size: stats && !e.isDirectory() ? stats.size : null,
+        type: isDir ? 'dir' : 'file',
+        size: stats && !isDir ? stats.size : null,
         mtime: stats?.mtimeMs ?? null,
       };
     })

@@ -130,14 +130,25 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
         let connectOpts: any = { host: ip, port: 22, readyTimeout: 15_000, keepaliveInterval: 10_000 };
 
         if (sshKeyRef.startsWith('ssh://')) {
-          fail('This node was registered using password authentication without a stored private key. Browser SSH terminal requires an SSH private key reference.');
+          fail('This node was registered without a stored credential reference. Browser SSH terminal requires stored SSH credentials.');
           return;
         } else {
-          // Encrypted private key stored in vault
+          // Encrypted private key or password JSON stored in vault
           try {
-            const privateKey = decryptSecret(sshKeyRef, env.secretsEncryptionKey);
-            connectOpts.username = 'root';
-            connectOpts.privateKey = privateKey;
+            const decrypted = decryptSecret(sshKeyRef, env.secretsEncryptionKey);
+            try {
+              const parsed = JSON.parse(decrypted);
+              if (parsed && typeof parsed === 'object' && parsed.type === 'password' && parsed.password) {
+                connectOpts.username = parsed.username || 'root';
+                connectOpts.password = parsed.password;
+              } else {
+                connectOpts.username = 'root';
+                connectOpts.privateKey = decrypted;
+              }
+            } catch {
+              connectOpts.username = 'root';
+              connectOpts.privateKey = decrypted;
+            }
           } catch (err: any) {
             fail(`Failed to decrypt SSH key: ${err?.message || 'Invalid key reference or encryption key'}`);
             return;

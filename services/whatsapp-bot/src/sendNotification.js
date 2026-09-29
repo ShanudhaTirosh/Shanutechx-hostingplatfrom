@@ -37,8 +37,9 @@ async function processQueue() {
       queue.shift();
       item.resolve();
     } catch (err) {
-      if (err.message && err.message.includes('not connected')) {
-        // Socket temporarily reconnecting — pause queue and retry in 5s
+      item.retries = (item.retries || 0) + 1;
+      if (err.message && err.message.includes('not connected') && item.retries <= 5) {
+        // Socket temporarily reconnecting — pause queue and retry up to 5 times
         await new Promise((r) => setTimeout(r, 5000));
         continue;
       }

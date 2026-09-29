@@ -135,6 +135,18 @@ export async function buildAndRun(
     }
   }
 
+  if (buffered.trim()) {
+    try {
+      const event = JSON.parse(buffered) as BuildEvent;
+      onEvent(event);
+      if (event.phase === 'done' || event.phase === 'error') {
+        finalEvent = event;
+      }
+    } catch {
+      logger.warn({ deploymentId: params.deploymentId, line: buffered }, 'Skipping unparseable trailing build event line from node-agent');
+    }
+  }
+
   return finalEvent;
 }
 

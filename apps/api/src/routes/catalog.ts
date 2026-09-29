@@ -307,6 +307,7 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
         'x-agent-secret': env.nodeAgentSecret,
       },
       body: JSON.stringify({ composeYaml: yamlContent, projectName: composeName, envVars }),
+      signal: AbortSignal.timeout(120_000),
     });
 
     if (!agentRes.ok) {

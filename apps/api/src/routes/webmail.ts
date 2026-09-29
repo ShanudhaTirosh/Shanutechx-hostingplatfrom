@@ -1864,7 +1864,8 @@ webmailRouter.post('/webmail/business/mail-merge', async (req: AuthedRequest, re
       let personalizedBody = bodyTemplate;
       if (r.variables && typeof r.variables === 'object') {
         for (const [k, v] of Object.entries(r.variables)) {
-          personalizedBody = personalizedBody.replace(new RegExp(`{{\\s*${k}\\s*}}`, 'g'), String(v));
+          const escapedKey = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          personalizedBody = personalizedBody.replace(new RegExp(`{{\\s*${escapedKey}\\s*}}`, 'g'), String(v));
         }
       }
 
@@ -1872,7 +1873,7 @@ webmailRouter.post('/webmail/business/mail-merge', async (req: AuthedRequest, re
         data: {
           userId,
           folder: 'sent',
-          senderName: (req.user as any).displayName || 'User',
+          senderName: (req.user as any)?.displayName || 'User',
           senderEmail: req.user!.email,
           recipientEmail: r.email,
           subject,

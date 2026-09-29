@@ -285,13 +285,15 @@ async function backupDatabase({ containerId, type, databaseId, masterPassword })
 
   const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
   const stream = await exec.start();
-  let dumpData = Buffer.alloc(0);
+  const writeStream = fs.createWriteStream(filePath);
   await new Promise((resolve, reject) => {
-    stream.on('data', (chunk) => {
-      dumpData = Buffer.concat([dumpData, Buffer.from(chunk)]);
+    stream.pipe(writeStream);
+    writeStream.on('finish', resolve);
+    stream.on('error', (err) => {
+      writeStream.destroy(err);
+      reject(err);
     });
-    stream.on('end', resolve);
-    stream.on('error', reject);
+    writeStream.on('error', reject);
   });
 
   const inspect = await exec.inspect();
@@ -299,7 +301,6 @@ async function backupDatabase({ containerId, type, databaseId, masterPassword })
     throw new Error(`Managed database dump failed (exit ${inspect.ExitCode})`);
   }
 
-  fs.writeFileSync(filePath, dumpData);
   const stats = fs.statSync(filePath);
 
   return {
@@ -348,7 +349,6 @@ async function restoreDatabase({ containerId, type, databaseId, backupId, master
   }
 
   const container = docker.getContainer(containerId);
-  const fileContent = fs.readFileSync(filePath, 'utf8');
 
   let cmd = [];
   if (type === 'postgres') {
@@ -368,14 +368,15 @@ async function restoreDatabase({ containerId, type, databaseId, backupId, master
   });
 
   const stream = await exec.start({ hijack: true, stdin: true });
-  stream.write(fileContent);
-  stream.end();
+  const fileStream = fs.createReadStream(filePath);
+  fileStream.pipe(stream);
 
   let output = '';
   await new Promise((resolve, reject) => {
     stream.on('data', (chunk) => { output += chunk.toString(); });
     stream.on('end', resolve);
     stream.on('error', reject);
+    fileStream.on('error', reject);
   });
 
   return { ok: true, containerId, backupId, message: 'Database snapshot successfully restored.' };

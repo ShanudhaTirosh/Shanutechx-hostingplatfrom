@@ -75,12 +75,18 @@ async function connect() {
       currentQr = null;
       currentQrDataUrl = null;
 
-      if (loggedOut) {
-        appLogger.error('WhatsApp session logged out. Resetting auth folder.');
-        await resetSession();
-      } else {
-        appLogger.warn({ statusCode }, 'WhatsApp connection closed, reconnecting in 5s...');
-        setTimeout(connect, 5000);
+      try {
+        if (loggedOut) {
+          appLogger.error('WhatsApp session logged out. Resetting auth folder.');
+          await resetSession();
+        } else {
+          appLogger.warn({ statusCode }, 'WhatsApp connection closed, reconnecting in 5s...');
+          setTimeout(() => {
+            connect().catch((err) => appLogger.error({ err }, 'Failed to reconnect WhatsApp'));
+          }, 5000);
+        }
+      } catch (err) {
+        appLogger.error({ err }, 'Error during WhatsApp connection close handling');
       }
     }
 

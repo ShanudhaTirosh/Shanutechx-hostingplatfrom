@@ -53,6 +53,7 @@ function matchesIpRange(ip, cidr) {
 }
 
 function matchesHeader(headers, matchValue) {
+  if (!headers || typeof headers !== 'object') return false;
   const { name, value } = parseHeaderMatch(matchValue);
   const actual = headers[name];
   if (actual === undefined) return false;
@@ -60,12 +61,14 @@ function matchesHeader(headers, matchValue) {
 }
 
 function matchesPath(path, matchValue) {
+  if (!path || typeof path !== 'string') return false;
   // A trailing "*" matches a prefix; otherwise the path must match exactly.
   if (matchValue.endsWith('*')) return path.startsWith(matchValue.slice(0, -1));
   return path === matchValue;
 }
 
 function matchesUserAgent(userAgent, matchValue) {
+  if (!userAgent || typeof userAgent !== 'string') return false;
   return userAgent.toLowerCase().includes(matchValue.toLowerCase());
 }
 

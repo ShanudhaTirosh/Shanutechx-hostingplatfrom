@@ -21,6 +21,26 @@ export interface SftpItem {
   permissions: number;
 }
 
+function parseCredentialString(decrypted: string): { privateKey?: string; password?: string; username?: string } {
+  try {
+    const parsed = JSON.parse(decrypted);
+    if (parsed && typeof parsed === 'object') {
+      if (parsed.privateKey) {
+        return { privateKey: parsed.privateKey, username: parsed.username };
+      }
+      if (parsed.password) {
+        return { password: parsed.password, username: parsed.username };
+      }
+    }
+  } catch {
+    // Not JSON format
+  }
+  if (decrypted.startsWith('-----BEGIN') || decrypted.includes('PRIVATE KEY')) {
+    return { privateKey: decrypted };
+  }
+  return { password: decrypted };
+}
+
 /**
  * Resolves SSH connection options for a direct/manual VpsProvision.
  */
@@ -30,7 +50,7 @@ export function getVpsSshConfig(provision: VpsProvision): ConnectConfig {
     throw new Error('VPS does not have an IP address configured');
   }
 
-  const username = provision.username || 'root';
+  let username = provision.username || 'root';
   const port = provision.sshPort || 22;
 
   let password: string | undefined;
@@ -38,11 +58,10 @@ export function getVpsSshConfig(provision: VpsProvision): ConnectConfig {
 
   if (provision.credentialRef) {
     const decrypted = decryptSecret(provision.credentialRef, env.secretsEncryptionKey);
-    if (decrypted.startsWith('-----BEGIN') || decrypted.includes('PRIVATE KEY')) {
-      privateKey = decrypted;
-    } else {
-      password = decrypted;
-    }
+    const creds = parseCredentialString(decrypted);
+    if (creds.privateKey) privateKey = creds.privateKey;
+    if (creds.password) password = creds.password;
+    if (creds.username && !provision.username) username = creds.username;
   }
 
   return {
@@ -531,18 +550,17 @@ export async function testVpsConnectionRaw(params: TestConnectionParams): Promis
 }> {
   const host = params.ip.trim();
   const port = params.sshPort || 22;
-  const username = params.username?.trim() || 'root';
+  let username = params.username?.trim() || 'root';
   const passwordOrKey = params.password;
   const testType = params.testType || 'both';
 
   let privateKey: string | undefined;
   let password: string | undefined;
 
-  if (passwordOrKey.startsWith('-----BEGIN') || passwordOrKey.includes('PRIVATE KEY')) {
-    privateKey = passwordOrKey;
-  } else {
-    password = passwordOrKey;
-  }
+  const creds = parseCredentialString(passwordOrKey);
+  if (creds.privateKey) privateKey = creds.privateKey;
+  if (creds.password) password = creds.password;
+  if (creds.username && !params.username) username = creds.username;
 
   const config: ConnectConfig = {
     host,

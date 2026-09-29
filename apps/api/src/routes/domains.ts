@@ -252,7 +252,7 @@ domainsRouter.post('/domains/:id/verify', async (req: AuthedRequest, res) => {
       },
     });
 
-    if (!customDomain) {
+    if (!customDomain || !customDomain.deployment) {
       return res.status(404).json({
         error: 'Custom domain not found',
         message: `No custom domain found with ID: ${customDomainId}`,
@@ -389,7 +389,7 @@ domainsRouter.delete('/domains/:id', async (req: AuthedRequest, res) => {
       },
     });
 
-    if (!customDomain) {
+    if (!customDomain || !customDomain.deployment) {
       return res.status(404).json({
         error: 'Custom domain not found',
         message: `No custom domain found with ID: ${customDomainId}`,

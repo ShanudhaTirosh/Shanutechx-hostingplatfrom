@@ -86,13 +86,20 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
 
         const { deployment, subdomain } = await deployService({
           userId: parent.userId,
-          serviceType: 'node_hosting',
-          repoUrl: cloneUrl || parent.repoUrl,
+          serviceType: parent.webHostingType || 'node_hosting',
+          repoUrl: cloneUrl || parent.repoUrl || '',
           branch: headBranch || `pr-${prNumber}`,
           preferredName: previewSubdomain,
           internalPort: parent.internalPort || 3000,
           isPreview: true,
           parentDeploymentId: parent.id,
+          gitAccountId: parent.gitAccountId ?? undefined,
+          gitProvider: parent.gitProvider ?? undefined,
+          gitTokenEncrypted: parent.githubTokenEncrypted ?? undefined,
+          startCommand: parent.startCommand ?? undefined,
+          entryFile: parent.entryFile ?? undefined,
+          frameworkPreset: parent.frameworkPreset ?? undefined,
+          exposureMode: parent.exposureMode ?? undefined,
         });
 
         return res.status(201).json({
@@ -158,13 +165,20 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
 
         const { deployment, subdomain } = await deployService({
           userId: parent.userId,
-          serviceType: 'node_hosting',
-          repoUrl: cloneUrl || parent.repoUrl,
+          serviceType: parent.webHostingType || 'node_hosting',
+          repoUrl: cloneUrl || parent.repoUrl || '',
           branch: headBranch || `mr-${mrIid}`,
           preferredName: previewSubdomain,
           internalPort: parent.internalPort || 3000,
           isPreview: true,
           parentDeploymentId: parent.id,
+          gitAccountId: parent.gitAccountId ?? undefined,
+          gitProvider: parent.gitProvider ?? undefined,
+          gitTokenEncrypted: parent.githubTokenEncrypted ?? undefined,
+          startCommand: parent.startCommand ?? undefined,
+          entryFile: parent.entryFile ?? undefined,
+          frameworkPreset: parent.frameworkPreset ?? undefined,
+          exposureMode: parent.exposureMode ?? undefined,
         });
 
         return res.status(201).json({
