@@ -1,3 +1,8 @@
+import dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config();
+
 import { prisma } from '../lib/prisma';
 
 async function main() {
@@ -8,6 +13,9 @@ async function main() {
   `);
   await prisma.$executeRawUnsafe(`
     ALTER TABLE "SupabaseClientProject" ADD COLUMN IF NOT EXISTS "nodeIp" TEXT;
+  `);
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "SupabaseClientProject" ADD COLUMN IF NOT EXISTS "errorMessage" TEXT;
   `);
 
   await prisma.$executeRawUnsafe(`

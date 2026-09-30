@@ -1214,6 +1214,7 @@ model SupabaseClientProject {
   // Target VPS node for this Supabase stack
   nodeId             String?  // Node.id this stack is provisioned on
   nodeIp             String?  // Cached node IP for direct Studio URL: http://nodeIp:studioPort
+  errorMessage       String?  // Provisioning failure reason or last error message
   createdAt          DateTime @default(now())
 
   @@index([nodeId])

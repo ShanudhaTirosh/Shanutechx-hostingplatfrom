@@ -538,7 +538,8 @@ export interface SupabaseClientProject {
   clientEmail: string;
   dbName: string;
   region: string;
-  status: 'ACTIVE' | 'PROVISIONING' | 'SUSPENDED';
+  status: 'ACTIVE' | 'PROVISIONING' | 'STOPPED' | 'FAILED' | 'SUSPENDED';
+  errorMessage?: string | null;
   anonKey: string;
   serviceKey: string;
   smtpConfigured: boolean;
@@ -557,6 +558,12 @@ export interface SupabaseClientProject {
   apiUrl?: string;
   metaUrl?: string;
   dbUrl?: string;
+  resourceUsage?: {
+    cpuPct: number;
+    ramMb: number;
+    diskMb: number;
+    dbSizeMb: number;
+  };
   createdAt: string;
 }
 

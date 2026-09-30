@@ -2064,6 +2064,29 @@ export const api = {
       apiFetch('/api/supabase/projects', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<{ project: SupabaseClientProject }>(r)
       ),
+    startProject: (id: string) =>
+      apiFetch(`/api/supabase/projects/${id}/start`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; project: SupabaseClientProject }>(r)
+      ),
+    stopProject: (id: string) =>
+      apiFetch(`/api/supabase/projects/${id}/stop`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; project: SupabaseClientProject }>(r)
+      ),
+    restartProject: (id: string) =>
+      apiFetch(`/api/supabase/projects/${id}/restart`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; project: SupabaseClientProject }>(r)
+      ),
+    retryProject: (id: string) =>
+      apiFetch(`/api/supabase/projects/${id}/retry`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; project: SupabaseClientProject }>(r)
+      ),
+    migrateProject: (id: string, targetNodeId: string) =>
+      apiFetch(`/api/supabase/projects/${id}/migrate`, {
+        method: 'POST',
+        body: JSON.stringify({ targetNodeId }),
+      }).then((r) => asJson<{ ok: boolean; project: SupabaseClientProject }>(r)),
+    getProjectLogs: (id: string) =>
+      apiFetch(`/api/supabase/projects/${id}/logs`).then((r) => asJson<{ logs: any[] }>(r)),
     deleteProject: (id: string) =>
       apiFetch(`/api/supabase/projects/${id}`, { method: 'DELETE' }).then((r) =>
         asJson<{ ok: boolean; deletedId: string }>(r)
