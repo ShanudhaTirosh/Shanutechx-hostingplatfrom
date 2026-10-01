@@ -3,18 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui';
-
-import { WebmailLayout } from '@/components/webmail/WebmailLayout';
-import { WebmailThreadList } from '@/components/webmail/WebmailThreadList';
-import { WebmailThreadViewer } from '@/components/webmail/WebmailThreadViewer';
-import { WebmailRichComposer } from '@/components/webmail/WebmailRichComposer';
-import { WebmailFoldersAndLabelsModal } from '@/components/webmail/WebmailFoldersAndLabelsModal';
-import { WebmailRulesModal } from '@/components/webmail/WebmailRulesModal';
-import { WebmailSettingsModal } from '@/components/webmail/WebmailSettingsModal';
-import { WebmailCalendarTab } from '@/components/webmail/WebmailCalendarTab';
-import { WebmailContactsTab } from '@/components/webmail/WebmailContactsTab';
 import DynamicDnsSetupGuide from '@/components/email/DynamicDnsSetupGuide';
-import { WebmailMessage } from '@/lib/types';
 import {
   Mail,
   KeyRound,
@@ -23,8 +12,20 @@ import {
   Users,
   CreditCard,
   ShieldCheck,
-  Calendar,
-  ArrowLeft,
+  ExternalLink,
+  Copy,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  Plus,
+  Trash2,
+  Server,
+  Lock,
+  Unlock,
+  Key,
+  Database,
+  Code2,
+  ChevronRight
 } from 'lucide-react';
 
 interface Mailbox {
@@ -53,9 +54,10 @@ interface Mailbox {
   customDomain?: string;
   aliases?: string[];
   maxAliases?: number;
+  mailHostId?: string;
 }
 
-interface Domain {
+interface DomainRecord {
   id: string;
   domain: string;
   status: 'verified' | 'pending_dns';
@@ -66,123 +68,131 @@ interface Domain {
   createdAt: string;
 }
 
-interface Contact {
+interface MailHost {
   id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  company?: string;
-  notes?: string;
+  label: string;
+  hostname: string;
+  apiUrl: string;
+  status: string;
+  isDefault: boolean;
+  storageUsedBytes: number;
+  storageTotalBytes: number;
+  activeConnections: number;
+  mailboxCount: number;
+  domainCount: number;
 }
 
-interface TodoItem {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
-interface UpcomingEvent {
-  id: string;
-  title: string;
-  dateStr: string;
-  timeStr: string;
-  participants: string[];
-}
-
-export default function RedesignedMailboxStudioPage() {
-  const [activeTab, setActiveTab] = useState<'webmail' | 'smtp_creds' | 'dns' | 'aliases' | 'contacts' | 'billing' | 'delegation'>('webmail');
-  const [activeFolder, setActiveFolder] = useState<'inbox' | 'starred' | 'drafts' | 'sent' | 'spam' | 'trash' | 'archive' | 'snoozed'>('inbox');
-  const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  const [messages, setMessages] = useState<WebmailMessage[]>([]);
-  const [selectedMessage, setSelectedMessage] = useState<WebmailMessage | null>(null);
+export default function BusinessEmailManagementDashboard() {
+  const [activeTab, setActiveTab] = useState<'mailboxes' | 'dns' | 'credentials' | 'aliases' | 'admin_hosts' | 'admin_bulk'>('mailboxes');
 
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [selectedMailboxId, setSelectedMailboxId] = useState<string>('');
+  const [domains, setDomains] = useState<DomainRecord[]>([]);
+  const [mailHosts, setMailHosts] = useState<MailHost[]>([]);
+  const [healthInfo, setHealthInfo] = useState<any>(null);
+
   const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedCodeSnippet, setSelectedCodeSnippet] = useState<'node' | 'python' | 'curl'>('node');
 
-  const [domains, setDomains] = useState<Domain[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [todos, setTodos] = useState<TodoItem[]>([]);
-  const [newTodoText, setNewTodoText] = useState('');
-  const [events, setEvents] = useState<UpcomingEvent[]>([]);
-
-  // Modals & Inputs
-  const [showComposeModal, setShowComposeModal] = useState(false);
-  const [composeFrom, setComposeFrom] = useState('');
-  const [composeTo, setComposeTo] = useState('');
-  const [composeSubject, setComposeSubject] = useState('');
-  const [composeBody, setComposeBody] = useState('');
-  const [attachments, setAttachments] = useState<{ filename: string; sizeStr: string }[]>([]);
-  const [sending, setSending] = useState(false);
-
+  // New Alias input state
   const [newAliasPrefix, setNewAliasPrefix] = useState('');
   const [addingAlias, setAddingAlias] = useState(false);
-  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
 
-  const [showAddContactModal, setShowAddContactModal] = useState(false);
-  const [newContactName, setNewContactName] = useState('');
-  const [newContactEmail, setNewContactEmail] = useState('');
-  const [newContactPhone, setNewContactPhone] = useState('');
-  const [newContactCompany, setNewContactCompany] = useState('');
+  // New Domain input state
+  const [newDomainName, setNewDomainName] = useState('');
+  const [addingDomain, setAddingDomain] = useState(false);
+  const [verifyingDomainId, setVerifyingDomainId] = useState<string | null>(null);
 
-  const [newCustomDomain, setNewCustomDomain] = useState('');
-  const [verifyingDnsId, setVerifyingDnsId] = useState<string | null>(null);
+  // Admin Mail Host state
+  const [showAddHostModal, setShowAddHostModal] = useState(false);
+  const [hostLabel, setHostLabel] = useState('');
+  const [hostHostname, setHostHostname] = useState('');
+  const [hostApiUrl, setHostApiUrl] = useState('http://localhost:8080');
+  const [hostApiKey, setHostApiKey] = useState('');
+  const [hostIsDefault, setHostIsDefault] = useState(false);
+  const [submittingHost, setSubmittingHost] = useState(false);
 
-  // Webmail Suite Enhancements State
-  const [webmailCategory, setWebmailCategory] = useState<'primary' | 'social' | 'promotions' | 'updates'>('primary');
-  const [webmailViewMode, setWebmailViewMode] = useState<'threads' | 'flat'>('threads');
-  const [listDensity, setListDensity] = useState<'compact' | 'comfortable' | 'spacious'>('comfortable');
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  // Bulk Provisioning state
+  const [bulkUserId, setBulkUserId] = useState('');
+  const [bulkDomain, setBulkDomain] = useState('');
+  const [bulkPattern, setBulkPattern] = useState('user{n}');
+  const [bulkCount, setBulkCount] = useState(5);
+  const [bulkPassword, setBulkPassword] = useState('');
+  const [bulkQuota, setBulkQuota] = useState(1024);
+  const [bulkHostId, setBulkHostId] = useState('');
+  const [submittingBulk, setSubmittingBulk] = useState(false);
 
-  const [showFoldersModal, setShowFoldersModal] = useState(false);
-  const [showRulesModal, setShowRulesModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showCalendarTab, setShowCalendarTab] = useState(false);
+  // User details & roles
+  const [userRole, setUserRole] = useState<string>('customer');
+  const [usersList, setUsersList] = useState<any[]>([]);
 
   const { toast } = useToast();
 
+  const webmailBaseUrl = process.env.NEXT_PUBLIC_WEBMAIL_URL || 'http://localhost:3002';
 
   useEffect(() => {
-    fetchMailboxes();
-    fetchDomains();
-    fetchContacts();
-
-    api.email.todos().then((d) => {
-      if (d.todos) setTodos(d.todos);
-    }).catch(() => {});
-    api.email.events().then((d) => {
-      if (d.events) setEvents(d.events);
-    }).catch(() => {});
+    fetchData();
   }, []);
 
-  const fetchMailboxes = () => {
-    api.email.mailboxes().then((res) => {
-      const list = res.mailboxes || [];
+  const fetchData = async () => {
+    try {
+      const [mbRes, domRes] = await Promise.all([
+        api.email.mailboxes().catch(() => ({ mailboxes: [] })),
+        api.email.domains().catch(() => ({ domains: [] })),
+      ]);
+
+      const list = mbRes.mailboxes || [];
       setMailboxes(list);
       if (list.length > 0 && !selectedMailboxId) {
         setSelectedMailboxId(list[0].id);
       }
-    }).catch(() => {});
+
+      setDomains(domRes.domains || []);
+
+      // Fetch user role & admin info
+      const profile = await api.auth.me().catch(() => null);
+      if (profile?.user?.role) {
+        setUserRole(profile.user.role);
+        if (profile.user.role === 'admin' || profile.user.role === 'dev') {
+          fetchAdminData();
+        }
+      }
+    } catch (err: any) {
+      toast(err.message || 'Failed to load mailbox management data', 'error');
+    }
   };
 
-  const fetchDomains = () => {
-    api.email.domains().then((res) => setDomains(res.domains || [])).catch(() => {});
+  const fetchAdminData = async () => {
+    try {
+      const [hostsRes, healthRes, usersRes] = await Promise.all([
+        api.email.getHosts().catch(() => ({ hosts: [] })),
+        api.email.getSystemHealth().catch(() => null),
+        api.admin.allUsers().catch(() => ({ users: [] })),
+      ]);
+      setMailHosts(hostsRes.hosts || []);
+      setHealthInfo(healthRes);
+      setUsersList(usersRes.users || []);
+    } catch (_) {}
   };
 
-  const fetchContacts = () => {
-    api.email.contacts()
-      .then((res) => setContacts(res.contacts || []))
-      .catch(() => {});
+  const activeMailbox = mailboxes.find((m) => m.id === selectedMailboxId) || mailboxes[0];
 
-    api.products.list('smtp')
-      .then((res) => {
-        const prod = res.products?.find((p) => p.category === 'smtp') || res.products?.[0];
-        if (prod?.plans) setAvailablePlans(prod.plans);
-      })
-      .catch(() => {});
+  const handleOpenWebmail = (targetMailbox?: Mailbox) => {
+    const target = targetMailbox || activeMailbox;
+    const webmailUrl = target?.webmailUrl || webmailBaseUrl;
+    window.open(webmailUrl, '_blank');
+  };
+
+  const handleRevealPassword = async () => {
+    if (!activeMailbox) return;
+    try {
+      const res = await api.email.credentials(activeMailbox.id);
+      setRevealedPassword(res.password || '••••••••');
+      setShowPassword(true);
+    } catch (err: any) {
+      toast(err.message || 'Failed to reveal password', 'error');
+    }
   };
 
   const handleAddAlias = async (e: React.FormEvent) => {
@@ -191,11 +201,11 @@ export default function RedesignedMailboxStudioPage() {
     setAddingAlias(true);
     try {
       await api.smtp.addAlias(activeMailbox.id, newAliasPrefix.trim().toLowerCase());
-      toast(`Alias created successfully!`, 'success');
+      toast('Alias created successfully!', 'success');
       setNewAliasPrefix('');
-      fetchMailboxes();
+      fetchData();
     } catch (err: any) {
-      toast(err.message || 'Failed to create alias', 'error');
+      toast(err.message || 'Failed to add alias', 'error');
     } finally {
       setAddingAlias(false);
     }
@@ -205,35 +215,127 @@ export default function RedesignedMailboxStudioPage() {
     if (!activeMailbox) return;
     try {
       await api.smtp.removeAlias(activeMailbox.id, prefix);
-      toast(`Alias removed`, 'info');
-      fetchMailboxes();
+      toast('Alias removed', 'info');
+      fetchData();
     } catch (err: any) {
       toast(err.message || 'Failed to remove alias', 'error');
     }
   };
 
-  useEffect(() => {
-    api.webmail.listMessages(activeFolder).then((res) => {
-      const list: WebmailMessage[] = res.messages || [];
-      setMessages(list);
-      if (list.length > 0) setSelectedMessage(list[0]);
-      else setSelectedMessage(null);
-    }).catch(() => {
-      setMessages([]);
-      setSelectedMessage(null);
-    });
-  }, [activeFolder]);
-
-  const activeMailbox = mailboxes.find((m) => m.id === selectedMailboxId) || mailboxes[0];
-
-  const handleRevealPassword = async () => {
-    if (!activeMailbox) return;
+  const handleAddDomain = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDomainName.includes('.')) {
+      toast('Please enter a valid domain name (e.g. company.com)', 'error');
+      return;
+    }
+    setAddingDomain(true);
     try {
-      const res = await api.email.credentials(activeMailbox.id);
-      setRevealedPassword(res.password || '••••••••');
-      setShowPassword(true);
+      const res = await api.email.addDomain(newDomainName.trim().toLowerCase());
+      toast(`Custom domain ${newDomainName} added!`, 'success');
+      setDomains((prev) => [...prev, res.domain]);
+      setNewDomainName('');
     } catch (err: any) {
-      toast(err.message || 'Failed to reveal credentials', 'error');
+      toast(err.message || 'Failed to add domain', 'error');
+    } finally {
+      setAddingDomain(false);
+    }
+  };
+
+  const handleRecheckDns = async (domainId: string) => {
+    setVerifyingDomainId(domainId);
+    try {
+      const res = await api.email.verifyDomain(domainId);
+      toast(res.message || 'DNS verification checked', res.verified ? 'success' : 'info');
+      fetchData();
+    } catch (err: any) {
+      toast(err.message || 'DNS check failed', 'error');
+    } finally {
+      setVerifyingDomainId(null);
+    }
+  };
+
+  const handleAddMailHost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingHost(true);
+    try {
+      const res = await api.email.addHost({
+        label: hostLabel,
+        hostname: hostHostname,
+        apiUrl: hostApiUrl,
+        apiKey: hostApiKey,
+        isDefault: hostIsDefault,
+      });
+      toast(res.message || 'Mail host node added successfully!', 'success');
+      setShowAddHostModal(false);
+      setHostLabel('');
+      setHostHostname('');
+      setHostApiKey('');
+      fetchAdminData();
+    } catch (err: any) {
+      toast(err.message || 'Failed to add mail host', 'error');
+    } finally {
+      setSubmittingHost(false);
+    }
+  };
+
+  const handleTestMailHost = async (hostId: string) => {
+    try {
+      const res = await api.email.testHost(hostId);
+      toast(`Host test status: ${res.status}`, res.status === 'healthy' ? 'success' : 'error');
+      fetchAdminData();
+    } catch (err: any) {
+      toast(err.message || 'Host test failed', 'error');
+    }
+  };
+
+  const handleDeleteMailHost = async (hostId: string, label: string) => {
+    if (!confirm(`Are you sure you want to remove mail host "${label}"?`)) return;
+    try {
+      await api.email.deleteHost(hostId);
+      toast(`Mail host ${label} removed`, 'info');
+      fetchAdminData();
+    } catch (err: any) {
+      toast(err.message || 'Failed to remove mail host', 'error');
+    }
+  };
+
+  const handleBulkProvision = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingBulk(true);
+    try {
+      const res = await api.email.bulkProvision({
+        targetUserId: bulkUserId || (usersList[0]?.id || ''),
+        domain: bulkDomain,
+        pattern: bulkPattern,
+        count: bulkCount,
+        password: bulkPassword,
+        storageQuotaMb: bulkQuota,
+        mailHostId: bulkHostId || undefined,
+      });
+      toast(res.message || 'Bulk mailboxes created!', 'success');
+      setBulkPassword('');
+      fetchData();
+      if (userRole === 'admin' || userRole === 'dev') fetchAdminData();
+    } catch (err: any) {
+      toast(err.message || 'Bulk provisioning failed', 'error');
+    } finally {
+      setSubmittingBulk(false);
+    }
+  };
+
+  const handleMailboxAction = async (mailboxId: string, action: 'suspend' | 'unsuspend' | 'reset_password') => {
+    try {
+      let newPass: string | undefined;
+      if (action === 'reset_password') {
+        const promptPass = prompt('Enter new password for this mailbox (minimum 8 characters):');
+        if (!promptPass || promptPass.length < 8) return toast('Password must be at least 8 characters', 'error');
+        newPass = promptPass;
+      }
+      const res = await api.email.updateMailboxStatus(mailboxId, { action, newPassword: newPass });
+      toast(res.message || `Action ${action} completed successfully`, 'success');
+      fetchData();
+    } catch (err: any) {
+      toast(err.message || `Failed to perform ${action}`, 'error');
     }
   };
 
@@ -242,657 +344,241 @@ export default function RedesignedMailboxStudioPage() {
     toast(`${label} copied to clipboard!`, 'success');
   };
 
-  const toggleStar = async (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const target = messages.find((m) => m.id === id);
-    if (!target) return;
-    const nextStarred = !target.isStarred;
-    setMessages((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, isStarred: nextStarred } : m))
-    );
-    api.webmail.bulkAction({ action: nextStarred ? 'star' : 'unstar', messageIds: [id] }).catch(() => {});
-  };
+  // Code Snippet Templates
+  const getCodeSnippet = () => {
+    const host = activeMailbox?.smtpHost || 'mail.shanutechx.com';
+    const user = activeMailbox?.email || 'me@shanutechx.com';
+    const pass = revealedPassword || 'YOUR_PASSWORD';
 
-  const handleDeleteMessage = async (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    try {
-      await api.webmail.bulkAction({ action: 'delete', messageIds: [id] });
-      toast('Message moved to Trash', 'info');
-      setMessages((prev) => prev.filter((m) => m.id !== id));
-      if (selectedMessage?.id === id) {
-        setSelectedMessage(messages.find((m) => m.id !== id) || null);
-      }
-    } catch {
-      toast('Failed to delete message', 'error');
-    }
-  };
+    if (selectedCodeSnippet === 'node') {
+      return `const nodemailer = require('nodemailer');
 
-  const handleSendEmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSending(true);
-    try {
-      await api.email.send({
-        from: activeMailbox?.email || 'me@shanutechx.com',
-        to: composeTo,
-        subject: composeSubject,
-        body: composeBody,
-      });
-      toast(`Email dispatched to ${composeTo}!`, 'success');
-      setShowComposeModal(false);
-      setComposeTo('');
-      setComposeSubject('');
-      setComposeBody('');
-      setAttachments([]);
-    } catch (err: any) {
-      toast(err.message || 'Failed to send email', 'error');
-    } finally {
-      setSending(false);
-    }
-  };
+const transporter = nodemailer.createTransport({
+  host: '${host}',
+  port: 587,
+  secure: false, // true for 465, false for 587
+  auth: {
+    user: '${user}',
+    pass: '${pass}'
+  }
+});
 
-  const handleSaveDraft = async () => {
-    if (!composeTo && !composeSubject && !composeBody) return;
-    toast('Draft saved to Drafts folder', 'info');
-    setShowComposeModal(false);
-  };
-
-  const handleCreateContact = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const data = await api.email.createContact({
-        name: newContactName,
-        email: newContactEmail,
-        phone: newContactPhone,
-        company: newContactCompany,
-      });
-      toast(`Contact ${newContactName} saved successfully!`, 'success');
-      setContacts((prev) => [...prev, data.contact]);
-      setShowAddContactModal(false);
-      setNewContactName('');
-      setNewContactEmail('');
-      setNewContactPhone('');
-      setNewContactCompany('');
-    } catch (err: any) {
-      toast(err.message || 'Failed to add contact', 'error');
-    }
-  };
-
-  const handleAddDomain = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCustomDomain.includes('.')) {
-      toast('Please enter a valid domain name (e.g. mycompany.com)', 'error');
-      return;
-    }
-    try {
-      const res = await api.email.addDomain(newCustomDomain);
-      toast(`Custom domain ${newCustomDomain} added! Please configure DNS records.`, 'success');
-      setDomains((prev) => [...prev, res.domain]);
-      setNewCustomDomain('');
-    } catch (err: any) {
-      toast(err.message || 'Failed to add domain', 'error');
-    }
-  };
-
-  const handleVerifyDns = async (domainId: string) => {
-    setVerifyingDnsId(domainId);
-    try {
-      const res = await api.email.verifyDomain(domainId);
-      toast(res.message || 'DNS verification completed', res.verified ? 'success' : 'info');
-      fetchDomains();
-    } catch (err: any) {
-      toast(err.message || 'DNS verification failed', 'error');
-    } finally {
-      setVerifyingDnsId(null);
-    }
-  };
-
-  const handleLaunchWebmailSso = async () => {
-    try {
-      const res = await api.smtp.getSsoTicket(activeMailbox?.id);
-      if (res.webmailUrl) {
-        window.open(res.webmailUrl, '_blank');
-      }
-    } catch (err: any) {
-      toast(err.message || 'Failed to mint SSO session ticket', 'error');
-    }
-  };
-
-  const togglePin = async (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const target = messages.find((m) => m.id === id);
-    if (!target) return;
-    const nextPinned = !target.isPinned;
-    setMessages((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, isPinned: nextPinned } : m))
-    );
-    api.webmail.bulkAction({ action: nextPinned ? 'pin' : 'unpin', messageIds: [id] }).catch(() => {});
-  };
-
-  const handleBulkAction = async (action: string, ids: string[]) => {
-    try {
-      await api.webmail.bulkAction({ action: action as any, messageIds: ids });
-      toast(`Action "${action}" applied to ${ids.length} message(s)`, 'success');
-      if (action === 'delete' || action === 'archive') {
-        setMessages((prev) => prev.filter((m) => !ids.includes(m.id)));
-      }
-    } catch {
-      toast('Bulk action failed', 'error');
-    }
-  };
-
-  const filteredMessages = messages.filter((m) => {
-    if (activeFolder === 'starred' && !m.isStarred) return false;
-    if (activeFolder !== 'starred' && m.folder !== activeFolder) return false;
-    if (activeTag && m.labels && !m.labels.includes(activeTag)) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return (
-        (m.subject || '').toLowerCase().includes(q) ||
-        (m.senderName || m.senderEmail || m.from || '').toLowerCase().includes(q) ||
-        (m.snippet || m.htmlBody || m.body || '').toLowerCase().includes(q)
-      );
-    }
-    return true;
+async function sendMail() {
+  const info = await transporter.sendMail({
+    from: '"Business App" <${user}>',
+    to: "customer@example.com",
+    subject: "Hello from ShanuTechX Business Email",
+    text: "Transactional mail body",
   });
+  console.log("Message sent: %s", info.messageId);
+}
 
-  const unreadMessages = filteredMessages.filter((m) => !m.isRead);
-  const readMessages = filteredMessages.filter((m) => m.isRead);
+sendMail().catch(console.error);`;
+    } else if (selectedCodeSnippet === 'python') {
+      return `import smtplib
+from email.mime.text import MIMEText
+
+smtp_server = "${host}"
+port = 587
+sender_email = "${user}"
+password = "${pass}"
+
+message = MIMEText("Transactional mail body")
+message["Subject"] = "Hello from ShanuTechX Business Email"
+message["From"] = sender_email
+message["To"] = "customer@example.com"
+
+with smtplib.SMTP(smtp_server, port) as server:
+    server.starttls()
+    server.login(sender_email, password)
+    server.sendmail(sender_email, ["customer@example.com"], message.as_string())
+print("Email sent successfully!")`;
+    } else {
+      return `curl --ssl-reqd \\
+  --url 'smtp://${host}:587' \\
+  --user '${user}:${pass}' \\
+  --mail-from '${user}' \\
+  --mail-rcpt 'customer@example.com' \\
+  --upload-file - <<EOF
+From: "${user}" <${user}>
+To: customer@example.com
+Subject: Hello from ShanuTechX
+
+This is a test email sent via cURL command line.
+EOF`;
+    }
+  };
+
+  const isAdminOrDev = userRole === 'admin' || userRole === 'dev';
 
   return (
-    <div className="min-h-screen bg-[#f4f5f8] text-[#1c1d22] font-sans p-4 md:p-6 flex flex-col gap-6 animate-fade-in">
-      {/* Top Header & Navigation Studio Bar */}
-      <div className="bg-white rounded-3xl p-4 px-6 shadow-sm border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white font-extrabold flex items-center justify-center shadow-md shadow-indigo-500/20">
-            <Mail className="h-5 w-5" />
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 md:p-8 space-y-8 animate-fade-in">
+      {/* HEADER SECTION */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="h-14 w-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold text-2xl shadow-xl shadow-indigo-500/20">
+            <Mail className="h-7 w-7" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <span>ShanuTechX Business Email & Webmail Studio</span>
-              <span className="bg-indigo-100 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase">Hostinger & Gmail Tier</span>
+            <h1 className="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-3">
+              <span>Business Email & DNS Management</span>
+              <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
+                WildDuck Engine
+              </span>
             </h1>
-            <p className="text-xs text-slate-500">Enterprise SMTP hosting, dynamic DNS, webmail client, and client setup</p>
+            <p className="text-xs md:text-sm text-slate-400 mt-1">
+              Manage corporate mailboxes, custom domain DNS verification, SMTP developer credentials, and multi-node mail hosts.
+            </p>
           </div>
         </div>
 
-        {/* Studio Mode Navigation Tabs & Standalone SSO Launcher */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Global Action Button */}
+        <div className="flex items-center gap-3 flex-wrap">
           <button
-            onClick={handleLaunchWebmailSso}
-            className="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/20 hover:from-purple-500 hover:to-indigo-500 transition-all whitespace-nowrap flex items-center gap-1.5"
+            onClick={() => handleOpenWebmail()}
+            className="px-5 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs md:text-sm shadow-xl shadow-indigo-600/30 transition-all flex items-center gap-2"
           >
-            <Mail className="h-3.5 w-3.5" />
-            <span>Launch Standalone Webmail ↗</span>
+            <ExternalLink className="h-4 w-4" />
+            <span>Launch Webmail Portal ↗</span>
           </button>
-
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl overflow-x-auto">
-            {[
-              { id: 'webmail', label: 'Webmail Client', icon: Mail },
-              { id: 'smtp_creds', label: 'SMTP Credentials', icon: KeyRound },
-              { id: 'dns', label: 'Custom Domains & DNS', icon: Globe },
-              { id: 'aliases', label: 'Email Aliases', icon: Tag },
-              { id: 'contacts', label: 'Contacts', icon: Users },
-              { id: 'billing', label: 'Plan & Billing', icon: CreditCard },
-              { id: 'delegation', label: 'Admin Access', icon: ShieldCheck },
-            ].map((tab) => {
-              const IconComp = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                    activeTab === tab.id
-                      ? 'bg-white text-indigo-700 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                  }`}
-                >
-                  <IconComp className="h-3.5 w-3.5" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
         </div>
       </div>
 
-      {/* Main Container Area */}
-      {activeTab === 'webmail' && (
-        showCalendarTab ? (
-          <div className="flex-1 rounded-3xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl">
-            <div className="bg-slate-900 border-b border-slate-800 p-3 flex justify-between items-center px-6">
-              <span className="text-xs font-bold text-white flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-indigo-400" /> Integrated Calendar Mode
-              </span>
-              <button onClick={() => setShowCalendarTab(false)} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-1">
-                <ArrowLeft className="h-3.5 w-3.5" /> Back to Webmail Client
-              </button>
-            </div>
-            <WebmailCalendarTab />
-          </div>
-        ) : (
-          <WebmailLayout
-            mailboxes={mailboxes}
-            selectedMailboxId={selectedMailboxId}
-            onSelectMailboxId={setSelectedMailboxId}
-            activeFolder={activeFolder}
-            onSelectFolder={(f) => { setActiveFolder(f as any); setActiveTag(null); }}
-            activeTag={activeTag}
-            onSelectTag={setActiveTag}
-            activeCategory={webmailCategory}
-            onSelectCategory={(cat) => setWebmailCategory(cat as any)}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            listDensity={listDensity}
-            onChangeDensity={(d) => setListDensity(d as any)}
-            viewMode={webmailViewMode}
-            onChangeViewMode={setWebmailViewMode}
-            onOpenCompose={() => setShowComposeModal(true)}
-            onOpenFoldersModal={() => setShowFoldersModal(true)}
-            onOpenRulesModal={() => setShowRulesModal(false)}
-            onOpenSettingsModal={() => setShowSettingsModal(true)}
-            onOpenCalendarTab={() => setShowCalendarTab(true)}
-            onOpenContactsTab={() => setActiveTab('contacts')}
-            storageUsedMb={activeMailbox?.storageUsedMb || 434}
-            storageQuotaMb={activeMailbox?.storageQuotaMb || 1024}
-          >
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
-              {/* THREAD LIST (5 COLS) */}
-              <div className="lg:col-span-5 h-full min-h-[680px]">
-                <WebmailThreadList
-                  isThreaded={false}
-                  messages={filteredMessages}
-                  threads={[]}
-                  selectedMessageId={selectedMessage?.id || null}
-                  selectedThreadId={null}
-                  onSelectMessage={(msg) => {
-                    setSelectedMessage(msg);
-                    if (msg.threadId) setActiveThreadId(msg.threadId);
-                  }}
-                  onSelectThread={() => {}}
-                  activeFolder={activeFolder}
-                  onToggleStar={(id) => toggleStar(id)}
-                  onDeleteMessage={(id) => handleDeleteMessage(id)}
-                  onBulkAction={handleBulkAction}
-                  onOpenCompose={() => setShowComposeModal(true)}
-                />
-              </div>
+      {/* NAVIGATION TABS */}
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto">
+        {[
+          { id: 'mailboxes', label: 'Mailboxes & Aliases', icon: Mail },
+          { id: 'dns', label: 'Domain & DNS Checklist', icon: Globe },
+          { id: 'credentials', label: 'Developer Credentials', icon: KeyRound },
+          { id: 'aliases', label: 'Alias Configuration', icon: Tag },
+          ...(isAdminOrDev
+            ? [
+                { id: 'admin_hosts', label: 'Mail Hosts (Nodes)', icon: Server },
+                { id: 'admin_bulk', label: 'Bulk Creation & Health', icon: Database },
+              ]
+            : []),
+        ].map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                  : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
-              {/* THREAD / MESSAGE VIEWER (7 COLS) */}
-              <div className="lg:col-span-7 h-full min-h-[680px]">
-                <WebmailThreadViewer
-                  selectedMessage={selectedMessage}
-                  activeThreadId={activeThreadId}
-                  onReply={(msg) => {
-                    setComposeTo(msg.senderEmail || msg.from || '');
-                    setComposeSubject(`Re: ${msg.subject}`);
-                    setComposeBody(`\n\n--- On ${msg.createdAt || msg.timestamp}, ${msg.senderName || msg.from} wrote:\n> ${msg.htmlBody || msg.body}`);
-                    setShowComposeModal(true);
-                  }}
-                  onForward={(msg) => {
-                    setComposeSubject(`Fwd: ${msg.subject}`);
-                    setComposeBody(`\n\n--- Forwarded message ---\nFrom: ${msg.senderName || msg.from}\nSubject: ${msg.subject}\n\n${msg.htmlBody || msg.body}`);
-                    setShowComposeModal(true);
-                  }}
-                  onDelete={(id) => {
-                    handleDeleteMessage(id);
-                    setSelectedMessage(null);
-                  }}
-                />
-              </div>
-            </div>
-          </WebmailLayout>
-        )
-      )}
-
-      {/* WEBMAIL SUITE MODALS */}
-      <WebmailFoldersAndLabelsModal isOpen={showFoldersModal} onClose={() => setShowFoldersModal(false)} />
-      <WebmailRulesModal isOpen={showRulesModal} onClose={() => setShowRulesModal(false)} />
-      <WebmailSettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
-
-      {/* RICH DOCKABLE COMPOSER */}
-      {showComposeModal && (
-        <WebmailRichComposer
-          isOpen={showComposeModal}
-          onClose={() => setShowComposeModal(false)}
-          onSent={() => setShowComposeModal(false)}
-          defaultTo={composeTo}
-          defaultSubject={composeSubject}
-          defaultBody={composeBody}
-        />
-
-      )}
-
-
-      {/* TAB 2: SMTP CONNECTION CREDENTIALS */}
-      {activeTab === 'smtp_creds' && (
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-6 max-w-4xl mx-auto w-full">
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="text-base font-bold text-slate-900">SMTP & IMAP Connection Credentials</h2>
-            <p className="text-xs text-slate-500">Configure external mail apps (Outlook, Apple Mail, Thunderbird, iOS, Android) using standard parameters.</p>
+      {/* TAB 1: MAILBOXES LIST & ALIAS PROMPTS */}
+      {activeTab === 'mailboxes' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-white tracking-tight">Provisioned Corporate Mailboxes</h2>
+            <span className="text-xs text-slate-400 font-mono">Total: {mailboxes.length} Mailboxes</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Outbound SMTP Box */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-xs uppercase tracking-wider text-indigo-700">Outbound SMTP Server</h3>
-                <span className="bg-emerald-100 text-emerald-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full">Active</span>
-              </div>
-              <div className="space-y-3 text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Server Hostname</span>
-                  <div className="flex items-center justify-between mt-1 bg-white p-2.5 rounded-xl border border-slate-200 font-mono text-slate-900 font-bold">
-                    <span>{activeMailbox?.smtpHost || `mail.shanutechx.com`}</span>
-                    <button onClick={() => copyToClipboard(activeMailbox?.smtpHost || `mail.shanutechx.com`, 'SMTP Host')} className="text-indigo-600 text-[11px]">Copy</button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">STARTTLS Port</span>
-                    <div className="mt-1 bg-white p-2.5 rounded-xl border border-slate-200 font-mono text-slate-900 font-bold">
-                      587
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">SSL/TLS Port</span>
-                    <div className="mt-1 bg-white p-2.5 rounded-xl border border-slate-200 font-mono text-slate-900 font-bold">
-                      465
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Inbound IMAP Box */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-xs uppercase tracking-wider text-indigo-700">Inbound IMAP Server</h3>
-                <span className="bg-emerald-100 text-emerald-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full">Active</span>
-              </div>
-              <div className="space-y-3 text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Server Hostname</span>
-                  <div className="flex items-center justify-between mt-1 bg-white p-2.5 rounded-xl border border-slate-200 font-mono text-slate-900 font-bold">
-                    <span>{activeMailbox?.smtpHost.replace(/^mail\./, 'imap.') || `imap.shanutechx.com`}</span>
-                    <button onClick={() => copyToClipboard(activeMailbox?.smtpHost.replace(/^mail\./, 'imap.') || `imap.shanutechx.com`, 'IMAP Host')} className="text-indigo-600 text-[11px]">Copy</button>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[11px]">SSL/TLS Port</span>
-                  <div className="mt-1 bg-white p-2.5 rounded-xl border border-slate-200 font-mono text-slate-900 font-bold">
-                    993
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Account Authentication Details */}
-          <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-5 space-y-4">
-            <h3 className="font-bold text-xs uppercase tracking-wider text-slate-900">Authentication Credentials</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div>
-                <span className="text-slate-500 block text-[11px] mb-1">Username / Full Email</span>
-                <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 font-mono font-bold text-slate-900">
-                  <span>{activeMailbox?.email || 'me@shanutechx.com'}</span>
-                  <button onClick={() => copyToClipboard(activeMailbox?.email || 'me@shanutechx.com', 'Username')} className="text-indigo-600 font-bold text-[11px]">Copy</button>
-                </div>
-              </div>
-              <div>
-                <span className="text-slate-500 block text-[11px] mb-1">Password</span>
-                <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 font-mono font-bold text-slate-900">
-                  <span>{showPassword ? revealedPassword : '••••••••••••'}</span>
-                  <div className="flex items-center gap-2">
-                    <button onClick={handleRevealPassword} className="text-slate-600 font-bold text-[11px] hover:text-indigo-600">
-                      {showPassword ? 'Hide' : 'Reveal'}
-                    </button>
-                    {revealedPassword && (
-                      <button onClick={() => copyToClipboard(revealedPassword, 'Password')} className="text-indigo-600 font-bold text-[11px]">Copy</button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Copyable App Environment Variable Snippet */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 font-mono">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-emerald-400">Application .env File Configuration</h3>
-              <button
-                type="button"
-                onClick={() => {
-                  const envSnippet = `SMTP_HOST=${activeMailbox?.smtpHost || 'mail.shanutechx.com'}\nSMTP_PORT=587\nSMTP_SECURE=false\nSMTP_USER=${activeMailbox?.email || 'me@shanutechx.com'}\nSMTP_PASS=${revealedPassword || 'YOUR_PASSWORD'}`;
-                  copyToClipboard(envSnippet, 'Application .env Snippet');
-                }}
-                className="text-indigo-400 hover:text-indigo-300 font-bold text-xs bg-indigo-500/20 border border-indigo-500/30 px-3 py-1 rounded-xl"
-              >
-                Copy .env Snippet
-              </button>
-            </div>
-            <pre className="text-xs text-emerald-300 whitespace-pre-wrap bg-black/60 p-3 rounded-xl border border-white/10 select-text">
-{`SMTP_HOST=${activeMailbox?.smtpHost || 'mail.shanutechx.com'}
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=${activeMailbox?.email || 'me@shanutechx.com'}
-SMTP_PASS=${revealedPassword || '••••••••••••'}`}
-            </pre>
-          </div>
-
-          {/* External Client Setup Instructions */}
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
-            <h3 className="font-bold text-xs uppercase tracking-wider text-slate-900">Setup Guide for Email Clients</h3>
-            <div className="text-xs text-slate-600 space-y-2 leading-relaxed">
-              <p>1. Open <strong>Outlook</strong> / <strong>Apple Mail</strong> / <strong>Thunderbird</strong> and select <i>Add Account</i>.</p>
-              <p>2. Choose <strong>Manual Setup (IMAP/SMTP)</strong>.</p>
-              <p>3. Enter the Host, Port (587 STARTTLS for Outbound, 993 SSL for Inbound), and Full Email Username above.</p>
-              <p>4. Save settings and initiate sync.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: CUSTOM DOMAINS & DYNAMIC DNS */}
-      {activeTab === 'dns' && (
-        <div className="space-y-6 max-w-5xl mx-auto w-full">
-          <DynamicDnsSetupGuide
-            domain={activeMailbox?.customDomain || activeMailbox?.domain || 'shanutechx.com'}
-            planTier={activeMailbox?.planName || 'pro'}
-            aliases={activeMailbox?.aliases}
-            smtpUsername={activeMailbox?.username}
-          />
-
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 gap-4">
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Custom Domains & Dynamic DNS Record List</h2>
-                <p className="text-xs text-slate-500">Configure DNS records (MX, SPF, DKIM, DMARC) on your domain registrar (Namecheap, Cloudflare, GoDaddy).</p>
-              </div>
-              <form onSubmit={handleAddDomain} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={newCustomDomain}
-                  onChange={(e) => setNewCustomDomain(e.target.value)}
-                  placeholder="mycompany.com"
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <button type="submit" className="bg-indigo-600 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-sm hover:bg-indigo-700">
-                  + Add Domain
-                </button>
-              </form>
-            </div>
-
-          {domains.map((dom) => (
-            <div key={dom.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
-                <div className="flex items-center gap-3">
-                  <span className="font-extrabold text-sm text-slate-900 font-mono">{dom.domain}</span>
-                  <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${dom.status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {dom.status === 'verified' ? (
-                      <span className="flex items-center gap-1">
-                        <svg className="w-3 h-3 inline text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Verified
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1">
-                        <svg className="w-3 h-3 inline text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Pending DNS Check
-                      </span>
-                    )}
-                  </span>
-                </div>
-                <button
-                  onClick={() => handleVerifyDns(dom.id)}
-                  disabled={verifyingDnsId === dom.id}
-                  className="bg-slate-900 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl hover:bg-slate-800 shadow-sm"
-                >
-                  {verifyingDnsId === dom.id ? 'Checking DNS...' : 'Verify Records Now'}
-                </button>
-              </div>
-
-              {/* Records Checklist Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="text-[11px] font-extrabold text-slate-400 uppercase border-b border-slate-200">
-                      <th className="pb-2">Type</th>
-                      <th className="pb-2">Host / Name</th>
-                      <th className="pb-2">Value / Target</th>
-                      <th className="pb-2">Priority</th>
-                      <th className="pb-2 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200/60 font-mono text-slate-800">
-                    <tr>
-                      <td className="py-2.5 font-bold text-indigo-700">MX</td>
-                      <td>@</td>
-                      <td className="truncate max-w-xs">{dom.mxRecord || '10 mail.shanutechx.com'}</td>
-                      <td>10</td>
-                      <td className="text-right">
-                        <button onClick={() => copyToClipboard(dom.mxRecord || '10 mail.shanutechx.com', 'MX Record')} className="text-indigo-600 font-bold text-[11px]">Copy</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 font-bold text-indigo-700">TXT (SPF)</td>
-                      <td>@</td>
-                      <td className="truncate max-w-xs">{dom.spfRecord || 'v=spf1 include:mail.shanutechx.com ~all'}</td>
-                      <td>-</td>
-                      <td className="text-right">
-                        <button onClick={() => copyToClipboard(dom.spfRecord || 'v=spf1 include:mail.shanutechx.com ~all', 'SPF Record')} className="text-indigo-600 font-bold text-[11px]">Copy</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 font-bold text-indigo-700">TXT (DKIM)</td>
-                      <td>default._domainkey</td>
-                      <td className="truncate max-w-xs">{dom.dkimRecord || 'v=DKIM1; k=rsa; p=MIGf...'}</td>
-                      <td>-</td>
-                      <td className="text-right">
-                        <button onClick={() => copyToClipboard(dom.dkimRecord || 'v=DKIM1; k=rsa; p=MIGf...', 'DKIM Record')} className="text-indigo-600 font-bold text-[11px]">Copy</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 font-bold text-indigo-700">TXT (DMARC)</td>
-                      <td>_dmarc</td>
-                      <td className="truncate max-w-xs">{dom.dmarcRecord || `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${dom.domain}`}</td>
-                      <td>-</td>
-                      <td className="text-right">
-                        <button onClick={() => copyToClipboard(dom.dmarcRecord || `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${dom.domain}`, 'DMARC Record')} className="text-indigo-600 font-bold text-[11px]">Copy</button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB: EMAIL ALIASES MANAGEMENT */}
-      {activeTab === 'aliases' && (
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-6 max-w-5xl mx-auto w-full">
-          <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 gap-4">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Custom Domain Email Aliases & Sender Identities</h2>
-              <p className="text-xs text-slate-500">Create alias addresses (e.g. sales@domain, info@domain) that deliver to {activeMailbox?.email || 'your primary inbox'}.</p>
-            </div>
-            <form onSubmit={handleAddAlias} className="flex items-center gap-2">
-              <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs">
-                <input
-                  type="text"
-                  value={newAliasPrefix}
-                  onChange={(e) => setNewAliasPrefix(e.target.value)}
-                  placeholder="sales"
-                  className="bg-transparent text-slate-900 font-mono font-bold focus:outline-none w-24 text-right"
-                />
-                <span className="text-slate-400 font-mono pl-1">@{activeMailbox?.customDomain || 'shanutechx.com'}</span>
-              </div>
-              <button
-                type="submit"
-                disabled={addingAlias}
-                className="bg-indigo-600 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {addingAlias ? 'Creating...' : '+ Add Alias'}
-              </button>
-            </form>
-          </div>
-
-          <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4 flex items-center justify-between text-xs">
-            <div>
-              <span className="font-bold text-indigo-950">Alias Quota Usage: </span>
-              <span className="font-mono text-indigo-700 font-bold">
-                {activeMailbox?.aliases?.length || 0} / {activeMailbox?.maxAliases === -1 ? '∞ Unlimited' : (activeMailbox?.maxAliases || 10)} Aliases Used
-              </span>
-            </div>
-            <span className="text-slate-500 text-[11px]">Enforced by plan tier</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(!activeMailbox?.aliases || activeMailbox.aliases.length === 0) ? (
-              <div className="col-span-full text-center py-10 text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl">
-                No custom domain aliases added yet. Use the form above to add <code className="font-mono text-indigo-600">sales</code>, <code className="font-mono text-indigo-600">support</code>, or <code className="font-mono text-indigo-600">info</code>.
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {mailboxes.length === 0 ? (
+              <div className="col-span-full bg-slate-900/50 border border-slate-800 rounded-3xl p-12 text-center space-y-4">
+                <Mail className="h-12 w-12 text-slate-600 mx-auto" />
+                <h3 className="text-base font-bold text-white">No Mailboxes Provisioned Yet</h3>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  Mailboxes are automatically provisioned upon subscription payment approval or by platform administrators.
+                </p>
               </div>
             ) : (
-              activeMailbox.aliases.map((aliasPrefix: string) => {
-                const fullAlias = `${aliasPrefix}@${activeMailbox.customDomain || 'shanutechx.com'}`;
+              mailboxes.map((mb) => {
+                const usedPct = Math.min(100, Math.round((mb.storageUsedMb / (mb.storageQuotaMb || 1024)) * 100));
+                const hasAliases = Array.isArray(mb.aliases) && mb.aliases.length > 0;
+
                 return (
-                  <div key={aliasPrefix} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] uppercase font-extrabold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">Sender Identity</span>
-                        <button
-                          onClick={() => handleRemoveAlias(aliasPrefix)}
-                          className="text-rose-600 hover:text-rose-800 text-xs font-bold"
-                        >
-                          Remove
-                        </button>
+                  <div
+                    key={mb.id}
+                    className={`bg-slate-900 border rounded-3xl p-6 space-y-5 transition-all shadow-xl ${
+                      selectedMailboxId === mb.id ? 'border-indigo-500 shadow-indigo-500/10' : 'border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className="font-mono font-bold text-sm text-indigo-400 block truncate">{mb.email}</span>
+                        <span className="text-[11px] text-slate-400 font-sans block mt-0.5">{mb.planName || 'Pro Business Email'}</span>
                       </div>
-                      <h3 className="font-bold text-sm font-mono text-slate-900 truncate">{fullAlias}</h3>
-                      <p className="text-[11px] text-slate-500">Delivers to & sends from primary mailbox</p>
+                      <span
+                        className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                          mb.isSuspended ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        }`}
+                      >
+                        {mb.isSuspended ? 'Suspended' : 'Active'}
+                      </span>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
+                    {/* Storage Usage Bar */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-[11px] font-mono text-slate-400">
+                        <span>Storage Usage</span>
+                        <span>{mb.storageUsedMb} / {mb.storageQuotaMb} MB ({usedPct}%)</span>
+                      </div>
+                      <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all rounded-full ${
+                            usedPct > 90 ? 'bg-red-500' : usedPct > 70 ? 'bg-amber-500' : 'bg-indigo-500'
+                          }`}
+                          style={{ width: `${Math.max(4, usedPct)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Aliases Pill / Prompt */}
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Email Aliases</span>
+                      {hasAliases ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {mb.aliases!.map((alias) => (
+                            <span key={alias} className="bg-slate-800 text-slate-200 text-[11px] font-mono px-2.5 py-1 rounded-xl border border-slate-700/60">
+                              {alias}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setSelectedMailboxId(mb.id);
+                            setActiveTab('aliases');
+                          }}
+                          className="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-2xl py-2 px-3 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Configure Alias Prompt</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Action Footer */}
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-3">
                       <button
                         onClick={() => {
-                          setComposeFrom(fullAlias);
-                          setShowComposeModal(true);
+                          setSelectedMailboxId(mb.id);
+                          setActiveTab('credentials');
                         }}
-                        className="text-indigo-600 font-bold hover:underline flex items-center gap-1"
+                        className="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1.5"
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                        Compose as Alias
+                        <KeyRound className="h-3.5 w-3.5" />
+                        <span>SMTP Credentials</span>
                       </button>
+
                       <button
-                        onClick={() => copyToClipboard(fullAlias, 'Alias Address')}
-                        className="text-slate-600 hover:text-slate-900 font-medium"
+                        onClick={() => handleOpenWebmail(mb)}
+                        className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1"
                       >
-                        Copy
+                        <span>Open Webmail</span>
+                        <ChevronRight className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </div>
@@ -903,337 +589,637 @@ SMTP_PASS=${revealedPassword || '••••••••••••'}`}
         </div>
       )}
 
-      {/* TAB 4: CONTACTS MANAGEMENT */}
-      {activeTab === 'contacts' && (
-        <div className="bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 shadow-2xl flex-1">
-          <WebmailContactsTab
-            onComposeTo={(email) => {
-              setComposeTo(email);
-              setShowComposeModal(true);
-            }}
+      {/* TAB 2: DOMAIN & DNS CHECKLIST */}
+      {activeTab === 'dns' && (
+        <div className="space-y-8 max-w-5xl mx-auto">
+          <DynamicDnsSetupGuide
+            domain={activeMailbox?.customDomain || activeMailbox?.domain || 'shanutechx.com'}
+            planTier={activeMailbox?.planName || 'pro'}
+            aliases={activeMailbox?.aliases}
+            smtpUsername={activeMailbox?.username}
           />
+
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 gap-4">
+              <div>
+                <h2 className="text-base font-bold text-white">Custom Domain Registration & DNS Verification</h2>
+                <p className="text-xs text-slate-400">Check required MX, SPF, DKIM, and DMARC records for your custom domain.</p>
+              </div>
+
+              <form onSubmit={handleAddDomain} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newDomainName}
+                  onChange={(e) => setNewDomainName(e.target.value)}
+                  placeholder="company.com"
+                  className="bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                />
+                <button
+                  type="submit"
+                  disabled={addingDomain}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2 rounded-2xl shadow-lg transition-all"
+                >
+                  {addingDomain ? 'Adding...' : '+ Add Domain'}
+                </button>
+              </form>
+            </div>
+
+            {domains.map((dom) => (
+              <div key={dom.id} className="bg-slate-950 border border-slate-800 rounded-3xl p-6 space-y-5">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-black text-base text-white">{dom.domain}</span>
+                    <span
+                      className={`text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 ${
+                        dom.status === 'verified'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      }`}
+                    >
+                      {dom.status === 'verified' ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+                      <span>{dom.status === 'verified' ? 'All DNS Records Verified' : 'DNS Check Pending'}</span>
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => handleRecheckDns(dom.id)}
+                    disabled={verifyingDomainId === dom.id}
+                    className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow transition-all flex items-center gap-2"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${verifyingDomainId === dom.id ? 'animate-spin' : ''}`} />
+                    <span>Re-check DNS</span>
+                  </button>
+                </div>
+
+                {/* DNS Records Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="text-[11px] font-extrabold text-slate-500 uppercase border-b border-slate-800">
+                        <th className="pb-3">Record Type</th>
+                        <th className="pb-3">Host / Name</th>
+                        <th className="pb-3">Target Value</th>
+                        <th className="pb-3">Priority</th>
+                        <th className="pb-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                      <tr>
+                        <td className="py-3 font-bold text-indigo-400">MX</td>
+                        <td>@</td>
+                        <td className="truncate max-w-xs text-slate-200">{dom.mxRecord || '10 mail.shanutechx.com'}</td>
+                        <td>10</td>
+                        <td className="text-right">
+                          <button
+                            onClick={() => copyToClipboard(dom.mxRecord || '10 mail.shanutechx.com', 'MX Record')}
+                            className="text-indigo-400 hover:text-indigo-300 font-bold text-[11px] flex items-center gap-1 ml-auto"
+                          >
+                            <Copy className="h-3 w-3" /> Copy
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-bold text-indigo-400">TXT (SPF)</td>
+                        <td>@</td>
+                        <td className="truncate max-w-xs text-slate-200">{dom.spfRecord || 'v=spf1 include:mail.shanutechx.com ~all'}</td>
+                        <td>-</td>
+                        <td className="text-right">
+                          <button
+                            onClick={() => copyToClipboard(dom.spfRecord || 'v=spf1 include:mail.shanutechx.com ~all', 'SPF Record')}
+                            className="text-indigo-400 hover:text-indigo-300 font-bold text-[11px] flex items-center gap-1 ml-auto"
+                          >
+                            <Copy className="h-3 w-3" /> Copy
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-bold text-indigo-400">TXT (DKIM)</td>
+                        <td>default._domainkey</td>
+                        <td className="truncate max-w-xs text-slate-200">{dom.dkimRecord || 'v=DKIM1; k=rsa; p=MIGf...'}</td>
+                        <td>-</td>
+                        <td className="text-right">
+                          <button
+                            onClick={() => copyToClipboard(dom.dkimRecord || 'v=DKIM1; k=rsa; p=MIGf...', 'DKIM Record')}
+                            className="text-indigo-400 hover:text-indigo-300 font-bold text-[11px] flex items-center gap-1 ml-auto"
+                          >
+                            <Copy className="h-3 w-3" /> Copy
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-bold text-indigo-400">TXT (DMARC)</td>
+                        <td>_dmarc</td>
+                        <td className="truncate max-w-xs text-slate-200">{dom.dmarcRecord || `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${dom.domain}`}</td>
+                        <td>-</td>
+                        <td className="text-right">
+                          <button
+                            onClick={() => copyToClipboard(dom.dmarcRecord || `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${dom.domain}`, 'DMARC Record')}
+                            className="text-indigo-400 hover:text-indigo-300 font-bold text-[11px] flex items-center gap-1 ml-auto"
+                          >
+                            <Copy className="h-3 w-3" /> Copy
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
+      {/* TAB 3: DEVELOPER CREDENTIALS & CODE SNIPPETS */}
+      {activeTab === 'credentials' && (
+        <div className="space-y-6 max-w-4xl mx-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
+            <div className="border-b border-slate-800 pb-4">
+              <h2 className="text-base font-bold text-white">SMTP & IMAP Developer Credentials</h2>
+              <p className="text-xs text-slate-400">Use these parameters for programmatic email sending via Node.js Nodemailer, Python, or cURL.</p>
+            </div>
 
-      {/* TAB 5: PLAN & BILLING */}
-      {activeTab === 'billing' && (
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-8 max-w-5xl mx-auto w-full">
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="text-base font-bold text-slate-900">Email Hosting Subscription, Upgrades & Renewal</h2>
-            <p className="text-xs text-slate-500">View current plan usage, active subscription status, or purchase/upgrade email hosting plans with a 3-month minimum commitment.</p>
+            {/* Mailbox Selector */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-300 block">Select Mailbox Account</label>
+              <select
+                value={selectedMailboxId}
+                onChange={(e) => {
+                  setSelectedMailboxId(e.target.value);
+                  setShowPassword(false);
+                }}
+                className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+              >
+                {mailboxes.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.email} ({m.smtpHost})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Connection Parameters Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-3 text-xs">
+                <span className="font-extrabold text-indigo-400 uppercase tracking-wider block">Outbound SMTP Server</span>
+                <div className="space-y-2 font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Host:</span>
+                    <span className="text-white font-bold">{activeMailbox?.smtpHost || 'mail.shanutechx.com'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">STARTTLS Port:</span>
+                    <span className="text-white font-bold">587</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">SSL/TLS Port:</span>
+                    <span className="text-white font-bold">465</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Security:</span>
+                    <span className="text-emerald-400 font-bold">STARTTLS / TLS</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-3 text-xs">
+                <span className="font-extrabold text-indigo-400 uppercase tracking-wider block">Inbound IMAP Server</span>
+                <div className="space-y-2 font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Host:</span>
+                    <span className="text-white font-bold">{activeMailbox?.smtpHost.replace(/^mail\./, 'imap.') || 'imap.shanutechx.com'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">SSL/TLS Port:</span>
+                    <span className="text-white font-bold">993</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Security:</span>
+                    <span className="text-emerald-400 font-bold">SSL / TLS</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Authentication Credentials */}
+            <div className="bg-indigo-950/30 border border-indigo-500/20 rounded-2xl p-5 space-y-4">
+              <span className="font-extrabold text-xs uppercase tracking-wider text-indigo-300 block">Account Authentication</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+                <div>
+                  <span className="text-slate-400 block mb-1">Username / Email</span>
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center">
+                    <span>{activeMailbox?.email || 'me@shanutechx.com'}</span>
+                    <button onClick={() => copyToClipboard(activeMailbox?.email || 'me@shanutechx.com', 'Username')} className="text-indigo-400 font-bold text-[11px]">
+                      Copy
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-slate-400 block mb-1">Password</span>
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center">
+                    <span>{showPassword ? revealedPassword : '••••••••••••'}</span>
+                    <button onClick={handleRevealPassword} className="text-indigo-400 font-bold text-[11px]">
+                      {showPassword ? 'Hide' : 'Reveal'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Code Snippets Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xs text-white uppercase tracking-wider flex items-center gap-2">
+                  <Code2 className="h-4 w-4 text-indigo-400" /> Code Integration Snippet
+                </span>
+
+                <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  {[
+                    { id: 'node', label: 'Node.js (Nodemailer)' },
+                    { id: 'python', label: 'Python (smtplib)' },
+                    { id: 'curl', label: 'cURL' },
+                  ].map((snip) => (
+                    <button
+                      key={snip.id}
+                      onClick={() => setSelectedCodeSnippet(snip.id as any)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                        selectedCodeSnippet === snip.id ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {snip.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
+                <button
+                  onClick={() => copyToClipboard(getCodeSnippet(), 'Code Snippet')}
+                  className="absolute top-3 right-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-3 py-1 rounded-lg flex items-center gap-1 shadow"
+                >
+                  <Copy className="h-3 w-3" /> Copy
+                </button>
+                <pre className="text-emerald-400">{getCodeSnippet()}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: EMAIL ALIAS CONFIGURATION */}
+      {activeTab === 'aliases' && (
+        <div className="space-y-6 max-w-3xl mx-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
+            <div className="border-b border-slate-800 pb-4">
+              <h2 className="text-base font-bold text-white">Mailbox Alias Management</h2>
+              <p className="text-xs text-slate-400">Configure alias addresses (e.g. sales@domain.com, support@domain.com) routed directly into this mailbox.</p>
+            </div>
+
+            {/* Mailbox Selector */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-300 block">Active Mailbox</label>
+              <select
+                value={selectedMailboxId}
+                onChange={(e) => setSelectedMailboxId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+              >
+                {mailboxes.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.email} ({m.aliases?.length || 0} aliases)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Add New Alias Form */}
+            <form onSubmit={handleAddAlias} className="space-y-3">
+              <label className="text-xs font-bold text-slate-300 block">Add New Alias</label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white">
+                  <input
+                    type="text"
+                    value={newAliasPrefix}
+                    onChange={(e) => setNewAliasPrefix(e.target.value)}
+                    placeholder="sales"
+                    className="bg-transparent focus:outline-none flex-1"
+                  />
+                  <span className="text-slate-500">@{activeMailbox?.domain || 'domain.com'}</span>
+                </div>
+                <button
+                  type="submit"
+                  disabled={addingAlias}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-5 py-3 rounded-2xl shadow-lg transition-all"
+                >
+                  {addingAlias ? 'Adding...' : '+ Add Alias'}
+                </button>
+              </div>
+            </form>
+
+            {/* Active Aliases List */}
+            <div className="space-y-3">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Active Aliases ({activeMailbox?.aliases?.length || 0})</span>
+              {(!activeMailbox?.aliases || activeMailbox.aliases.length === 0) ? (
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 text-center text-xs text-slate-500">
+                  No aliases configured yet for this mailbox.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {activeMailbox.aliases.map((alias) => (
+                    <div key={alias} className="bg-slate-950 border border-slate-800 rounded-2xl p-3 px-4 flex items-center justify-between text-xs font-mono text-white">
+                      <span>{alias}</span>
+                      <button
+                        onClick={() => handleRemoveAlias(alias.split('@')[0])}
+                        className="text-red-400 hover:text-red-300 font-bold flex items-center gap-1"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: ADMIN MAIL HOSTS (NODES) */}
+      {isAdminOrDev && activeTab === 'admin_hosts' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-white tracking-tight">WildDuck Mail Server Nodes (Hosts)</h2>
+              <p className="text-xs text-slate-400">Add and manage cluster nodes for distributed mail hosting.</p>
+            </div>
+            <button
+              onClick={() => setShowAddHostModal(true)}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-2xl shadow-lg transition-all flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" /> Add Mail Host Node
+            </button>
           </div>
 
-          {activeMailbox && (
-            <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900">{activeMailbox.planName || 'Business Mail Hosting'}</h3>
-                  <p className="text-xs text-slate-500 font-mono">{activeMailbox.email}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {mailHosts.map((h) => (
+              <div key={h.id} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Server className="h-5 w-5 text-indigo-400" />
+                    <span className="font-bold text-sm text-white">{h.label}</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase ${
+                      h.status === 'healthy' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                    }`}
+                  >
+                    {h.status}
+                  </span>
                 </div>
-                <span className={`text-xs font-extrabold px-3 py-1 rounded-full ${activeMailbox.isSuspended ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                  {activeMailbox.isSuspended ? 'Suspended / Expired' : 'Active Subscription'}
-                </span>
-              </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs bg-white p-4 rounded-xl border border-slate-200/80">
-                <div>
-                  <span className="text-slate-400 text-[11px] block">Storage Quota</span>
-                  <span className="font-bold text-slate-900 font-mono">
-                    {activeMailbox.storageQuotaMb === -1 ? '∞ Unlimited' : `${(activeMailbox.storageQuotaMb / 1024).toFixed(0)} GB`}
-                  </span>
+                <div className="space-y-2 text-xs font-mono text-slate-300">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Hostname:</span>
+                    <span>{h.hostname}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">API URL:</span>
+                    <span className="truncate max-w-[180px]">{h.apiUrl}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Mailboxes:</span>
+                    <span>{h.mailboxCount}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Domains:</span>
+                    <span>{h.domainCount}</span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-slate-400 text-[11px] block">Daily Send Limit</span>
-                  <span className="font-bold text-slate-900 font-mono">{activeMailbox.dailySendLimit} / day</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[11px] block">Max Aliases</span>
-                  <span className="font-bold text-slate-900 font-mono">
-                    {activeMailbox.maxAliases === -1 ? '∞ Unlimited' : (activeMailbox.maxAliases || 10)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[11px] block">Expires On</span>
-                  <span className="font-bold text-indigo-700 font-mono">
-                    {activeMailbox.expiresAt ? new Date(activeMailbox.expiresAt).toLocaleDateString() : 'Permanent (Free)'}
-                  </span>
+
+                <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => handleTestMailHost(h.id)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs"
+                  >
+                    Test Connection
+                  </button>
+                  <button
+                    onClick={() => handleDeleteMailHost(h.id, h.label)}
+                    className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-xs border border-red-500/20"
+                  >
+                    Remove
+                  </button>
                 </div>
               </div>
+            ))}
+          </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await api.email.renew(activeMailbox.id);
-                      toast(res.message || 'Subscription renewed!', 'success');
-                      fetchMailboxes();
-                    } catch (err: any) {
-                      toast(err.message || 'Failed to renew', 'error');
-                    }
-                  }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2.5 px-5 rounded-xl shadow-sm"
-                >
-                  Renew Subscription (+3 Months)
-                </button>
+          {/* Add Mail Host Modal */}
+          {showAddHostModal && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-md space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="font-bold text-sm text-white">Add WildDuck Mail Host Node</h3>
+                  <button onClick={() => setShowAddHostModal(false)} className="text-slate-400 hover:text-white text-xs">✕</button>
+                </div>
+
+                <form onSubmit={handleAddMailHost} className="space-y-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-300 block mb-1">Host Label</label>
+                    <input
+                      type="text"
+                      required
+                      value={hostLabel}
+                      onChange={(e) => setHostLabel(e.target.value)}
+                      placeholder="e.g. Mail Node US-East-1"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-300 block mb-1">Hostname</label>
+                    <input
+                      type="text"
+                      required
+                      value={hostHostname}
+                      onChange={(e) => setHostHostname(e.target.value)}
+                      placeholder="mail-node1.example.com"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-300 block mb-1">API URL</label>
+                    <input
+                      type="url"
+                      required
+                      value={hostApiUrl}
+                      onChange={(e) => setHostApiUrl(e.target.value)}
+                      placeholder="http://1.2.3.4:8080"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-300 block mb-1">WildDuck API Key</label>
+                    <input
+                      type="password"
+                      required
+                      value={hostApiKey}
+                      onChange={(e) => setHostApiKey(e.target.value)}
+                      placeholder="Secret API key"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <input
+                      type="checkbox"
+                      id="isDefault"
+                      checked={hostIsDefault}
+                      onChange={(e) => setHostIsDefault(e.target.checked)}
+                      className="rounded bg-slate-950 border-slate-700 text-indigo-600"
+                    />
+                    <label htmlFor="isDefault" className="text-xs text-slate-300 font-bold">Set as Default Primary Host Node</label>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddHostModal(false)}
+                      className="px-4 py-2 rounded-xl bg-slate-800 text-white text-xs font-bold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingHost}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold"
+                    >
+                      {submittingHost ? 'Testing & Saving...' : 'Save Mail Host'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 6: ADMIN BULK PROVISIONING & HEALTH */}
+      {isAdminOrDev && activeTab === 'admin_bulk' && (
+        <div className="space-y-6 max-w-4xl mx-auto">
+          {/* Health Summary Banner */}
+          {healthInfo && (
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <span className="text-xs text-slate-400 block">Overall Cluster Status</span>
+                <span className="text-lg font-black text-emerald-400 font-mono uppercase">{healthInfo.overallStatus}</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-slate-400 block">Active Mail Hosts</span>
+                <span className="text-lg font-black text-white font-mono">{healthInfo.healthyHosts} / {healthInfo.totalHosts}</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-slate-400 block">Pending Queue Tasks</span>
+                <span className="text-lg font-black text-indigo-400 font-mono">{healthInfo.tasksCount}</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-slate-400 block">Total Storage Allocated</span>
+                <span className="text-lg font-black text-purple-400 font-mono">{healthInfo.totalStorageMb} MB</span>
               </div>
             </div>
           )}
 
-          {/* Email Hosting Plans Storefront Grid */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+          {/* Bulk Provisioning Form */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
+            <div className="border-b border-slate-800 pb-4">
+              <h2 className="text-base font-bold text-white">Bulk Mailbox Creation (CSV or Naming Pattern)</h2>
+              <p className="text-xs text-slate-400">Generate multiple corporate mailboxes simultaneously (e.g. employee1@domain.com ... employee10@domain.com).</p>
+            </div>
+
+            <form onSubmit={handleBulkProvision} className="space-y-4">
               <div>
-                <h3 className="font-bold text-sm text-slate-900 uppercase tracking-wider">Available Email Hosting Plans</h3>
-                <p className="text-xs text-slate-500">Configure prices in Dev Dashboard. All plans require a minimum 3-month purchase commitment.</p>
-              </div>
-              <span className="text-[10px] font-bold uppercase bg-amber-100 text-amber-800 px-3 py-1 rounded-full border border-amber-200 flex items-center gap-1">
-                <svg className="w-3 h-3 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                3-Month Minimum Commitment
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {availablePlans.map((plan) => {
-                const specs = plan.specsJson || {};
-                return (
-                  <div key={plan.id} className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4 flex flex-col justify-between hover:border-indigo-300 transition-all shadow-sm">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-sm text-slate-900">{plan.name}</h4>
-                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 font-mono">
-                          3 Months
-                        </span>
-                      </div>
-
-                      <div className="space-y-0.5">
-                        <p className="text-xl font-extrabold text-indigo-600 font-mono">
-                          LKR {(plan.price / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </p>
-                        <p className="text-[11px] text-slate-500">
-                          (LKR {((plan.price / 100) / 3).toLocaleString('en-US', { maximumFractionDigits: 0 })} / month)
-                        </p>
-                      </div>
-
-                      <div className="space-y-1.5 pt-2 border-t border-slate-200/60 text-xs text-slate-700 font-medium">
-                        <div className="flex items-center gap-2">
-                          <span className="text-indigo-600 font-bold">✓</span>
-                          <span>{specs.mailboxesCount === -1 ? 'Unlimited' : (specs.mailboxesCount || 1)} Mailbox Included</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-indigo-600 font-bold">✓</span>
-                          <span>{specs.storageLimitGb === -1 ? 'Unlimited Storage' : `${specs.storageLimitGb || 1} GB Storage per Mailbox`}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-indigo-600 font-bold">✓</span>
-                          <span>{specs.forwardingRules === -1 ? 'Unlimited Forwarding Rules' : `${specs.forwardingRules || 1} Forwarding Rule(s)`}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-indigo-600 font-bold">✓</span>
-                          <span>{specs.maxAliases === -1 || specs.emailAliases === -1 ? 'Unlimited Email Aliases' : `${specs.maxAliases || specs.emailAliases || 2} Email Aliases`}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-indigo-600 font-bold">✓</span>
-                          <span>{specs.dailyQuota || 500} emails/day send limit</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={async () => {
-                        try {
-                          await api.cart.addItem({ planId: plan.id }, 1);
-                          toast(`Added ${plan.name} to cart!`, 'success');
-                          window.location.href = '/cart';
-                        } catch (err: any) {
-                          toast(err.message || 'Failed to add to cart', 'error');
-                        }
-                      }}
-                      className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 rounded-xl shadow-sm transition-all"
-                    >
-                      Purchase Plan (3-Month Commitment) →
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 6: ADMIN DELEGATION & ACCESS */}
-      {activeTab === 'delegation' && (
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 space-y-6 max-w-4xl mx-auto w-full">
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="text-base font-bold text-slate-900">Admin Delegation & Access Management</h2>
-            <p className="text-xs text-slate-500">Grant delegated admins read/send permissions on client mailboxes on their behalf.</p>
-          </div>
-
-          <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 text-xs text-amber-900 space-y-1">
-            <p className="font-bold flex items-center gap-1.5">
-              <svg className="w-4 h-4 text-amber-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-              Delegation Rules:
-            </p>
-            <p>- Delegated admins can read emails, send emails, and manage settings on behalf of assigned clients.</p>
-            <p>- Non-dev admins cannot create new email accounts within client spaces (only provision/assign existing ones).</p>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Delegated Admin Access List</h3>
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
-              <p className="text-xs text-slate-600">Mailbox ID: <code className="font-mono text-indigo-700">{activeMailbox?.id}</code></p>
-              <p className="text-xs text-slate-600">Assigned Admins: <code className="font-mono text-slate-800">{activeMailbox?.allowedAdminIds?.join(', ') || 'None (Owner Only)'}</code></p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* COMPOSE EMAIL MODAL */}
-      {showComposeModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 w-full max-w-lg space-y-4 shadow-2xl animate-slide-up">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-sm text-slate-900">New Email Message</h3>
-              <button onClick={() => setShowComposeModal(false)} className="text-slate-400 hover:text-slate-700">✕</button>
-            </div>
-            <form onSubmit={handleSendEmail} className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">From (Sender Identity)</label>
+                <label className="text-xs font-bold text-slate-300 block mb-1">Assign to Customer User Account</label>
                 <select
-                  value={composeFrom || activeMailbox?.email || ''}
-                  onChange={(e) => setComposeFrom(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  value={bulkUserId}
+                  onChange={(e) => setBulkUserId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3 text-xs font-mono text-white"
                 >
-                  <option value={activeMailbox?.email || 'me@shanutechx.com'}>
-                    {activeMailbox?.email || 'me@shanutechx.com'} (Primary Mailbox)
-                  </option>
-                  {activeMailbox?.aliases?.map((aliasPrefix: string) => {
-                    const full = `${aliasPrefix}@${activeMailbox.customDomain || 'shanutechx.com'}`;
-                    return (
-                      <option key={aliasPrefix} value={full}>
-                        {full} (Alias Identity)
-                      </option>
-                    );
-                  })}
+                  {usersList.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.displayName ? `${u.displayName} (${u.email})` : u.email} [{u.role}]
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">To</label>
-                <input
-                  type="email" required value={composeTo}
-                  onChange={(e) => setComposeTo(e.target.value)}
-                  placeholder="recipient@domain.com"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Subject</label>
-                <input
-                  type="text" required value={composeSubject}
-                  onChange={(e) => setComposeSubject(e.target.value)}
-                  placeholder="Subject line"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Message</label>
-                <textarea
-                  rows={6} required value={composeBody}
-                  onChange={(e) => setComposeBody(e.target.value)}
-                  placeholder="Write message..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                />
-              </div>
-              
-              {/* Attachment simulator */}
-              <div className="flex items-center justify-between border-t border-slate-100 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const filename = `attachment-${Date.now().toString().slice(-4)}.pdf`;
-                    setAttachments((prev) => [...prev, { filename, sizeStr: '1.2 MB' }]);
-                    toast(`Attached ${filename}`, 'info');
-                  }}
-                  className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                  </svg>
-                  Attach File
-                </button>
-                {attachments.length > 0 && <span className="text-[11px] text-slate-500 font-mono">{attachments.length} file(s) attached</span>}
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Domain Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={bulkDomain}
+                    onChange={(e) => setBulkDomain(e.target.value)}
+                    placeholder="company.com"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
+                  />
+                </div>
 
-              <div className="flex justify-between gap-2 pt-2 border-t border-slate-100">
-                <button type="button" onClick={handleSaveDraft} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
-                  Save Draft
-                </button>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setShowComposeModal(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
-                  <button type="submit" disabled={sending} className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md">
-                    {sending ? 'Sending...' : 'Send Email →'}
-                  </button>
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Username Naming Pattern</label>
+                  <input
+                    type="text"
+                    required
+                    value={bulkPattern}
+                    onChange={(e) => setBulkPattern(e.target.value)}
+                    placeholder="user{n}"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
+                  />
                 </div>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* ADD CONTACT MODAL */}
-      {showAddContactModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 w-full max-w-md space-y-4 shadow-2xl animate-slide-up">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-sm text-slate-900">Add New Contact</h3>
-              <button onClick={() => setShowAddContactModal(false)} className="text-slate-400 hover:text-slate-700">✕</button>
-            </div>
-            <form onSubmit={handleCreateContact} className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Full Name</label>
-                <input
-                  type="text" required value={newContactName}
-                  onChange={(e) => setNewContactName(e.target.value)}
-                  placeholder="John Doe"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Number of Mailboxes (N)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={bulkCount}
+                    onChange={(e) => setBulkCount(parseInt(e.target.value, 10) || 1)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Quota per Mailbox (MB)</label>
+                  <input
+                    type="number"
+                    value={bulkQuota}
+                    onChange={(e) => setBulkQuota(parseInt(e.target.value, 10) || 1024)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Password for All</label>
+                  <input
+                    type="password"
+                    required
+                    value={bulkPassword}
+                    onChange={(e) => setBulkPassword(e.target.value)}
+                    placeholder="Minimum 8 characters"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Email Address</label>
-                <input
-                  type="email" required value={newContactEmail}
-                  onChange={(e) => setNewContactEmail(e.target.value)}
-                  placeholder="john@company.com"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Phone (Optional)</label>
-                <input
-                  type="text" value={newContactPhone}
-                  onChange={(e) => setNewContactPhone(e.target.value)}
-                  placeholder="+1 234 567 890"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Company / Tag (Optional)</label>
-                <input
-                  type="text" value={newContactCompany}
-                  onChange={(e) => setNewContactCompany(e.target.value)}
-                  placeholder="Acme Corp"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button type="button" onClick={() => setShowAddContactModal(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
-                <button type="submit" className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md">
-                  Save Contact
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={submittingBulk}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-6 py-3 rounded-2xl shadow-lg transition-all"
+                >
+                  {submittingBulk ? 'Provisioning Mailboxes...' : `+ Provision ${bulkCount} Mailboxes Now`}
                 </button>
               </div>
             </form>

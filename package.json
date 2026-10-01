@@ -12,6 +12,7 @@
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:dashboard": "npm run dev --workspace=apps/dashboard",
+    "dev:webmail": "npm run dev --workspace=apps/webmail",
     "dev:whatsapp": "npm run dev --workspace=services/whatsapp-bot",
     "dev:discord": "npm run dev --workspace=services/discord-bot",
     "dev:node-agent": "npm run dev --workspace=services/node-agent",

@@ -1,3 +1,5 @@
+import { prisma } from './prisma';
+import { decryptSecret } from './secretsVault';
 import { env } from '../env';
 import { logger } from './logger';
 
@@ -6,6 +8,11 @@ export class WildDuckError extends Error {
     super(message);
     this.name = 'WildDuckError';
   }
+}
+
+export interface MailHostTarget {
+  apiUrl: string;
+  apiKey: string;
 }
 
 export interface WildDuckUser {
@@ -67,12 +74,46 @@ export interface DkimRecordResult {
   txtRecord: string;
 }
 
+export async function getMailHostTarget(mailHostId?: string | null): Promise<MailHostTarget> {
+  if (mailHostId) {
+    try {
+      const host = await prisma.mailHost.findUnique({ where: { id: mailHostId } });
+      if (host) {
+        const apiKey = decryptSecret(host.apiKeyEnc, env.secretsEncryptionKey);
+        return { apiUrl: host.apiUrl, apiKey };
+      }
+    } catch (_) {}
+  }
+
+  // Fallback to default MailHost in DB
+  try {
+    const defaultHost = await prisma.mailHost.findFirst({ where: { isDefault: true, status: 'healthy' } });
+    if (defaultHost) {
+      const apiKey = decryptSecret(defaultHost.apiKeyEnc, env.secretsEncryptionKey);
+      return { apiUrl: defaultHost.apiUrl, apiKey };
+    }
+  } catch (_) {}
+
+  // Fallback to environment variables
+  return {
+    apiUrl: (env.wildduckApiUrl || 'http://localhost:8080').replace(/\/$/, ''),
+    apiKey: env.wildduckApiKey || '',
+  };
+}
+
 async function wildDuckRequest<T>(
   path: string,
-  options: { method?: string; body?: unknown; query?: Record<string, string | number | undefined> } = {}
+  options: {
+    method?: string;
+    body?: unknown;
+    query?: Record<string, string | number | undefined>;
+    mailHostId?: string | null;
+    hostTarget?: MailHostTarget;
+  } = {}
 ): Promise<T> {
-  const baseUrl = (env.wildduckApiUrl || 'http://localhost:8080').replace(/\/$/, '');
-  const apiKey = env.wildduckApiKey;
+  const target = options.hostTarget || (await getMailHostTarget(options.mailHostId));
+  const baseUrl = target.apiUrl.replace(/\/$/, '');
+  const apiKey = target.apiKey;
 
   if (!apiKey) {
     throw new WildDuckError('WildDuck API Key (WILDDUCK_API_KEY) is not configured.');
@@ -110,17 +151,33 @@ async function wildDuckRequest<T>(
     return data as T;
   } catch (err: any) {
     if (err instanceof WildDuckError) throw err;
-    logger.error({ err: err.message, path }, 'WildDuck API connection failed');
+    logger.error({ err: err.message, path, baseUrl }, 'WildDuck API connection failed');
     throw new WildDuckError(`WildDuck connection error: ${err.message}`);
   }
 }
 
 export const wildduckClient = {
+  // ── MAIL HOST CONNECTION VERIFICATION ─────────────────────────────────
+  async testHostConnection(apiUrl: string, apiKey: string): Promise<{ success: boolean; status?: string; message?: string }> {
+    try {
+      const res = await wildDuckRequest<any>('/health', {
+        hostTarget: { apiUrl, apiKey },
+      });
+      return { success: true, status: res.status || 'healthy' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to connect to WildDuck host node' };
+    }
+  },
+
   // ── USER MANAGEMENT ──────────────────────────────────────────────────
-  async createUser(params: { username: string; password: string; name?: string; quotaGb?: number }): Promise<WildDuckUser> {
+  async createUser(
+    params: { username: string; password: string; name?: string; quotaGb?: number },
+    mailHostId?: string | null
+  ): Promise<WildDuckUser> {
     const quotaBytes = (params.quotaGb || 1) * 1024 * 1024 * 1024;
     const res = await wildDuckRequest<{ success: boolean; id: string }>('/users', {
       method: 'POST',
+      mailHostId,
       body: {
         username: params.username.toLowerCase(),
         password: params.password,
@@ -131,8 +188,8 @@ export const wildduckClient = {
     return { id: res.id, username: params.username, name: params.name, quota: quotaBytes };
   },
 
-  async getUser(userId: string): Promise<WildDuckUser> {
-    const res = await wildDuckRequest<any>(`/users/${encodeURIComponent(userId)}`);
+  async getUser(userId: string, mailHostId?: string | null): Promise<WildDuckUser> {
+    const res = await wildDuckRequest<any>(`/users/${encodeURIComponent(userId)}`, { mailHostId });
     return {
       id: res.id || userId,
       username: res.username,
@@ -142,7 +199,11 @@ export const wildduckClient = {
     };
   },
 
-  async updateUser(userId: string, data: { password?: string; quotaGb?: number; name?: string }): Promise<boolean> {
+  async updateUser(
+    userId: string,
+    data: { password?: string; quotaGb?: number; name?: string },
+    mailHostId?: string | null
+  ): Promise<boolean> {
     const body: Record<string, unknown> = {};
     if (data.password) body.password = data.password;
     if (data.name) body.name = data.name;
@@ -150,29 +211,34 @@ export const wildduckClient = {
 
     const res = await wildDuckRequest<{ success: boolean }>(`/users/${encodeURIComponent(userId)}`, {
       method: 'PUT',
+      mailHostId,
       body,
     });
     return !!res.success;
   },
 
-  async deleteUser(userId: string): Promise<boolean> {
+  async deleteUser(userId: string, mailHostId?: string | null): Promise<boolean> {
     const res = await wildDuckRequest<{ success: boolean }>(`/users/${encodeURIComponent(userId)}`, {
       method: 'DELETE',
+      mailHostId,
     });
     return !!res.success;
   },
 
   // ── ADDRESS & ALIAS MANAGEMENT ─────────────────────────────────────
-  async createAddress(userId: string, address: string, name?: string): Promise<WildDuckAddress> {
+  async createAddress(userId: string, address: string, name?: string, mailHostId?: string | null): Promise<WildDuckAddress> {
     const res = await wildDuckRequest<{ success: boolean; id: string }>(`/users/${encodeURIComponent(userId)}/addresses`, {
       method: 'POST',
+      mailHostId,
       body: { address: address.toLowerCase(), name },
     });
     return { id: res.id, address, name };
   },
 
-  async listAddresses(userId: string): Promise<WildDuckAddress[]> {
-    const res = await wildDuckRequest<{ results: any[] }>(`/users/${encodeURIComponent(userId)}/addresses`);
+  async listAddresses(userId: string, mailHostId?: string | null): Promise<WildDuckAddress[]> {
+    const res = await wildDuckRequest<{ results: any[] }>(`/users/${encodeURIComponent(userId)}/addresses`, {
+      mailHostId,
+    });
     return (res.results || []).map((a) => ({
       id: a.id,
       address: a.address,
@@ -181,17 +247,19 @@ export const wildduckClient = {
     }));
   },
 
-  async deleteAddress(userId: string, addressId: string): Promise<boolean> {
+  async deleteAddress(userId: string, addressId: string, mailHostId?: string | null): Promise<boolean> {
     const res = await wildDuckRequest<{ success: boolean }>(
       `/users/${encodeURIComponent(userId)}/addresses/${encodeURIComponent(addressId)}`,
-      { method: 'DELETE' }
+      { method: 'DELETE', mailHostId }
     );
     return !!res.success;
   },
 
   // ── MAILBOX & MESSAGES ──────────────────────────────────────────────
-  async listMailboxes(userId: string): Promise<WildDuckMailbox[]> {
-    const res = await wildDuckRequest<{ results: any[] }>(`/users/${encodeURIComponent(userId)}/mailboxes`);
+  async listMailboxes(userId: string, mailHostId?: string | null): Promise<WildDuckMailbox[]> {
+    const res = await wildDuckRequest<{ results: any[] }>(`/users/${encodeURIComponent(userId)}/mailboxes`, {
+      mailHostId,
+    });
     return (res.results || []).map((m) => ({
       id: m.id,
       path: m.path,

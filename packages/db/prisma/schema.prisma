@@ -968,7 +968,30 @@ model SmtpAccount {
   planTier        String   @default("pro")
   allowedAdminIds String[] @default([]) // Dev-assigned admin user IDs allowed to read/write/send via this mailbox
 
+  mailHostId        String?
+  mailHost          MailHost?        @relation(fields: [mailHostId], references: [id])
+
   @@index([userId])
+  @@index([mailHostId])
+}
+
+// Registered WildDuck mail server nodes (hosts) for multi-node email cluster
+model MailHost {
+  id                String        @id @default(cuid())
+  label             String
+  hostname          String        @unique
+  apiUrl            String
+  apiKeyEnc         String        // AES-256-GCM encrypted API token
+  status            String        @default("healthy") // "healthy" | "degraded" | "offline"
+  isDefault         Boolean       @default(false)
+  storageUsedBytes  BigInt        @default(0)
+  storageTotalBytes BigInt        @default(0)
+  activeConnections Int           @default(0)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  smtpAccounts      SmtpAccount[]
+  emailDomains      EmailDomain[]
 }
 
 // Platform-wide outbound mailer config (singleton row, id "global").
@@ -1141,16 +1164,19 @@ model KbArticle {
 
 // Custom email domain verification records.
 model EmailDomain {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   smtpAccountId String?
-  domain        String   @unique
-  status        String   @default("pending_dns") // 'pending_dns' | 'verified'
-  createdAt     DateTime @default(now())
+  domain        String    @unique
+  status        String    @default("pending_dns") // 'pending_dns' | 'verified'
+  mailHostId    String?
+  mailHost      MailHost? @relation(fields: [mailHostId], references: [id])
+  createdAt     DateTime  @default(now())
 
   @@index([userId])
   @@index([smtpAccountId])
+  @@index([mailHostId])
 }
 
 // Secrets Vault for encrypted environment secret storage (AES-256-GCM).

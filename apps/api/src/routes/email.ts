@@ -12,6 +12,7 @@ import { wildduckClient } from '../lib/wildduckClient';
 import dns from 'dns';
 import { getServerIp, buildSpfRecord } from '../lib/mailAuth';
 import { getWebmailClusterConfig, updateWebmailClusterConfig, verifyS3StorageConnection } from '../lib/webmailS3Storage';
+import crypto from 'crypto';
 
 export const emailRouter = Router();
 
@@ -1418,4 +1419,433 @@ emailRouter.get('/admin/mail/telemetry', requireAdminOrDev, async (req: AuthedRe
     assignedNode,
   });
 });
+
+// =====================================================================
+// MAIL HOSTS (NODES) ARCHITECTURE & BULK MANAGEMENT API
+// =====================================================================
+
+/**
+ * GET /api/admin/email/hosts
+ * List all registered WildDuck mail server nodes (hosts).
+ */
+emailRouter.get('/admin/email/hosts', requireAdminOrDev, async (_req: AuthedRequest, res) => {
+  try {
+    const hosts = await prisma.mailHost.findMany({
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+      include: {
+        _count: { select: { smtpAccounts: true, emailDomains: true } },
+      },
+    });
+
+    const formatted = hosts.map((h) => ({
+      id: h.id,
+      label: h.label,
+      hostname: h.hostname,
+      apiUrl: h.apiUrl,
+      status: h.status,
+      isDefault: h.isDefault,
+      storageUsedBytes: Number(h.storageUsedBytes),
+      storageTotalBytes: Number(h.storageTotalBytes),
+      activeConnections: h.activeConnections,
+      mailboxCount: h._count.smtpAccounts,
+      domainCount: h._count.emailDomains,
+      createdAt: h.createdAt.toISOString(),
+      updatedAt: h.updatedAt.toISOString(),
+    }));
+
+    res.json({ hosts: formatted, total: formatted.length });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to list mail hosts');
+    res.status(500).json({ error: err.message || 'Failed to list mail hosts' });
+  }
+});
+
+const addHostSchema = z.object({
+  label: z.string().min(1),
+  hostname: z.string().min(1),
+  apiUrl: z.string().url(),
+  apiKey: z.string().min(1),
+  isDefault: z.boolean().optional().default(false),
+});
+
+/**
+ * POST /api/admin/email/hosts
+ * Add a new WildDuck mail server node (host).
+ */
+emailRouter.post('/admin/email/hosts', requireAdminOrDev, async (req: AuthedRequest, res) => {
+  const parse = addHostSchema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: 'Invalid host data', details: parse.error.format() });
+
+  const { label, hostname, apiUrl, apiKey, isDefault } = parse.data;
+
+  try {
+    const existing = await prisma.mailHost.findUnique({ where: { hostname: hostname.toLowerCase().trim() } });
+    if (existing) {
+      return res.status(409).json({ error: 'A mail host with this hostname is already registered.' });
+    }
+
+    // Verify connectivity to the mail host node
+    const testResult = await wildduckClient.testHostConnection(apiUrl, apiKey);
+    const initialStatus = testResult.success ? (testResult.status || 'healthy') : 'offline';
+
+    if (isDefault) {
+      await prisma.mailHost.updateMany({ data: { isDefault: false } });
+    }
+
+    const apiKeyEnc = encryptSecret(apiKey, env.secretsEncryptionKey);
+    const newHost = await prisma.mailHost.create({
+      data: {
+        label,
+        hostname: hostname.toLowerCase().trim(),
+        apiUrl: apiUrl.replace(/\/$/, ''),
+        apiKeyEnc,
+        isDefault: !!isDefault,
+        status: initialStatus,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'email.add_host',
+        target: `Added Mail Host Node ${label} (${hostname}) - Status: ${initialStatus}`,
+      },
+    });
+
+    res.status(201).json({
+      host: {
+        id: newHost.id,
+        label: newHost.label,
+        hostname: newHost.hostname,
+        apiUrl: newHost.apiUrl,
+        status: newHost.status,
+        isDefault: newHost.isDefault,
+        createdAt: newHost.createdAt.toISOString(),
+      },
+      connectionTest: testResult,
+      message: `Mail host ${label} added successfully (${initialStatus}).`,
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to add mail host');
+    res.status(500).json({ error: err.message || 'Failed to add mail host' });
+  }
+});
+
+/**
+ * POST /api/admin/email/hosts/:id/test
+ * Test connection to a specific mail host node and update status.
+ */
+emailRouter.post('/api/admin/email/hosts/:id/test', requireAdminOrDev, async (req: AuthedRequest, res) => {
+  try {
+    const host = await prisma.mailHost.findUnique({ where: { id: req.params.id } });
+    if (!host) return res.status(404).json({ error: 'Mail host not found' });
+
+    const apiKey = decryptSecret(host.apiKeyEnc, env.secretsEncryptionKey);
+    const testResult = await wildduckClient.testHostConnection(host.apiUrl, apiKey);
+    const newStatus = testResult.success ? (testResult.status || 'healthy') : 'offline';
+
+    await prisma.mailHost.update({
+      where: { id: host.id },
+      data: { status: newStatus },
+    });
+
+    res.json({
+      ok: true,
+      hostId: host.id,
+      status: newStatus,
+      testResult,
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to test mail host');
+    res.status(500).json({ error: err.message || 'Failed to test mail host' });
+  }
+});
+
+/**
+ * DELETE /api/admin/email/hosts/:id
+ * Delete a mail host node.
+ */
+emailRouter.delete('/admin/email/hosts/:id', requireAdminOrDev, async (req: AuthedRequest, res) => {
+  try {
+    const host = await prisma.mailHost.findUnique({ where: { id: req.params.id } });
+    if (!host) return res.status(404).json({ error: 'Mail host not found' });
+
+    await prisma.mailHost.delete({ where: { id: host.id } });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'email.delete_host',
+        target: `Removed Mail Host Node ${host.label} (${host.hostname})`,
+      },
+    });
+
+    res.json({ ok: true, id: req.params.id });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to delete mail host');
+    res.status(500).json({ error: err.message || 'Failed to delete mail host' });
+  }
+});
+
+/**
+ * POST /api/admin/email/mailboxes/bulk
+ * Bulk provision mailboxes (CSV list or naming pattern, e.g. user{n}@domain.com).
+ */
+const bulkProvisionSchema = z.object({
+  targetUserId: z.string().min(1),
+  domain: z.string().min(1),
+  password: z.string().min(8),
+  mailHostId: z.string().optional(),
+  storageQuotaMb: z.number().int().positive().default(1024),
+  dailySendLimit: z.number().int().positive().default(1000),
+  // Pattern creation: e.g. prefixPattern "employee{n}", count: 10, startNum: 1
+  pattern: z.string().optional(),
+  count: z.number().int().positive().max(100).optional(),
+  startNum: z.number().int().nonnegative().default(1),
+  // Explicit CSV list
+  usernames: z.array(z.string()).optional(),
+});
+
+emailRouter.post('/admin/email/mailboxes/bulk', requireAdminOrDev, async (req: AuthedRequest, res) => {
+  const parse = bulkProvisionSchema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: 'Invalid bulk provisioning payload', details: parse.error.format() });
+
+  const { targetUserId, domain, password, mailHostId, storageQuotaMb, dailySendLimit, pattern, count, startNum, usernames } = parse.data;
+
+  const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+  if (!targetUser) return res.status(404).json({ error: 'Target user not found' });
+
+  const domainStr = domain.toLowerCase().trim();
+  const smtpHost = `mail.${domainStr}`;
+  const webmailUrl = process.env.NODE_ENV === 'production' ? `https://mail.${domainStr}` : 'http://localhost:3001/email';
+  const credentialRef = encryptSecret(password, env.secretsEncryptionKey);
+
+  const listToCreate: string[] = [];
+  if (usernames && usernames.length > 0) {
+    usernames.forEach((u) => {
+      const clean = u.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
+      if (clean && !listToCreate.includes(clean)) listToCreate.push(clean);
+    });
+  } else if (pattern && count) {
+    for (let i = 0; i < count; i++) {
+      const num = startNum + i;
+      const u = pattern.replace('{n}', String(num)).toLowerCase().replace(/[^a-z0-9._-]/g, '');
+      if (u && !listToCreate.includes(u)) listToCreate.push(u);
+    }
+  }
+
+  if (listToCreate.length === 0) {
+    return res.status(400).json({ error: 'No valid usernames provided or generated by pattern.' });
+  }
+
+  const created: any[] = [];
+  const errors: { username: string; error: string }[] = [];
+
+  for (const username of listToCreate) {
+    try {
+      const fullEmail = `${username}@${domainStr}`;
+      let wildduckUserId: string | undefined;
+      let wildduckAddressId: string | undefined;
+
+      try {
+        const wdUser = await wildduckClient.createUser(
+          {
+            username: fullEmail,
+            password,
+            name: targetUser.displayName || targetUser.email,
+            quotaGb: Math.max(1, Math.ceil(storageQuotaMb / 1024)),
+          },
+          mailHostId
+        );
+        if (wdUser) {
+          wildduckUserId = wdUser.id;
+          const addr = await wildduckClient.createAddress(wdUser.id, fullEmail, targetUser.displayName || undefined, mailHostId).catch(() => null);
+          if (addr) wildduckAddressId = addr.id;
+        }
+      } catch (wdErr: any) {
+        logger.warn({ username, err: wdErr.message }, 'WildDuck API user provision failed during bulk create');
+      }
+
+      const acc = await prisma.smtpAccount.create({
+        data: {
+          userId: targetUserId,
+          postalOrgId: 'shanutechx',
+          wildduckUserId,
+          wildduckAddressId,
+          mailHostId: mailHostId || null,
+          smtpHost,
+          smtpPort: 587,
+          smtpUsername: username,
+          credentialRef,
+          webmailUrl,
+          storageQuotaMb,
+          dailySendLimit,
+          maxAliases: 10,
+          customDomain: domainStr,
+          isSuspended: false,
+          billingModel: 'permanent_free',
+        },
+      });
+
+      created.push({
+        id: acc.id,
+        email: fullEmail,
+        username,
+        domain: domainStr,
+      });
+    } catch (err: any) {
+      errors.push({ username, error: err.message || 'Failed to create mailbox' });
+    }
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      adminId: req.user!.id,
+      action: 'email.bulk_provision',
+      target: `Bulk provisioned ${created.length} mailboxes under domain ${domainStr} for ${targetUser.email}`,
+    },
+  });
+
+  res.status(201).json({
+    ok: true,
+    created,
+    createdCount: created.length,
+    failedCount: errors.length,
+    errors,
+    message: `Successfully provisioned ${created.length} mailboxes.`,
+  });
+});
+
+/**
+ * PATCH /api/admin/email/mailboxes/:id/status
+ * Suspend, unsuspend, or reset password of any mailbox.
+ */
+const statusPatchSchema = z.object({
+  action: z.enum(['suspend', 'unsuspend', 'reset_password']),
+  newPassword: z.string().min(8).optional(),
+});
+
+emailRouter.patch('/admin/email/mailboxes/:id/status', requireAdminOrDev, async (req: AuthedRequest, res) => {
+  const parse = statusPatchSchema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: 'Invalid status patch body', details: parse.error.format() });
+
+  const { action, newPassword } = parse.data;
+
+  try {
+    const account = await prisma.smtpAccount.findUnique({ where: { id: req.params.id } });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    if (action === 'suspend') {
+      await prisma.smtpAccount.update({
+        where: { id: account.id },
+        data: { isSuspended: true },
+      });
+
+      if (account.wildduckUserId) {
+        // Suspend user in WildDuck by setting a random unguessable password
+        const lockPass = `Suspended_${crypto.randomBytes(16).toString('hex')}`;
+        await wildduckClient.updateUser(account.wildduckUserId, { password: lockPass }, account.mailHostId).catch(() => {});
+      }
+
+      await prisma.auditLog.create({
+        data: {
+          adminId: req.user!.id,
+          action: 'email.suspend_mailbox',
+          target: `Suspended mailbox ${account.smtpUsername}@${account.customDomain || env.rootDomain}`,
+        },
+      });
+
+      return res.json({ ok: true, isSuspended: true, message: 'Mailbox suspended successfully.' });
+    }
+
+    if (action === 'unsuspend') {
+      await prisma.smtpAccount.update({
+        where: { id: account.id },
+        data: { isSuspended: false },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          adminId: req.user!.id,
+          action: 'email.unsuspend_mailbox',
+          target: `Unsuspended mailbox ${account.smtpUsername}@${account.customDomain || env.rootDomain}`,
+        },
+      });
+
+      return res.json({ ok: true, isSuspended: false, message: 'Mailbox unsuspended successfully.' });
+    }
+
+    if (action === 'reset_password') {
+      if (!newPassword) return res.status(400).json({ error: 'newPassword is required for reset_password action' });
+
+      const newCredentialRef = encryptSecret(newPassword, env.secretsEncryptionKey);
+      await prisma.smtpAccount.update({
+        where: { id: account.id },
+        data: { credentialRef: newCredentialRef },
+      });
+
+      if (account.wildduckUserId) {
+        await wildduckClient.updateUser(account.wildduckUserId, { password: newPassword }, account.mailHostId).catch(() => {});
+      }
+
+      await prisma.auditLog.create({
+        data: {
+          adminId: req.user!.id,
+          action: 'email.reset_password',
+          target: `Reset password for mailbox ${account.smtpUsername}@${account.customDomain || env.rootDomain}`,
+        },
+      });
+
+      return res.json({ ok: true, message: 'Password reset successfully.' });
+    }
+
+    res.status(400).json({ error: 'Unsupported action' });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to update mailbox status');
+    res.status(500).json({ error: err.message || 'Failed to update mailbox status' });
+  }
+});
+
+/**
+ * GET /api/admin/email/system-health
+ * Complete system health across mail hosts, tasks, queues, and storage.
+ */
+emailRouter.get('/admin/email/system-health', requireAdminOrDev, async (_req: AuthedRequest, res) => {
+  try {
+    const hosts = await prisma.mailHost.findMany();
+    const tasks = await wildduckClient.listTasks().catch(() => []);
+    const health = await wildduckClient.getHealth().catch(() => ({ status: 'yellow' }));
+
+    const accountsAgg = await prisma.smtpAccount.aggregate({
+      _count: { id: true },
+      _sum: { storageQuotaMb: true, storageUsedMb: true, dailySendCount: true },
+    });
+
+    const healthyHostsCount = hosts.filter((h) => h.status === 'healthy').length;
+
+    res.json({
+      overallStatus: health.status || 'green',
+      totalHosts: hosts.length,
+      healthyHosts: healthyHostsCount,
+      hosts: hosts.map((h) => ({
+        id: h.id,
+        label: h.label,
+        hostname: h.hostname,
+        apiUrl: h.apiUrl,
+        status: h.status,
+        isDefault: h.isDefault,
+      })),
+      tasksCount: tasks.length,
+      activeTasks: tasks.slice(0, 10),
+      totalMailboxes: accountsAgg._count.id || 0,
+      totalStorageMb: accountsAgg._sum.storageQuotaMb || 0,
+      totalUsedStorageMb: accountsAgg._sum.storageUsedMb || 0,
+      dailySendCountTotal: accountsAgg._sum.dailySendCount || 0,
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to fetch system health');
+    res.status(500).json({ error: err.message || 'Failed to fetch system health' });
+  }
+});
+
 

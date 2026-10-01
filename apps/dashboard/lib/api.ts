@@ -148,6 +148,9 @@ export const api = {
   },
   portsOverview: () => apiFetch('/api/ports/overview').then((r) => asJsonWithCode<PortsOverview>(r)),
   me: () => apiFetch('/api/me').then((r) => asJson<{ user: ApiUser; rootDomain: string }>(r)),
+  auth: {
+    me: () => apiFetch('/api/me').then((r) => asJson<{ user: ApiUser; rootDomain: string }>(r)),
+  },
 
 
   updateProfile: (data: { displayName?: string; phoneNumber?: string | null; discordUserId?: string | null }) =>
@@ -315,6 +318,18 @@ export const api = {
           assignedNode: any;
         }>(r)
       ),
+    getHosts: () => apiFetch('/api/admin/email/hosts').then((r) => asJson<{ hosts: any[] }>(r)),
+    addHost: (data: { label: string; hostname: string; apiUrl: string; apiKey: string; isDefault?: boolean }) =>
+      apiFetch('/api/admin/email/hosts', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ host: any; message: string }>(r)),
+    testHost: (id: string) =>
+      apiFetch(`/api/admin/email/hosts/${id}/test`, { method: 'POST' }).then((r) => asJson<{ ok: boolean; status: string; message?: string }>(r)),
+    deleteHost: (id: string) =>
+      apiFetch(`/api/admin/email/hosts/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    getSystemHealth: () => apiFetch('/api/admin/email/system-health').then((r) => asJson<any>(r)),
+    bulkProvision: (data: { targetUserId: string; domain: string; pattern: string; count: number; password: string; storageQuotaMb?: number; mailHostId?: string }) =>
+      apiFetch('/api/admin/email/mailboxes/bulk', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ created: any[]; count: number; message: string }>(r)),
+    updateMailboxStatus: (id: string, data: { action: 'suspend' | 'unsuspend' | 'reset_password'; newPassword?: string }) =>
+      apiFetch(`/api/admin/email/mailboxes/${id}/status`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
   },
 
   webmail: {
