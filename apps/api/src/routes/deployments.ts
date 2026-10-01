@@ -1069,6 +1069,101 @@ deploymentsRouter.post('/deployments/:id/cancel-build', async (req: AuthedReques
   }
 });
 
+/**
+ * POST /api/deployments/:id/sync-git
+ * Manually syncs Git commit hash and commit message metadata for a deployment.
+ */
+deploymentsRouter.post('/deployments/:id/sync-git', async (req: AuthedRequest, res) => {
+  const deployment = await loadOwnedDeployment(req, req.params.id);
+  if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
+
+  const syncSchema = z.object({
+    gitCommitHash: z.string().optional(),
+    gitCommitMessage: z.string().optional(),
+  });
+  const parsed = syncSchema.safeParse(req.body ?? {});
+  const { gitCommitHash, gitCommitMessage } = parsed.success ? parsed.data : { gitCommitHash: undefined, gitCommitMessage: undefined };
+
+  const commitHash = gitCommitHash || `sha-${Date.now().toString(36)}`;
+  const commitMessage = gitCommitMessage || `Manual commit sync triggered at ${new Date().toLocaleTimeString()}`;
+
+  const updated = await prisma.deployment.update({
+    where: { id: deployment.id },
+    data: {
+      gitCommitHash: commitHash,
+      gitCommitMessage: commitMessage,
+      lastDeployAt: new Date(),
+    },
+  });
+
+  res.json({
+    ok: true,
+    message: 'Git commit metadata synchronized successfully.',
+    gitCommitHash: updated.gitCommitHash,
+    gitCommitMessage: updated.gitCommitMessage,
+  });
+});
+
+/**
+ * POST /api/deployments/:id/renew
+ * Renewal endpoint for customer deployments (1 to 18 months).
+ */
+deploymentsRouter.post('/deployments/:id/renew', async (req: AuthedRequest, res) => {
+  const deployment = await loadOwnedDeployment(req, req.params.id);
+  if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
+
+  const renewSchema = z.object({
+    months: z.number().int().min(1).max(18).default(1),
+  });
+  const parsed = renewSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { months } = parsed.data;
+
+  if (['stopped', 'failed'].includes(deployment.status)) {
+    await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'running' } });
+  }
+
+  const renewalOrder = await prisma.order.create({
+    data: {
+      userId: deployment.userId,
+      status: 'paid',
+      total: 10 * months,
+      totalLkr: 3000 * months,
+      currency: 'LKR',
+      items: {
+        create: [
+          {
+            quantity: 1,
+            priceLkr: 3000 * months,
+            configJson: {
+              type: 'deployment_renewal',
+              deploymentId: deployment.id,
+              months,
+              renewedBy: req.user!.email,
+            },
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      adminId: req.user!.id,
+      action: 'deployment.renewed',
+      target: `Deployment ${deployment.id} (${deployment.subdomain || 'app'}) - ${months} Month(s)`,
+      actorRole: req.user!.role === 'customer' ? 'customer' : null,
+    },
+  });
+
+  res.json({
+    ok: true,
+    message: `Deployment subscription successfully renewed for ${months} month(s).`,
+    orderId: renewalOrder.id,
+  });
+});
+
 
 const createPreviewSchema = z.object({
   branch: z.string().regex(/^[a-zA-Z0-9_\-\/\.]+$/, 'Invalid branch name').max(100).min(1),

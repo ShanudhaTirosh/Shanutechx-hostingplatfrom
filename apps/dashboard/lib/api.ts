@@ -751,6 +751,14 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }).then((r) => asJson<{ ok: boolean; deployment: any }>(r)),
+    renew: (id: string, months: number = 1) =>
+      apiFetch(`/api/deployments/${id}/renew`, { method: 'POST', body: JSON.stringify({ months }) }).then((r) =>
+        asJson<{ ok: boolean; message: string; orderId: string }>(r)
+      ),
+    syncGit: (id: string, data?: { gitCommitHash?: string; gitCommitMessage?: string }) =>
+      apiFetch(`/api/deployments/${id}/sync-git`, { method: 'POST', body: JSON.stringify(data || {}) }).then((r) =>
+        asJson<{ ok: boolean; message: string; gitCommitHash: string; gitCommitMessage: string }>(r)
+      ),
 
     redeploy: async (id: string, onEvent?: (event: BuildEvent) => void): Promise<void> => {
       const res = await apiFetch(`/api/deployments/${id}/redeploy`, { method: 'POST', body: JSON.stringify({}) });
@@ -1274,6 +1282,13 @@ export const api = {
           ssh: { success: boolean; message: string };
           sftp: { success: boolean; message: string };
         }>(r)
+      ),
+    renew: (id: string, data?: { months?: number; notes?: string }) =>
+      apiFetch(`/api/vps-provisions/${id}/renew`, {
+        method: 'POST',
+        body: JSON.stringify(data || {}),
+      }).then((r) =>
+        asJson<{ ok: boolean; message: string; provision: VpsProvision; orderId: string }>(r)
       ),
   },
 
@@ -2044,6 +2059,10 @@ export const api = {
     restoreS3Backup: (id: string, backupId: string) =>
       apiFetch(`/api/managed-databases/${id}/s3-restore`, { method: 'POST', body: JSON.stringify({ backupId }) }).then((r) =>
         asJson<{ ok: boolean; restoredBackupId: string }>(r)
+      ),
+    renew: (id: string, months: number = 1) =>
+      apiFetch(`/api/managed-databases/${id}/renew`, { method: 'POST', body: JSON.stringify({ months }) }).then((r) =>
+        asJson<{ ok: boolean; message: string; orderId: string }>(r)
       ),
   },
 

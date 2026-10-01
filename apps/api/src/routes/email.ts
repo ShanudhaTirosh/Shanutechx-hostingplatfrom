@@ -443,7 +443,9 @@ emailRouter.post('/email/mailboxes/:id/renew', async (req: AuthedRequest, res) =
       });
     }
 
-    const newExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days renewal
+    const months = Math.min(18, Math.max(1, Number(req.body?.months) || 1));
+    const baseDate = account.expiresAt && account.expiresAt.getTime() > Date.now() ? account.expiresAt : new Date();
+    const newExpiresAt = new Date(baseDate.getTime() + months * 30 * 24 * 60 * 60 * 1000);
     const updated = await prisma.smtpAccount.update({
       where: { id: account.id },
       data: {
@@ -456,13 +458,13 @@ emailRouter.post('/email/mailboxes/:id/renew', async (req: AuthedRequest, res) =
       data: {
         adminId: req.user!.id,
         action: 'email.renew_subscription',
-        target: `Renewed mailbox subscription for ${account.smtpUsername} until ${newExpiresAt.toISOString()}`,
+        target: `Renewed mailbox subscription for ${account.smtpUsername} for ${months} month(s) until ${newExpiresAt.toISOString()}`,
       },
     });
 
     res.json({
       ok: true,
-      message: 'Subscription renewed successfully for 30 days.',
+      message: `Subscription renewed successfully for ${months} month(s).`,
       expiresAt: newExpiresAt.toISOString(),
       isSuspended: false,
     });

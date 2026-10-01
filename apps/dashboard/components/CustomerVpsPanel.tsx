@@ -52,6 +52,9 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
   const [showContainers, setShowContainers] = useState<boolean>(false);
 
   // Modals
+  const [showRenewModal, setShowRenewModal] = useState<boolean>(false);
+  const [renewMonths, setRenewMonths] = useState<number>(1);
+
   const [showChangePassword, setShowChangePassword] = useState<boolean>(false);
   const [newPasswordInput, setNewPasswordInput] = useState<string>('');
 
@@ -171,6 +174,20 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
       onRefresh?.();
     } catch (err: any) {
       toast(`Sync failed: ${err.message}`, 'error');
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleCustomerRenewSubmit() {
+    setBusyAction('customer_renew');
+    try {
+      const res = await api.vps.renew(p.id, { months: renewMonths });
+      toast(res.message || 'VPS subscription renewed successfully.', 'success');
+      setShowRenewModal(false);
+      onRefresh?.();
+    } catch (err: any) {
+      toast(`Renewal failed: ${err.message}`, 'error');
     } finally {
       setBusyAction(null);
     }
@@ -355,6 +372,18 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
               className="flex items-center gap-1.5"
             >
               <IconRestart size={14} /> Restart
+            </Button>
+
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setShowRenewModal(true);
+                setRenewMonths(1);
+              }}
+              className="flex items-center gap-1.5 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+            >
+              <IconRefresh size={14} /> Renew VPS
             </Button>
 
             <a
@@ -644,6 +673,106 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
       {/* Web SSH Terminal Modal */}
       {showTerminal && (
         <SshTerminal kind="provision" id={p.id} onClose={() => setShowTerminal(false)} />
+      )}
+
+      {/* Customer Renew VPS Modal */}
+      {showRenewModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="max-w-md w-full border border-white/20 bg-neutral-900 space-y-4 shadow-2xl p-6">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <IconRefresh size={18} className="text-emerald-400" />
+                Renew VPS Subscription
+              </h3>
+              <button onClick={() => setShowRenewModal(false)} className="text-text-muted hover:text-white text-sm">✕</button>
+            </div>
+
+            <p className="text-xs text-text-muted leading-relaxed">
+              Extend your VPS (<span className="text-white font-mono">{p.ip || p.id.slice(0, 8)}</span>) subscription period. Choose your desired extension plan below.
+            </p>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-text-muted block mb-1 font-semibold">Select Renewal Term *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRenewMonths(1)}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      renewMonths === 1
+                        ? 'border-accent-teal bg-accent-teal/10 text-white font-bold'
+                        : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="text-xs font-bold">1 Month</div>
+                    <div className="text-[10px] text-text-muted mt-0.5">$15.00 / month</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRenewMonths(3)}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      renewMonths === 3
+                        ? 'border-accent-teal bg-accent-teal/10 text-white font-bold'
+                        : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="text-xs font-bold">3 Months</div>
+                    <div className="text-[10px] text-emerald-400 mt-0.5">$42.00 (Save 7%)</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRenewMonths(6)}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      renewMonths === 6
+                        ? 'border-accent-teal bg-accent-teal/10 text-white font-bold'
+                        : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="text-xs font-bold">6 Months</div>
+                    <div className="text-[10px] text-emerald-400 mt-0.5">$80.00 (Save 11%)</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRenewMonths(12)}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      renewMonths === 12
+                        ? 'border-accent-teal bg-accent-teal/10 text-white font-bold'
+                        : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="text-xs font-bold">12 Months</div>
+                    <div className="text-[10px] text-emerald-400 mt-0.5">$150.00 (Save 17%)</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRenewMonths(18)}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      renewMonths === 18
+                        ? 'border-accent-teal bg-accent-teal/10 text-white font-bold'
+                        : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="text-xs font-bold">18 Months (Max)</div>
+                    <div className="text-[10px] text-emerald-400 mt-0.5">$210.00 (Save 22%)</div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
+              <Button size="sm" variant="secondary" onClick={() => setShowRenewModal(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" variant="primary" onClick={handleCustomerRenewSubmit} loading={busyAction === 'customer_renew'}>
+                Confirm Renewal
+              </Button>
+            </div>
+          </Card>
+        </div>
       )}
     </Card>
   );

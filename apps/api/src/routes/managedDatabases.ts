@@ -798,6 +798,65 @@ managedDatabasesRouter.post('/managed-databases/:id/migrate', async (req: Authed
 });
 
 /**
+ * POST /api/managed-databases/:id/renew
+ * Renewal endpoint for managed database instances (1 to 18 months).
+ */
+managedDatabasesRouter.post('/managed-databases/:id/renew', async (req: AuthedRequest, res) => {
+  const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+
+  const schema = z.object({ months: z.number().int().min(1).max(18).default(1) });
+  const parsed = schema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { months } = parsed.data;
+
+  if (db.status === 'stopped') {
+    await prisma.managedDatabase.update({ where: { id: db.id }, data: { status: 'running' } });
+  }
+
+  const renewalOrder = await prisma.order.create({
+    data: {
+      userId: db.userId,
+      status: 'paid',
+      total: 12 * months,
+      totalLkr: 3600 * months,
+      currency: 'LKR',
+      items: {
+        create: [
+          {
+            quantity: 1,
+            priceLkr: 3600 * months,
+            configJson: {
+              type: 'database_renewal',
+              databaseId: db.id,
+              months,
+              renewedBy: req.user!.email,
+            },
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      adminId: req.user!.id,
+      action: 'managed_database.renewed',
+      target: `Database ${db.id} (${db.type}) - ${months} Month(s)`,
+      actorRole: req.user!.role === 'customer' ? 'customer' : null,
+    },
+  });
+
+  res.json({
+    ok: true,
+    message: `Managed ${db.type.toUpperCase()} database renewed for ${months} month(s).`,
+    orderId: renewalOrder.id,
+  });
+});
+
+/**
  * POST /api/managed-databases/:id/scale
  * Live vertical scaling of database resources (CPU cores, RAM memory, Storage limit, and maxConnections).
  */

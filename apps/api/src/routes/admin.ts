@@ -132,7 +132,8 @@ adminRouter.get('/admin/staff', async (_req, res) => {
 /**
  * Returns ALL users (any role) for admin dropdowns — e.g. the "assign to
  * user" picker in the managed-database and SMTP provisioning forms.
- * Supports ?search= for instant filtering.
+ * Supports ?search= for instant filtering and sorts users who paid for VPS
+ * plans at the top of the list.
  */
 adminRouter.get('/admin/all-users', async (req: AuthedRequest, res) => {
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : undefined;
@@ -142,14 +143,57 @@ adminRouter.get('/admin/all-users', async (req: AuthedRequest, res) => {
           OR: [
             { email: { contains: search, mode: 'insensitive' } },
             { displayName: { contains: search, mode: 'insensitive' } },
+            { id: { contains: search, mode: 'insensitive' } },
           ],
         }
       : undefined,
     orderBy: { createdAt: 'desc' },
-    take: 50,
-    select: { id: true, email: true, displayName: true, role: true },
+    take: 100,
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      role: true,
+      orders: {
+        where: { status: 'paid' },
+        select: { id: true, total: true },
+      },
+      vpsProvisions: {
+        select: { id: true, status: true, ip: true },
+      },
+    },
   });
-  res.json({ users });
+
+  const formatted = users.map((u: any) => {
+    const paidOrders = u.orders || [];
+    const vpsCount = u.vpsProvisions ? u.vpsProvisions.length : 0;
+    const hasPaidVps = paidOrders.length > 0 || vpsCount > 0;
+    const totalSpent = paidOrders.reduce((acc: number, o: any) => acc + (o.total || 0), 0);
+    const awaitingDelivery = paidOrders.length > 0 && vpsCount < paidOrders.length;
+
+    return {
+      id: u.id,
+      email: u.email,
+      displayName: u.displayName,
+      role: u.role,
+      hasPaidVps,
+      paidOrderCount: paidOrders.length,
+      totalSpent,
+      vpsCount,
+      awaitingDelivery,
+    };
+  });
+
+  // Sort paid VPS users awaiting delivery FIRST, then already-assigned paid users, then by total spent
+  formatted.sort((a: any, b: any) => {
+    if (a.awaitingDelivery && !b.awaitingDelivery) return -1;
+    if (!a.awaitingDelivery && b.awaitingDelivery) return 1;
+    if (a.hasPaidVps && !b.hasPaidVps) return -1;
+    if (!a.hasPaidVps && b.hasPaidVps) return 1;
+    return b.totalSpent - a.totalSpent;
+  });
+
+  res.json({ users: formatted });
 });
 
 const setRoleSchema = z.object({ role: z.enum(['customer', 'support', 'dev', 'admin']) });
