@@ -22,7 +22,11 @@ redis.on('error', (err) => {
 });
 
 export async function storeState<T>(prefix: string, key: string, value: T, ttlSeconds: number): Promise<void> {
-  await redis.set(`${prefix}:${key}`, JSON.stringify(value), 'EX', ttlSeconds);
+  try {
+    await redis.set(`${prefix}:${key}`, JSON.stringify(value), 'EX', ttlSeconds);
+  } catch (err: any) {
+    logger.warn({ err: err.message, prefix, key }, 'Failed to store state in Redis');
+  }
 }
 
 export async function consumeState<T>(prefix: string, key: string): Promise<T | null> {
@@ -35,10 +39,12 @@ export async function consumeState<T>(prefix: string, key: string): Promise<T | 
       fullKey
     )) as string | null;
   } catch {
-    data = await redis.get(fullKey);
-    if (data) {
-      await redis.del(fullKey);
-    }
+    try {
+      data = await redis.get(fullKey);
+      if (data) {
+        await redis.del(fullKey);
+      }
+    } catch {}
   }
 
   if (!data) return null;
@@ -46,5 +52,55 @@ export async function consumeState<T>(prefix: string, key: string): Promise<T | 
     return JSON.parse(data) as T;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Transparent Redis caching wrapper.
+ * Returns cached value if present in Redis; otherwise invokes fetcher, caches result, and returns data.
+ * Gracefully falls back to fetcher if Redis is unavailable or fails.
+ */
+export async function getCached<T>(
+  key: string,
+  ttlSeconds: number,
+  fetcher: () => Promise<T>
+): Promise<T> {
+  try {
+    const cached = await redis.get(key);
+    if (cached) {
+      return JSON.parse(cached) as T;
+    }
+  } catch (err: any) {
+    logger.warn({ key, err: err.message }, 'Redis getCached read error — falling back to fetcher');
+  }
+
+  const freshData = await fetcher();
+
+  if (freshData !== null && freshData !== undefined) {
+    try {
+      await redis.set(key, JSON.stringify(freshData), 'EX', ttlSeconds);
+    } catch (err: any) {
+      logger.warn({ key, err: err.message }, 'Redis getCached write error');
+    }
+  }
+
+  return freshData;
+}
+
+/**
+ * Invalidate a single key or pattern from Redis
+ */
+export async function invalidateCache(keyOrPattern: string): Promise<void> {
+  try {
+    if (keyOrPattern.includes('*')) {
+      const keys = await redis.keys(keyOrPattern);
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+    } else {
+      await redis.del(keyOrPattern);
+    }
+  } catch (err: any) {
+    logger.warn({ keyOrPattern, err: err.message }, 'Failed to invalidate Redis cache');
   }
 }

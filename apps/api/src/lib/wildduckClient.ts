@@ -74,31 +74,37 @@ export interface DkimRecordResult {
   txtRecord: string;
 }
 
+import { getCached } from './redis';
+
 export async function getMailHostTarget(mailHostId?: string | null): Promise<MailHostTarget> {
-  if (mailHostId) {
+  const cacheKey = `mailhost:target:${mailHostId || 'default'}`;
+
+  return getCached<MailHostTarget>(cacheKey, 120, async () => {
+    if (mailHostId) {
+      try {
+        const host = await prisma.mailHost.findUnique({ where: { id: mailHostId } });
+        if (host) {
+          const apiKey = decryptSecret(host.apiKeyEnc, env.secretsEncryptionKey);
+          return { apiUrl: host.apiUrl, apiKey };
+        }
+      } catch (_) {}
+    }
+
+    // Fallback to default MailHost in DB
     try {
-      const host = await prisma.mailHost.findUnique({ where: { id: mailHostId } });
-      if (host) {
-        const apiKey = decryptSecret(host.apiKeyEnc, env.secretsEncryptionKey);
-        return { apiUrl: host.apiUrl, apiKey };
+      const defaultHost = await prisma.mailHost.findFirst({ where: { isDefault: true, status: 'healthy' } });
+      if (defaultHost) {
+        const apiKey = decryptSecret(defaultHost.apiKeyEnc, env.secretsEncryptionKey);
+        return { apiUrl: defaultHost.apiUrl, apiKey };
       }
     } catch (_) {}
-  }
 
-  // Fallback to default MailHost in DB
-  try {
-    const defaultHost = await prisma.mailHost.findFirst({ where: { isDefault: true, status: 'healthy' } });
-    if (defaultHost) {
-      const apiKey = decryptSecret(defaultHost.apiKeyEnc, env.secretsEncryptionKey);
-      return { apiUrl: defaultHost.apiUrl, apiKey };
-    }
-  } catch (_) {}
-
-  // Fallback to environment variables
-  return {
-    apiUrl: (env.wildduckApiUrl || 'http://localhost:8080').replace(/\/$/, ''),
-    apiKey: env.wildduckApiKey || '',
-  };
+    // Fallback to environment variables
+    return {
+      apiUrl: (env.wildduckApiUrl || 'http://localhost:8080').replace(/\/$/, ''),
+      apiKey: env.wildduckApiKey || '',
+    };
+  });
 }
 
 async function wildDuckRequest<T>(

@@ -1611,24 +1611,44 @@ const httpServer = app.listen(PORT, BIND_HOST, () => {
 
   // Periodic autonomous stats reporting loop back to control plane API
   const API_URL = process.env.API_URL;
-  const NODE_ID = process.env.NODE_ID;
-  if (API_URL && NODE_ID) {
-    setInterval(async () => {
+  let NODE_ID = process.env.NODE_ID;
+  if (API_URL) {
+    const reportInterval = setInterval(async () => {
       try {
-        const stats = await collectStats();
-        await fetch(`${API_URL}/api/nodes/${NODE_ID}/stats`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-agent-secret': AGENT_SECRET,
-          },
-          body: JSON.stringify(stats),
-          signal: AbortSignal.timeout(10_000),
-        });
+        if (!NODE_ID) {
+          // Self-discover node ID from control plane
+          const res = await fetch(`${API_URL}/api/nodes`, {
+            headers: { 'x-agent-secret': AGENT_SECRET },
+            signal: AbortSignal.timeout(10_000),
+          }).catch(() => null);
+
+          if (res && res.ok) {
+            const data = await res.json().catch(() => ({}));
+            if (Array.isArray(data.nodes) && data.nodes.length > 0) {
+              const myIp = process.env.HOST_IP || '127.0.0.1';
+              const matched = data.nodes.find((n) => n.ip === myIp || n.label === (process.env.LABEL || 'node-01'));
+              if (matched) NODE_ID = matched.id;
+            }
+          }
+        }
+
+        if (NODE_ID) {
+          const stats = await collectStats();
+          await fetch(`${API_URL}/api/nodes/${NODE_ID}/stats`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-agent-secret': AGENT_SECRET,
+            },
+            body: JSON.stringify(stats),
+            signal: AbortSignal.timeout(10_000),
+          });
+        }
       } catch (err) {
-        logger.debug({ err }, 'Periodic node stats reporting failed');
+        logger.debug({ err: err.message }, 'Periodic node stats reporting failed');
       }
-    }, 60_000);
+    }, 30_000);
+    reportInterval.unref();
   }
 });
 
