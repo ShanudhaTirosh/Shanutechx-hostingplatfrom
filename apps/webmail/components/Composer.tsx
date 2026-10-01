@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   AlertCircle,
   File,
+  UploadCloud,
 } from 'lucide-react';
 import { api } from '../lib/api';
 
@@ -57,6 +58,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const [readReceipt, setReadReceipt] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduledDate, setScheduledDate] = useState('');
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   // Signatures & Canned templates
   const [signatures, setSignatures] = useState<any[]>([]);
@@ -78,15 +80,21 @@ export const Composer: React.FC<ComposerProps> = ({
       setErrorMsg(null);
 
       // Load signatures & templates
-      api.webmail.getSignatures().then((res) => {
-        setSignatures(res.signatures || []);
-        const def = (res.signatures || []).find((s: any) => s.isDefault);
-        if (def) setSelectedSignature(def.htmlContent);
-      }).catch(() => {});
+      api.webmail
+        .getSignatures()
+        .then((res) => {
+          setSignatures(res.signatures || []);
+          const def = (res.signatures || []).find((s: any) => s.isDefault);
+          if (def) setSelectedSignature(def.htmlContent);
+        })
+        .catch(() => {});
 
-      api.webmail.getTemplates().then((res) => {
-        setTemplates(res.templates || []);
-      }).catch(() => {});
+      api.webmail
+        .getTemplates()
+        .then((res) => {
+          setTemplates(res.templates || []);
+        })
+        .catch(() => {});
     }
   }, [isOpen, defaultRecipient, defaultSubject, defaultBody]);
 
@@ -135,11 +143,33 @@ export const Composer: React.FC<ComposerProps> = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    const newAtts = Array.from(files).map((f) => ({
+    addFiles(Array.from(files));
+  };
+
+  const addFiles = (files: File[]) => {
+    const newAtts = files.map((f) => ({
       filename: f.name,
       sizeStr: (f.size / 1024).toFixed(1) + ' KB',
     }));
     setAttachments((prev) => [...prev, ...newAtts]);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingFile(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingFile(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      addFiles(Array.from(e.dataTransfer.files));
+    }
   };
 
   const insertFormat = (tag: string) => {
@@ -160,16 +190,32 @@ export const Composer: React.FC<ComposerProps> = ({
 
   if (isMinimized) {
     return (
-      <div className="fixed bottom-0 right-6 z-50 w-72 bg-slate-900 border border-slate-700 rounded-t-xl shadow-2xl flex items-center justify-between px-4 py-3 text-slate-200 cursor-pointer" onClick={() => setIsMinimized(false)}>
+      <div
+        className="fixed bottom-0 right-6 z-50 w-72 bg-slate-900 border border-slate-700 rounded-t-xl shadow-2xl flex items-center justify-between px-4 py-3 text-slate-200 cursor-pointer"
+        onClick={() => setIsMinimized(false)}
+      >
         <div className="flex items-center gap-2 truncate text-sm font-semibold">
           <FileText className="w-4 h-4 text-indigo-400" />
           <span className="truncate">{subject || 'New Message'}</span>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={(e) => { e.stopPropagation(); setIsMinimized(false); setIsMaximized(true); }} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMinimized(false);
+              setIsMaximized(true);
+            }}
+            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200"
+          >
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200"
+          >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -178,11 +224,24 @@ export const Composer: React.FC<ComposerProps> = ({
   }
 
   return (
-    <div className={`fixed z-50 transition-all duration-200 shadow-2xl flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden ${
-      isMaximized
-        ? 'inset-4 sm:inset-10'
-        : 'bottom-0 right-4 sm:right-6 w-full max-w-2xl h-[620px] rounded-b-none border-b-0'
-    }`}>
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`fixed z-50 transition-all duration-200 shadow-2xl flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden ${
+        isMaximized
+          ? 'inset-4 sm:inset-10'
+          : 'bottom-0 right-4 sm:right-6 w-full max-w-2xl h-[620px] rounded-b-none border-b-0'
+      }`}
+    >
+      {/* Drag & Drop Overlay */}
+      {isDraggingFile && (
+        <div className="absolute inset-0 bg-indigo-600/20 backdrop-blur-sm z-50 border-2 border-dashed border-indigo-400 flex flex-col items-center justify-center space-y-2 pointer-events-none">
+          <UploadCloud className="w-10 h-10 text-indigo-300 animate-bounce" />
+          <p className="text-sm font-bold text-white">Drop files to attach to email</p>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-slate-950 border-b border-slate-800 text-slate-200 select-none">
         <span className="text-sm font-semibold flex items-center gap-2">
@@ -190,10 +249,16 @@ export const Composer: React.FC<ComposerProps> = ({
           {inReplyTo ? 'Reply to Thread' : 'New Email Message'}
         </span>
         <div className="flex items-center gap-1.5">
-          <button onClick={() => setIsMaximized(!isMaximized)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors">
+          <button
+            onClick={() => setIsMaximized(!isMaximized)}
+            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
+          >
             {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
-          <button onClick={onClose} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors">
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -201,8 +266,12 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {errorMsg && (
         <div className="bg-rose-500/10 border-b border-rose-500/20 px-4 py-2 text-xs text-rose-300 flex items-center justify-between">
-          <span className="flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0" /> {errorMsg}</span>
-          <button onClick={() => setErrorMsg(null)}><X className="w-3 h-3" /></button>
+          <span className="flex items-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {errorMsg}
+          </span>
+          <button onClick={() => setErrorMsg(null)}>
+            <X className="w-3 h-3" />
+          </button>
         </div>
       )}
 
@@ -218,7 +287,10 @@ export const Composer: React.FC<ComposerProps> = ({
             className="flex-1 bg-transparent text-slate-100 placeholder-slate-500 border-none focus:outline-none focus:ring-0 text-xs"
           />
           {!showCc && (
-            <button onClick={() => setShowCc(true)} className="text-slate-400 hover:text-indigo-400 text-[11px] font-medium transition-colors">
+            <button
+              onClick={() => setShowCc(true)}
+              className="text-slate-400 hover:text-indigo-400 text-[11px] font-medium transition-colors"
+            >
               Cc / Bcc
             </button>
           )}
@@ -264,17 +336,33 @@ export const Composer: React.FC<ComposerProps> = ({
       {/* Formatting Toolbar */}
       <div className="px-3 py-1.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between text-slate-400 text-xs">
         <div className="flex items-center gap-1">
-          <button onClick={() => insertFormat('b')} title="Bold" className="p-1 hover:bg-slate-800 rounded hover:text-slate-200">
+          <button
+            onClick={() => insertFormat('b')}
+            title="Bold"
+            className="p-1 hover:bg-slate-800 rounded hover:text-slate-200"
+          >
             <Bold className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => insertFormat('i')} title="Italic" className="p-1 hover:bg-slate-800 rounded hover:text-slate-200">
+          <button
+            onClick={() => insertFormat('i')}
+            title="Italic"
+            className="p-1 hover:bg-slate-800 rounded hover:text-slate-200"
+          >
             <Italic className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => insertFormat('u')} title="Underline" className="p-1 hover:bg-slate-800 rounded hover:text-slate-200">
+          <button
+            onClick={() => insertFormat('u')}
+            title="Underline"
+            className="p-1 hover:bg-slate-800 rounded hover:text-slate-200"
+          >
             <Underline className="w-3.5 h-3.5" />
           </button>
           <div className="w-px h-4 bg-slate-800 mx-1" />
-          <button onClick={() => insertFormat('ul')} title="Bullet List" className="p-1 hover:bg-slate-800 rounded hover:text-slate-200">
+          <button
+            onClick={() => insertFormat('ul')}
+            title="Bullet List"
+            className="p-1 hover:bg-slate-800 rounded hover:text-slate-200"
+          >
             <List className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -323,7 +411,10 @@ export const Composer: React.FC<ComposerProps> = ({
         {attachments.length > 0 && (
           <div className="pt-2 border-t border-slate-800/80 flex flex-wrap gap-2">
             {attachments.map((att, idx) => (
-              <div key={idx} className="flex items-center gap-2 bg-slate-800 px-2.5 py-1 rounded-md text-[11px] text-slate-300 border border-slate-700">
+              <div
+                key={idx}
+                className="flex items-center gap-2 bg-slate-800 px-2.5 py-1 rounded-md text-[11px] text-slate-300 border border-slate-700"
+              >
                 <File className="w-3 h-3 text-indigo-400" />
                 <span className="truncate max-w-[140px]">{att.filename}</span>
                 <span className="text-slate-500">({att.sizeStr})</span>
@@ -356,14 +447,19 @@ export const Composer: React.FC<ComposerProps> = ({
             )}
           </button>
 
-          <label className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg cursor-pointer transition-colors" title="Attach file">
+          <label
+            className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
+            title="Attach file"
+          >
             <Paperclip className="w-4 h-4" />
             <input type="file" multiple onChange={handleFileUpload} className="hidden" />
           </label>
 
           <button
             onClick={() => setShowSchedule(!showSchedule)}
-            className={`p-2 rounded-lg transition-colors ${scheduledDate ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
+            className={`p-2 rounded-lg transition-colors ${
+              scheduledDate ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            }`}
             title="Schedule Send"
           >
             <Clock className="w-4 h-4" />
@@ -383,7 +479,11 @@ export const Composer: React.FC<ComposerProps> = ({
             </div>
           )}
 
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Discard">
+          <button
+            onClick={onClose}
+            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+            title="Discard"
+          >
             <Trash2 className="w-4 h-4" />
           </button>
         </div>

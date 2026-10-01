@@ -134,26 +134,45 @@ async function wildDuckRequest<T>(
     'X-Access-Token': apiKey,
   };
 
-  try {
-    const res = await fetch(urlStr, {
-      method: options.method || 'GET',
-      headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
+  const maxRetries = (options.method || 'GET') === 'GET' ? 3 : 1;
+  let lastError: any = null;
 
-    const data = await res.json().catch(() => ({}));
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-    if (!res.ok) {
-      const errorMsg = (data as any)?.error || (data as any)?.message || `HTTP ${res.status}`;
-      throw new WildDuckError(`WildDuck API Error: ${errorMsg}`, res.status, data);
+    try {
+      const res = await fetch(urlStr, {
+        method: options.method || 'GET',
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const errorMsg = (data as any)?.error || (data as any)?.message || `HTTP ${res.status}`;
+        throw new WildDuckError(`WildDuck API Error: ${errorMsg}`, res.status, data);
+      }
+
+      return data as T;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err instanceof WildDuckError && err.status && err.status < 500) {
+        throw err;
+      }
+      lastError = err;
+      if (attempt < maxRetries) {
+        const backoffMs = Math.pow(2, attempt) * 200;
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      }
     }
-
-    return data as T;
-  } catch (err: any) {
-    if (err instanceof WildDuckError) throw err;
-    logger.error({ err: err.message, path, baseUrl }, 'WildDuck API connection failed');
-    throw new WildDuckError(`WildDuck connection error: ${err.message}`);
   }
+
+  logger.error({ err: lastError?.message, path, baseUrl }, 'WildDuck API connection failed after retries');
+  throw new WildDuckError(`WildDuck connection error: ${lastError?.message || 'Request failed'}`);
 }
 
 export const wildduckClient = {
