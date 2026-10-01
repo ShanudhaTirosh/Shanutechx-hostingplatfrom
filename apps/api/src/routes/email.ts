@@ -62,8 +62,17 @@ emailRouter.get('/email/mailboxes', async (req: AuthedRequest, res) => {
       const orderStatus = acc.orderItem?.order?.status;
       const domain = acc.customDomain || acc.smtpHost.replace(/^mail\./, '');
       const isExpired = acc.expiresAt ? new Date(acc.expiresAt) < now : false;
-      const isSuspended = acc.isSuspended || isExpired;
-      const status = isSuspended ? 'expired' : (orderStatus ? (orderStatus === 'paid' ? 'active' : 'pending') : 'active');
+      const isCancelled = orderStatus ? (orderStatus === 'cancelled' || orderStatus === 'failed') : false;
+      const isSuspended = !acc.isActive || acc.isSuspended || isExpired || isCancelled;
+      const status = acc.isSuspended
+        ? 'suspended'
+        : isExpired
+        ? 'expired'
+        : isCancelled
+        ? 'cancelled'
+        : orderStatus === 'pending'
+        ? 'pending'
+        : 'active';
 
       return {
         id: acc.id,

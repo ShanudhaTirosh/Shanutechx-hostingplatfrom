@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+import DOMPurify from 'isomorphic-dompurify';
 
 export interface MessageDetail {
   id: string;
@@ -204,10 +205,14 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
               {/* Card Expanded Content */}
               {isExpanded && (
                 <div className="px-4 pb-4 pt-2 border-t border-slate-800/60 space-y-4">
-                  {/* HTML Body Render */}
+                  {/* HTML Body Render (Sanitized with DOMPurify to prevent XSS) */}
                   <div
                     className="prose prose-invert max-w-none text-xs leading-relaxed text-slate-200 overflow-x-auto"
-                    dangerouslySetInnerHTML={{ __html: msg.htmlBody || `<p>${msg.snippet}</p>` }}
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(msg.htmlBody || `<p>${msg.snippet}</p>`, {
+                        ADD_ATTR: ['target', 'rel'],
+                      }),
+                    }}
                   />
 
                   {/* Attachments Section */}

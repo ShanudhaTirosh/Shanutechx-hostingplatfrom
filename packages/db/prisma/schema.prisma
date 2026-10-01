@@ -696,8 +696,11 @@ model WebmailMessage {
   createdAt       DateTime     @default(now())
 
   @@index([userId, folder])
+  @@index([userId, folder, createdAt])
   @@index([userId, threadId])
   @@index([userId, category])
+  @@index([userId, isRead])
+  @@index([userId, isStarred])
   @@index([smtpAccountId])
 }
 
@@ -972,6 +975,8 @@ model SmtpAccount {
   mailHost          MailHost?        @relation(fields: [mailHostId], references: [id])
 
   @@index([userId])
+  @@index([userId, isSuspended])
+  @@index([smtpUsername])
   @@index([mailHostId])
 }
 

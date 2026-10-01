@@ -95,13 +95,20 @@ webmailRouter.get('/webmail/messages', async (req: AuthedRequest, res: Response)
   const role = req.user!.role;
 
   let accessibleAccounts: any[] = [];
-  if (role === 'dev') {
+  if ((role as string) === 'dev') {
     accessibleAccounts = await prisma.smtpAccount.findMany({ select: { id: true, userId: true, wildduckUserId: true, smtpUsername: true, customDomain: true, smtpHost: true } });
   } else {
     accessibleAccounts = await prisma.smtpAccount.findMany({
       where: { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
       select: { id: true, userId: true, wildduckUserId: true, smtpUsername: true, customDomain: true, smtpHost: true },
     });
+  }
+
+  if (smtpAccountId) {
+    const found = accessibleAccounts.find((a) => a.id === smtpAccountId);
+    if (!found) {
+      return res.status(403).json({ error: 'Access denied: Mailbox account not found or inaccessible.' });
+    }
   }
 
   const targetAccount = smtpAccountId ? accessibleAccounts.find((a) => a.id === smtpAccountId) : accessibleAccounts[0];
@@ -149,10 +156,10 @@ webmailRouter.get('/webmail/messages', async (req: AuthedRequest, res: Response)
 
   const where: any = {
     ...parsedWhere,
-    OR: role === 'dev' ? undefined : [{ userId }, { smtpAccountId: { in: accessibleAccountIds } }],
+    OR: (role as string) === 'dev' ? undefined : [{ userId }, { smtpAccountId: { in: accessibleAccountIds } }],
   };
 
-  if (role === 'dev') delete where.OR;
+  if ((role as string) === 'dev') delete where.OR;
 
   if (folder === 'starred') {
     where.isStarred = true;
@@ -307,10 +314,32 @@ const sendSchema = z.object({
   attachments: z.array(z.object({ filename: z.string(), sizeStr: z.string(), url: z.string().optional() })).optional(),
 });
 
+// In-memory idempotency cache for webmail send requests (TTL 10 mins)
+const sendIdempotencyMap = new Map<string, { timestamp: number; response: any }>();
+
+function cleanIdempotencyMap() {
+  const now = Date.now();
+  for (const [key, val] of sendIdempotencyMap.entries()) {
+    if (now - val.timestamp > 10 * 60 * 1000) {
+      sendIdempotencyMap.delete(key);
+    }
+  }
+}
+
 // 2.1 Send Outbound Email (Support Scheduled Send & Threading)
 webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) => {
   const parsed = sendSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const idempotencyKey = (req.headers['x-idempotency-key'] as string) || (req.body.idempotencyKey as string);
+  if (idempotencyKey) {
+    cleanIdempotencyMap();
+    const cached = sendIdempotencyMap.get(`${req.user!.id}:${idempotencyKey}`);
+    if (cached) {
+      logger.info({ userId: req.user!.id, idempotencyKey }, 'Returning idempotent cached response for send request');
+      return res.status(200).json(cached.response);
+    }
+  }
 
   const { recipientEmail, subject, htmlBody, smtpAccountId, threadId, inReplyTo, scheduledAt, readReceipt, labels, attachments } = parsed.data;
   const userId = req.user!.id;
@@ -329,6 +358,16 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
   if (!account || !(await canAccessMailbox(account, userId, role))) {
     return res.status(400).json({
       error: 'No accessible mailbox provisioned for sending. Contact dev administrator for mailbox access.',
+    });
+  }
+
+  if (account.isSuspended) {
+    return res.status(403).json({ error: 'Mailbox account is currently suspended. Sending is disabled.' });
+  }
+
+  if (account.dailySendLimit > 0 && account.dailySendCount >= account.dailySendLimit) {
+    return res.status(429).json({
+      error: `Daily send limit reached for this mailbox (${account.dailySendCount}/${account.dailySendLimit}). Please try again tomorrow or upgrade your plan.`,
     });
   }
 
@@ -381,6 +420,11 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
         );
         logger.info({ recipientEmail, messageId: sendResult.messageId, senderUserId: userId }, 'Delegated webmail message delivered via SMTP');
       }
+
+      await prisma.smtpAccount.update({
+        where: { id: account.id },
+        data: { dailySendCount: { increment: 1 } },
+      });
     } catch (err: any) {
       logger.error({ err: err.message, recipientEmail }, 'Webmail email delivery failed');
       return res.status(502).json({
@@ -390,7 +434,16 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
     }
   }
 
-  res.status(201).json({ ok: true, message, scheduled: isScheduled });
+  const responsePayload = { ok: true, message, scheduled: isScheduled };
+
+  if (idempotencyKey) {
+    sendIdempotencyMap.set(`${req.user!.id}:${idempotencyKey}`, {
+      timestamp: Date.now(),
+      response: responsePayload,
+    });
+  }
+
+  res.status(201).json(responsePayload);
 });
 
 // 2.2 Save / Auto-Save Draft
