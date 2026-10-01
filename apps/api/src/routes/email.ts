@@ -716,10 +716,11 @@ emailRouter.post('/email/domains/:id/verify', async (req: AuthedRequest, res) =>
 
     let mxVerified = false;
     let spfVerified = false;
+    let dkimVerified = false;
 
     try {
       const mx = await dns.promises.resolveMx(domainStr!);
-      mxVerified = mx.some((r) => r.exchange.toLowerCase().includes(env.rootDomain));
+      mxVerified = mx.some((r) => r.exchange.toLowerCase().includes(env.rootDomain) || r.exchange.toLowerCase().includes(domainStr!.toLowerCase()));
     } catch {}
 
     try {
@@ -727,18 +728,26 @@ emailRouter.post('/email/domains/:id/verify', async (req: AuthedRequest, res) =>
       spfVerified = txt.some((t) => t.join('').includes('v=spf1'));
     } catch {}
 
-    if (mxVerified && spfVerified) {
+    try {
+      const dkimTxt = await dns.promises.resolveTxt(`wildduck._domainkey.${domainStr!}`);
+      dkimVerified = dkimTxt.some((t) => t.join('').includes('v=DKIM1') || t.join('').includes('p='));
+    } catch {}
+
+    const isVerified = mxVerified && (spfVerified || dkimVerified);
+
+    if (isVerified) {
       await prisma.emailDomain.update({ where: { id: req.params.id }, data: { status: 'verified' } });
     }
 
     res.json({
       domain: domainStr,
-      verified: mxVerified && spfVerified,
+      verified: isVerified,
       mxVerified,
       spfVerified,
-      message: (mxVerified && spfVerified)
-        ? 'All DNS records verified successfully!'
-        : `DNS verification pending. MX: ${mxVerified ? '✓' : '✗'}, SPF: ${spfVerified ? '✓' : '✗'}`,
+      dkimVerified,
+      message: isVerified
+        ? 'Domain DNS records verified successfully!'
+        : `DNS verification pending. MX: ${mxVerified ? '✓' : '✗'}, SPF: ${spfVerified ? '✓' : '✗'}, DKIM: ${dkimVerified ? '✓' : '✗'}`,
     });
   } catch (err: any) {
     logger.error({ err }, 'Failed to verify domain DNS');

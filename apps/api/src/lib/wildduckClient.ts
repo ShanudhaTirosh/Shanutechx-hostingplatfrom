@@ -568,5 +568,17 @@ export const wildduckClient = {
     }).catch(() => ({ success: false }));
     return !!res.success;
   },
+
+  async getDkimKey(domain: string, mailHostId?: string | null): Promise<DkimRecordResult | null> {
+    return wildDuckRequest<DkimRecordResult>(`/dkim/${encodeURIComponent(domain)}`, { mailHostId }).catch(() => null);
+  },
+
+  async createDkimKey(domain: string, selector = 'wildduck', mailHostId?: string | null): Promise<DkimRecordResult | null> {
+    return wildDuckRequest<DkimRecordResult>(`/dkim`, {
+      method: 'POST',
+      body: { domain, selector },
+      mailHostId,
+    }).catch(() => null);
+  },
 };
 
