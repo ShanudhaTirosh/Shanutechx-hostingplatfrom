@@ -1,3 +1,4 @@
+# name: Uptime Kuma
 # slogan: A fancy self-hosted monitoring tool and public status page engine
 # documentation: https://docs.shanutechx.com/templates/uptime-kuma
 # category: analytics
@@ -19,6 +20,11 @@ services:
       - "${PORT:-3001}:3001"
     volumes:
       - kuma-data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "node extra/healthcheck.js"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -27,3 +33,4 @@ services:
 
 volumes:
   kuma-data:
+

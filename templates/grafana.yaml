@@ -1,3 +1,4 @@
+# name: Grafana Observability
 # slogan: The open and composable observability and data visualization platform
 # documentation: https://docs.shanutechx.com/templates/grafana
 # category: analytics
@@ -21,8 +22,14 @@ services:
       - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:?GF_SECURITY_ADMIN_PASSWORD is required}
       - GF_USERS_ALLOW_SIGN_UP=false
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     deploy:
       resources:
         limits:
           cpus: '1.0'
           memory: 512M
+

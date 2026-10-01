@@ -61,7 +61,7 @@ function parseMeta(content: string, filename: string): TemplateMeta {
   return {
     slug,
     filename,
-    name: slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    name: meta.name ?? slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
     slogan: meta.slogan ?? '',
     documentation: meta.documentation ?? '',
     category: meta.category ?? 'other',

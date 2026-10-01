@@ -1,4 +1,6 @@
+# name: Lavalink Audio Server
 # slogan: Production Lavalink v4 audio server with YouTube, Spotify (LavaSrc), and LavaSearch plugins pre-installed.
+# documentation: https://docs.shanutechx.com/templates/lavalink
 # category: gaming
 # tags: lavalink, discord, bot, audio, music, spotify, youtube
 # logo: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/discord.svg
@@ -6,6 +8,8 @@
 # defaultInternalPort: 2333
 # requiresExposedPort: true
 # recommendedExposureMode: raw_tcp
+
+version: '3.8'
 
 services:
   lavalink:
@@ -32,3 +36,4 @@ services:
 
 volumes:
   lavalink_config:
+

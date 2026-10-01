@@ -1,4 +1,6 @@
+# name: LiveKit WebRTC Server
 # slogan: Real-time audio and video WebRTC server for apps.
+# documentation: https://docs.shanutechx.com/templates/livekit
 # category: communication
 # tags: livekit, webrtc, video, audio, streaming, voice
 # logo: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/livekit.svg
@@ -7,11 +9,18 @@
 # requiresExposedPort: true
 # recommendedExposureMode: ssl_with_proxy
 
+version: '3.8'
+
 services:
   redis:
     image: redis:7-alpine
     command: redis-server --save 60 1
     restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         limits:
@@ -27,8 +36,14 @@ services:
       - "7882:7882/udp"
     environment:
       - LIVEKIT_KEYS=${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}:${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:7880/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     restart: always
     deploy:
       resources:
@@ -38,3 +53,4 @@ services:
 
 volumes:
   livekit_data:
+

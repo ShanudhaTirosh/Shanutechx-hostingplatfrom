@@ -1,4 +1,6 @@
+# name: WordPress
 # slogan: Web publishing platform and content management system.
+# documentation: https://docs.shanutechx.com/templates/wordpress
 # category: cms
 # tags: wordpress, cms, blog, website, mysql, mariadb
 # logo: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/wordpress.svg
@@ -6,6 +8,8 @@
 # defaultInternalPort: 8080
 # requiresExposedPort: true
 # recommendedExposureMode: ssl_with_proxy
+
+version: '3.8'
 
 services:
   db:
@@ -43,6 +47,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     restart: always
     deploy:
       resources:
@@ -53,3 +62,4 @@ services:
 volumes:
   wordpress_db_data:
   wordpress_html:
+

@@ -1,3 +1,4 @@
+# name: Hermes AI Agent
 # slogan: Autonomous AI agent framework with web UI, vector memory store, and tool execution engine
 # documentation: https://docs.shanutechx.com/templates/hermes-agent
 # category: ai
@@ -24,9 +25,16 @@ services:
       - HERMES_SECRET_KEY=${HERMES_SECRET_KEY:?HERMES_SECRET_KEY is required}
       - REDIS_URL=redis://hermes-redis:6379
       - VECTOR_STORE_URL=http://hermes-vector:6333
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     depends_on:
-      - hermes-redis
-      - hermes-vector
+      hermes-redis:
+        condition: service_healthy
+      hermes-vector:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -38,6 +46,11 @@ services:
     container_name: ${HERMES_CONTAINER_NAME:-hermes}-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         limits:
@@ -50,8 +63,14 @@ services:
     restart: unless-stopped
     ports:
       - "6333:6333"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:6333/readyz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         limits:
           cpus: '1.0'
           memory: 512M
+
