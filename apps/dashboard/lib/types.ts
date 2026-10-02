@@ -103,7 +103,7 @@ export interface Payment {
 
 export type DeploymentStatus = 'pending' | 'pending_configuration' | 'building' | 'running' | 'failed' | 'stopped';
 
-export type ManagedDatabaseStatus = 'pending' | 'pending_configuration' | 'running' | 'stopped' | 'failed' | 'terminated';
+export type ManagedDatabaseStatus = 'pending' | 'pending_configuration' | 'running' | 'stopped' | 'failed' | 'deleting' | 'terminated';
 
 export type CustomDomainStatus = 'pending' | 'verified' | 'failed' | 'ssl_provisioning' | 'active';
 
@@ -267,22 +267,45 @@ export interface Subscription {
 
 export type ProjectStatus = 'pending' | 'running' | 'failed';
 
+export interface ProjectMember {
+  id: string;
+  projectId: string;
+  userId: string;
+  role: 'owner' | 'admin' | 'developer' | 'read_only';
+  createdAt: string;
+  user?: ApiUser | Pick<ApiUser, 'id' | 'email' | 'displayName' | 'role'>;
+}
+
 export interface Project {
   id: string;
   userId: string;
   name: string;
-  nodeId: string;
+  description?: string | null;
+  region?: string | null;
+  isArchived?: boolean;
+  nodeId?: string | null;
   dbName: string;
   dbUsername: string;
-  dbPassword: string;        // only revealed on single-project GET
-  apiPort: number | null;
-  containerId: string | null;
-  status: ProjectStatus;
-  r2BucketName: string | null;
+  dbPassword?: string;        // only revealed on single-project GET
+  apiPort?: number | null;
+  dbPort?: number | null;
+  containerId?: string | null;
+  status: ProjectStatus | 'running' | 'pending' | 'failed' | 'archived';
+  r2BucketName?: string | null;
   createdAt: string;
   updatedAt: string;
-  user?: Pick<ApiUser, 'id' | 'email' | 'displayName'>;
-  node?: { id: string; label: string; ip: string };
+  user?: ApiUser | Pick<ApiUser, 'id' | 'email' | 'displayName'>;
+  node?: { id: string; label: string; ip: string } | Node;
+  callerRole?: 'owner' | 'admin' | 'developer' | 'read_only';
+  members?: ProjectMember[];
+  databases?: ManagedDatabase[];
+  aggregateMetrics?: {
+    totalDatabases: number;
+    activeDatabases: number;
+    totalCpuCores: number;
+    totalRamMb: number;
+    totalStorageGb: number;
+  };
 }
 
 export interface TableColumn {
@@ -294,14 +317,21 @@ export interface TableColumn {
 
 export interface ProjectTable {
   name: string;
-  columns: TableColumn[];
+  schema?: string;
+  columns?: TableColumn[];
   rowCount: number;
 }
 
 export interface SqlResult {
-  rows: Record<string, unknown>[];
-  fields: { name: string; dataTypeID: number }[];
-  rowCount: number;
+  ok?: boolean;
+  exitCode?: number;
+  rawOutput?: string;
+  executionTimeMs?: number;
+  rows?: Record<string, unknown>[];
+  fields?: { name: string; dataTypeID: number }[];
+  columns?: string[];
+  rowCount?: number;
+  error?: string;
 }
 
 export interface CatalogTemplate {
@@ -514,6 +544,7 @@ export interface ManagedDatabaseUser {
 export interface ManagedDatabase {
   id: string;
   userId: string;
+  projectId?: string | null;
   nodeId: string;
   type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
   status: ManagedDatabaseStatus;
@@ -521,6 +552,8 @@ export interface ManagedDatabase {
   internalHost?: string | null;
   internalPort?: number | null;
   dbName?: string | null;
+  masterUsername?: string | null;
+  masterPassword?: string | null;
   allowedIps?: string[];
   maxConnections?: number | null;
   dbVersion?: string | null;
@@ -531,6 +564,7 @@ export interface ManagedDatabase {
   createdAt: string;
   connectionString?: string;
 }
+
 
 export interface SupabaseClientProject {
   id: string;

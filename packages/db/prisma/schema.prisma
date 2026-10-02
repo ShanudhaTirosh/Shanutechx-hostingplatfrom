@@ -167,6 +167,7 @@ model User {
   managedDatabases      ManagedDatabase[]
   auditLogs             AuditLog[]             @relation("AdminAuditLogs")
   projects              Project[]
+  projectMemberships    ProjectMember[]
   reviewedPayments      Payment[]              @relation("PaymentReviewer")
   pushTokens            PushToken[]
   emailMessages         EmailMessage[]
@@ -284,6 +285,22 @@ enum ProductCategory {
   database
   app_catalog
   bot_hosting
+  node_app_hosting
+  python_app_hosting
+  discordbot_node
+  discordbot_python
+  whatsappbot_hosting
+  lavalink_hosting
+  ai_subscription
+  smtp_hosting
+  database_hosting
+  vps_hosting
+  email_hosting
+  managed_database
+  app_container
+  media_livekit
+  cloud_storage
+  custom_service
 }
 
 enum PlanBillingType {
@@ -1079,6 +1096,7 @@ enum NotificationEvent {
   deployment_failed
   deployment_recovered
   vps_assigned
+  new_ai_subscription_request
 }
 
 // Infra-level Discord channel webhooks, configured from the Dev Dashboard —
@@ -1449,45 +1467,68 @@ model WebhookDelivery {
 // runs its own container with no HTTP-facing route, just an internal
 // connection string handed back to the customer.
 model ManagedDatabase {
-  id             String                @id @default(cuid())
-  userId         String
-  user           User                  @relation(fields: [userId], references: [id])
-  orderItemId    String?               @unique
-  orderItem      OrderItem?            @relation(fields: [orderItemId], references: [id])
-  nodeId         String
-  node           Node                  @relation(fields: [nodeId], references: [id])
-  type           ManagedDatabaseType
-  status         ManagedDatabaseStatus @default(pending)
-  containerId    String?
-  internalHost   String? // container name, reachable only on the node's internal Docker network
-  internalPort   Int?
-  credentialRef  String? // encrypted master password — see lib/secretsVault.ts
-  dbName         String?               @default("main_db")
-  allowedIps     String[]              @default(["0.0.0.0/0"])
-  maxConnections Int?                  @default(100)
-  dbVersion      String?               @default("latest")
-  cpuLimit       Float?
-  memoryLimitMb  Int?
-  storageLimitGb Int?
-  createdAt      DateTime              @default(now())
+  id                  String                @id @default(cuid())
+  userId              String
+  user                User                  @relation(fields: [userId], references: [id])
+  orderItemId         String?               @unique
+  orderItem           OrderItem?            @relation(fields: [orderItemId], references: [id])
+  projectId           String?
+  project             Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  name                String?
+  nodeId              String
+  node                Node                  @relation(fields: [nodeId], references: [id])
+  type                ManagedDatabaseType
+  status              ManagedDatabaseStatus @default(pending)
+  containerId         String?
+  internalHost        String? // container name, reachable only on the node's internal Docker network
+  internalPort        Int?
+  poolerPort          Int?
+  credentialRef       String? // encrypted master password — see lib/secretsVault.ts
+  dbName              String?               @default("main_db")
+  allowedIps          String[]              @default(["0.0.0.0/0"])
+  maxConnections      Int?                  @default(100)
+  dbVersion           String?               @default("latest")
+  sslMode             String                @default("require")
+  cpuLimit            Float?
+  memoryLimitMb       Int?
+  storageLimitGb      Int?
+  scheduledDeletionAt DateTime?
+  extensions          String[]              @default(["uuid-ossp", "pgcrypto", "pgvector"])
+  createdAt           DateTime              @default(now())
 
-  dbUsers ManagedDatabaseUser[]
-  backups DatabaseBackup[]
+  dbUsers      ManagedDatabaseUser[]
+  backups      DatabaseBackup[]
+  savedQueries DatabaseSavedQuery[]
 
   @@index([userId])
   @@index([nodeId])
+  @@index([projectId])
 }
 
 model ManagedDatabaseUser {
-  id          String          @id @default(cuid())
-  databaseId  String
-  database    ManagedDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
-  username    String
-  passwordEnc String // AES-256-GCM encrypted password
-  role        String          @default("read_write") // admin | read_write | read_only
-  createdAt   DateTime        @default(now())
+  id             String          @id @default(cuid())
+  databaseId     String
+  database       ManagedDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+  username       String
+  passwordEnc    String // AES-256-GCM encrypted password
+  role           String          @default("read_write") // admin | read_write | read_only
+  isDisabled     Boolean         @default(false)
+  privileges     Json?
+  lastRotatedAt  DateTime?
+  createdAt      DateTime        @default(now())
 
   @@unique([databaseId, username])
+}
+
+model DatabaseSavedQuery {
+  id         String          @id @default(cuid())
+  databaseId String
+  database   ManagedDatabase @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+  title      String
+  sql        String          @db.Text
+  createdAt  DateTime        @default(now())
+
+  @@index([databaseId])
 }
 
 // Logs every Leaseweb API call this platform makes (minus secrets — never
@@ -1512,6 +1553,9 @@ model Project {
   userId       String
   user         User     @relation(fields: [userId], references: [id])
   name         String
+  description  String?
+  region       String?  @default("ap-southeast-1")
+  isArchived   Boolean  @default(false)
   nodeId       String
   node         Node     @relation(fields: [nodeId], references: [id])
   dbName       String
@@ -1528,12 +1572,27 @@ model Project {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  authUsers    ProjectAuthUser[]
-  oauthConfigs ProjectOAuthConfig[]
-  magicLinks   ProjectMagicLink[]
+  managedDatabases ManagedDatabase[]
+  members          ProjectMember[]
+  authUsers        ProjectAuthUser[]
+  oauthConfigs     ProjectOAuthConfig[]
+  magicLinks       ProjectMagicLink[]
 
   @@index([userId])
   @@index([nodeId])
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("developer") // owner | admin | developer | read_only
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@index([userId])
 }
 
 // History log for runBackup() calls (manual "Run backup now" clicks and the

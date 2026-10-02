@@ -354,7 +354,7 @@ export async function executeDatabaseQueryOnNode(
     query: string;
     masterPassword?: string;
   }
-): Promise<{ ok: boolean; exitCode: number; rawOutput: string; executionTimeMs: number }> {
+): Promise<{ ok: boolean; exitCode: number; rawOutput: string; executionTimeMs: number; rows?: any[] }> {
   const res = await fetch(agentUrl(node, `/agent/managed-databases/${containerId}/query`), {
     method: 'POST',
     headers: agentHeaders({ 'Content-Type': 'application/json' }),
@@ -364,7 +364,7 @@ export async function executeDatabaseQueryOnNode(
     const errorText = await res.text().catch(() => '');
     throw new Error(`Query execution failed (${res.status}): ${errorText}`);
   }
-  return (await res.json()) as { ok: boolean; exitCode: number; rawOutput: string; executionTimeMs: number };
+  return (await res.json()) as { ok: boolean; exitCode: number; rawOutput: string; executionTimeMs: number; rows?: any[] };
 }
 
 /** Triggers a snapshot backup of a managed database on node. */

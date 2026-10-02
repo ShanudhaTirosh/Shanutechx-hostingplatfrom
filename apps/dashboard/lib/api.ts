@@ -23,6 +23,7 @@ import {
   Customer,
   Subscription,
   Project,
+  ProjectMember,
   ProjectTable,
   SqlResult,
   CatalogTemplate,
@@ -1600,62 +1601,7 @@ export const api = {
         asJson<{ ok: boolean }>(r)
       ),
   },
-  projects: {
-    list: () =>
-      apiFetch('/api/projects').then((r) => asJson<{ projects: Project[] }>(r)),
-    get: (id: string) =>
-      apiFetch(`/api/projects/${id}`).then((r) => asJson<{ project: Project }>(r)),
-    create: (data: { userId: string; name: string; nodeId: string; orderItemId?: string }) =>
-      apiFetch('/api/projects', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
-        asJson<{ project: Project }>(r)
-      ),
-    delete: (id: string) =>
-      apiFetch(`/api/projects/${id}`, { method: 'DELETE' }).then((r) =>
-        asJson<{ ok: boolean }>(r)
-      ),
-    tables: (id: string) =>
-      apiFetch(`/api/projects/${id}/tables`).then((r) =>
-        asJson<{ tables: ProjectTable[] }>(r)
-      ),
-    rows: (id: string, table: string, page = 1, limit = 50) =>
-      apiFetch(`/api/projects/${id}/tables/${table}/rows?page=${page}&limit=${limit}`).then((r) =>
-        asJson<{ rows: Record<string, unknown>[]; total: number }>(r)
-      ),
-    insertRow: (id: string, table: string, row: Record<string, unknown>) =>
-      apiFetch(`/api/projects/${id}/tables/${table}/rows`, {
-        method: 'POST',
-        body: JSON.stringify(row),
-      }).then((r) => asJson<{ row: Record<string, unknown> }>(r)),
-    updateRow: (id: string, table: string, pk: string | number, data: Record<string, unknown>) =>
-      apiFetch(`/api/projects/${id}/tables/${table}/rows/${pk}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }).then((r) => asJson<{ row: Record<string, unknown> }>(r)),
-    deleteRow: (id: string, table: string, pk: string | number) =>
-      apiFetch(`/api/projects/${id}/tables/${table}/rows/${pk}`, { method: 'DELETE' }).then((r) =>
-        asJson<{ ok: boolean }>(r)
-      ),
-    sql: (id: string, sql: string) =>
-      apiFetch(`/api/projects/${id}/sql`, { method: 'POST', body: JSON.stringify({ sql }) }).then(
-        (r) => asJson<SqlResult>(r)
-      ),
-    provisionStorage: (id: string) =>
-      apiFetch(`/api/projects/${id}/storage`, { method: 'POST' }).then((r) =>
-        asJson<{ bucketName: string; endpoint: string }>(r)
-      ),
-    authUsers: (id: string) =>
-      apiFetch(`/api/projects/${id}/auth/users`).then((r) =>
-        asJson<{ users: Array<{ id: string; email: string; emailVerified: boolean; createdAt: string; lastLoginAt: string | null }> }>(r)
-      ),
-    oauthConfigs: (id: string) =>
-      apiFetch(`/api/projects/${id}/auth/oauth-config`).then((r) =>
-        asJson<{ configs: Array<{ id: string; provider: string; clientId: string; redirectUri: string }> }>(r)
-      ),
-    saveOAuthConfig: (id: string, data: { provider: 'google' | 'github' | 'discord'; clientId: string; clientSecret: string; redirectUri: string }) =>
-      apiFetch(`/api/projects/${id}/auth/oauth-config`, { method: 'POST', body: JSON.stringify(data) }).then((r) =>
-        asJson<{ config: { id: string; provider: string; clientId: string; redirectUri: string } }>(r)
-      ),
-  },
+
 
   traefik: {
     overview: () => apiFetch('/api/traefik/overview').then((r) => asJson<{ overview: any }>(r)),
@@ -1954,8 +1900,11 @@ export const api = {
 
   managedDatabases: {
     list: () => apiFetch('/api/managed-databases').then((r) => asJson<{ databases: ManagedDatabase[] }>(r)),
+    listByProject: (projectId: string) =>
+      apiFetch(`/api/managed-databases?projectId=${encodeURIComponent(projectId)}`).then((r) => asJson<{ databases: ManagedDatabase[] }>(r)),
     create: (data: {
       userId?: string;
+      projectId?: string;
       type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
       dbName?: string;
       masterUsername?: string;
@@ -1963,6 +1912,9 @@ export const api = {
       allowedIps?: string[];
       maxConnections?: number;
       dbVersion?: string;
+      cpuLimit?: number;
+      memoryLimitMb?: number;
+      storageLimitGb?: number;
     }) =>
       apiFetch('/api/managed-databases', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<{ database: ManagedDatabase & { masterUsername?: string; masterPassword?: string } }>(r)
@@ -1975,10 +1927,15 @@ export const api = {
           type: string;
           host: string;
           port: number;
+          poolerPort?: number;
           username: string;
           password: string;
           databaseName: string;
+          sslMode?: string;
+          allowedIps?: string[];
           connectionString: string;
+          pooledConnectionString?: string;
+          snippets?: Record<string, string>;
         }>(r)
       ),
     action: (id: string, action: 'start' | 'stop' | 'restart') =>
@@ -2033,12 +1990,62 @@ export const api = {
           type: string;
           host: string;
           port: number;
+          poolerPort?: number;
           username: string;
           password: string;
           databaseName: string;
+          sslMode: string;
+          allowedIps: string[];
           connectionString: string;
+          pooledConnectionString?: string;
+          snippets: Record<string, string>;
         }>(r)
       ),
+    getSchema: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}/schema`).then((r) =>
+        asJson<{ tables: Array<{ name: string; columns: Array<{ name: string; type: string; nullable: boolean; isPrimaryKey: boolean; isForeignKey: boolean; defaultValue?: string }> }> }>(r)
+      ),
+    getExtensions: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}/extensions`).then((r) =>
+        asJson<{ extensions: Array<{ name: string; description: string; isEnabled: boolean }> }>(r)
+      ),
+    toggleExtension: (id: string, extensionName: string, enable: boolean) =>
+      apiFetch(`/api/managed-databases/${id}/extensions/toggle`, { method: 'POST', body: JSON.stringify({ extensionName, enable }) }).then((r) =>
+        asJson<{ ok: boolean; extensionName: string; isEnabled: boolean; extensions?: Array<{ name: string; description: string; isEnabled: boolean }> }>(r)
+      ),
+    getSnippets: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}/snippets`).then((r) =>
+        asJson<{ snippets: Array<{ id: string; databaseId: string; title: string; sql: string; createdAt: string }> }>(r)
+      ),
+    saveSnippet: (id: string, data: { title: string; sql: string }) =>
+      apiFetch(`/api/managed-databases/${id}/snippets`, { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ snippet: { id: string; databaseId: string; title: string; sql: string; createdAt: string } }>(r)
+      ),
+    deleteSnippet: (id: string, snippetId: string) =>
+      apiFetch(`/api/managed-databases/${id}/snippets/${snippetId}`, { method: 'DELETE' }).then((r) =>
+        asJson<{ ok: boolean }>(r)
+      ),
+    getMetrics: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}/metrics`).then((r) =>
+        asJson<{
+          metrics: {
+            cpuPct: number;
+            ramMb: number;
+            maxRamMb: number;
+            ramPct: number;
+            storageGb: number;
+            maxStorageGb: number;
+            storagePct: number;
+            activeConnections: number;
+            maxConnections: number;
+            slowQueries: any[];
+            warnings: string[];
+            updatedAt: string;
+          };
+        }>(r)
+      ),
+    getLogs: (id: string) =>
+      apiFetch(`/api/managed-databases/${id}/logs`).then((r) => asJson<{ logs: Array<{ timestamp: string; message: string }> }>(r)),
     migrate: (id: string, targetNodeId?: string) =>
       apiFetch(`/api/managed-databases/${id}/migrate`, { method: 'POST', body: JSON.stringify({ targetNodeId }) }).then((r) =>
         asJson<{ ok: boolean; message: string; database: ManagedDatabase }>(r)
@@ -2064,6 +2071,74 @@ export const api = {
       apiFetch(`/api/managed-databases/${id}/renew`, { method: 'POST', body: JSON.stringify({ months }) }).then((r) =>
         asJson<{ ok: boolean; message: string; orderId: string }>(r)
       ),
+  },
+
+  projects: {
+    list: (params?: { search?: string; isArchived?: boolean }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.search) searchParams.append('search', params.search);
+      if (params?.isArchived !== undefined) searchParams.append('isArchived', String(params.isArchived));
+      const qs = searchParams.toString() ? `?${searchParams.toString()}` : '';
+      return apiFetch(`/api/projects${qs}`).then((r) => asJson<{ projects: Project[] }>(r));
+    },
+    create: (data: { name: string; description?: string; region?: string; nodeId?: string; targetUserId?: string; userId?: string }) =>
+      apiFetch('/api/projects', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ project: Project }>(r)),
+    get: (id: string) =>
+      apiFetch(`/api/projects/${id}`).then((r) => asJson<{ project: Project }>(r)),
+    update: (id: string, data: { name?: string; description?: string; region?: string; isArchived?: boolean }) =>
+      apiFetch(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) => asJson<{ project: Project }>(r)),
+    delete: (id: string) =>
+      apiFetch(`/api/projects/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean; deletedId: string }>(r)),
+    members: (id: string) =>
+      apiFetch(`/api/projects/${id}/members`).then((r) => asJson<{ members: ProjectMember[] }>(r)),
+    addMember: (id: string, data: { email: string; role?: string }) =>
+      apiFetch(`/api/projects/${id}/members`, { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ member: ProjectMember; project: Project }>(r)),
+    removeMember: (id: string, memberUserId: string) =>
+      apiFetch(`/api/projects/${id}/members/${memberUserId}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean; removedUserId: string; project: Project }>(r)),
+    projectDatabases: (id: string) =>
+      apiFetch(`/api/projects/${id}/databases`).then((r) => asJson<{ databases: ManagedDatabase[] }>(r)),
+    provisionStorage: (id: string) =>
+      apiFetch(`/api/projects/${id}/storage`, { method: 'POST' }).then((r) => asJson<{ bucketName: string; endpoint: string }>(r)),
+    tables: (id: string) =>
+      apiFetch(`/api/projects/${id}/tables`).then((r) => asJson<{ tables: ProjectTable[] }>(r)),
+    rows: (id: string, table: string, page = 1, limit = 50) =>
+      apiFetch(`/api/projects/${id}/tables/${encodeURIComponent(table)}/rows?page=${page}&limit=${limit}`).then((r) =>
+        asJson<{ rows: Record<string, unknown>[]; total?: number }>(r)
+      ),
+    insertRow: (id: string, table: string, data: Record<string, unknown>) =>
+      apiFetch(`/api/projects/${id}/tables/${encodeURIComponent(table)}/rows`, { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ ok: boolean; inserted: Record<string, unknown> }>(r)
+      ),
+    updateRow: (id: string, table: string, pk: string | number, data: Record<string, unknown>) =>
+      apiFetch(`/api/projects/${id}/tables/${encodeURIComponent(table)}/rows/${encodeURIComponent(pk)}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ ok: boolean; updated: Record<string, unknown> }>(r)
+      ),
+    deleteRow: (id: string, table: string, pk: string | number) =>
+      apiFetch(`/api/projects/${id}/tables/${encodeURIComponent(table)}/rows/${encodeURIComponent(pk)}`, { method: 'DELETE' }).then((r) =>
+        asJson<{ ok: boolean; deletedPk: string | number }>(r)
+      ),
+    sql: (id: string, sql: string) =>
+      apiFetch(`/api/projects/${id}/sql`, { method: 'POST', body: JSON.stringify({ sql }) }).then((r) =>
+        asJson<SqlResult>(r)
+      ),
+    query: (id: string, sql: string) =>
+      apiFetch(`/api/projects/${id}/sql`, { method: 'POST', body: JSON.stringify({ sql }) }).then((r) =>
+        asJson<SqlResult>(r)
+      ),
+    listSnippets: (id: string) =>
+      apiFetch(`/api/projects/${id}/snippets`).then((r) => asJson<{ snippets: Array<{ id: string; title: string; query: string; createdAt: string }> }>(r)),
+    createSnippet: (id: string, data: { title: string; query: string }) =>
+      apiFetch(`/api/projects/${id}/snippets`, { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ snippet: { id: string; title: string; query: string; createdAt: string } }>(r)
+      ),
+    deleteSnippet: (id: string, snippetId: string) =>
+      apiFetch(`/api/projects/${id}/snippets/${snippetId}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
+    authUsers: (id: string) =>
+      apiFetch(`/api/projects/${id}/auth/users`).then((r) => asJson<{ users: any[] }>(r)),
+    oauthConfigs: (id: string) =>
+      apiFetch(`/api/projects/${id}/auth/oauth/configs`).then((r) => asJson<{ configs: any[] }>(r)),
+    saveOAuthConfig: (id: string, data: any) =>
+      apiFetch(`/api/projects/${id}/auth/oauth/configs`, { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ config: any }>(r)),
   },
 
   notifications: {

@@ -1,97 +1,219 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../lib/prisma';
-import { requireAuth, requireDev, AuthedRequest } from '../middleware/auth';
-import { encryptSecret, decryptSecret } from '../lib/secretsVault';
-import { env } from '../env';
 import crypto from 'crypto';
+import { prisma } from '../lib/prisma';
+import { requireAuth, AuthedRequest } from '../middleware/auth';
+import { canAccessResource } from '../middleware/rbac';
+import { encryptSecret, decryptSecret } from '../lib/secretsVault';
+import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
+import { env } from '../env';
 import { provisionProjectBucket } from '../lib/r2Storage';
 
 export const projectsRouter = Router();
 
+projectsRouter.use(requireAuth);
+
 /**
- * The Project primitive — isolated auth (ProjectAuthUser), storage bucket,
- * Postgres database, realtime, functions — is the platform's in-house
- * Supabase clone. It is infrastructure the dev (platform owner) uses to
- * build ShanuTechX's own products.
+ * Helper: Check if caller can access a project
+ * Allowed if:
+ * 1. Dev user (role === 'dev')
+ * 2. Owner of project (project.userId === req.user.id)
+ * 3. Member of project in ProjectMember table
+ * 4. Assigned Admin for customer owner
  */
-projectsRouter.use(requireAuth, requireDev);
+async function canAccessProject(req: AuthedRequest, projectId: string): Promise<{ project: any; role: string } | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      user: { select: { id: true, email: true, displayName: true } },
+      node: { select: { id: true, label: true, ip: true } },
+      members: { include: { user: { select: { id: true, email: true, displayName: true } } } },
+      managedDatabases: true,
+    },
+  });
 
-// ── Helper: load a project the caller is allowed to see ─────────────────────
-// (Kept for shape/compat with the rest of the file, but with requireDev on
-// the whole router above, every caller reaching here already IS dev — this
-// is effectively always true now. Left explicit rather than removed, in
-// case a future non-dev read-only view is intentionally added back.)
+  if (!project) return null;
 
-async function loadOwnedProject(req: AuthedRequest, id: string) {
-  const proj = await prisma.project.findUnique({ where: { id } });
-  if (!proj) return null;
-  if (req.user!.role !== 'dev') return null;
-  return proj;
+  // Dev user has superuser access
+  if (req.user!.role === 'dev') {
+    return { project, role: 'owner' };
+  }
+
+  // Owner of project
+  if (project.userId === req.user!.id) {
+    return { project, role: 'owner' };
+  }
+
+  // Check project membership
+  const member = project.members.find((m: any) => m.userId === req.user!.id);
+  if (member) {
+    return { project, role: member.role };
+  }
+
+  // Assigned Admin check
+  if (req.user!.role === 'admin' && (await canAccessResource(project.userId, req))) {
+    return { project, role: 'admin' };
+  }
+
+  return null;
 }
 
-// ── List projects (dev sees all — dev is the only role that reaches here) ───
+// ── 1. List Projects ────────────────────────────────────────────────────────
+projectsRouter.get('/projects', async (req: AuthedRequest, res) => {
+  try {
+    const isDev = req.user!.role === 'dev';
+    const isAdmin = req.user!.role === 'admin';
+    const userId = req.user!.id;
 
-projectsRouter.get('/projects', async (_req: AuthedRequest, res) => {
-  const projects = await prisma.project.findMany({
-    include: { user: { select: { id: true, email: true, displayName: true } }, node: { select: { id: true, label: true, ip: true } } },
-    orderBy: { createdAt: 'desc' },
-  });
-  // Don't expose passwords in list view
-  const sanitized = projects.map(({ dbPassword, ...rest }: any) => rest);
-  res.json({ projects: sanitized });
+    let whereCondition: any = {};
+
+    if (isDev) {
+      // Dev sees all
+      whereCondition = {};
+    } else if (isAdmin) {
+      // Admin sees owned, assigned customers', or membership projects
+      const assignedCustomers = await prisma.user.findMany({
+        where: { assignedAdminId: userId },
+        select: { id: true },
+      });
+      const customerIds = assignedCustomers.map((c) => c.id);
+      whereCondition = {
+        OR: [
+          { userId },
+          { userId: { in: customerIds } },
+          { members: { some: { userId } } },
+        ],
+      };
+    } else {
+      // Customer sees owned or member projects
+      whereCondition = {
+        OR: [
+          { userId },
+          { members: { some: { userId } } },
+        ],
+      };
+    }
+
+    const { search, isArchived } = req.query as { search?: string; isArchived?: string };
+    if (isArchived !== undefined) {
+      whereCondition.isArchived = isArchived === 'true';
+    }
+
+    if (search) {
+      whereCondition.name = { contains: search, mode: 'insensitive' };
+    }
+
+    const projects = await prisma.project.findMany({
+      where: whereCondition,
+      include: {
+        user: { select: { id: true, email: true, displayName: true } },
+        node: { select: { id: true, label: true, ip: true } },
+        members: { select: { id: true, userId: true, role: true } },
+        _count: {
+          select: {
+            managedDatabases: true,
+            members: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const sanitized = projects.map(({ dbPassword, ...rest }: any) => rest);
+    res.json({ projects: sanitized });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to list projects' });
+  }
 });
 
-// ── Create project (dev only) ────────────────────────────────────────────────
-
-const createSchema = z.object({
-  userId: z.string().min(1),
+// ── 2. Create Project ───────────────────────────────────────────────────────
+const createProjectSchema = z.object({
   name: z.string().min(1).max(60),
-  nodeId: z.string().min(1),
-  orderItemId: z.string().optional(),
+  description: z.string().max(255).optional(),
+  region: z.string().optional(),
+  nodeId: z.string().optional(),
+  targetUserId: z.string().optional(),
 });
 
 projectsRouter.post('/projects', async (req: AuthedRequest, res) => {
-  const parsed = createSchema.safeParse(req.body);
+  const parsed = createProjectSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const { userId, name, nodeId, orderItemId } = parsed.data;
+  const { name, description, region, nodeId, targetUserId } = parsed.data;
 
-  // Verify node exists
-  const node = await prisma.node.findUnique({ where: { id: nodeId } });
-  if (!node) return res.status(404).json({ error: 'Node not found' });
+  // Determine owner user
+  let ownerUserId = req.user!.id;
+  if (targetUserId && (req.user!.role === 'admin' || req.user!.role === 'dev')) {
+    if (req.user!.role === 'admin' && !(await canAccessResource(targetUserId, req))) {
+      return res.status(403).json({ error: 'Unauthorized to create project for target user' });
+    }
+    ownerUserId = targetUserId;
+  }
 
-  // Verify user exists
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) return res.status(404).json({ error: 'User not found' });
+  // Select node if not specified
+  let selectedNodeId = nodeId;
+  if (!selectedNodeId) {
+    try {
+      const selectedNode = await selectNodeForDeployment({ requiredTag: 'node-hosting', isAdminDeployment: true });
+      selectedNodeId = selectedNode.id;
+    } catch (err: any) {
+      if (err instanceof NodeSelectionError) return res.status(409).json({ error: err.message });
+      return res.status(500).json({ error: 'Failed to select node for project' });
+    }
+  }
 
-  // Generate secure DB credentials
+  const node = await prisma.node.findUnique({ where: { id: selectedNodeId } });
+  if (!node) return res.status(404).json({ error: 'Target node not found' });
+
+  // Generate DB credentials for default project database container
   const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 30);
   const dbName = `proj_${slug}_${crypto.randomBytes(3).toString('hex')}`;
   const dbUsername = `user_${crypto.randomBytes(4).toString('hex')}`;
   const rawPassword = crypto.randomBytes(16).toString('hex');
   const encryptedPassword = encryptSecret(rawPassword, env.secretsEncryptionKey);
 
-  const project = await prisma.project.create({
-    data: {
-      userId,
-      name,
-      nodeId,
-      dbName,
-      dbUsername,
-      dbPassword: encryptedPassword,
-      status: 'pending',
-    },
-    include: {
-      user: { select: { id: true, email: true } },
-      node: { select: { id: true, label: true, ip: true } },
-    },
-  });
+  try {
+    const project = await prisma.project.create({
+      data: {
+        userId: ownerUserId,
+        name,
+        description: description || null,
+        region: region || 'ap-southeast-1',
+        nodeId: selectedNodeId,
+        dbName,
+        dbUsername,
+        dbPassword: encryptedPassword,
+        status: 'pending',
+        members: {
+          create: {
+            userId: ownerUserId,
+            role: 'owner',
+          },
+        },
+      },
+      include: {
+        user: { select: { id: true, email: true, displayName: true } },
+        node: { select: { id: true, label: true, ip: true } },
+        members: true,
+      },
+    });
 
-  // Kick off provisioning on node-agent (fire-and-forget with status update)
-  void provisionProject(project.id, node.ip, dbName, dbUsername, rawPassword);
+    // Fire provisioning on node-agent
+    void provisionProject(project.id, node.ip, dbName, dbUsername, rawPassword);
 
-  res.status(201).json({ project });
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'project.create',
+        target: project.id,
+      },
+    }).catch(() => {});
+
+    const { dbPassword, ...sanitized } = project;
+    res.status(201).json({ project: sanitized });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to create project' });
+  }
 });
 
 async function provisionProject(
@@ -136,39 +258,115 @@ async function provisionProject(
   }
 }
 
-// ── Get single project ───────────────────────────────────────────────────────
-
+// ── 3. Get Project Details ──────────────────────────────────────────────────
 projectsRouter.get('/projects/:id', async (req: AuthedRequest, res) => {
-  const proj = await loadOwnedProject(req, req.params.id);
-  if (!proj) return res.status(404).json({ error: 'Project not found' });
+  const access = await canAccessProject(req, req.params.id);
+  if (!access) return res.status(404).json({ error: 'Project not found or access denied' });
 
-  // Reveal decrypted password only for the project owner (and staff)
-  const password = decryptSecret(proj.dbPassword, env.secretsEncryptionKey);
+  const { project, role } = access;
+  const password = decryptSecret(project.dbPassword, env.secretsEncryptionKey);
+
+  // Compute resource usage aggregates across project's databases
+  const databases = await prisma.managedDatabase.findMany({
+    where: { projectId: project.id },
+    include: {
+      node: { select: { id: true, label: true, ip: true } },
+      dbUsers: { select: { id: true, username: true, role: true, isDisabled: true } },
+    },
+  });
+
+  const aggregateMetrics = {
+    totalDatabases: databases.length,
+    activeDatabases: databases.filter((d) => d.status === 'running').length,
+    totalCpuCores: databases.reduce((acc, d) => acc + (d.cpuLimit || 1), 0),
+    totalRamMb: databases.reduce((acc, d) => acc + (d.memoryLimitMb || 512), 0),
+    totalStorageGb: databases.reduce((acc, d) => acc + (d.storageLimitGb || 10), 0),
+  };
 
   res.json({
     project: {
-      ...proj,
+      ...project,
       dbPassword: password,
+      callerRole: role,
+      databases: databases.map(({ credentialRef, ...rest }: any) => rest),
+      aggregateMetrics,
     },
   });
 });
 
-// ── Delete / deprovision project (staff only) ────────────────────────────────
+// ── 4. Update Project ───────────────────────────────────────────────────────
+const updateProjectSchema = z.object({
+  name: z.string().min(1).max(60).optional(),
+  description: z.string().max(255).optional(),
+  region: z.string().optional(),
+  isArchived: z.boolean().optional(),
+});
 
-projectsRouter.delete('/projects/:id', async (req: AuthedRequest, res) => {
-  const proj = await prisma.project.findUnique({
-    where: { id: req.params.id },
-    include: { node: true },
-  });
-  if (!proj) return res.status(404).json({ error: 'Project not found' });
-
-  // Fire-and-forget deprovision on node-agent
-  if (proj.containerId && proj.node) {
-    void deprovisionProject(proj.node.ip, proj.id);
+projectsRouter.patch('/projects/:id', async (req: AuthedRequest, res) => {
+  const access = await canAccessProject(req, req.params.id);
+  if (!access) return res.status(404).json({ error: 'Project not found' });
+  if (access.role !== 'owner' && access.role !== 'admin' && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'Only project owners and admins can update settings' });
   }
 
-  await prisma.project.delete({ where: { id: proj.id } });
-  res.json({ ok: true });
+  const parsed = updateProjectSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  try {
+    const updated = await prisma.project.update({
+      where: { id: req.params.id },
+      data: parsed.data,
+      include: {
+        user: { select: { id: true, email: true, displayName: true } },
+        node: { select: { id: true, label: true, ip: true } },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'project.update',
+        target: req.params.id,
+      },
+    }).catch(() => {});
+
+    const { dbPassword, ...sanitized } = updated;
+    res.json({ project: sanitized });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to update project' });
+  }
+});
+
+// ── 5. Delete / Archive Project ──────────────────────────────────────────────
+projectsRouter.delete('/projects/:id', async (req: AuthedRequest, res) => {
+  const access = await canAccessProject(req, req.params.id);
+  if (!access) return res.status(404).json({ error: 'Project not found' });
+  if (access.role !== 'owner' && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'Only the project owner can delete the project' });
+  }
+
+  const { project } = access;
+
+  try {
+    // Fire-and-forget deprovision on node-agent if container exists
+    if (project.containerId && project.node) {
+      void deprovisionProject(project.node.ip, project.id);
+    }
+
+    await prisma.project.delete({ where: { id: project.id } });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'project.delete',
+        target: project.id,
+      },
+    }).catch(() => {});
+
+    res.json({ ok: true, deletedId: project.id });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete project' });
+  }
 });
 
 async function deprovisionProject(nodeIp: string, projectId: string) {
@@ -183,53 +381,127 @@ async function deprovisionProject(nodeIp: string, projectId: string) {
   }
 }
 
-// ── Object storage (R2 bucket) per project — dev/admin only ─────────────────
-// See lib/r2Storage.ts for the honest limitations (shared platform R2
-// credentials, not a per-bucket scoped token).
+// ── 6. Project Members Management ───────────────────────────────────────────
+projectsRouter.get('/projects/:id/members', async (req: AuthedRequest, res) => {
+  const access = await canAccessProject(req, req.params.id);
+  if (!access) return res.status(404).json({ error: 'Project not found' });
 
-projectsRouter.post('/projects/:id/storage', async (req: AuthedRequest, res) => {
-  const proj = await prisma.project.findUnique({ where: { id: req.params.id } });
-  if (!proj) return res.status(404).json({ error: 'Project not found' });
+  const members = await prisma.projectMember.findMany({
+    where: { projectId: req.params.id },
+    include: { user: { select: { id: true, email: true, displayName: true, role: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  res.json({ members });
+});
+
+const addMemberSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(['admin', 'developer', 'read_only']).default('developer'),
+});
+
+projectsRouter.post('/projects/:id/members', async (req: AuthedRequest, res) => {
+  const access = await canAccessProject(req, req.params.id);
+  if (!access) return res.status(404).json({ error: 'Project not found' });
+  if (access.role !== 'owner' && access.role !== 'admin' && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'Only owners and admins can invite project members' });
+  }
+
+  const parsed = addMemberSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const targetUser = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+  if (!targetUser) return res.status(404).json({ error: 'User with this email not found' });
 
   try {
-    const { bucketName, endpoint } = await provisionProjectBucket(proj.id);
-    await prisma.project.update({ where: { id: proj.id }, data: { r2BucketName: bucketName } });
+    const member = await prisma.projectMember.create({
+      data: {
+        projectId: req.params.id,
+        userId: targetUser.id,
+        role: parsed.data.role,
+      },
+      include: { user: { select: { id: true, email: true, displayName: true } } },
+    });
+
+    res.status(201).json({ member });
+  } catch (err: any) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: 'User is already a member of this project' });
+    }
+    res.status(500).json({ error: err.message || 'Failed to add project member' });
+  }
+});
+
+projectsRouter.delete('/projects/:id/members/:memberUserId', async (req: AuthedRequest, res) => {
+  const access = await canAccessProject(req, req.params.id);
+  if (!access) return res.status(404).json({ error: 'Project not found' });
+  if (access.role !== 'owner' && access.role !== 'admin' && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'Unauthorized to remove members' });
+  }
+
+  try {
+    await prisma.projectMember.delete({
+      where: {
+        projectId_userId: {
+          projectId: req.params.id,
+          userId: req.params.memberUserId,
+        },
+      },
+    });
+
+    res.json({ ok: true, removedUserId: req.params.memberUserId });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to remove project member' });
+  }
+});
+
+// ── 7. Object Storage Provisioning (R2) ─────────────────────────────────────
+projectsRouter.post('/projects/:id/storage', async (req: AuthedRequest, res) => {
+  const access = await canAccessProject(req, req.params.id);
+  if (!access) return res.status(404).json({ error: 'Project not found' });
+
+  try {
+    const { bucketName, endpoint } = await provisionProjectBucket(access.project.id);
+    await prisma.project.update({ where: { id: access.project.id }, data: { r2BucketName: bucketName } });
     res.status(201).json({ bucketName, endpoint });
   } catch (err: any) {
     res.status(502).json({ error: err.message });
   }
 });
 
-// ── Execute SQL on the project database ─────────────────────────────────────
-// Tunnels an arbitrary SQL statement through the node-agent to the project's
-// Postgres container. The node-agent validates it's running in the right DB.
-
+// ── 8. Execute SQL on Project Default DB Container ──────────────────────────
 const sqlSchema = z.object({
   sql: z.string().min(1).max(50_000),
 });
 
 projectsRouter.post('/projects/:id/sql', async (req: AuthedRequest, res) => {
-  const proj = await loadOwnedProject(req, req.params.id);
-  if (!proj) return res.status(404).json({ error: 'Project not found' });
-  if (proj.status !== 'running') return res.status(400).json({ error: 'Project is not running' });
+  const access = await canAccessProject(req, req.params.id);
+  if (!access) return res.status(404).json({ error: 'Project not found' });
+
+  const { project, role } = access;
+  if (role === 'read_only' && /^\s*(DROP|ALTER|DELETE|UPDATE|INSERT|CREATE|TRUNCATE)\b/i.test(req.body.sql)) {
+    return res.status(403).json({ error: 'Read-only members cannot execute data definition or modification statements' });
+  }
+
+  if (project.status !== 'running') return res.status(400).json({ error: 'Project is not running' });
 
   const parsed = sqlSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const node = await prisma.node.findUnique({ where: { id: proj.nodeId } });
+  const node = await prisma.node.findUnique({ where: { id: project.nodeId } });
   if (!node) return res.status(500).json({ error: 'Node not found' });
 
   try {
     const { env } = await import('../env');
     const agentRes = await fetch(
-      `http://${node.ip}:${env.nodeAgentPort}/agent/projects/${proj.id}/sql`,
+      `http://${node.ip}:${env.nodeAgentPort}/agent/projects/${project.id}/sql`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-agent-secret': env.nodeAgentSecret,
         },
-        body: JSON.stringify({ sql: parsed.data.sql, dbName: proj.dbName }),
+        body: JSON.stringify({ sql: parsed.data.sql, dbName: project.dbName }),
       }
     );
 
@@ -238,42 +510,38 @@ projectsRouter.post('/projects/:id/sql', async (req: AuthedRequest, res) => {
       return res.status(400).json({ error: agentData.error ?? 'SQL execution failed' });
     }
 
-    res.json(agentData); // { rows, fields, rowCount }
+    res.json(agentData);
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'SQL execution failed' });
   }
 });
 
-// ── List tables in the project database ─────────────────────────────────────
-
+// ── 9. List Tables ──────────────────────────────────────────────────────────
 projectsRouter.get('/projects/:id/tables', async (req: AuthedRequest, res) => {
-  const proj = await loadOwnedProject(req, req.params.id);
-  if (!proj) return res.status(404).json({ error: 'Project not found' });
-  if (proj.status !== 'running') return res.status(400).json({ error: 'Project is not running' });
+  const access = await canAccessProject(req, req.params.id);
+  if (!access) return res.status(404).json({ error: 'Project not found' });
 
-  const node = await prisma.node.findUnique({ where: { id: proj.nodeId } });
+  const { project } = access;
+  if (project.status !== 'running') return res.status(400).json({ error: 'Project is not running' });
+
+  const node = await prisma.node.findUnique({ where: { id: project.nodeId } });
   if (!node) return res.status(500).json({ error: 'Node not found' });
 
   try {
     const { env } = await import('../env');
     const agentRes = await fetch(
-      `http://${node.ip}:${env.nodeAgentPort}/agent/projects/${proj.id}/tables`,
+      `http://${node.ip}:${env.nodeAgentPort}/agent/projects/${project.id}/tables`,
       { headers: { 'x-agent-secret': env.nodeAgentSecret } }
     );
     const data = (await agentRes.json()) as any;
     if (!agentRes.ok) return res.status(400).json({ error: data.error ?? 'Failed to list tables' });
-    res.json(data); // { tables: [{ name, columns: [{name, type}] }] }
+    res.json(data);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── CRUD proxy endpoints ─────────────────────────────────────────────────────
-// GET    /projects/:id/tables/:table/rows
-// POST   /projects/:id/tables/:table/rows
-// PATCH  /projects/:id/tables/:table/rows/:pk
-// DELETE /projects/:id/tables/:table/rows/:pk
-
+// ── 10. Table Row CRUD Proxies ──────────────────────────────────────────────
 async function proxyToAgent(
   req: AuthedRequest,
   res: any,
@@ -281,18 +549,24 @@ async function proxyToAgent(
   agentPath: string,
   body?: Record<string, unknown>
 ) {
-  const proj = await loadOwnedProject(req, req.params.id);
-  if (!proj) return res.status(404).json({ error: 'Project not found' });
-  if (proj.status !== 'running') return res.status(400).json({ error: 'Project is not running' });
+  const access = await canAccessProject(req, req.params.id);
+  if (!access) return res.status(404).json({ error: 'Project not found' });
 
-  const node = await prisma.node.findUnique({ where: { id: proj.nodeId } });
+  const { project, role } = access;
+  if (role === 'read_only' && method !== 'GET') {
+    return res.status(403).json({ error: 'Read-only member cannot modify table rows' });
+  }
+
+  if (project.status !== 'running') return res.status(400).json({ error: 'Project is not running' });
+
+  const node = await prisma.node.findUnique({ where: { id: project.nodeId } });
   if (!node) return res.status(500).json({ error: 'Node not found' });
 
   try {
     const { env } = await import('../env');
     const url = `http://${node.ip}:${env.nodeAgentPort}${agentPath}`;
     const headers: Record<string, string> = { 'x-agent-secret': env.nodeAgentSecret };
-    const payload = body ? { ...body, dbName: proj.dbName } : undefined;
+    const payload = body ? { ...body, dbName: project.dbName } : undefined;
     if (payload) headers['Content-Type'] = 'application/json';
 
     const agentRes = await fetch(url, {
