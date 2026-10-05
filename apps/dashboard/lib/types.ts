@@ -84,6 +84,8 @@ export interface Order {
   userId: string;
   status: 'draft' | 'awaiting_payment' | 'paid' | 'cancelled';
   total: number;
+  totalLkr?: number;
+  currency?: string;
   createdAt: string;
   items?: OrderItem[];
   payments?: Payment[];
@@ -95,10 +97,16 @@ export interface Payment {
   id: string;
   orderId: string;
   method: 'manual' | 'sms' | 'proof_upload';
+  proofUrl?: string | null;
+  extractedJson?: Record<string, any> | null;
   confidenceScore: number | null;
   status: PaymentStatus;
   createdAt: string;
-  order?: Order & { user?: ApiUser };
+  reviewedById?: string | null;
+  reviewedBy?: ApiUser | null;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  order?: Order & { user?: ApiUser; items?: OrderItem[] };
 }
 
 export type DeploymentStatus = 'pending' | 'pending_configuration' | 'building' | 'running' | 'failed' | 'stopped';

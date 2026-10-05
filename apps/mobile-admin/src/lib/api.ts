@@ -57,16 +57,21 @@ export interface Payment {
   orderId: string;
   method: string;
   proofUrl: string | null;
+  extractedJson?: Record<string, any> | null;
+  confidenceScore?: number | null;
   status: string;
   createdAt: string;
   reviewedById: string | null;
+  reviewedBy?: { id: string; email: string; displayName?: string | null } | null;
   reviewedAt: string | null;
   rejectionReason: string | null;
   order?: {
     id: string;
     totalLkr: number;
+    total?: number;
     currency: string;
     user?: { email: string; displayName?: string | null };
+    items?: Array<{ id: string; quantity: number; service?: { name: string }; plan?: { name: string } }>;
   };
 }
 
@@ -169,7 +174,10 @@ export const api = {
   },
 
   payments: {
-    reviewQueue: () => apiFetch('/api/payments/review-queue').then((r) => asJson<{ payments: Payment[] }>(r)),
+    reviewQueue: (status?: string) =>
+      apiFetch(`/api/payments/review-queue${status ? `?status=${encodeURIComponent(status)}` : ''}`).then((r) =>
+        asJson<{ payments: Payment[]; total: number; statusFilter: string }>(r)
+      ),
     review: (id: string, approve: boolean, reason?: string) =>
       apiFetch(`/api/payments/${id}/review`, {
         method: 'POST',

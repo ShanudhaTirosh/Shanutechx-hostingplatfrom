@@ -1036,7 +1036,10 @@ export const api = {
 
 
   payments: {
-    reviewQueue: () => apiFetch('/api/payments/review-queue').then((r) => asJson<{ payments: Payment[] }>(r)),
+    reviewQueue: (status?: string) =>
+      apiFetch(`/api/payments/review-queue${status ? `?status=${encodeURIComponent(status)}` : ''}`).then((r) =>
+        asJson<{ payments: Payment[]; total: number; statusFilter: string }>(r)
+      ),
     review: (id: string, approve: boolean, reason?: string) =>
       apiFetch(`/api/payments/${id}/review`, {
         method: 'POST',

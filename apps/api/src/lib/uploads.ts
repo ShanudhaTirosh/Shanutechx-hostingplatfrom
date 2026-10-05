@@ -44,3 +44,25 @@ export const uploadPaymentProof = multer({
     cb(null, true);
   },
 }).single('proof');
+
+/**
+ * Returns a web-accessible relative URL path for an uploaded payment proof file.
+ */
+export function getPublicProofUrl(orderId: string, filename: string): string {
+  const safeOrderId = path.basename(orderId).replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `/uploads/payments/${safeOrderId}/${filename}`;
+}
+
+/**
+ * Normalizes any proof URL path (legacy absolute disk path or relative URL) to a clean web-accessible relative path.
+ */
+export function normalizeProofUrl(proofUrl: string | null | undefined): string | null {
+  if (!proofUrl) return null;
+  if (proofUrl.startsWith('http://') || proofUrl.startsWith('https://')) return proofUrl;
+  const match = proofUrl.match(/uploads[/\\]payments[/\\]([^/\\]+)[/\\]([^/\\]+)$/);
+  if (match) {
+    return `/uploads/payments/${match[1]}/${match[2]}`;
+  }
+  return proofUrl;
+}
+

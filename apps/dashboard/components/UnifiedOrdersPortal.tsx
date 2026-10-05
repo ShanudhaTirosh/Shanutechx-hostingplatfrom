@@ -690,10 +690,22 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
         {error && <div className="mt-4"><ErrorBanner message={error} /></div>}
 
         {latestPayment && order.status === 'awaiting_payment' && (
-          <p className="text-text-muted text-xs mt-3 flex items-center gap-2">
-            Last payment attempt:
-            <Badge status={latestPayment.status} />
-          </p>
+          <div className="mt-4 p-3 rounded-xl glass border border-white/[0.06] text-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-text-muted font-medium">Payment Review Status:</span>
+              <Badge status={latestPayment.status} />
+            </div>
+            {latestPayment.status === 'manual_review' && (
+              <p className="text-orange-300/90 text-[11px] leading-relaxed">
+                ⏳ Proof received — currently awaiting manual verification by staff. Your services will activate as soon as confirmed.
+              </p>
+            )}
+            {latestPayment.status === 'rejected' && latestPayment.rejectionReason && (
+              <p className="text-red-400 text-[11px] leading-relaxed">
+                ❌ Proof could not be verified: <span className="text-text-primary font-medium">{latestPayment.rejectionReason}</span>. Please re-upload a clear transfer receipt.
+              </p>
+            )}
+          </div>
         )}
 
         <div className="flex flex-wrap gap-2.5 mt-4">
@@ -712,7 +724,7 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
                 size="sm"
               >
                 <UploadIcon />
-                {uploading ? 'Uploading...' : 'Upload Payment Proof'}
+                {uploading ? 'Uploading...' : latestPayment?.status === 'manual_review' ? 'Re-upload Payment Proof' : 'Upload Payment Proof'}
               </Button>
             </>
           )}

@@ -158,6 +158,16 @@ app.use(
   })
 );
 
+import { UPLOADS_DIR } from './lib/uploads';
+import fs from 'fs';
+
+// Serve uploaded payment proofs & static media
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/api/uploads', express.static(UPLOADS_DIR));
+
 // CSRF Protection: Validate Origin header for state-changing requests
 app.use(csrfProtection);
 

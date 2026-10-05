@@ -16,6 +16,7 @@ import {
   Td,
   Badge,
   Button,
+  formatMoney,
 } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
@@ -261,7 +262,7 @@ export default function AdminDashboardPage() {
             {pendingPaymentsList.map((p) => (
               <Tr key={p.id} onClick={() => router.push('/admin/review-queue')}>
                 <Td className="font-mono text-xs text-text-primary">#{p.orderId?.slice(0, 8)}</Td>
-                <Td className="text-xs font-bold text-emerald-400">LKR {(p.amount / 100).toFixed(2)}</Td>
+                <Td className="text-xs font-bold text-emerald-400">{formatMoney(p.order?.totalLkr ?? p.order?.total ?? 0, 'LKR')}</Td>
                 <Td className="text-xs text-text-muted">{new Date(p.createdAt).toLocaleDateString()}</Td>
                 <Td>
                   <Badge status="manual_review" />

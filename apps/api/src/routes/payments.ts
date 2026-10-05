@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdmin, AuthedRequest } from '../middleware/auth';
 import { paymentReviewVisibilityWhere, canReviewPayment } from '../middleware/rbac';
-import { uploadPaymentProof } from '../lib/uploads';
+import { uploadPaymentProof, getPublicProofUrl, normalizeProofUrl } from '../lib/uploads';
 import { notifyCustomer, notifyAdmins, sendInvoiceDeliveryNotification } from '../lib/notifications';
 
 import { notifyDiscordChannel } from '../lib/discordWebhooks';
@@ -61,14 +61,21 @@ paymentsRouter.post(
 
       if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
+      const relativeProofUrl = getPublicProofUrl(order.id, req.file.filename);
+
       const payment = await prisma.payment.create({
         data: {
           orderId: order.id,
           method: 'proof_upload',
-          proofUrl: req.file.path,
+          proofUrl: relativeProofUrl,
           status: 'manual_review',
         },
       });
+
+      const baseUrl = process.env.API_URL || `http://localhost:${env.port}`;
+      const fullDiscordProofUrl = relativeProofUrl
+        ? (relativeProofUrl.startsWith('http') ? relativeProofUrl : `${baseUrl}${relativeProofUrl}`)
+        : '(none)';
 
       void notifyAdmins(
         `New payment proof uploaded for order ${order.id}. Awaiting manual admin review.`
@@ -77,11 +84,11 @@ paymentsRouter.post(
         'Order': order.id,
         'Customer': order.user.email,
         'Amount (LKR)': formatCurrency(order.totalLkr, 'LKR'),
-        'Proof': payment.proofUrl ?? '(none)',
+        'Proof': fullDiscordProofUrl,
       });
 
       res.status(202).json({
-        payment,
+        payment: { ...payment, proofUrl: normalizeProofUrl(payment.proofUrl) },
         reasons: ['Proof received — submitted for manual admin review. An admin will approve or decline it shortly.'],
       });
     });
@@ -103,16 +110,29 @@ paymentsRouter.get('/payments/review-queue', requireAdmin, async (req: AuthedReq
 
   const where = { ...statusWhere, ...visibility };
 
-  const [payments, total] = await Promise.all([
+  const [rawPayments, total] = await Promise.all([
     prisma.payment.findMany({
       where,
-      include: { order: { include: { user: true } }, reviewedBy: true },
+      include: {
+        order: {
+          include: {
+            user: { select: { id: true, email: true, displayName: true } },
+            items: { include: { service: true, plan: { include: { product: true } } } },
+          },
+        },
+        reviewedBy: { select: { id: true, email: true, displayName: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take,
       skip,
     }),
     prisma.payment.count({ where }),
   ]);
+
+  const payments = rawPayments.map((p) => ({
+    ...p,
+    proofUrl: normalizeProofUrl(p.proofUrl),
+  }));
 
   res.json({ payments, total, take, skip, statusFilter: statusParam });
 });
@@ -202,6 +222,7 @@ paymentsRouter.post('/payments/:id/review', requireAdmin, async (req: AuthedRequ
 
   const updated = {
     ...payment,
+    proofUrl: normalizeProofUrl(payment.proofUrl),
     status: newStatus as typeof payment.status,
     reviewedById: req.user!.id,
     reviewedAt: new Date(),
