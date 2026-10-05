@@ -143,6 +143,21 @@ export async function requireAuth(
       role: user.role,
     };
 
+    // User Impersonation: Allows admin/dev staff to impersonate a customer account
+    const impersonateUserId = req.headers['x-impersonate-user-id'] as string | undefined;
+    if (impersonateUserId && (user.role === 'admin' || user.role === 'dev')) {
+      const targetUser = await prisma.user.findUnique({ where: { id: impersonateUserId } });
+      if (targetUser && !targetUser.isBanned) {
+        (req as any).adminUser = req.user;
+        req.user = {
+          id: targetUser.id,
+          firebaseUid: targetUser.firebaseUid,
+          email: targetUser.email,
+          role: targetUser.role,
+        };
+      }
+    }
+
     if (user.role === 'admin' || user.role === 'support') {
       void ensureStaffMarkedInRealtimeDb(user.firebaseUid);
     }

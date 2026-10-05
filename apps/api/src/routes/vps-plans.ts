@@ -32,6 +32,50 @@ const vpsplanSchema = z.object({
 const updateVpsPlanSchema = vpsplanSchema.partial();
 
 /**
+ * POST /api/vps-plans/calculate-custom
+ * Calculates custom resource slider pricing for interactive checkout sliders (Paymenter Feature).
+ */
+vpsPlansRouter.post('/vps-plans/calculate-custom', async (req: AuthedRequest, res) => {
+  const schema = z.object({
+    cpuCores: z.number().int().min(1).max(64).default(1),
+    ramGb: z.number().int().min(1).max(512).default(2),
+    storageGb: z.number().int().min(10).max(4000).default(20),
+    bandwidthGb: z.number().int().min(100).max(50000).default(1000),
+    currency: z.enum(['LKR', 'USD']).default('LKR'),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { cpuCores, ramGb, storageGb, bandwidthGb, currency } = parsed.data;
+
+  // Base pricing rate constants
+  // LKR rates: CPU 1200/core, RAM 800/GB, Disk 300 per 10GB, Bandwidth 200 per 500GB
+  const cpuPriceLkr = cpuCores * 1200;
+  const ramPriceLkr = ramGb * 800;
+  const storagePriceLkr = Math.ceil(storageGb / 10) * 300;
+  const bwPriceLkr = Math.ceil(bandwidthGb / 500) * 200;
+
+  const totalMonthlyLkr = cpuPriceLkr + ramPriceLkr + storagePriceLkr + bwPriceLkr;
+  const usdRate = 300; // 1 USD = 300 LKR
+  const totalMonthlyUsd = Math.round((totalMonthlyLkr / usdRate) * 100) / 100;
+
+  const finalTotal = currency === 'USD' ? totalMonthlyUsd : totalMonthlyLkr;
+
+  res.json({
+    specs: { cpuCores, ramGb, storageGb, bandwidthGb },
+    breakdown: {
+      cpuPrice: currency === 'USD' ? Math.round((cpuPriceLkr / usdRate) * 100) / 100 : cpuPriceLkr,
+      ramPrice: currency === 'USD' ? Math.round((ramPriceLkr / usdRate) * 100) / 100 : ramPriceLkr,
+      storagePrice: currency === 'USD' ? Math.round((storagePriceLkr / usdRate) * 100) / 100 : storagePriceLkr,
+      bandwidthPrice: currency === 'USD' ? Math.round((bwPriceLkr / usdRate) * 100) / 100 : bwPriceLkr,
+    },
+    totalMonthly: finalTotal,
+    totalMonthlyLkr,
+    currency,
+  });
+});
+
+/**
  * GET /api/vps-plans
  * Returns all VPS plans available for customer browsing and provisioning.
  * Access: All authenticated users (customers for browsing)

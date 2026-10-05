@@ -407,3 +407,34 @@ adminRouter.post('/admin/firebase-sync', async (req: AuthedRequest, res) => {
   });
 });
 
+/**
+ * Impersonate a customer account (Paymenter Feature). Allows staff to view and inspect
+ * client area as a customer.
+ */
+adminRouter.post('/admin/impersonate/:userId', async (req: AuthedRequest, res) => {
+  const target = await prisma.user.findUnique({ where: { id: req.params.userId } });
+  if (!target) return res.status(404).json({ error: 'User not found' });
+
+  if (target.isBanned) {
+    return res.status(400).json({ error: 'Cannot impersonate a banned user' });
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      adminId: req.user!.id,
+      action: 'admin.impersonate_user',
+      target: target.email,
+    },
+  });
+
+  res.json({
+    ok: true,
+    impersonatedUser: {
+      id: target.id,
+      email: target.email,
+      displayName: target.displayName,
+      role: target.role,
+    },
+  });
+});
+

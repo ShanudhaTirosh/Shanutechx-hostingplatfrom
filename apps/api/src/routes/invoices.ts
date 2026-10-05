@@ -13,6 +13,52 @@ invoicesRouter.use(requireAuth);
 
 const INVOICES_DIR = process.env.INVOICES_DIR || '/var/lib/shanutechx/invoices';
 
+/**
+ * GET /api/invoices - Lists all invoices (proforma & paid) for the current user or admin
+ */
+invoicesRouter.get('/invoices', async (req: AuthedRequest, res) => {
+  const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev' || req.user!.role === 'support';
+  const where = isStaff ? {} : { userId: req.user!.id };
+
+  const orders = await prisma.order.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      user: { select: { id: true, email: true, displayName: true } },
+      items: { include: { service: true, plan: { include: { product: true } } } },
+      payments: { select: { id: true, status: true, method: true, createdAt: true } },
+      invoice: true,
+    },
+    take: 100,
+  });
+
+  const invoices = orders.map((order: any) => {
+    const createdDate = new Date(order.createdAt);
+    const dueDate = new Date(createdDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const invoiceNumber = `INV-${createdDate.getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`;
+    const invoiceStatus = order.status === 'paid' ? 'paid' : order.status === 'awaiting_payment' ? 'proforma' : 'cancelled';
+
+    return {
+      id: order.invoice?.id || order.id,
+      invoiceNumber,
+      orderId: order.id,
+      issuedAt: order.createdAt,
+      dueAt: dueDate.toISOString(),
+      status: invoiceStatus,
+      isProforma: order.status !== 'paid',
+      total: order.total,
+      totalLkr: order.totalLkr,
+      currency: order.currency || 'LKR',
+      customer: order.user,
+      itemCount: order.items.length,
+      itemsSummary: order.items.map((it: any) => it.service?.name || it.plan?.name || 'Service').join(', '),
+      pdfAvailable: !!order.invoice?.pdfUrl || order.status === 'paid',
+    };
+  });
+
+  res.json({ invoices, total: invoices.length });
+});
+
 async function loadOwnedOrderWithItems(req: AuthedRequest, orderId: string) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },

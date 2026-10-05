@@ -687,6 +687,7 @@ managedDatabasesRouter.patch('/managed-databases/:id/users/:username', async (re
  */
 managedDatabasesRouter.patch('/managed-databases/:id/config', async (req: AuthedRequest, res) => {
   const configSchema = z.object({
+    name: z.string().min(1).optional(),
     dbName: z.string().optional(),
     allowedIps: z.array(z.string()).optional(),
     maxConnections: z.number().optional(),
