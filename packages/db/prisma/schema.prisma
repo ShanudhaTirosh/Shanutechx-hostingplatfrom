@@ -58,6 +58,8 @@ enum PaymentMethod {
 
 enum TicketStatus {
   open
+  claimed
+  on_hold
   pending
   closed
 }
@@ -196,6 +198,8 @@ model User {
   webmailEvents         WebmailEvent[]
   reviews               Review[]
   notificationChannels  NotificationChannel[]
+  claimedTickets        Ticket[]               @relation("ClaimedTickets")
+  createdAnnouncements  Announcement[]         @relation("CreatedAnnouncements")
 
   @@index([assignedAdminId])
 }
@@ -1326,21 +1330,53 @@ model AuditLog {
 // living in Firebase. A ticket can optionally reference an order, so a
 // "my payment hasn't gone through" ticket can show the order inline.
 model Ticket {
-  id        String         @id @default(cuid())
-  userId    String
-  user      User           @relation(fields: [userId], references: [id])
-  orderId   String?
-  order     Order?         @relation(fields: [orderId], references: [id])
-  subject   String
-  status    TicketStatus   @default(open)
-  priority  TicketPriority @default(medium)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id               String         @id @default(cuid())
+  userId           String
+  user             User           @relation(fields: [userId], references: [id])
+  orderId          String?
+  order            Order?         @relation(fields: [orderId], references: [id])
+  subject          String
+  category         String         @default("support") // support | billing | purchase | other
+  status           TicketStatus   @default(open)
+  priority         TicketPriority @default(medium)
+  claimedById      String?
+  claimedBy        User?          @relation("ClaimedTickets", fields: [claimedById], references: [id])
+  closeReason      String?
+  closedAt         DateTime?
+  rating           Int?
+  feedback         String?
+  transcript       String?        @db.Text
+  lastActivityAt   DateTime       @default(now())
+  originPlatform   String         @default("web") // web | discord | whatsapp
+  discordChannelId String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   messages TicketMessage[]
 
   @@index([userId])
   @@index([orderId])
+  @@index([claimedById])
+  @@index([status])
+}
+
+model Announcement {
+  id             String    @id @default(cuid())
+  title          String
+  message        String    @db.Text
+  targetPlatform String    @default("both") // discord | whatsapp | both
+  channelId      String?
+  color          Int?      @default(8140525)
+  imageUrl       String?
+  rolePing       String?
+  status         String    @default("sent") // draft | scheduled | sending | sent | failed
+  scheduledFor   DateTime?
+  sentAt         DateTime?
+  createdById    String?
+  createdBy      User?     @relation("CreatedAnnouncements", fields: [createdById], references: [id])
+  createdAt      DateTime  @default(now())
+
+  @@index([status, scheduledFor])
 }
 
 model TicketMessage {

@@ -146,7 +146,9 @@ async function resetSession() {
 let messageListeners = [];
 
 function onMessageUpsert(listener) {
-  messageListeners.push(listener);
+  if (!messageListeners.includes(listener)) {
+    messageListeners.push(listener);
+  }
   if (sock) {
     sock.ev.on('messages.upsert', listener);
   }

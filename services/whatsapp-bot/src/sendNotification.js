@@ -33,7 +33,19 @@ async function processQueue() {
 
     try {
       const sock = getSocket();
-      await sock.sendMessage(jid, { text: item.message });
+      if (item.document) {
+        const buffer = Buffer.isBuffer(item.document.buffer)
+          ? item.document.buffer
+          : Buffer.from(item.document.base64 || '', 'base64');
+        await sock.sendMessage(jid, {
+          document: buffer,
+          mimetype: item.document.mimetype || 'application/pdf',
+          fileName: item.document.fileName || 'document.pdf',
+          caption: item.message || '',
+        });
+      } else {
+        await sock.sendMessage(jid, { text: item.message });
+      }
       queue.shift();
       item.resolve();
     } catch (err) {
@@ -52,10 +64,10 @@ async function processQueue() {
   processing = false;
 }
 
-/** Enqueue a notification. Resolves once it's actually been sent. */
-function sendNotification(phoneNumber, message) {
+/** Enqueue a notification (text or document). Resolves once sent. */
+function sendNotification(phoneNumber, message, document = null) {
   return new Promise((resolve, reject) => {
-    queue.push({ phoneNumber, message, resolve, reject });
+    queue.push({ phoneNumber, message, document, resolve, reject });
     processQueue();
   });
 }

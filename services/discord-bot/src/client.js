@@ -10,11 +10,14 @@ const logger = pino({
 });
 
 let client = null;
-let ready = false;
+let isReady = false;
 
 async function registerSlashCommands(clientId) {
   const token = process.env.DISCORD_BOT_TOKEN;
-  if (!token) return;
+  if (!token) {
+    logger.warn('DISCORD_BOT_TOKEN missing in env. Skipping slash command registration.');
+    return;
+  }
 
   try {
     const rest = new REST({ version: '10' }).setToken(token);
@@ -29,6 +32,15 @@ async function registerSlashCommands(clientId) {
 }
 
 function connect() {
+  if (client) {
+    try {
+      client.removeAllListeners();
+      client.destroy();
+    } catch (_) {}
+    client = null;
+    isReady = false;
+  }
+
   client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
@@ -39,8 +51,8 @@ function connect() {
   });
 
   client.once('ready', async () => {
-    ready = true;
-    logger.info({ tag: client.user.tag }, 'Discord bot connected');
+    isReady = true;
+    logger.info({ tag: client.user.tag }, 'Discord bot connected successfully.');
     await registerSlashCommands(client.user.id);
   });
 
@@ -48,7 +60,7 @@ function connect() {
     try {
       await handleInteraction(interaction);
     } catch (err) {
-      logger.error({ err }, 'Error executing Discord interaction');
+      logger.error({ err }, 'Unhandled error executing Discord interaction');
     }
   });
 
@@ -74,7 +86,7 @@ function connect() {
         const apiBase = process.env.API_INTERNAL_URL || 'http://localhost:4000';
         const secret = process.env.DISCORD_INTERNAL_SECRET;
 
-        await fetch(`${apiBase}/api/internal/reply-ticket`, {
+        const res = await fetch(`${apiBase}/api/internal/reply-ticket`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -86,7 +98,10 @@ function connect() {
             staffUserLabel: `${message.author.username} (via Discord Channel)`,
           }),
         });
-        logger.info({ ticketId, author: message.author.username }, 'Synced Discord channel message to ticket thread');
+
+        if (res.ok) {
+          logger.info({ ticketId, author: message.author.username }, 'Synced Discord channel message to ticket thread');
+        }
       } catch (err) {
         logger.error({ err, ticketId }, 'Failed to relay Discord ticket message to API');
       }
@@ -94,15 +109,21 @@ function connect() {
   });
 
   client.on('error', (err) => {
-    logger.error({ err }, 'Discord client error');
+    logger.error({ err }, 'Discord client connection error');
   });
 
-  return client.login(process.env.DISCORD_BOT_TOKEN);
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!token) {
+    logger.error('DISCORD_BOT_TOKEN not provided in .env');
+    return Promise.reject(new Error('DISCORD_BOT_TOKEN missing'));
+  }
+
+  return client.login(token);
 }
 
 function getClient() {
-  if (!client || !ready) {
-    throw new Error('Discord client not connected yet');
+  if (!client || !isReady) {
+    throw new Error('Discord client not connected or not ready yet');
   }
   return client;
 }

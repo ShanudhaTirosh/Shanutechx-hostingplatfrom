@@ -1,7 +1,9 @@
-const fetch = globalThis.fetch;
+const { RateLimiter } = require('./utils');
 
 const API_BASE = process.env.API_INTERNAL_URL || 'http://localhost:3000';
 const INTERNAL_SECRET = process.env.WHATSAPP_INTERNAL_SECRET;
+
+const rateLimiter = new RateLimiter(6, 60000); // 6 commands per minute per phone
 
 async function apiFetch(path, options = {}) {
   try {
@@ -13,55 +15,309 @@ async function apiFetch(path, options = {}) {
         ...(options.headers || {}),
       },
     });
-    if (!res.ok) return null;
-    return res.json().catch(() => null);
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      return { _error: true, status: res.status, error: errBody.error || 'Request failed' };
+    }
+    return res.json().catch(() => ({}));
   } catch (err) {
-    return null;
+    return { _error: true, status: 500, error: err.message };
   }
 }
 
+// In-memory state machine for interactive ticket creation menus per phone number
+const userPendingMenu = new Map();
+
+const FAQ_RESPONSES = {
+  deploy: `*Deploying Apps on ShanuTechX*\n\n1. Log into https://${process.env.ROOT_DOMAIN || 'shanutechx.com'}/dashboard\n2. Click *New Deployment* and select your Git repository or Docker image.\n3. Configure your environment variables and port exposure.\n4. Click *Deploy*! Autonomous container provisioning takes under 30 seconds.`,
+  database: `*Managed Databases*\n\nShanuTechX supports one-click provisioning for PostgreSQL 16, MySQL 8, Redis, and MongoDB.\nVisit Dashboard -> Databases Hub to launch a managed database or self-hosted Supabase stack instantly.`,
+  ssh: `*Interactive Web SSH*\n\nAccess your host node terminal directly in browser via Dashboard -> Compute Nodes -> Terminal. WebSockets SSH with xterm.js encryption is active by default.`,
+  domain: `*Custom Domains & Port Exposure*\n\nEvery project automatically gets a Cloudflare DNS sub-domain (\`node-label.rootDomain\`). You can attach custom domains and map custom ports under Dashboard -> Port Exposures.`,
+  pricing: `*ShanuTechX Pricing*\n\n• Micro Node: \$5/mo (1 vCPU, 1GB RAM, 20GB SSD)\n• Standard Node: \$15/mo (2 vCPU, 4GB RAM, 80GB SSD)\n• High-Performance Node: \$35/mo (4 vCPU, 8GB RAM, 160GB SSD)\nVisit https://${process.env.ROOT_DOMAIN || 'shanutechx.com'}/pricing for details.`,
+};
+
 async function handleCommand(senderPhone, messageText) {
   const text = messageText.trim();
+  const cleanPhone = senderPhone.replace(/[^0-9]/g, '');
 
+  if (rateLimiter.isRateLimited(cleanPhone)) {
+    return `[ANTI-SPAM] You are sending commands too fast. Please wait a minute.`;
+  }
+
+  // Handle pending interactive menu choice for tickets
+  if (userPendingMenu.has(cleanPhone)) {
+    const pending = userPendingMenu.get(cleanPhone);
+
+    if (pending.step === 'SELECT_CATEGORY') {
+      const choice = text.trim();
+      const categories = { '1': 'support', '2': 'billing', '3': 'purchase', '4': 'other' };
+      if (categories[choice]) {
+        const category = categories[choice];
+        userPendingMenu.set(cleanPhone, { step: 'ENTER_DETAILS', category });
+        return `Selected category: *${category.toUpperCase()}*\n\nPlease reply with your ticket subject and details in this format:\n\`Subject | Detailed message\``;
+      } else {
+        userPendingMenu.delete(cleanPhone);
+        return `Invalid category selection. Ticket creation cancelled. Type \`!ticket\` to try again.`;
+      }
+    }
+
+    if (pending.step === 'ENTER_DETAILS') {
+      const parts = text.split('|');
+      const subject = parts[0]?.trim() || `Ticket from WhatsApp (+${cleanPhone})`;
+      const message = parts[1]?.trim() || parts[0]?.trim() || 'No description provided';
+      userPendingMenu.delete(cleanPhone);
+
+      const res = await apiFetch('/api/internal/open-ticket', {
+        method: 'POST',
+        body: JSON.stringify({
+          customerPhone: cleanPhone,
+          category: pending.category,
+          subject,
+          message,
+          originPlatform: 'whatsapp',
+        }),
+      });
+
+      if (res._error) {
+        return `Failed to create ticket: ${res.error}`;
+      }
+
+      return `*Support Ticket Created Successfully!*\n\n• *Ticket ID*: \`#${res.ticket.id.slice(0, 8).toUpperCase()}\`\n• *Category*: ${res.ticket.category.toUpperCase()}\n• *Subject*: ${res.ticket.subject}\n• *Status*: OPEN\n\nA support agent will reply shortly. You can send replies to this ticket using:\n\`!reply ${res.ticket.id.slice(0, 8)} your message\``;
+    }
+  }
+
+  // 1. Status Command
   if (text.startsWith('!status') || text.startsWith('/status')) {
     const health = await apiFetch('/api/health');
-    if (!health) return '[WARNING] *ShanuTechX Platform*: Health check endpoint offline.';
+    if (health._error) return '[WARNING] *ShanuTechX Platform*: Health check endpoint offline.';
     return `*ShanuTechX System Status*\n\n• *Status*: ${health.ok ? '[ONLINE]' : '[DEGRADED]'}\n• *Timestamp*: ${new Date().toLocaleString()}\n• *API Base*: ${API_BASE}`;
   }
 
+  // 2. Deployments Command
   if (text.startsWith('!deployments') || text.startsWith('/deployments')) {
-    const cleanPhone = senderPhone.replace(/[^0-9]/g, '');
     const data = await apiFetch(`/api/internal/customer-summary?phone=${encodeURIComponent(cleanPhone)}`);
-
-    if (!data || !data.deployments || data.deployments.length === 0) {
-      return `*ShanuTechX Deployments*\n\nNo active deployments found linked to phone number (+${cleanPhone}).`;
+    if (data._error || !data.deployments || data.deployments.length === 0) {
+      return `*ShanuTechX Deployments*\n\nNo active deployments found linked to (+${cleanPhone}).`;
     }
-
     const list = data.deployments
       .map((d) => `• *${d.name}*: ${d.status.toUpperCase()} (${d.publicUrl || 'internal'})`)
       .join('\n');
     return `*Your Active Deployments*\n\n${list}`;
   }
 
-  if (text.startsWith('!tickets') || text.startsWith('/tickets')) {
-    const cleanPhone = senderPhone.replace(/[^0-9]/g, '');
-    const data = await apiFetch(`/api/internal/customer-summary?phone=${encodeURIComponent(cleanPhone)}`);
+  // 3. Ticket Interactive Menu & Commands
+  if (text === '!ticket' || text === '/ticket' || text === '!ticket open') {
+    userPendingMenu.set(cleanPhone, { step: 'SELECT_CATEGORY' });
+    return `*ShanuTechX Support Ticket System*\n\nPlease select a ticket category by replying with a number:\n\n1. *Support* - Technical issues & container errors\n2. *Billing* - Invoices, payments & subscriptions\n3. *Purchase* - Plan upgrades & new orders\n4. *Other* - General inquiries\n\nOr open directly using:\n\`!ticket open [category] [subject] | [message]\``;
+  }
 
-    if (!data || !data.tickets || data.tickets.length === 0) {
-      return `*ShanuTechX Support Tickets*\n\nNo open support tickets linked to (+${cleanPhone}).`;
+  if (text.startsWith('!ticket open ')) {
+    const body = text.slice('!ticket open '.length).trim();
+    const parts = body.split(' ');
+    const categoryInput = parts[0]?.toLowerCase();
+    const validCategories = ['support', 'billing', 'purchase', 'other'];
+    let category = 'support';
+    let restText = body;
+
+    if (validCategories.includes(categoryInput)) {
+      category = categoryInput;
+      restText = parts.slice(1).join(' ');
     }
 
+    const detailParts = restText.split('|');
+    const subject = detailParts[0]?.trim() || `Ticket from WhatsApp (+${cleanPhone})`;
+    const message = detailParts[1]?.trim() || detailParts[0]?.trim() || 'No description provided';
+
+    const res = await apiFetch('/api/internal/open-ticket', {
+      method: 'POST',
+      body: JSON.stringify({
+        customerPhone: cleanPhone,
+        category,
+        subject,
+        message,
+        originPlatform: 'whatsapp',
+      }),
+    });
+
+    if (res._error) {
+      return `Failed to create ticket: ${res.error}`;
+    }
+
+    return `*Support Ticket Created Successfully!*\n\n• *Ticket ID*: \`#${res.ticket.id.slice(0, 8).toUpperCase()}\`\n• *Category*: ${res.ticket.category.toUpperCase()}\n• *Subject*: ${res.ticket.subject}\n• *Status*: OPEN\n\nA support agent will reply shortly. You can send replies using:\n\`!reply ${res.ticket.id.slice(0, 8)} your message\``;
+  }
+
+  // 4. Ticket List Command
+  if (text.startsWith('!tickets') || text.startsWith('/tickets')) {
+    const data = await apiFetch(`/api/internal/customer-summary?phone=${encodeURIComponent(cleanPhone)}`);
+    if (data._error || !data.tickets || data.tickets.length === 0) {
+      return `*ShanuTechX Support Tickets*\n\nNo open support tickets linked to (+${cleanPhone}).`;
+    }
     const list = data.tickets
       .map((t) => `• *#${t.id.slice(0, 8).toUpperCase()}*: ${t.subject} [${t.status.toUpperCase()}]`)
       .join('\n');
     return `*Your Open Support Tickets*\n\n${list}`;
   }
 
-  if (text.startsWith('!help') || text.startsWith('/help') || text === 'help' || text === 'hi' || text === 'hello') {
-    return `*ShanuTechX Bot Commands*\n\n• *!status* - System cluster health\n• *!deployments* - List your application deployments\n• *!tickets* - Check your support tickets\n• *!help* - Show command list\n\nNeed technical assistance? Open a ticket at https://${process.env.ROOT_DOMAIN || 'shanutechx.com'}/tickets`;
+  // 5. Reply to Ticket Command
+  if (text.startsWith('!reply ')) {
+    const body = text.slice('!reply '.length).trim();
+    const spaceIdx = body.indexOf(' ');
+    if (spaceIdx === -1) {
+      return `Usage: \`!reply [ticketId] [your message]\``;
+    }
+    const ticketId = body.slice(0, spaceIdx).trim();
+    const replyMessage = body.slice(spaceIdx + 1).trim();
+
+    const res = await apiFetch('/api/internal/reply-ticket', {
+      method: 'POST',
+      body: JSON.stringify({
+        ticketId,
+        senderPhone: cleanPhone,
+        message: replyMessage,
+        originPlatform: 'whatsapp',
+      }),
+    });
+
+    if (res._error) {
+      return `Failed to post reply: ${res.error}`;
+    }
+
+    return `*Reply sent to ticket #${ticketId.slice(0, 8).toUpperCase()}*`;
   }
 
-  return null; // Not a recognized command
+  // 6. Rate Closed Ticket Command
+  if (text.startsWith('!rate ')) {
+    const body = text.slice('!rate '.length).trim();
+    const parts = body.split(' ');
+    const ticketId = parts[0]?.trim();
+    const ratingStr = parts[1]?.trim();
+    const feedback = parts.slice(2).join(' ').trim();
+
+    const rating = parseInt(ratingStr, 10);
+    if (!ticketId || isNaN(rating) || rating < 1 || rating > 5) {
+      return `Usage: \`!rate [ticketId] [1-5] [optional feedback]\` (e.g., \`!rate abc12345 5 Great support!\`)`;
+    }
+
+    const res = await apiFetch('/api/internal/rate-ticket', {
+      method: 'POST',
+      body: JSON.stringify({
+        ticketId,
+        rating,
+        feedback,
+      }),
+    });
+
+    if (res._error) {
+      return `Failed to record feedback: ${res.error}`;
+    }
+
+    return `Thank you! Your ${rating}-star rating has been recorded for ticket #${ticketId.slice(0, 8).toUpperCase()}.`;
+  }
+
+  // 7. Staff Commands (Claim, Unclaim, Close, Broadcast, Invoice)
+  if (text.startsWith('!claim ')) {
+    const ticketId = text.slice('!claim '.length).trim();
+    const res = await apiFetch('/api/internal/claim-ticket', {
+      method: 'POST',
+      body: JSON.stringify({ ticketId, staffPhone: cleanPhone, force: text.includes('--force') }),
+    });
+    if (res._error) return `Failed to claim ticket: ${res.error}`;
+    return `*Ticket #${ticketId.slice(0, 8).toUpperCase()} Claimed Successfully*`;
+  }
+
+  if (text.startsWith('!unclaim ')) {
+    const ticketId = text.slice('!unclaim '.length).trim();
+    const res = await apiFetch('/api/internal/unclaim-ticket', {
+      method: 'POST',
+      body: JSON.stringify({ ticketId, staffPhone: cleanPhone }),
+    });
+    if (res._error) return `Failed to unclaim ticket: ${res.error}`;
+    return `*Ticket #${ticketId.slice(0, 8).toUpperCase()} Unclaimed*`;
+  }
+
+  if (text.startsWith('!close ')) {
+    const body = text.slice('!close '.length).trim();
+    const parts = body.split(' ');
+    const ticketId = parts[0]?.trim();
+    const reason = parts.slice(1).join(' ').trim() || 'Resolved by staff via WhatsApp';
+
+    const res = await apiFetch('/api/internal/close-ticket', {
+      method: 'POST',
+      body: JSON.stringify({ ticketId, reason, closedBy: `whatsapp:${cleanPhone}` }),
+    });
+    if (res._error) return `Failed to close ticket: ${res.error}`;
+    return `*Ticket #${ticketId.slice(0, 8).toUpperCase()} Closed*`;
+  }
+
+  if (text.startsWith('!broadcast ')) {
+    const message = text.slice('!broadcast '.length).trim();
+    const res = await apiFetch('/api/internal/announcements/send', {
+      method: 'POST',
+      body: JSON.stringify({
+        platforms: ['whatsapp'],
+        title: 'Platform Announcement',
+        message,
+        authorName: `Staff (+${cleanPhone})`,
+      }),
+    });
+    if (res._error) return `Broadcast failed: ${res.error}`;
+    return `*WhatsApp Broadcast Queued Successfully* (${res.deliveredCount || 0} recipients)`;
+  }
+
+  if (text.startsWith('!invoice ')) {
+    const body = text.slice('!invoice '.length).trim();
+    const parts = body.split(' ');
+    const userEmail = parts[0];
+    const amount = parseFloat(parts[1]);
+    const description = parts.slice(2).join(' ') || 'Platform Hosting Service';
+
+    if (!userEmail || isNaN(amount)) {
+      return `Usage: \`!invoice [userEmail] [amount] [description]\``;
+    }
+
+    const res = await apiFetch('/api/internal/invoices/generate-and-send', {
+      method: 'POST',
+      body: JSON.stringify({
+        userEmail,
+        items: [{ name: description, amount, quantity: 1 }],
+        createdBy: `whatsapp:${cleanPhone}`,
+      }),
+    });
+
+    if (res._error) return `Invoice delivery failed: ${res.error}`;
+    return `*Invoice #${res.invoice.invoiceNumber} Generated & Sent to ${userEmail}* (Total: \$${res.invoice.total.toFixed(2)})`;
+  }
+
+  // 8. FAQ Auto-replies & Knowledge Base
+  const lowerText = text.toLowerCase();
+  for (const [kw, resp] of Object.entries(FAQ_RESPONSES)) {
+    if (lowerText.includes(kw)) {
+      return resp;
+    }
+  }
+
+  // 9. Help Command
+  if (text.startsWith('!help') || text.startsWith('/help') || text === 'help' || text === 'hi' || text === 'hello') {
+    return `*ShanuTechX WhatsApp Virtual Assistant*\n\n` +
+      `*Customer Commands:*\n` +
+      `• *!status* - Check cloud cluster system health\n` +
+      `• *!deployments* - List your container deployments\n` +
+      `• *!ticket* - Interactive menu to open a support ticket\n` +
+      `• *!ticket open [category] [subject] | [message]* - Quick open ticket\n` +
+      `• *!tickets* - List your open tickets\n` +
+      `• *!reply [ticketId] [message]* - Send reply to ticket\n` +
+      `• *!rate [ticketId] [1-5] [feedback]* - Rate resolved ticket\n` +
+      `• *!help* - Show this command list\n\n` +
+      `*Staff Commands:*\n` +
+      `• *!claim [ticketId]* - Claim a support ticket\n` +
+      `• *!unclaim [ticketId]* - Release ticket claim\n` +
+      `• *!close [ticketId] [reason]* - Close ticket\n` +
+      `• *!broadcast [message]* - Send WhatsApp broadcast\n` +
+      `• *!invoice [email] [amount] [desc]* - Generate PDF invoice\n\n` +
+      `Need more help? Visit https://${process.env.ROOT_DOMAIN || 'shanutechx.com'}`;
+  }
+
+  return null; // Not a recognized command or keyword
 }
 
 module.exports = { handleCommand };

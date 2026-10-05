@@ -5,6 +5,7 @@ import { env } from '../env';
 import { fulfillOrder } from '../lib/orderFulfillment';
 import { notifyCustomer, notifyTicketEmbed } from '../lib/notifications';
 import { renderPaymentReviewEmail, renderTicketReplyEmail } from '../lib/emailTemplates';
+import { generateInvoicePdf } from '../lib/invoicePdf';
 
 export const internalBotRouter = Router();
 
@@ -44,10 +45,7 @@ internalBotRouter.get('/internal/customer-summary', async (req: Request, res: Re
 
   let user = await prisma.user.findFirst({
     where: {
-      OR: [
-        { phoneNumber: phone },
-        { phoneNumber: `+${phone}` },
-      ],
+      OR: [{ phoneNumber: phone }, { phoneNumber: `+${phone}` }],
     },
   });
 
@@ -73,8 +71,8 @@ internalBotRouter.get('/internal/customer-summary', async (req: Request, res: Re
       take: 10,
     }),
     prisma.ticket.findMany({
-      where: { userId: user.id, status: { in: ['open', 'pending'] } },
-      select: { id: true, subject: true, status: true, priority: true },
+      where: { userId: user.id, status: { in: ['open', 'claimed', 'on_hold', 'pending'] } },
+      select: { id: true, subject: true, category: true, status: true, priority: true },
       take: 10,
     }),
   ]);
@@ -84,7 +82,6 @@ internalBotRouter.get('/internal/customer-summary', async (req: Request, res: Re
 
 /**
  * GET /api/internal/deployments-summary?email=customer@example.com
- * Retrieve deployments for a customer matched by email
  */
 internalBotRouter.get('/internal/deployments-summary', async (req: Request, res: Response) => {
   const email = typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
@@ -105,7 +102,7 @@ internalBotRouter.get('/internal/deployments-summary', async (req: Request, res:
     name: d.subdomain || d.id,
     subdomain: d.subdomain,
     status: d.status,
-    url: d.customDomain ? `https://${d.customDomain}` : (d.subdomain ? `https://${d.subdomain}.${env.rootDomain}` : null),
+    url: d.customDomain ? `https://${d.customDomain}` : d.subdomain ? `https://${d.subdomain}.${env.rootDomain}` : null,
   }));
 
   res.json({ deployments: formatted });
@@ -113,14 +110,38 @@ internalBotRouter.get('/internal/deployments-summary', async (req: Request, res:
 
 /**
  * GET /api/internal/open-tickets
- * Retrieve open customer support tickets for internal bots (Discord/WhatsApp)
+ * Retrieve open customer support tickets for internal bots with search & category filters
  */
-internalBotRouter.get('/internal/open-tickets', async (_req: Request, res: Response) => {
+internalBotRouter.get('/internal/open-tickets', async (req: Request, res: Response) => {
+  const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+  const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+  const search = typeof req.query.search === 'string' ? req.query.search.trim() : undefined;
+
+  const whereClause: any = {};
+  if (status) {
+    whereClause.status = status;
+  } else {
+    whereClause.status = { in: ['open', 'claimed', 'on_hold', 'pending'] };
+  }
+  if (category && category !== 'all') {
+    whereClause.category = category;
+  }
+  if (search) {
+    whereClause.OR = [
+      { subject: { contains: search, mode: 'insensitive' } },
+      { id: { contains: search, mode: 'insensitive' } },
+      { user: { email: { contains: search, mode: 'insensitive' } } },
+    ];
+  }
+
   const tickets = await prisma.ticket.findMany({
-    where: { status: { in: ['open', 'pending'] } },
-    orderBy: { createdAt: 'desc' },
-    take: 25,
-    include: { user: { select: { email: true, displayName: true } } },
+    where: whereClause,
+    orderBy: { updatedAt: 'desc' },
+    take: 30,
+    include: {
+      user: { select: { email: true, displayName: true, phoneNumber: true, discordUserId: true } },
+      claimedBy: { select: { email: true, displayName: true } },
+    },
   });
 
   res.json({ tickets });
@@ -128,7 +149,6 @@ internalBotRouter.get('/internal/open-tickets', async (_req: Request, res: Respo
 
 /**
  * GET /api/internal/all-deployments
- * Retrieve all active container deployments across nodes
  */
 internalBotRouter.get('/internal/all-deployments', async (_req: Request, res: Response) => {
   const deployments = await prisma.deployment.findMany({
@@ -147,7 +167,7 @@ internalBotRouter.get('/internal/all-deployments', async (_req: Request, res: Re
     id: d.id,
     name: d.subdomain ? `${d.subdomain}.${env.rootDomain}` : d.id,
     status: d.status,
-    publicUrl: d.customDomain ? `https://${d.customDomain}` : (d.subdomain ? `https://${d.subdomain}.${env.rootDomain}` : null),
+    publicUrl: d.customDomain ? `https://${d.customDomain}` : d.subdomain ? `https://${d.subdomain}.${env.rootDomain}` : null,
     node: d.node,
   }));
 
@@ -156,7 +176,6 @@ internalBotRouter.get('/internal/all-deployments', async (_req: Request, res: Re
 
 /**
  * POST /api/internal/review-payment
- * Review manual payment proof (Approve or Decline) right inside Discord
  */
 internalBotRouter.post('/internal/review-payment', async (req: Request, res: Response) => {
   const { orderId, paymentId, approve, reason, reviewedBy } = req.body || {};
@@ -212,7 +231,6 @@ internalBotRouter.post('/internal/review-payment', async (req: Request, res: Res
     }
   }
 
-  // Notify customer of review outcome
   const emailRender = renderPaymentReviewEmail({
     orderId: order.id,
     approved: approve,
@@ -221,11 +239,19 @@ internalBotRouter.post('/internal/review-payment', async (req: Request, res: Res
 
   void notifyCustomer(order.user, emailRender.text);
 
+  await prisma.auditLog.create({
+    data: {
+      action: approve ? 'payment.approved' : 'payment.declined',
+      target: `Order ${order.id}`,
+      actorRole: 'staff',
+    },
+  });
+
   res.json({
     ok: true,
     orderId: order.id,
     status: newOrderStatus,
-    reviewedBy: reviewedBy || 'Discord Bot',
+    reviewedBy: reviewedBy || 'Bot Reviewer',
   });
 });
 
@@ -234,13 +260,12 @@ internalBotRouter.post('/internal/review-payment', async (req: Request, res: Res
  * Open support ticket from Discord/WhatsApp bot. Matches customer by discordUserId, phone, or email.
  */
 internalBotRouter.post('/internal/open-ticket', async (req: Request, res: Response) => {
-  const { discordUserId, userEmail, phone, subject, message, priority } = req.body || {};
+  const { discordUserId, userEmail, phone, category, subject, message, priority, originPlatform } = req.body || {};
 
   if (!subject || !message) {
     return res.status(400).json({ error: 'subject and message are required' });
   }
 
-  // Find user by discordUserId, email, or phone
   let user: any = null;
   if (discordUserId) {
     user = await prisma.user.findFirst({ where: { discordUserId } });
@@ -255,7 +280,6 @@ internalBotRouter.post('/internal/open-ticket', async (req: Request, res: Respon
     });
   }
 
-  // If no registered user, find or default to system/guest dev account
   if (!user) {
     user = await prisma.user.findFirst({ where: { role: { in: ['admin', 'dev'] } } });
   }
@@ -265,12 +289,15 @@ internalBotRouter.post('/internal/open-ticket', async (req: Request, res: Respon
   }
 
   const validPriority = ['low', 'medium', 'high', 'urgent'].includes(priority) ? priority : 'medium';
+  const validCategory = ['support', 'billing', 'purchase', 'other'].includes(category) ? category : 'support';
 
   const ticket = await prisma.ticket.create({
     data: {
       userId: user.id,
       subject,
+      category: validCategory,
       priority: validPriority as any,
+      originPlatform: originPlatform || 'web',
       messages: {
         create: {
           senderId: user.id,
@@ -282,7 +309,6 @@ internalBotRouter.post('/internal/open-ticket', async (req: Request, res: Respon
     include: { messages: true, user: true },
   });
 
-  // Emit Discord embed & customer DMs
   void notifyTicketEmbed({
     ticketId: ticket.id,
     subject: ticket.subject,
@@ -294,15 +320,99 @@ internalBotRouter.post('/internal/open-ticket', async (req: Request, res: Respon
     status: ticket.status,
   });
 
+  await prisma.auditLog.create({
+    data: {
+      action: 'ticket.opened',
+      target: `Ticket ${ticket.id} (${ticket.subject})`,
+      actorRole: 'customer',
+    },
+  });
+
   res.status(201).json({ ok: true, ticket });
 });
 
 /**
+ * POST /api/internal/claim-ticket
+ * Claim ticket. Enforces anti-double-claim unless force=true.
+ */
+internalBotRouter.post('/internal/claim-ticket', async (req: Request, res: Response) => {
+  const { ticketId, staffUserLabel, staffUserId, force } = req.body || {};
+
+  if (!ticketId) return res.status(400).json({ error: 'ticketId is required' });
+
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    include: { user: true, claimedBy: true },
+  });
+
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+  if (ticket.claimedById && !force && ticket.claimedById !== staffUserId) {
+    return res.status(409).json({
+      error: `Ticket is already claimed by ${ticket.claimedBy?.displayName || ticket.claimedBy?.email || 'another staff member'}. Pass force=true to transfer.`,
+    });
+  }
+
+  let staffUser = staffUserId ? await prisma.user.findUnique({ where: { id: staffUserId } }) : null;
+  if (!staffUser) {
+    staffUser = await prisma.user.findFirst({ where: { role: { in: ['admin', 'dev', 'support'] } } });
+  }
+
+  const updated = await prisma.ticket.update({
+    where: { id: ticket.id },
+    data: {
+      status: 'claimed',
+      claimedById: staffUser ? staffUser.id : ticket.userId,
+      lastActivityAt: new Date(),
+      updatedAt: new Date(),
+    },
+    include: { user: true, claimedBy: true },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'ticket.claimed',
+      target: `Ticket ${ticket.id} claimed by ${staffUserLabel || staffUser?.email}`,
+      actorRole: 'staff',
+    },
+  });
+
+  res.json({ ok: true, ticket: updated, claimedBy: staffUserLabel || staffUser?.displayName || staffUser?.email });
+});
+
+/**
+ * POST /api/internal/unclaim-ticket
+ */
+internalBotRouter.post('/internal/unclaim-ticket', async (req: Request, res: Response) => {
+  const { ticketId, staffUserLabel } = req.body || {};
+  if (!ticketId) return res.status(400).json({ error: 'ticketId is required' });
+
+  const updated = await prisma.ticket.update({
+    where: { id: ticketId },
+    data: {
+      status: 'open',
+      claimedById: null,
+      lastActivityAt: new Date(),
+      updatedAt: new Date(),
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'ticket.unclaimed',
+      target: `Ticket ${ticketId} unclaimed by ${staffUserLabel || 'Staff'}`,
+      actorRole: 'staff',
+    },
+  });
+
+  res.json({ ok: true, ticket: updated });
+});
+
+/**
  * POST /api/internal/reply-ticket
- * Allows Discord/WhatsApp bots or staff to reply to a ticket from Discord
  */
 internalBotRouter.post('/internal/reply-ticket', async (req: Request, res: Response) => {
-  const { ticketId, body, staffUserLabel } = req.body || {};
+  const { ticketId, body, staffUserLabel, senderRole } = req.body || {};
 
   if (!ticketId || !body) {
     return res.status(400).json({ error: 'ticketId and body are required' });
@@ -317,76 +427,305 @@ internalBotRouter.post('/internal/reply-ticket', async (req: Request, res: Respo
     return res.status(404).json({ error: 'Ticket not found' });
   }
 
-  // Find staff user or use ticket user for recording
+  const role = senderRole === 'customer' ? 'customer' : 'admin';
   const staffUser =
     (await prisma.user.findFirst({ where: { role: { in: ['admin', 'dev', 'support'] } } })) || ticket.user;
 
   const msg = await prisma.ticketMessage.create({
     data: {
       ticketId: ticket.id,
-      senderId: staffUser.id,
-      senderRole: 'admin',
+      senderId: role === 'customer' ? ticket.userId : staffUser.id,
+      senderRole: role as any,
       body: body,
     },
   });
 
   await prisma.ticket.update({
     where: { id: ticket.id },
-    data: { status: 'pending', updatedAt: new Date() },
+    data: {
+      status: role === 'customer' ? 'open' : 'pending',
+      lastActivityAt: new Date(),
+      updatedAt: new Date(),
+    },
   });
 
-  // Render ticket reply email & notify customer
-  const rendered = renderTicketReplyEmail({
-    ticketSubject: ticket.subject,
-    senderName: staffUserLabel || staffUser.displayName || 'ShanuTechX Support Staff',
-    messageBody: body,
-    ticketId: ticket.id,
-  });
-
-  void notifyCustomer(ticket.user, rendered.text, rendered.html, rendered.subject);
+  if (role !== 'customer') {
+    const rendered = renderTicketReplyEmail({
+      ticketSubject: ticket.subject,
+      senderName: staffUserLabel || staffUser.displayName || 'ShanuTechX Support Staff',
+      messageBody: body,
+      ticketId: ticket.id,
+    });
+    void notifyCustomer(ticket.user, rendered.text, rendered.html, rendered.subject);
+  }
 
   res.json({ ok: true, message: msg });
 });
 
 /**
- * POST /api/internal/claim-ticket
- * Staff claims ticket in Discord
+ * POST /api/internal/close-ticket
+ * Close ticket with reason, generate full transcript, and save to DB
  */
-internalBotRouter.post('/internal/claim-ticket', async (req: Request, res: Response) => {
-  const { ticketId, staffUserLabel } = req.body || {};
+internalBotRouter.post('/internal/close-ticket', async (req: Request, res: Response) => {
+  const { ticketId, reason, staffUserLabel } = req.body || {};
 
   if (!ticketId) return res.status(400).json({ error: 'ticketId is required' });
 
-  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId }, include: { user: true } });
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    include: { user: true, messages: { orderBy: { createdAt: 'asc' } } },
+  });
+
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+  // Generate clean text transcript
+  const transcriptLines = [
+    `==================================================`,
+    `SHANUTECHX SUPPORT TICKET TRANSCRIPT`,
+    `Ticket ID: ${ticket.id}`,
+    `Subject: ${ticket.subject}`,
+    `Category: ${ticket.category.toUpperCase()}`,
+    `Customer: ${ticket.user.email} (${ticket.user.displayName || 'Customer'})`,
+    `Closed Date: ${new Date().toISOString()}`,
+    `Closed By: ${staffUserLabel || 'Staff'}`,
+    `Close Reason: ${reason || 'Resolved'}`,
+    `==================================================\n`,
+  ];
+
+  for (const m of ticket.messages) {
+    const sender = m.senderRole === 'admin' ? 'STAFF' : 'CUSTOMER';
+    transcriptLines.push(`[${m.createdAt.toISOString()}] ${sender}: ${m.body}`);
+  }
+
+  const transcript = transcriptLines.join('\n');
 
   const updated = await prisma.ticket.update({
     where: { id: ticket.id },
-    data: { status: 'open', updatedAt: new Date() },
+    data: {
+      status: 'closed',
+      closeReason: reason || 'Resolved',
+      closedAt: new Date(),
+      transcript,
+      updatedAt: new Date(),
+    },
   });
 
-  res.json({ ok: true, ticket: updated, claimedBy: staffUserLabel || 'Staff Member' });
+  const closeMessage = `Your support ticket "${ticket.subject}" (#${ticket.id.slice(0, 8).toUpperCase()}) has been closed.\nReason: ${
+    reason || 'Resolved'
+  }\n\nPlease rate your experience (1 to 5 stars) by replying with !rate ${ticket.id.slice(0, 8)} [1-5] [feedback]`;
+
+  void notifyCustomer(ticket.user, closeMessage);
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'ticket.closed',
+      target: `Ticket ${ticket.id} (${ticket.subject})`,
+      actorRole: 'staff',
+    },
+  });
+
+  res.json({ ok: true, ticket: updated, transcript });
 });
 
 /**
- * POST /api/internal/close-ticket
- * Staff or customer closes ticket from Discord or Dashboard
+ * POST /api/internal/rate-ticket
  */
-internalBotRouter.post('/internal/close-ticket', async (req: Request, res: Response) => {
-  const { ticketId, staffUserLabel } = req.body || {};
+internalBotRouter.post('/internal/rate-ticket', async (req: Request, res: Response) => {
+  const { ticketId, rating, feedback } = req.body || {};
+  if (!ticketId || typeof rating !== 'number') {
+    return res.status(400).json({ error: 'ticketId and rating (1-5) are required' });
+  }
 
-  if (!ticketId) return res.status(400).json({ error: 'ticketId is required' });
+  const validRating = Math.max(1, Math.min(5, Math.round(rating)));
 
-  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId }, include: { user: true } });
-  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
-
-  const updated = await prisma.ticket.update({
-    where: { id: ticket.id },
-    data: { status: 'closed', updatedAt: new Date() },
+  const ticket = await prisma.ticket.update({
+    where: { id: ticketId },
+    data: {
+      rating: validRating,
+      feedback: feedback || null,
+    },
   });
 
-  void notifyCustomer(ticket.user, `Your support ticket "${ticket.subject}" has been closed by ${staffUserLabel || 'Support'}.`);
-
-  res.json({ ok: true, ticket: updated });
+  res.json({ ok: true, ticket });
 });
 
+/**
+ * POST /api/internal/announcements/send
+ */
+internalBotRouter.post('/internal/announcements/send', async (req: Request, res: Response) => {
+  const { title, message, targetPlatform, channelId, color, imageUrl, rolePing, scheduledFor, createdById } = req.body || {};
+
+  if (!title || !message) {
+    return res.status(400).json({ error: 'title and message are required' });
+  }
+
+  const announcement = await prisma.announcement.create({
+    data: {
+      title,
+      message,
+      targetPlatform: targetPlatform || 'both',
+      channelId: channelId || null,
+      color: color || 8140525,
+      imageUrl: imageUrl || null,
+      rolePing: rolePing || null,
+      status: scheduledFor ? 'scheduled' : 'sent',
+      scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
+      sentAt: scheduledFor ? null : new Date(),
+      createdById: createdById || null,
+    },
+  });
+
+  // If not scheduled, dispatch immediately
+  if (!scheduledFor) {
+    if (targetPlatform === 'discord' || targetPlatform === 'both') {
+      await fetch(`${env.discordBotUrl}/internal/send-channel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-internal-secret': env.discordInternalSecret },
+        body: JSON.stringify({
+          channelId: channelId || process.env.DISCORD_ANNOUNCEMENT_CHANNEL_ID || process.env.ADMIN_ALERT_CHANNEL_ID,
+          message: `${rolePing ? `${rolePing}\n` : ''}📢 **${title}**\n${message}${imageUrl ? `\n${imageUrl}` : ''}`,
+        }),
+      }).catch(() => {});
+    }
+
+    if (targetPlatform === 'whatsapp' || targetPlatform === 'both') {
+      const customers = await prisma.user.findMany({
+        where: { phoneNumber: { not: null } },
+        select: { phoneNumber: true },
+        take: 100,
+      });
+
+      for (const c of customers) {
+        if (c.phoneNumber) {
+          void fetch(`${env.whatsappBotUrl}/internal/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-internal-secret': env.whatsappInternalSecret },
+            body: JSON.stringify({
+              phoneNumber: c.phoneNumber,
+              message: `📢 *${title}*\n\n${message}`,
+            }),
+          }).catch(() => {});
+        }
+      }
+    }
+  }
+
+  res.json({ ok: true, announcement });
+});
+
+/**
+ * POST /api/internal/invoices/generate-and-send
+ * Generates branded PDF invoice and delivers to customer via WhatsApp/Discord DM
+ */
+internalBotRouter.post('/internal/invoices/generate-and-send', async (req: Request, res: Response) => {
+  const { orderId } = req.body || {};
+  if (!orderId) return res.status(400).json({ error: 'orderId is required' });
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      user: true,
+      items: { include: { plan: { include: { product: true } }, service: true } },
+    },
+  });
+
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+
+  const items = order.items.map((i) => ({
+    name: i.plan?.name ?? i.service?.name ?? 'Cloud Hosting Service',
+    quantity: i.quantity,
+    unitPrice: i.plan?.price ?? i.service?.price ?? 0,
+  }));
+
+  const pdfBytes = await generateInvoicePdf({
+    invoiceId: `INV-${new Date(order.createdAt).getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`,
+    issuedAt: order.createdAt,
+    customerEmail: order.user.email,
+    items,
+    total: order.total,
+    currencyLabel: order.currency,
+  });
+
+  const invoice = await prisma.invoice.upsert({
+    where: { orderId: order.id },
+    create: { orderId: order.id, pdfUrl: null },
+    update: {},
+  });
+
+  const messageText = `📄 *Invoice INV-${new Date(order.createdAt).getFullYear()}-${order.id
+    .slice(0, 8)
+    .toUpperCase()}*\n\nOrder Total: ${order.currency} ${(order.total / 100).toFixed(2)}\nStatus: ${order.status.toUpperCase()}\nDate: ${new Date(
+    order.createdAt
+  ).toLocaleDateString()}`;
+
+  void notifyCustomer(order.user, messageText);
+
+  res.json({
+    ok: true,
+    invoiceId: invoice.id,
+    orderId: order.id,
+    pdfBytesLength: pdfBytes.length,
+    message: 'Invoice PDF generated and dispatched to customer channels',
+  });
+});
+
+/**
+ * GET /api/internal/invoices/list
+ */
+internalBotRouter.get('/internal/invoices/list', async (req: Request, res: Response) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim() : undefined;
+
+  const whereClause: any = {};
+  if (search) {
+    whereClause.OR = [
+      { id: { contains: search, mode: 'insensitive' } },
+      { order: { user: { email: { contains: search, mode: 'insensitive' } } } },
+    ];
+  }
+
+  const invoices = await prisma.invoice.findMany({
+    where: whereClause,
+    orderBy: { issuedAt: 'desc' },
+    take: 30,
+    include: {
+      order: {
+        include: {
+          user: { select: { email: true, displayName: true } },
+          items: true,
+        },
+      },
+    },
+  });
+
+  res.json({ invoices });
+});
+
+/**
+ * POST /api/internal/sweep-inactive-tickets
+ * Auto-close tickets inactive >24 hours
+ */
+internalBotRouter.post('/internal/sweep-inactive-tickets', async (_req: Request, res: Response) => {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const staleTickets = await prisma.ticket.findMany({
+    where: {
+      status: { in: ['open', 'pending'] },
+      lastActivityAt: { lt: cutoff },
+    },
+  });
+
+  let closedCount = 0;
+  for (const t of staleTickets) {
+    await prisma.ticket.update({
+      where: { id: t.id },
+      data: {
+        status: 'closed',
+        closeReason: 'Auto-closed after 24h of inactivity',
+        closedAt: new Date(),
+      },
+    });
+    closedCount++;
+  }
+
+  res.json({ ok: true, closedCount, totalScanned: staleTickets.length });
+});

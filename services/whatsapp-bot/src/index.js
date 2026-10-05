@@ -1,8 +1,8 @@
-const crypto = require('crypto');
 const express = require('express');
 const { connect, requestPairingCode, resetSession, getSocket, getTelemetryState, onMessageUpsert, logger } = require('./connection');
 const { sendNotification } = require('./sendNotification');
 const { handleCommand } = require('./commandHandler');
+const { verifyInternalSecret } = require('./utils');
 
 const PORT = process.env.WHATSAPP_PORT || 4100;
 const INTERNAL_SECRET = process.env.WHATSAPP_INTERNAL_SECRET;
@@ -13,7 +13,16 @@ if (!INTERNAL_SECRET) {
 }
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
+// Middleware for timing-safe internal authorization
+function authorizeInternal(req, res, next) {
+  const secret = req.headers['x-internal-secret'];
+  if (!verifyInternalSecret(secret, INTERNAL_SECRET)) {
+    return res.status(401).json({ error: 'Unauthorized internal bot access' });
+  }
+  next();
+}
 
 // Liveness — Docker HEALTHCHECK target.
 app.get('/internal/health', (_req, res) => {
@@ -21,58 +30,27 @@ app.get('/internal/health', (_req, res) => {
 });
 
 // Telemetry & QR Code status endpoint for Admin Panel dashboard
-app.get('/internal/status', (req, res) => {
-  const secret = req.headers['x-internal-secret'];
-  const key = 'shanutechx-whatsapp-gate';
-  const isValid =
-    typeof secret === 'string' &&
-    crypto.timingSafeEqual(
-      crypto.createHmac('sha256', key).update(secret).digest(),
-      crypto.createHmac('sha256', key).update(INTERNAL_SECRET).digest()
-    );
-  if (!isValid) return res.status(401).json({ error: 'Unauthorized' });
-
+app.get('/internal/status', authorizeInternal, (_req, res) => {
   res.json(getTelemetryState());
 });
 
-app.post('/internal/send', async (req, res) => {
-  const secret = req.headers['x-internal-secret'];
-  const key = 'shanutechx-whatsapp-gate';
-  const isValid =
-    typeof secret === 'string' &&
-    crypto.timingSafeEqual(
-      crypto.createHmac('sha256', key).update(secret).digest(),
-      crypto.createHmac('sha256', key).update(INTERNAL_SECRET).digest()
-    );
-  if (!isValid) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const { phoneNumber, message } = req.body || {};
-  if (!phoneNumber || !message) {
-    return res.status(400).json({ error: 'phoneNumber and message are required' });
+// Outbound notification & document invoice delivery endpoint
+app.post('/internal/send', authorizeInternal, async (req, res) => {
+  const { phoneNumber, message, document } = req.body || {};
+  if (!phoneNumber || (!message && !document)) {
+    return res.status(400).json({ error: 'phoneNumber and message or document are required' });
   }
 
   try {
-    await sendNotification(phoneNumber, message);
+    await sendNotification(phoneNumber, message || '', document || null);
     res.json({ ok: true });
   } catch (err) {
-    logger.error({ phoneNumber, err }, 'Failed to send WhatsApp message');
-    res.status(502).json({ error: 'Failed to send message' });
+    logger.error({ phoneNumber, err }, 'Failed to send WhatsApp notification');
+    res.status(502).json({ error: 'Failed to send message: ' + (err.message || 'Unknown error') });
   }
 });
 
-app.post('/internal/pairing-code', async (req, res) => {
-  const secret = req.headers['x-internal-secret'];
-  const key = 'shanutechx-whatsapp-gate';
-  const isValid =
-    typeof secret === 'string' &&
-    crypto.timingSafeEqual(
-      crypto.createHmac('sha256', key).update(secret).digest(),
-      crypto.createHmac('sha256', key).update(INTERNAL_SECRET).digest()
-    );
-  if (!isValid) return res.status(401).json({ error: 'Unauthorized' });
-
+app.post('/internal/pairing-code', authorizeInternal, async (req, res) => {
   const { phoneNumber } = req.body || {};
   if (!phoneNumber) return res.status(400).json({ error: 'phoneNumber is required' });
 
@@ -85,17 +63,7 @@ app.post('/internal/pairing-code', async (req, res) => {
   }
 });
 
-app.post('/internal/reset-session', async (req, res) => {
-  const secret = req.headers['x-internal-secret'];
-  const key = 'shanutechx-whatsapp-gate';
-  const isValid =
-    typeof secret === 'string' &&
-    crypto.timingSafeEqual(
-      crypto.createHmac('sha256', key).update(secret).digest(),
-      crypto.createHmac('sha256', key).update(INTERNAL_SECRET).digest()
-    );
-  if (!isValid) return res.status(401).json({ error: 'Unauthorized' });
-
+app.post('/internal/reset-session', authorizeInternal, async (_req, res) => {
   try {
     await resetSession();
     res.json({ ok: true, message: 'WhatsApp session reset successfully', state: getTelemetryState() });
@@ -105,17 +73,7 @@ app.post('/internal/reset-session', async (req, res) => {
   }
 });
 
-app.post('/internal/reconnect', async (req, res) => {
-  const secret = req.headers['x-internal-secret'];
-  const key = 'shanutechx-whatsapp-gate';
-  const isValid =
-    typeof secret === 'string' &&
-    crypto.timingSafeEqual(
-      crypto.createHmac('sha256', key).update(secret).digest(),
-      crypto.createHmac('sha256', key).update(INTERNAL_SECRET).digest()
-    );
-  if (!isValid) return res.status(401).json({ error: 'Unauthorized' });
-
+app.post('/internal/reconnect', authorizeInternal, async (_req, res) => {
   try {
     await connect();
     res.json({ ok: true, message: 'WhatsApp reconnect initiated', state: getTelemetryState() });
@@ -142,7 +100,8 @@ onMessageUpsert(async ({ messages, type }) => {
       try {
         const reply = await handleCommand(sender, text);
         if (reply) {
-          await sendNotification(sender.split('@')[0], reply);
+          const cleanPhone = sender.split('@')[0];
+          await sendNotification(cleanPhone, reply);
         }
       } catch (err) {
         logger.error({ sender, err }, 'Error handling WhatsApp incoming command');
@@ -151,8 +110,7 @@ onMessageUpsert(async ({ messages, type }) => {
   }
 });
 
-connect()
-  .catch((err) => {
-    logger.fatal({ err }, 'Failed to connect WhatsApp socket');
-    process.exit(1);
-  });
+connect().catch((err) => {
+  logger.fatal({ err }, 'Failed to connect WhatsApp socket');
+  process.exit(1);
+});
