@@ -202,7 +202,7 @@ test('node-agent backup / restore', async (t) => {
     assert.equal(out.ok, true);
     assert.equal(fs.readFileSync(path.join(wsDir, 'keep.txt'), 'utf8'), 'kept');
     assert.equal(fs.readlinkSync(path.join(wsDir, 'safe-rel')), 'keep.txt');
-    assert.equal(fs.readlinkSync(path.join(wsDir, 'dir/safe-up')), '../keep.txt', 'in-tree relative link with ".." is preserved exactly');
+    assert.equal(fs.readlinkSync(path.join(wsDir, 'dir/safe-up')).replace(/\\/g, '/'), '../keep.txt', 'in-tree relative link with ".." is preserved exactly');
     for (const name of ['abs', 'up', 'dir/deep-up']) {
       let exists = true;
       try { fs.lstatSync(path.join(wsDir, name)); } catch { exists = false; }

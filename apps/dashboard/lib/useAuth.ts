@@ -67,12 +67,14 @@ export async function getAuthToken(): Promise<string> {
 export async function apiFetch(path: string, init: RequestInit = {}) {
   const token = await getAuthToken();
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  const impersonatedUserId = typeof window !== 'undefined' ? localStorage.getItem('stx_impersonate_user_id') : null;
 
   return fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       ...init.headers,
       Authorization: `Bearer ${token}`,
+      ...(impersonatedUserId ? { 'X-Impersonate-User-Id': impersonatedUserId } : {}),
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     },
   });

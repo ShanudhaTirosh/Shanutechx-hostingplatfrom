@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/useAuth';
 import { AppUserProvider, useAppUser } from '@/lib/AppUserContext';
 import Sidebar from '@/components/Sidebar';
 import { NotificationChannelBanner } from '@/components/NotificationChannelBanner';
+import { ImpersonationBanner } from '@/components/ImpersonationBanner';
 import { ToastProvider } from '@/components/ui';
 import { RightClickProtector, DevRightClickToggle } from '@/components/RightClickProtector';
 import { ThemeProvider, ThemeToggle } from '@/components/ThemeProvider';
@@ -232,6 +233,7 @@ function GatedLayoutContent({
 
         {/* Page content */}
         <main className="flex-1 min-w-0 py-6 px-4 md:px-7 animate-fade-in">
+          <ImpersonationBanner />
           <NotificationChannelBanner />
           <Suspense fallback={<DashboardSkeleton />}>
             {children}

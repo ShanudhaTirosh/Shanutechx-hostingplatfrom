@@ -189,6 +189,10 @@ export const api = {
       apiFetch(`/api/admin/users/${userId}/ban`, { method: 'POST', body: JSON.stringify({ reason }) }).then((r) =>
         asJson<{ ok: boolean; message: string }>(r)
       ),
+    impersonateUser: (userId: string) =>
+      apiFetch(`/api/admin/impersonate/${userId}`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; user: { id: string; email: string; displayName: string | null }; message: string }>(r)
+      ),
     unbanUser: (userId: string) =>
       apiFetch(`/api/admin/users/${userId}/unban`, { method: 'POST' }).then((r) =>
         asJson<{ ok: boolean; message: string }>(r)
@@ -661,6 +665,12 @@ export const api = {
       }).then((r) => asJson<{ payment: Payment; reasons: string[] }>(r));
     },
     invoiceUrl: (orderId: string) => `/api/orders/${orderId}/invoice`,
+  },
+
+  invoices: {
+    list: () => apiFetch('/api/invoices').then((r) => asJson<{ invoices: any[] }>(r)),
+    get: (id: string) => apiFetch(`/api/invoices/${id}`).then((r) => asJson<{ invoice: any }>(r)),
+    downloadPdfUrl: (id: string) => `/api/invoices/${id}/pdf`,
   },
 
   deployments: {

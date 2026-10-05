@@ -77,9 +77,11 @@ function isExcludedWorkspacePath(p) {
  * targets that climb out, so we skip those explicitly and report them instead of failing the whole restore.
  */
 function isEscapingSymlink(entryPath, linkpath) {
-  if (!linkpath || String(linkpath).startsWith('/')) return true;
-  const dir = path.posix.dirname(String(entryPath).replace(/^\.\//, ''));
-  const resolved = path.posix.normalize(path.posix.join(dir, String(linkpath)));
+  if (!linkpath) return true;
+  const normLink = String(linkpath).replace(/\\/g, '/');
+  if (normLink.startsWith('/') || /^[A-Za-z]:/.test(normLink)) return true;
+  const dir = path.posix.dirname(String(entryPath).replace(/\\/g, '/').replace(/^\.\//, ''));
+  const resolved = path.posix.normalize(path.posix.join(dir, normLink));
   return resolved === '..' || resolved.startsWith('../');
 }
 
