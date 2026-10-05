@@ -197,6 +197,21 @@ export const api = {
       apiFetch(`/api/tickets/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }).then((r) =>
         asJson<{ ticket: Ticket }>(r)
       ),
+    claim: (id: string, force?: boolean) =>
+      apiFetch('/api/internal/claim-ticket', {
+        method: 'POST',
+        body: JSON.stringify({ ticketId: id, force }),
+      }).then((r) => asJson<{ ok: boolean }>(r)),
+    unclaim: (id: string) =>
+      apiFetch('/api/internal/unclaim-ticket', {
+        method: 'POST',
+        body: JSON.stringify({ ticketId: id }),
+      }).then((r) => asJson<{ ok: boolean }>(r)),
+    close: (id: string, reason?: string) =>
+      apiFetch('/api/internal/close-ticket', {
+        method: 'POST',
+        body: JSON.stringify({ ticketId: id, reason }),
+      }).then((r) => asJson<{ ok: boolean }>(r)),
   },
 
   analytics: {

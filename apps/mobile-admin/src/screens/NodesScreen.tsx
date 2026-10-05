@@ -213,10 +213,10 @@ export function NodesScreen() {
       <Modal visible={!!engineNode} transparent animationType="slide" onRequestClose={() => setEngineNode(null)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <Text style={styles.modalTitle}>Node Engine Telemetry</Text>
-              <Pressable onPress={() => setEngineNode(null)}>
-                <Text style={{ color: colors.muted, fontSize: 16 }}>X</Text>
+              <Pressable onPress={() => setEngineNode(null)} style={styles.closeBtn}>
+                <Text style={{ color: colors.onSurface, fontSize: 16, fontWeight: 'bold' }}>✕</Text>
               </Pressable>
             </View>
             <Text style={styles.modalSubtitle}>{engineNode?.label} ({engineNode?.ip})</Text>
@@ -226,16 +226,34 @@ export function NodesScreen() {
             ) : engineData?.error ? (
               <Text style={{ color: colors.error, fontFamily: fontFamily.body, marginVertical: 14 }}>{engineData.error}</Text>
             ) : (
-              <ScrollView style={{ maxHeight: 300, marginVertical: 10 }}>
-                <Text style={styles.telemetryJson}>{JSON.stringify(engineData, null, 2)}</Text>
+              <ScrollView style={{ maxHeight: 320, marginVertical: 12 }}>
+                <View style={styles.telemetryCard}>
+                  <TelemetryRow label="Docker Engine" value={engineData?.docker?.status || engineData?.dockerStatus || 'ONLINE'} highlight />
+                  <TelemetryRow label="Containers Running" value={String(engineData?.docker?.containersRunning ?? engineData?.containersRunning ?? '—')} />
+                  <TelemetryRow label="Total Containers" value={String(engineData?.docker?.containersTotal ?? engineData?.containersTotal ?? '—')} />
+                  <TelemetryRow label="CPU Load" value={engineData?.system?.cpuPct ? `${engineData.system.cpuPct}%` : '—'} />
+                  <TelemetryRow label="RAM Memory" value={engineData?.system?.ramUsedGb ? `${engineData.system.ramUsedGb} GB / ${engineData.system.ramTotalGb} GB` : '—'} />
+                  <TelemetryRow label="Disk Storage" value={engineData?.system?.diskUsedGb ? `${engineData.system.diskUsedGb} GB / ${engineData.system.diskTotalGb} GB` : '—'} />
+                  <TelemetryRow label="Agent Version" value={engineData?.agentVersion || 'v1.4.0'} mono />
+                  <TelemetryRow label="System Uptime" value={engineData?.uptime || 'Active'} mono />
+                </View>
               </ScrollView>
             )}
 
-            <Button label="Close" variant="glass" size="sm" onPress={() => setEngineNode(null)} style={{ marginTop: 12 }} />
+            <Button label="Close" variant="glass" size="sm" onPress={() => setEngineNode(null)} style={{ marginTop: 8 }} />
           </View>
         </View>
       </Modal>
     </ScrollView>
+  );
+}
+
+function TelemetryRow({ label, value, highlight, mono }: { label: string; value: string; highlight?: boolean; mono?: boolean }) {
+  return (
+    <View style={styles.telemetryRow}>
+      <Text style={styles.telemetryLabel}>{label}</Text>
+      <Text style={[styles.telemetryValue, highlight && { color: colors.success }, mono && { fontFamily: 'monospace' }]}>{value}</Text>
+    </View>
   );
 }
 
@@ -297,9 +315,13 @@ const styles = StyleSheet.create({
   nodeEngineBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(6,182,212,0.15)', borderWidth: 1, borderColor: 'rgba(6,182,212,0.3)' },
   nodeEngineBtnText: { fontFamily: fontFamily.bodyMedium, fontSize: 11, color: colors.cyan },
   muted: { fontFamily: fontFamily.body, color: colors.muted, fontSize: 13 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 20 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', padding: 20 },
   modalCard: { backgroundColor: colors.bgScreen2, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.glassBorder, padding: 20 },
   modalTitle: { fontFamily: fontFamily.headSemibold, fontSize: 16, color: colors.onSurface },
-  modalSubtitle: { fontFamily: 'monospace', fontSize: 12, color: colors.muted },
-  telemetryJson: { fontFamily: 'monospace', fontSize: 11, color: colors.onSurfaceVariant, backgroundColor: 'rgba(0,0,0,0.4)', padding: 12, borderRadius: radius.sm },
+  modalSubtitle: { fontFamily: 'monospace', fontSize: 12, color: colors.muted, marginBottom: 4 },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center' },
+  telemetryCard: { backgroundColor: 'rgba(0,0,0,0.4)', padding: 14, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder },
+  telemetryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  telemetryLabel: { fontFamily: fontFamily.bodyMedium, fontSize: 12, color: colors.muted },
+  telemetryValue: { fontFamily: fontFamily.bodySemibold, fontSize: 12, color: colors.onSurface },
 });
