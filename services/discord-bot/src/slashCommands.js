@@ -191,7 +191,7 @@ async function handleInteraction(interaction) {
 
   // Rate Limiter Check
   if (rateLimiter.isRateLimited(userId)) {
-    const errorMsg = '⚠️ Rate limit exceeded. Please wait a minute before running more commands.';
+    const errorMsg = '[RATE LIMIT] Exceeded. Please wait a minute before running more commands.';
     if (interaction.isRepliable()) {
       if (interaction.deferred || interaction.replied) {
         await interaction.followUp({ content: errorMsg, ephemeral: true }).catch(() => {});
@@ -247,9 +247,9 @@ async function handleInteraction(interaction) {
       });
 
       if (res.ok) {
-        await interaction.editReply(`✅ You claimed ticket #${ticketId.slice(0, 8).toUpperCase()}`);
+        await interaction.editReply(`[SUCCESS] You claimed ticket #${ticketId.slice(0, 8).toUpperCase()}`);
       } else {
-        await interaction.editReply(`❌ Claim failed: ${res.error}`);
+        await interaction.editReply(`[ERROR] Claim failed: ${res.error}`);
       }
     } else if (action === 'reply_ticket') {
       const modal = new ModalBuilder()
@@ -303,9 +303,9 @@ async function handleInteraction(interaction) {
       });
 
       if (res.ok) {
-        await interaction.editReply(`✅ Support ticket #${res.ticket.id.slice(0, 8).toUpperCase()} created successfully! A staff member will respond shortly.`);
+        await interaction.editReply(`[SUCCESS] Support ticket #${res.ticket.id.slice(0, 8).toUpperCase()} created successfully! Staff notified.`);
       } else {
-        await interaction.editReply(`❌ Could not open ticket: ${res.error}`);
+        await interaction.editReply(`[ERROR] Could not open ticket: ${res.error}`);
       }
     } else if (interaction.customId.startsWith('modal_reply_ticket:')) {
       const ticketId = interaction.customId.split(':')[1];
@@ -318,9 +318,9 @@ async function handleInteraction(interaction) {
       });
 
       if (res.ok) {
-        await interaction.editReply(`💬 Reply delivered for ticket #${ticketId.slice(0, 8).toUpperCase()}!`);
+        await interaction.editReply(`[REPLY] Delivered for ticket #${ticketId.slice(0, 8).toUpperCase()}!`);
       } else {
-        await interaction.editReply(`❌ Failed to deliver reply: ${res.error}`);
+        await interaction.editReply(`[ERROR] Failed to deliver reply: ${res.error}`);
       }
     } else if (interaction.customId.startsWith('modal_close_ticket:')) {
       const ticketId = interaction.customId.split(':')[1];
@@ -333,9 +333,9 @@ async function handleInteraction(interaction) {
       });
 
       if (res.ok) {
-        await interaction.editReply(`🔒 Ticket #${ticketId.slice(0, 8).toUpperCase()} closed with transcript saved.`);
+        await interaction.editReply(`[CLOSED] Ticket #${ticketId.slice(0, 8).toUpperCase()} closed with transcript saved.`);
       } else {
-        await interaction.editReply(`❌ Failed to close ticket: ${res.error}`);
+        await interaction.editReply(`[ERROR] Failed to close ticket: ${res.error}`);
       }
     }
     return;
@@ -351,15 +351,15 @@ async function handleInteraction(interaction) {
       await interaction.deferReply();
 
       const embed = new EmbedBuilder()
-        .setTitle('🎫 ShanuTechX Customer Support Portal')
+        .setTitle('[SUPPORT PORTAL] ShanuTechX Customer Support')
         .setColor(0x7c3aed)
         .setDescription(
           'Need help with your hosting, VPS, databases, or billing?\nSelect a category below to open a private support ticket with our engineering team.'
         )
         .addFields(
-          { name: '🔧 Technical Support', value: 'Container builds, VPS setup, database connections, SSL', inline: true },
-          { name: '💳 Billing & Payments', value: 'Invoice queries, payment proof reviews, subscription renewals', inline: true },
-          { name: '🛍️ Purchase / Sales', value: 'Custom spec VPS quotes, enterprise plans, bulk provisioning', inline: true }
+          { name: '[SUPPORT] Technical Support', value: 'Container builds, VPS setup, database connections, SSL', inline: true },
+          { name: '[BILLING] Billing & Payments', value: 'Invoice queries, payment proof reviews, subscription renewals', inline: true },
+          { name: '[PURCHASE] Purchase / Sales', value: 'Custom spec VPS quotes, enterprise plans, bulk provisioning', inline: true }
         )
         .setFooter({ text: 'ShanuTechX Autonomous Platform Support' });
 
@@ -367,10 +367,10 @@ async function handleInteraction(interaction) {
         .setCustomId('ticket_category_select')
         .setPlaceholder('Select a Support Category...')
         .addOptions([
-          { label: 'Technical Support', value: 'support', description: 'Setup, deployments, VPS, databases', emoji: '🔧' },
-          { label: 'Billing & Payments', value: 'billing', description: 'Invoices, payment proofs, subscriptions', emoji: '💳' },
-          { label: 'Purchase / Sales', value: 'purchase', description: 'Custom quotes, server upgrades', emoji: '🛍️' },
-          { label: 'Other Inquiries', value: 'other', description: 'General questions & feedback', emoji: '💬' },
+          { label: 'Technical Support', value: 'support', description: 'Setup, deployments, VPS, databases' },
+          { label: 'Billing & Payments', value: 'billing', description: 'Invoices, payment proofs, subscriptions' },
+          { label: 'Purchase / Sales', value: 'purchase', description: 'Custom quotes, server upgrades' },
+          { label: 'Other Inquiries', value: 'other', description: 'General questions & feedback' },
         ]);
 
       const row = new ActionRowBuilder().addComponents(selectMenu);
@@ -395,11 +395,11 @@ async function handleInteraction(interaction) {
       });
 
       if (!res.ok) {
-        await interaction.editReply(`❌ Could not open ticket: ${res.error}`);
+        await interaction.editReply(`[ERROR] Could not open ticket: ${res.error}`);
         return;
       }
 
-      await interaction.editReply(`✅ Ticket #${res.ticket.id.slice(0, 8).toUpperCase()} opened! Staff alerted.`);
+      await interaction.editReply(`[SUCCESS] Ticket #${res.ticket.id.slice(0, 8).toUpperCase()} opened! Staff alerted.`);
     } else if (commandName === 'claim-ticket') {
       await interaction.deferReply();
       const ticketId = interaction.options.getString('ticket_id');
@@ -411,9 +411,9 @@ async function handleInteraction(interaction) {
       });
 
       if (res.ok) {
-        await interaction.editReply(`🙋‍♂️ Ticket #${ticketId.slice(0, 8).toUpperCase()} claimed by @${userLabel}!`);
+        await interaction.editReply(`[CLAIMED] Ticket #${ticketId.slice(0, 8).toUpperCase()} claimed by @${userLabel}!`);
       } else {
-        await interaction.editReply(`❌ Failed to claim: ${res.error}`);
+        await interaction.editReply(`[ERROR] Failed to claim: ${res.error}`);
       }
     } else if (commandName === 'unclaim-ticket') {
       await interaction.deferReply();
@@ -425,9 +425,9 @@ async function handleInteraction(interaction) {
       });
 
       if (res.ok) {
-        await interaction.editReply(`🔓 Ticket #${ticketId.slice(0, 8).toUpperCase()} unclaimed and returned to open queue.`);
+        await interaction.editReply(`[UNCLAIMED] Ticket #${ticketId.slice(0, 8).toUpperCase()} returned to open queue.`);
       } else {
-        await interaction.editReply(`❌ Unclaim failed: ${res.error}`);
+        await interaction.editReply(`[ERROR] Unclaim failed: ${res.error}`);
       }
     } else if (commandName === 'reply-ticket') {
       await interaction.deferReply();
@@ -440,9 +440,9 @@ async function handleInteraction(interaction) {
       });
 
       if (res.ok) {
-        await interaction.editReply(`💬 Reply sent for ticket #${ticketId.slice(0, 8).toUpperCase()}!`);
+        await interaction.editReply(`[REPLY] Sent for ticket #${ticketId.slice(0, 8).toUpperCase()}!`);
       } else {
-        await interaction.editReply(`❌ Failed to send reply: ${res.error}`);
+        await interaction.editReply(`[ERROR] Failed to send reply: ${res.error}`);
       }
     } else if (commandName === 'close-ticket') {
       await interaction.deferReply();
@@ -455,9 +455,9 @@ async function handleInteraction(interaction) {
       });
 
       if (res.ok) {
-        await interaction.editReply(`🔒 Ticket #${ticketId.slice(0, 8).toUpperCase()} closed.`);
+        await interaction.editReply(`[CLOSED] Ticket #${ticketId.slice(0, 8).toUpperCase()} closed.`);
       } else {
-        await interaction.editReply(`❌ Failed to close ticket: ${res.error}`);
+        await interaction.editReply(`[ERROR] Failed to close ticket: ${res.error}`);
       }
     } else if (commandName === 'tickets-list') {
       await interaction.deferReply();
@@ -470,7 +470,7 @@ async function handleInteraction(interaction) {
       }
 
       const embed = new EmbedBuilder()
-        .setTitle('🎫 Active Support Tickets')
+        .setTitle('[TICKETS] Active Support Queue')
         .setColor(0x06b6d4)
         .setDescription(
           res.tickets
@@ -507,9 +507,9 @@ async function handleInteraction(interaction) {
       });
 
       if (res.ok) {
-        await interaction.editReply(`📢 Announcement **"${title}"** dispatched successfully to Discord & WhatsApp!`);
+        await interaction.editReply(`[ANNOUNCEMENT] **"${title}"** dispatched successfully to Discord & WhatsApp!`);
       } else {
-        await interaction.editReply(`❌ Announcement dispatch failed: ${res.error}`);
+        await interaction.editReply(`[ERROR] Announcement dispatch failed: ${res.error}`);
       }
     } else if (commandName === 'send-invoice') {
       await interaction.deferReply();
@@ -521,16 +521,16 @@ async function handleInteraction(interaction) {
       });
 
       if (res.ok) {
-        await interaction.editReply(`📄 Official PDF Invoice generated & dispatched for Order #${orderId.slice(0, 8).toUpperCase()}`);
+        await interaction.editReply(`[INVOICE] Official PDF Invoice generated & dispatched for Order #${orderId.slice(0, 8).toUpperCase()}`);
       } else {
-        await interaction.editReply(`❌ Failed to send invoice: ${res.error}`);
+        await interaction.editReply(`[ERROR] Failed to send invoice: ${res.error}`);
       }
     } else if (commandName === 'status') {
       await interaction.deferReply();
       const health = await apiFetch('/api/health');
 
       const embed = new EmbedBuilder()
-        .setTitle('⚡ ShanuTechX Platform Status')
+        .setTitle('[STATUS] ShanuTechX Platform Cluster')
         .setColor(health?.ok ? 0x22c55e : 0xef4444)
         .addFields(
           { name: 'Cluster Status', value: health?.ok ? 'ONLINE' : 'DEGRADED', inline: true },
@@ -544,21 +544,21 @@ async function handleInteraction(interaction) {
       await interaction.deferReply({ ephemeral: true });
 
       const embed = new EmbedBuilder()
-        .setTitle('📚 ShanuTechX Discord Bot Commands')
+        .setTitle('[COMMANDS] ShanuTechX Discord Bot Guide')
         .setColor(0x3b82f6)
         .setDescription('Complete guide to available slash commands and features.')
         .addFields(
           {
-            name: '🎫 Customer Commands',
+            name: '[CUSTOMER] Commands',
             value: '• `/open-ticket` - Open new support ticket\n• `/status` - Check platform health',
           },
           {
-            name: '🛠️ Staff & Operations',
+            name: '[STAFF] Operations',
             value:
               '• `/ticket-panel` - Deploy interactive ticket panel\n• `/claim-ticket` - Claim an unassigned ticket\n• `/unclaim-ticket` - Return ticket to queue\n• `/reply-ticket` - Reply to customer ticket\n• `/close-ticket` - Close ticket with transcript\n• `/tickets-list` - View open ticket queue',
           },
           {
-            name: '📢 Broadcast & Invoicing',
+            name: '[BROADCAST] Invoicing & Announcements',
             value: '• `/announce` - Post rich announcement\n• `/send-invoice` - Dispatch PDF invoice to customer\n• `/review-payment` - Approve/Decline manual payment proof',
           }
         );
