@@ -9,6 +9,7 @@ import { wildduckClient } from '../lib/wildduckClient';
 import { logger } from '../lib/logger';
 import { env } from '../env';
 import { Resolver } from 'dns/promises';
+import { validateDomainForUser } from '../lib/smtpProvisioner';
 
 export const webmailRouter = Router();
 
@@ -1610,6 +1611,12 @@ webmailRouter.post('/webmail/domains', async (req: AuthedRequest, res: Response)
 
     const cleanDomain = domain.trim().toLowerCase();
     const rootDomain = env.rootDomain || 'shanutechx.com';
+
+    // Domain validation check: customers cannot connect platform root domain
+    const domainCheck = validateDomainForUser(req.user!.role, cleanDomain, rootDomain);
+    if (!domainCheck.valid) {
+      return res.status(403).json({ error: domainCheck.error });
+    }
 
     // Verify limit
     const smtpAccounts = await prisma.smtpAccount.findMany({ where: { userId } });

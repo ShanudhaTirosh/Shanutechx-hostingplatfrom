@@ -6,7 +6,7 @@ import { ownedResourceWhere } from '../middleware/rbac';
 import { logger } from '../lib/logger';
 import { env } from '../env';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
-import { sendSmtpReleaseEmail, getTierFromPlanName } from '../lib/smtpProvisioner';
+import { sendSmtpReleaseEmail, getTierFromPlanName, validateDomainForUser } from '../lib/smtpProvisioner';
 import { sendSmtpEmail } from '../lib/smtpDispatcher';
 import { wildduckClient } from '../lib/wildduckClient';
 import dns from 'dns';
@@ -316,7 +316,14 @@ emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
 
   const { email, password, storageQuotaMb, dailySendLimit } = parse.data;
   const username = email.split('@')[0].replace(/[^a-zA-Z0-9_\-\.]/g, '');
-  const domainStr = email.includes('@') ? email.split('@')[1] : env.rootDomain;
+  const domainStr = (email.includes('@') ? email.split('@')[1] : env.rootDomain).toLowerCase().trim();
+
+  // Enforce customer domain rule: Customers must use their own verified custom domain. System domains are restricted to system users.
+  const domainCheck = validateDomainForUser(role, domainStr, env.rootDomain);
+  if (!domainCheck.valid) {
+    return res.status(403).json({ error: domainCheck.error });
+  }
+
   const smtpHost = `mail.${domainStr}`;
   const credentialRef = encryptSecret(password, env.secretsEncryptionKey);
   const webmailUrl = process.env.NODE_ENV === 'production' ? `https://mail.${domainStr}` : 'http://localhost:3001/email';
