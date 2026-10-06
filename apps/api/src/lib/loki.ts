@@ -12,7 +12,7 @@ export interface LokiLogEntry {
 
 export interface LokiQueryResult {
   isConfigured: boolean;
-  status: 'connected' | 'disconnected' | 'unconfigured';
+  status: 'connected' | 'disconnected' | 'unconfigured' | 'active_platform_telemetry';
   totalLines: number;
   entries: LokiLogEntry[];
 }
