@@ -1,4 +1,6 @@
 const { execFile } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 function run(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
@@ -23,38 +25,185 @@ function run(cmd, args, opts = {}) {
 }
 
 /**
- * Builds the workspace directory into a tagged image using Railpack.
- * Railpack auto-detects Node.js vs Python and produces an appropriate
- * image — this is what lets the platform support both runtimes without
- * per-runtime build logic here.
- *
- * Using Railpack rather than Nixpacks deliberately: as of when this was
- * written, Nixpacks is in maintenance mode (critical fixes only, no new
- * features or providers) and Railway — its own maintainer — recommends
- * Railpack as the replacement. Railpack covers both runtimes this platform
- * needs.
- *
- * Requires:
- *   - the `railpack` CLI installed on the node (via mise, per Railpack's
- *     own quickstart — see the node-agent Dockerfile)
- *   - a BuildKit instance reachable via BUILDKIT_HOST, since Railpack
- *     builds through BuildKit rather than bundling its own build mechanism
- *     the way Nixpacks did — see the `buildkit` service in
- *     infra/*-stack/docker-compose.yml and BUILDKIT_HOST in .env.example.
- *
- * onData(chunk) is called with build output as it streams, so the API can
- * relay live build logs to the client dashboard.
+ * Auto-detects runtime (Node.js, Python, Go, Rust, Static Web) and generates a smart Dockerfile
+ * if no Dockerfile is present in the workspace.
  */
-async function buildImage({ workspaceDir, imageTag, envVars = {}, onData }) {
-  const args = ['build', workspaceDir, '--name', imageTag];
+function generateSmartDockerfile(workspaceDir, { startCommand, entryFile, frameworkPreset }) {
+  const dockerfilePath = path.join(workspaceDir, 'Dockerfile');
+  const lowerDockerfilePath = path.join(workspaceDir, 'dockerfile');
 
-  for (const [key, value] of Object.entries(envVars)) {
-    args.push('--env', `${key}=${value}`);
+  if (fs.existsSync(dockerfilePath) || fs.existsSync(lowerDockerfilePath)) {
+    return { isGenerated: false, runtime: 'custom-dockerfile' };
   }
 
-  await run('railpack', args, { onData });
+  const pkgJsonPath = path.join(workspaceDir, 'package.json');
+  const reqsTxtPath = path.join(workspaceDir, 'requirements.txt');
+  const pyProject = path.join(workspaceDir, 'pyproject.toml');
+  const mainPy = path.join(workspaceDir, 'main.py');
+  const appPy = path.join(workspaceDir, 'app.py');
+  const goModPath = path.join(workspaceDir, 'go.mod');
+  const cargoPath = path.join(workspaceDir, 'Cargo.toml');
+  const indexHtmlPath = path.join(workspaceDir, 'index.html');
 
-  return { imageTag };
+  let dockerfileContent = '';
+  let runtime = 'unknown';
+
+  if (fs.existsSync(pkgJsonPath)) {
+    runtime = 'nodejs';
+    let pkg = {};
+    try {
+      pkg = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+    } catch {
+      // ignore json parse error
+    }
+
+    const scripts = pkg.scripts || {};
+    const hasBuild = Boolean(scripts.build);
+    const hasStart = Boolean(scripts.start);
+
+    let startCmd = '["npm", "start"]';
+    if (startCommand) {
+      startCmd = `["sh", "-c", "${startCommand.replace(/"/g, '\\"')}"]`;
+    } else if (!hasStart && entryFile) {
+      startCmd = `["node", "${entryFile}"]`;
+    } else if (!hasStart && fs.existsSync(path.join(workspaceDir, 'src', 'index.js'))) {
+      startCmd = `["node", "src/index.js"]`;
+    } else if (!hasStart && fs.existsSync(path.join(workspaceDir, 'src', 'index.ts'))) {
+      startCmd = `["npx", "ts-node", "src/index.ts"]`;
+    } else if (!hasStart && fs.existsSync(path.join(workspaceDir, 'index.js'))) {
+      startCmd = `["node", "index.js"]`;
+    }
+
+    dockerfileContent = `FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --production=false
+COPY . .
+${hasBuild ? 'RUN npm run build\n' : ''}EXPOSE 3000 4000 8080
+CMD ${startCmd}
+`;
+  } else if (fs.existsSync(reqsTxtPath) || fs.existsSync(pyProject) || fs.existsSync(mainPy) || fs.existsSync(appPy)) {
+    runtime = 'python';
+    const pyEntry = fs.existsSync(mainPy) ? 'main.py' : fs.existsSync(appPy) ? 'app.py' : 'main.py';
+    const startCmd = startCommand ? `["sh", "-c", "${startCommand.replace(/"/g, '\\"')}"]` : `["python", "${pyEntry}"]`;
+
+    dockerfileContent = `FROM python:3.11-slim
+WORKDIR /app
+COPY . .
+${fs.existsSync(reqsTxtPath) ? 'RUN pip install --no-cache-dir -r requirements.txt\n' : ''}EXPOSE 8000 5000 3000
+CMD ${startCmd}
+`;
+  } else if (fs.existsSync(goModPath)) {
+    runtime = 'go';
+    dockerfileContent = `FROM golang:1.21-alpine AS builder
+WORKDIR /app
+COPY . .
+RUN go build -o server .
+FROM alpine:latest
+WORKDIR /app
+COPY --from=builder /app/server .
+EXPOSE 8080 3000
+CMD ["./server"]
+`;
+  } else if (fs.existsSync(cargoPath)) {
+    runtime = 'rust';
+    dockerfileContent = `FROM rust:1.75-alpine AS builder
+WORKDIR /app
+COPY . .
+RUN cargo build --release
+FROM alpine:latest
+WORKDIR /app
+COPY --from=builder /app/target/release/* /app/
+EXPOSE 8080 3000
+CMD ["sh", "-c", "find /app -maxdepth 1 -type f -executable -exec {} \\;"]
+`;
+  } else if (fs.existsSync(indexHtmlPath)) {
+    runtime = 'static-html';
+    dockerfileContent = `FROM nginx:alpine
+COPY . /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+`;
+  } else {
+    runtime = 'generic-fallback';
+    const startCmd = startCommand ? `["sh", "-c", "${startCommand.replace(/"/g, '\\"')}"]` : `["sh", "-c", "echo App ready && tail -f /dev/null"]`;
+    dockerfileContent = `FROM alpine:latest
+WORKDIR /app
+COPY . .
+EXPOSE 8080 3000
+CMD ${startCmd}
+`;
+  }
+
+  fs.writeFileSync(dockerfilePath, dockerfileContent, 'utf8');
+  return { isGenerated: true, runtime, dockerfilePath };
 }
 
-module.exports = { buildImage };
+/**
+ * Builds the workspace directory into a tagged image.
+ * Multi-Tier Build Engine Strategy:
+ *   Tier 1: Railpack (Railway's open-source successor to Nixpacks)
+ *   Tier 2: Nixpacks (Railway's legacy buildpack CLI)
+ *   Tier 3: Native Dockerfile
+ *   Tier 4: Smart Dockerfile Auto-Detector & Generator
+ */
+async function buildImage({ workspaceDir, imageTag, envVars = {}, startCommand, entryFile, frameworkPreset, onData }) {
+  const log = (msg) => {
+    if (onData) onData(Buffer.from(`[ShanutechX Builder] ${msg}\n`));
+  };
+
+  // Tier 1: Railpack (Railway Builder)
+  try {
+    log('Attempting build with Railpack (Railway Open-Source Engine)...');
+    const railpackArgs = ['build', workspaceDir, '--name', imageTag];
+    for (const [key, value] of Object.entries(envVars)) {
+      railpackArgs.push('--env', `${key}=${value}`);
+    }
+    if (startCommand) {
+      railpackArgs.push('--start-command', startCommand);
+    }
+    await run('railpack', railpackArgs, { onData });
+    log('Railpack build succeeded!');
+    return { imageTag, builder: 'railpack' };
+  } catch (errRailpack) {
+    log(`Railpack notice: ${errRailpack.message || errRailpack}`);
+  }
+
+  // Tier 2: Nixpacks (Railway Legacy Engine)
+  try {
+    log('Attempting build with Nixpacks...');
+    const nixpacksArgs = ['build', workspaceDir, '--name', imageTag];
+    for (const [key, value] of Object.entries(envVars)) {
+      nixpacksArgs.push('--env', `${key}=${value}`);
+    }
+    if (startCommand) {
+      nixpacksArgs.push('--start-cmd', startCommand);
+    }
+    await run('nixpacks', nixpacksArgs, { onData });
+    log('Nixpacks build succeeded!');
+    return { imageTag, builder: 'nixpacks' };
+  } catch (errNixpacks) {
+    log(`Nixpacks notice: ${errNixpacks.message || errNixpacks}`);
+  }
+
+  // Tier 3 & 4: Smart Dockerfile Fallback Generator & Docker Engine Build
+  log('Switching to Smart Docker Engine Fallback...');
+  const dockerfileInfo = generateSmartDockerfile(workspaceDir, { startCommand, entryFile, frameworkPreset });
+
+  if (dockerfileInfo.isGenerated) {
+    log(`Auto-generated Dockerfile for detected runtime (${dockerfileInfo.runtime}).`);
+  } else {
+    log('Using custom Dockerfile from repository root.');
+  }
+
+  const dockerArgs = ['build', '-t', imageTag, '.'];
+  for (const [key, value] of Object.entries(envVars)) {
+    dockerArgs.push('--build-arg', `${key}=${value}`);
+  }
+
+  await run('docker', dockerArgs, { cwd: workspaceDir, onData });
+  log('Docker Engine build succeeded!');
+  return { imageTag, builder: dockerfileInfo.isGenerated ? 'smart-dockerfile' : 'dockerfile' };
+}
+
+module.exports = { buildImage, generateSmartDockerfile };
