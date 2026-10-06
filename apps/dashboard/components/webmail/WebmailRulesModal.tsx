@@ -150,7 +150,7 @@ export function WebmailRulesModal({ isOpen, onClose }: WebmailRulesModalProps) {
             </label>
             <input
               type="email"
-              placeholder="e.g. backup@gmail.com"
+              placeholder="e.g. backup@shanutechx.com"
               value={actionForwardTo}
               onChange={(e) => setActionForwardTo(e.target.value)}
               className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white placeholder:text-slate-600"

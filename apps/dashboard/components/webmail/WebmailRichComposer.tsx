@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useToast } from '@/components/ui';
 import {
   X, Minimize2, Maximize2, Send, Bold, Italic, Underline, Link2,
-  Paperclip, Smile, ChevronDown, Plus, Trash2, Wand2, Clock,
+  Paperclip, Smile, ChevronDown, Plus, Trash2, Clock,
   AlertCircle,
 } from 'lucide-react';
 
@@ -50,9 +50,6 @@ export function WebmailRichComposer({
   const [showTemplates, setShowTemplates] = useState(false);
   const [toChips, setToChips] = useState<string[]>([]);
   const [toInput, setToInput] = useState(defaultTo);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [showAiBar, setShowAiBar] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -149,23 +146,6 @@ export function WebmailRichComposer({
       toast(err.message || 'Failed to send email', 'error');
     } finally {
       setSending(false);
-    }
-  };
-
-  const handleAiDraft = async () => {
-    if (!aiPrompt.trim()) return;
-    setAiLoading(true);
-    try {
-      const res = await api.webmail.ai.draft({ prompt: aiPrompt, tone: 'professional', recipientName: toChips[0] });
-      setSubject(res.draft.subject);
-      setBody(res.draft.body);
-      setShowAiBar(false);
-      setAiPrompt('');
-      toast('AI draft ready!', 'success');
-    } catch {
-      toast('AI draft failed', 'error');
-    } finally {
-      setAiLoading(false);
     }
   };
 
@@ -313,15 +293,6 @@ export function WebmailRichComposer({
             <button className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all" title="Emoji">
               <Smile className="h-3.5 w-3.5" />
             </button>
-            <div className="w-px h-4 bg-white/10 mx-0.5" />
-            <button
-              onClick={() => setShowAiBar(!showAiBar)}
-              className={`flex items-center gap-1 p-1.5 px-2 rounded-lg text-[10px] font-bold transition-all ${showAiBar ? 'bg-violet-600/20 text-violet-300' : 'text-slate-400 hover:text-violet-300 hover:bg-violet-600/10'}`}
-              title="AI Draft"
-            >
-              <Wand2 className="h-3.5 w-3.5" />
-              AI Draft
-            </button>
             <div className="flex-1" />
             {/* Templates picker */}
             {templates.length > 0 && (
@@ -353,27 +324,7 @@ export function WebmailRichComposer({
             )}
           </div>
 
-          {/* AI Prompt Bar */}
-          {showAiBar && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-violet-600/10 border-b border-violet-500/20">
-              <Wand2 className="h-3.5 w-3.5 text-violet-400 shrink-0" />
-              <input
-                type="text"
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAiDraft()}
-                placeholder="Describe what to write... (e.g. 'Follow up on invoice #123')"
-                className="flex-1 bg-transparent text-xs text-violet-200 placeholder-violet-400/50 outline-none"
-              />
-              <button
-                onClick={handleAiDraft}
-                disabled={aiLoading}
-                className="px-2.5 py-1 rounded-lg bg-violet-600 text-white text-[10px] font-bold hover:bg-violet-500 disabled:opacity-50 transition-all"
-              >
-                {aiLoading ? 'Generating...' : 'Generate'}
-              </button>
-            </div>
-          )}
+
 
           {/* Body */}
           <textarea

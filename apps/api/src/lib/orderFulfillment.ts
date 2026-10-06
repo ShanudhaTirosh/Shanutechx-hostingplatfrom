@@ -54,7 +54,15 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
 
     // Canonical product category discriminators
     const isVps = productCategory === 'vps';
-    const isSmtp = productCategory === 'smtp';
+    const isSmtp =
+      productCategory === 'smtp' ||
+      productCategory === 'email' ||
+      productCategory === 'mail' ||
+      productCategory === 'smtp_hosting' ||
+      productCategory === 'email_hosting' ||
+      productName.includes('smtp') ||
+      productName.includes('email') ||
+      (productName.includes('mail') && !productName.includes('gmail'));
     const isManagedDb = productCategory === 'database';
     const isAppCatalog = productCategory === 'app_catalog';
     const isBotHosting = productCategory === 'bot_hosting';
@@ -155,7 +163,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
             }
           }
 
-          await prisma.smtpAccount.create({
+          const createdAccount = await prisma.smtpAccount.create({
             data: {
               userId: order.userId,
               orderItemId: item.id,
@@ -172,6 +180,64 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
               dailySendLimit,
               expiresAt,
               planTier: item.plan?.name || tier.name,
+            },
+          });
+
+          // Deliver immediate welcome email into the customer's Webmail inbox
+          const mailboxEmail = `${username}@${env.rootDomain}`;
+          const welcomeHtml = `
+            <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 640px; margin: 0 auto; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 12px; padding: 24px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; padding-bottom: 16px; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #38bdf8; font-size: 20px; font-weight: 700;">Welcome to ShanuTechX Enterprise Webmail</h2>
+                <span style="background: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.2); padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600;">ACTIVE</span>
+              </div>
+              <p style="font-size: 14px; color: #cbd5e1; line-height: 1.6;">
+                Your enterprise email account hosted on <strong>ShanuTechX Mail Engine</strong> has been successfully provisioned and activated.
+              </p>
+              
+              <div style="background: #1e293b; border-radius: 8px; padding: 16px; margin: 20px 0; border: 1px solid #334155;">
+                <h3 style="margin-top: 0; color: #94a3b8; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em;">Mailbox Configuration</h3>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #e2e8f0;">
+                  <tr><td style="padding: 6px 0; color: #94a3b8; width: 150px;">Primary Email:</td><td style="padding: 6px 0; font-family: monospace; color: #38bdf8;">${mailboxEmail}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">SMTP Username:</td><td style="padding: 6px 0; font-family: monospace;">${username}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">Plan Tier:</td><td style="padding: 6px 0;">${item.plan?.name || tier.name}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">Storage Limit:</td><td style="padding: 6px 0;">${storageQuotaMb === -1 ? 'Unlimited' : `${storageQuotaMb} MB`}</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #1e293b; border-radius: 8px; padding: 16px; margin: 20px 0; border: 1px solid #334155;">
+                <h3 style="margin-top: 0; color: #94a3b8; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em;">Server & DNS Connection Settings</h3>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #e2e8f0;">
+                  <tr><td style="padding: 6px 0; color: #94a3b8; width: 150px;">SMTP Host:</td><td style="padding: 6px 0; font-family: monospace;">${smtpHost} (Port 587 TLS / 465 SSL)</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">IMAP / POP3 Host:</td><td style="padding: 6px 0; font-family: monospace;">${smtpHost} (Port 993 SSL / 995 SSL)</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">MX Record:</td><td style="padding: 6px 0; font-family: monospace;">10 ${smtpHost}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">SPF Record:</td><td style="padding: 6px 0; font-family: monospace;">v=spf1 include:${env.rootDomain} ~all</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">DKIM Selector:</td><td style="padding: 6px 0; font-family: monospace;">shanutechx._domainkey.${env.rootDomain}</td></tr>
+                </table>
+              </div>
+
+              <p style="font-size: 13px; color: #94a3b8; margin-top: 24px;">
+                You can now send and receive emails, manage custom aliases, configure signatures, and attach domain names directly from this interface.
+              </p>
+            </div>
+          `;
+
+          await prisma.webmailMessage.create({
+            data: {
+              userId: order.userId,
+              smtpAccountId: createdAccount.id,
+              folder: 'inbox',
+              threadId: `welcome_${order.id}`,
+              senderName: 'ShanuTechX Mail System',
+              senderEmail: `noreply@${env.rootDomain}`,
+              recipientEmail: order.user.email,
+              subject: `🚀 Welcome to ShanuTechX Webmail (${mailboxEmail})`,
+              snippet: `Your enterprise mailbox ${mailboxEmail} is ready. View server connection settings and credentials.`,
+              htmlBody: welcomeHtml,
+              category: 'primary',
+              priority: 'high',
+              isRead: false,
+              isStarred: true,
             },
           });
 
@@ -193,7 +259,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
           });
 
           fulfilledItems.push(`SMTP Mailbox (${username}@${env.rootDomain})`);
-          logger.info({ orderId: order.id, username }, 'Auto-provisioned SMTP Account');
+          logger.info({ orderId: order.id, username }, 'Auto-provisioned SMTP Account and delivered Welcome Message');
         } catch (err) {
           logger.error({ orderId: order.id, err }, 'Failed to auto-provision SMTP account');
         }
