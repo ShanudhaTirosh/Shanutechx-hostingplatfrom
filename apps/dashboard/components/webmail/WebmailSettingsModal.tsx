@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import {
   Settings, FileSignature, FileText, Sun, Ban, X, Trash2, Plus, Zap, HardDrive,
   MailCheck, ArrowUpCircle, CheckCircle2, ExternalLink, Globe, ShieldCheck, User,
-  Check, RefreshCw, Layers, Key
+  Check, RefreshCw, Layers, Key, Upload, Image, Camera
 } from 'lucide-react';
 
 interface WebmailSettingsModalProps {
@@ -93,6 +93,26 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
   };
 
   if (!isOpen) return null;
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Image size exceeds 5MB limit', 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (result) {
+        setAvatarUrl(result);
+        toast('Image loaded! Click "Save Profile Preferences" to apply.', 'success');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -274,14 +294,45 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">Avatar Image URL (Optional)</label>
-                <input
-                  type="url"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  placeholder="https://example.com/avatar.jpg"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
-                />
+                <label className="text-slate-400 block mb-1 font-semibold">Profile Avatar Picture</label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  {/* Upload File Button */}
+                  <label className="flex-1 flex items-center justify-center gap-2 p-2.5 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-800/60 text-slate-200 rounded-xl text-xs font-semibold cursor-pointer transition-all shadow-sm">
+                    <Upload className="w-4 h-4 text-indigo-400" />
+                    <span>Upload Image File</span>
+                    <input
+                      type="file"
+                      accept="image/png, image/jpeg, image/webp, image/gif, image/svg+xml"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {/* Or divider */}
+                  <span className="text-[10px] text-slate-500 text-center font-bold uppercase px-1">OR</span>
+
+                  {/* Image URL Input */}
+                  <div className="flex-[2] relative">
+                    <input
+                      type="url"
+                      value={avatarUrl}
+                      onChange={(e) => setAvatarUrl(e.target.value)}
+                      placeholder="Paste image URL (https://...)"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 pr-8 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/60"
+                    />
+                    {avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setAvatarUrl('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-400 p-0.5"
+                        title="Remove avatar image"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">Supports PNG, JPEG, WEBP, GIF, or SVG images (Max 5MB)</p>
               </div>
 
               <button
