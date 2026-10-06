@@ -18,6 +18,7 @@ meRouter.get('/me', requireAuth, async (req: AuthedRequest, res) => {
         email: true,
         role: true,
         displayName: true,
+        avatarUrl: true,
         phoneNumber: true,
         discordUserId: true,
         isBanned: true,
@@ -32,6 +33,7 @@ meRouter.get('/me', requireAuth, async (req: AuthedRequest, res) => {
 
 const updateProfileSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
+  avatarUrl: z.string().nullable().optional(),
   // E.164-ish: allow a leading + and 7-15 digits. Real validation happens
   // implicitly the first time a WhatsApp send to this number fails or
   // succeeds — this is just enough to catch obvious typos before saving.
@@ -68,6 +70,7 @@ meRouter.patch('/me', requireAuth, async (req: AuthedRequest, res) => {
       email: user.email,
       role: user.role,
       displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
       phoneNumber: user.phoneNumber,
       discordUserId: user.discordUserId,
     },
@@ -115,6 +118,7 @@ meRouter.patch('/me/role', requireAuth, async (req: AuthedRequest, res) => {
       email: true,
       role: true,
       displayName: true,
+      avatarUrl: true,
       phoneNumber: true,
       discordUserId: true,
       isBanned: true,

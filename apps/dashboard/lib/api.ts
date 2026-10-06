@@ -154,9 +154,9 @@ export const api = {
   },
 
 
-  updateProfile: (data: { displayName?: string; phoneNumber?: string | null; discordUserId?: string | null }) =>
+  updateProfile: (data: { displayName?: string; avatarUrl?: string | null; phoneNumber?: string | null; discordUserId?: string | null }) =>
     apiFetch('/api/me', { method: 'PATCH', body: JSON.stringify(data) }).then((r) =>
-      asJson<{ user: ApiUser }>(r)
+      asJson<{ user: any }>(r)
     ),
 
   updateRole: (role: 'customer' | 'support' | 'dev' | 'admin') =>

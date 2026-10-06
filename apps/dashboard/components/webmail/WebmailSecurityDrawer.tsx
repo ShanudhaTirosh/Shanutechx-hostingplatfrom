@@ -25,9 +25,8 @@ export function WebmailSecurityDrawer({ isOpen, onClose }: WebmailSecurityDrawer
     try {
       const res = await api.webmail.adminDnsCheck();
       setChecks(res.checks || {});
-    } catch {
-      // fallback mock for UI preview
-      setChecks({ 'shanutechx.com': true });
+    } catch (_err) {
+      setChecks({});
     } finally {
       setLoading(false);
     }

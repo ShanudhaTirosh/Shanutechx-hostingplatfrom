@@ -118,7 +118,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
     e.preventDefault();
     setIsSavingProfile(true);
     try {
-      await api.updateProfile({ displayName });
+      await api.updateProfile({ displayName, avatarUrl });
       toast('Profile preferences updated!', 'success');
     } catch {
       toast('Failed to update profile', 'error');

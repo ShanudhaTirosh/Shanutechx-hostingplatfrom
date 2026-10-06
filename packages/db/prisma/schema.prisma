@@ -129,6 +129,7 @@ model User {
   firebaseUid   String    @unique
   email         String    @unique
   displayName   String?
+  avatarUrl     String?
   phoneNumber   String? // for WhatsApp order/payment notifications
   discordUserId String? // for Discord DM notifications, if linked
   role          Role      @default(customer)
