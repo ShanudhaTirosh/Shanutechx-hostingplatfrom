@@ -21,6 +21,7 @@ export function DeployWebhookPanel({ deploymentId, apiBase = '' }: Props) {
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedSecret, setCopiedSecret] = useState(false);
+  const [autoRegistering, setAutoRegistering] = useState(false);
   const { toast } = useToast();
 
   const fullWebhookUrl = info ? `${apiBase}${info.webhookUrl}` : '';
@@ -37,6 +38,19 @@ export function DeployWebhookPanel({ deploymentId, apiBase = '' }: Props) {
   }
 
   useEffect(() => { loadInfo(); }, [deploymentId]);
+
+  async function handleAutoRegister() {
+    setAutoRegistering(true);
+    try {
+      const res = await api.deployments.autoRegisterDeployWebhook(deploymentId);
+      toast(res.message, 'success');
+      loadInfo();
+    } catch (err: any) {
+      toast(err.message, 'error');
+    } finally {
+      setAutoRegistering(false);
+    }
+  }
 
   async function handleGenerateSecret() {
     setGeneratingSecret(true);
@@ -108,14 +122,26 @@ export function DeployWebhookPanel({ deploymentId, apiBase = '' }: Props) {
 
       {/* Webhook URL */}
       {info?.hasSecret && (
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-text-muted uppercase tracking-wider block">Webhook Payload URL</label>
-          <div className="flex gap-2">
-            <code className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-emerald-400 font-mono truncate">
-              {fullWebhookUrl || info.webhookUrl}
-            </code>
-            <Button size="sm" variant="secondary" onClick={() => copyToClipboard(fullWebhookUrl || info.webhookUrl, 'url')}>
-              {copiedUrl ? <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Copied!</span> : <span className="flex items-center gap-1"><Copy className="h-3.5 w-3.5" /> Copy</span>}
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-text-muted uppercase tracking-wider block">Webhook Payload URL</label>
+            <div className="flex gap-2">
+              <code className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-emerald-400 font-mono truncate">
+                {fullWebhookUrl || info.webhookUrl}
+              </code>
+              <Button size="sm" variant="secondary" onClick={() => copyToClipboard(fullWebhookUrl || info.webhookUrl, 'url')}>
+                {copiedUrl ? <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Copied!</span> : <span className="flex items-center gap-1"><Copy className="h-3.5 w-3.5" /> Copy</span>}
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-3.5 rounded-xl bg-accent-violet/10 border border-accent-violet/25 text-xs">
+            <div>
+              <p className="font-semibold text-accent-violet">1-Click GitHub Webhook Setup</p>
+              <p className="text-[11px] text-text-muted mt-0.5">Auto-configure this webhook URL and secret directly in your GitHub repository.</p>
+            </div>
+            <Button size="sm" variant="secondary" onClick={handleAutoRegister} loading={autoRegistering}>
+              Auto-Register Webhook
             </Button>
           </div>
         </div>

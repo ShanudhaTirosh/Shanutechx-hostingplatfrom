@@ -20,6 +20,17 @@ import { env } from '../env';
  */
 export const deployWebhooksRouter = Router();
 
+function getDecryptedEnvVars(deployment: any): Record<string, string> | undefined {
+  if (!deployment.envVarsEncrypted) return undefined;
+  try {
+    const json = decryptSecret(deployment.envVarsEncrypted, env.secretsEncryptionKey);
+    return JSON.parse(json);
+  } catch (err) {
+    logger.error({ deploymentId: deployment.id, err }, 'Failed to decrypt deployment envVars');
+    return undefined;
+  }
+}
+
 /**
  * GET /deployments/:id/webhook-info
  * Returns webhook URL and whether a secret has been set, without exposing
@@ -37,6 +48,7 @@ deployWebhooksRouter.get('/deployments/:id/webhook-info', requireAuth, async (re
   res.json({
     hasSecret: !!deployment.deployWebhookSecret,
     webhookUrl,
+    autoDeploy: deployment.autoDeploy !== false,
   });
 });
 
@@ -58,7 +70,7 @@ deployWebhooksRouter.post('/deployments/:id/webhook-secret', requireAuth, async 
 
   const secret = crypto.randomBytes(32).toString('hex');
   const encSecret = encryptSecret(secret, env.secretsEncryptionKey);
-  await prisma.deployment.update({ where: { id: deployment.id }, data: { deployWebhookSecret: encSecret } });
+  await prisma.deployment.update({ where: { id: deployment.id }, data: { deployWebhookSecret: encSecret, autoDeploy: true } });
 
   const webhookUrl = `/api/deploy-webhooks/${deployment.id}`;
   res.json({
@@ -69,6 +81,91 @@ deployWebhooksRouter.post('/deployments/:id/webhook-secret', requireAuth, async 
       gitlab: `Add a webhook in your repo's Settings -> Webhooks: URL = <your API base>${webhookUrl}, Secret Token = the value above, trigger = "Push events".`,
     },
   });
+});
+
+/**
+ * POST /deployments/:id/webhook-auto-register
+ * Automatically registers a GitHub Webhook via the GitHub REST API using the
+ * user's connected GitHub OAuth token or saved repo access token.
+ */
+deployWebhooksRouter.post('/deployments/:id/webhook-auto-register', requireAuth, async (req: AuthedRequest, res) => {
+  const deployment = await prisma.deployment.findUnique({ where: { id: req.params.id } });
+  if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
+  if (!(await canAccessResource(deployment.userId, req))) return res.status(404).json({ error: 'Deployment not found' });
+  if (!deployment.repoUrl) return res.status(409).json({ error: 'Deployment has no git repository' });
+
+  // Parse GitHub owner/repo from repoUrl (e.g., https://github.com/owner/repo)
+  const ghMatch = deployment.repoUrl.match(/github\.com[\/:]([^\/]+)\/([^\/\s\.]+)/i);
+  if (!ghMatch) {
+    return res.status(400).json({ error: 'Automatic webhook registration is only supported for GitHub repositories' });
+  }
+
+  const [, owner, repo] = ghMatch;
+
+  // Resolve secret
+  let rawSecret: string;
+  if (deployment.deployWebhookSecret) {
+    try {
+      rawSecret = decryptSecret(deployment.deployWebhookSecret, env.secretsEncryptionKey);
+    } catch {
+      rawSecret = deployment.deployWebhookSecret;
+    }
+  } else {
+    rawSecret = crypto.randomBytes(32).toString('hex');
+    const encSecret = encryptSecret(rawSecret, env.secretsEncryptionKey);
+    await prisma.deployment.update({ where: { id: deployment.id }, data: { deployWebhookSecret: encSecret, autoDeploy: true } });
+  }
+
+  // Resolve fresh token for this repo/account
+  const { resolveRepoUrlForBuild, extractEmbeddedToken } = await import('../lib/gitAuth');
+  const authedUrl = await resolveRepoUrlForBuild(deployment.id, deployment.repoUrl);
+  const token = extractEmbeddedToken(authedUrl);
+
+  if (!token) {
+    return res.status(400).json({
+      error: 'No connected GitHub account or token found for this repository. Please connect your GitHub account or supply a PAT.',
+    });
+  }
+
+  const host = req.get('host') || 'localhost:4000';
+  const protocol = req.protocol || 'https';
+  const payloadUrl = `${protocol}://${host}/api/deploy-webhooks/${deployment.id}`;
+
+  try {
+    const ghRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/hooks`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'ShanuTechX-Platform',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: 'web',
+        active: true,
+        events: ['push'],
+        config: {
+          url: payloadUrl,
+          content_type: 'json',
+          secret: rawSecret,
+          insecure_ssl: '0',
+        },
+      }),
+    });
+
+    if (!ghRes.ok) {
+      const errText = await ghRes.text().catch(() => '');
+      if (ghRes.status === 422 && errText.includes('already exists')) {
+        return res.json({ ok: true, message: 'GitHub webhook is already configured and active for this repository!' });
+      }
+      return res.status(ghRes.status).json({ error: `GitHub API error (${ghRes.status}): ${errText || 'Failed to register webhook'}` });
+    }
+
+    res.json({ ok: true, message: `GitHub Webhook successfully registered for ${owner}/${repo}!` });
+  } catch (err: any) {
+    logger.error({ err, deploymentId: deployment.id }, 'Failed to auto-register GitHub webhook');
+    res.status(500).json({ error: err.message || 'Failed to register GitHub webhook' });
+  }
 });
 
 deployWebhooksRouter.delete('/deployments/:id/webhook-secret', requireAuth, async (req: AuthedRequest, res) => {
@@ -171,9 +268,19 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
         {
           deploymentId: deployment.id,
           repoUrl: deployment.repoUrl!,
-          branch: pushedBranch,
+          branch: pushedBranch || deployment.branch || undefined,
           subdomain: deployment.subdomain ?? undefined,
           internalPort: deployment.internalPort!,
+          envVars: getDecryptedEnvVars(deployment),
+          startCommand: deployment.startCommand ?? undefined,
+          entryFile: deployment.entryFile ?? undefined,
+          frameworkPreset: deployment.frameworkPreset ?? undefined,
+          cpuLimit: deployment.cpuLimit ?? undefined,
+          memoryLimit: deployment.memoryLimit ?? undefined,
+          storageLimit: deployment.storageLimit ?? undefined,
+          exposureMode: deployment.exposureMode ?? undefined,
+          publishedPort: deployment.publishedPort ?? undefined,
+          backupRepoUrl: deployment.backupRepoFullName ?? undefined,
         },
         () => {} // no streaming listener for a background webhook-triggered build
       );

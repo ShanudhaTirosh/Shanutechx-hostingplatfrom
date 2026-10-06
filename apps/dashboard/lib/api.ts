@@ -827,6 +827,10 @@ export const api = {
       apiFetch(`/api/deployments/${id}/webhook-info`).then((r) =>
         asJson<{ webhookUrl: string; hasSecret: boolean; repoUrl: string | null; instructions: { github: string; gitlab: string } }>(r)
       ),
+    autoRegisterDeployWebhook: (id: string) =>
+      apiFetch(`/api/deployments/${id}/webhook-auto-register`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; message: string; webhookUrl: string; hookId?: number | string }>(r)
+      ),
     /**
      * Deployments stream build progress as newline-delimited JSON rather
      * than a single response — onEvent fires for every line as it arrives,

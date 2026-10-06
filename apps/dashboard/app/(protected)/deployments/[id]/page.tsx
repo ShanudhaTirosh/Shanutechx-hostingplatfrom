@@ -144,6 +144,16 @@ export default function DeploymentDetailPage() {
   }, [deploymentId]);
 
   useEffect(() => {
+    if (!deployment) return;
+    if (deployment.status === 'running' || deployment.status === 'building') {
+      const interval = setInterval(() => {
+        loadDeployment();
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [deployment?.status, deploymentId]);
+
+  useEffect(() => {
     // Native EventSource cannot send this app's Authorization header, so it never actually connected here (every
     // request 401'd instantly and looked like "Log stream disconnected."). streamAuthedEvents reads the same
     // endpoint with fetch instead, which can carry the token.
