@@ -40,12 +40,17 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  me: () => request<any>('/me'),
+  updateProfile: (data: { displayName?: string; avatarUrl?: string }) => request<any>('/me', { method: 'PATCH', body: JSON.stringify(data) }),
+  post: <T = any>(path: string, body?: any) => request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+
   auth: {
-    me: () => request<any>('/auth/me'),
+    me: () => request<any>('/me'),
   },
 
   email: {
     mailboxes: () => request<any>('/email/mailboxes'),
+    createMailbox: (data: any) => request<any>('/email/mailboxes', { method: 'POST', body: JSON.stringify(data) }),
     credentials: (id: string) => request<any>(`/email/mailboxes/${id}/credentials`),
     domains: () => request<any>('/email/domains'),
     contacts: () => request<any>('/email/contacts'),
@@ -61,6 +66,7 @@ export const api = {
   },
 
   webmail: {
+    getCredentials: () => request<any>('/webmail/account/credentials'),
     listMessages: (folder = 'inbox', search = '', smtpAccountId?: string) => {
       const q = new URLSearchParams({ folder });
       if (search) q.append('search', search);
@@ -80,34 +86,68 @@ export const api = {
     listFolders: () => request<any>('/webmail/folders'),
     createFolder: (data: any) => request<any>('/webmail/folders', { method: 'POST', body: JSON.stringify(data) }),
     deleteFolder: (id: string) => request<any>(`/webmail/folders/${id}`, { method: 'DELETE' }),
+    folders: {
+      list: () => request<any>('/webmail/folders'),
+      create: (data: any) => request<any>('/webmail/folders', { method: 'POST', body: JSON.stringify(data) }),
+      delete: (id: string) => request<any>(`/webmail/folders/${id}`, { method: 'DELETE' }),
+    },
 
     // Custom Labels
     listLabels: () => request<any>('/webmail/labels'),
     createLabel: (data: any) => request<any>('/webmail/labels', { method: 'POST', body: JSON.stringify(data) }),
     deleteLabel: (id: string) => request<any>(`/webmail/labels/${id}`, { method: 'DELETE' }),
+    labels: {
+      list: () => request<any>('/webmail/labels'),
+      create: (data: any) => request<any>('/webmail/labels', { method: 'POST', body: JSON.stringify(data) }),
+      delete: (id: string) => request<any>(`/webmail/labels/${id}`, { method: 'DELETE' }),
+    },
 
     // Rules & Filters
     listFilters: () => request<any>('/webmail/filters'),
     createFilter: (data: any) => request<any>('/webmail/filters', { method: 'POST', body: JSON.stringify(data) }),
     deleteFilter: (id: string) => request<any>(`/webmail/filters/${id}`, { method: 'DELETE' }),
+    filters: {
+      list: () => request<any>('/webmail/filters'),
+      create: (data: any) => request<any>('/webmail/filters', { method: 'POST', body: JSON.stringify(data) }),
+      delete: (id: string) => request<any>(`/webmail/filters/${id}`, { method: 'DELETE' }),
+    },
 
     // Signatures
     getSignatures: () => request<any>('/webmail/signatures'),
     createSignature: (data: any) => request<any>('/webmail/signatures', { method: 'POST', body: JSON.stringify(data) }),
     deleteSignature: (id: string) => request<any>(`/webmail/signatures/${id}`, { method: 'DELETE' }),
+    signatures: {
+      list: () => request<any>('/webmail/signatures'),
+      create: (data: any) => request<any>('/webmail/signatures', { method: 'POST', body: JSON.stringify(data) }),
+      delete: (id: string) => request<any>(`/webmail/signatures/${id}`, { method: 'DELETE' }),
+    },
 
     // Templates / Canned Responses
     getTemplates: () => request<any>('/webmail/templates'),
     createTemplate: (data: any) => request<any>('/webmail/templates', { method: 'POST', body: JSON.stringify(data) }),
     deleteTemplate: (id: string) => request<any>(`/webmail/templates/${id}`, { method: 'DELETE' }),
+    templates: {
+      list: () => request<any>('/webmail/templates'),
+      create: (data: any) => request<any>('/webmail/templates', { method: 'POST', body: JSON.stringify(data) }),
+      delete: (id: string) => request<any>(`/webmail/templates/${id}`, { method: 'DELETE' }),
+    },
 
     // Vacation Auto-Reply
     getAutoReply: () => request<any>('/webmail/auto-reply'),
     setAutoReply: (data: any) => request<any>('/webmail/auto-reply', { method: 'POST', body: JSON.stringify(data) }),
+    autoReply: {
+      get: () => request<any>('/webmail/auto-reply'),
+      save: (data: any) => request<any>('/webmail/auto-reply', { method: 'POST', body: JSON.stringify(data) }),
+    },
 
     // Blocked Senders
     getBlockedSenders: () => request<any>('/webmail/blocked-senders'),
     addBlockedSender: (data: any) => request<any>('/webmail/blocked-senders', { method: 'POST', body: JSON.stringify(data) }),
     deleteBlockedSender: (id: string) => request<any>(`/webmail/blocked-senders/${id}`, { method: 'DELETE' }),
+    blockedSenders: {
+      list: () => request<any>('/webmail/blocked-senders'),
+      add: (data: any) => request<any>('/webmail/blocked-senders', { method: 'POST', body: JSON.stringify(data) }),
+      delete: (id: string) => request<any>(`/webmail/blocked-senders/${id}`, { method: 'DELETE' }),
+    },
   },
 };

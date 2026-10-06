@@ -28,12 +28,14 @@ import {
   CheckCircle2,
   RotateCcw,
   X,
+  Key,
 } from 'lucide-react';
 import { MailboxSwitcher, Mailbox } from './MailboxSwitcher';
 import { ThreadList, WebmailMessage } from './ThreadList';
 import { ThreadViewer, MessageDetail } from './ThreadViewer';
 import { Composer } from './Composer';
 import { SettingsModal } from './SettingsModal';
+import { WebmailCredentialsModal } from '../../dashboard/components/webmail/WebmailCredentialsModal';
 import { api } from '../lib/api';
 import { firebaseAuth } from '../lib/firebaseClient';
 
@@ -70,6 +72,8 @@ export const WebmailLayout: React.FC = () => {
   const [composerInReplyTo, setComposerInReplyTo] = useState<string | undefined>(undefined);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isCredentialsOpen, setIsCredentialsOpen] = useState<boolean>(false);
+  const [userRole, setUserRole] = useState<string>('customer');
   const [showSearchHelp, setShowSearchHelp] = useState<boolean>(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState<boolean>(false);
 
@@ -93,6 +97,9 @@ export const WebmailLayout: React.FC = () => {
   useEffect(() => {
     loadMailboxes();
     loadFoldersAndLabels();
+    api.me().then((res) => {
+      if (res?.user?.role) setUserRole(res.user.role);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -415,6 +422,13 @@ export const WebmailLayout: React.FC = () => {
             <RefreshCw className={`w-4 h-4 ${isLoadingMessages ? 'animate-spin text-indigo-400' : ''}`} />
           </button>
           <button
+            onClick={() => setIsCredentialsOpen(true)}
+            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-indigo-400 transition-colors"
+            title="Developer Credentials & REST API"
+          >
+            <Key className="w-4 h-4" />
+          </button>
+          <button
             onClick={() => setIsSettingsOpen(true)}
             className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
             title="Settings"
@@ -689,6 +703,14 @@ export const WebmailLayout: React.FC = () => {
         mailboxes={mailboxes}
         activeMailboxId={activeMailboxId}
         onRefreshData={loadFoldersAndLabels}
+      />
+
+      {/* Developer Credentials & System Provisioning Modal */}
+      <WebmailCredentialsModal
+        isOpen={isCredentialsOpen}
+        onClose={() => setIsCredentialsOpen(false)}
+        userRole={userRole}
+        selectedMailboxId={activeMailboxId || undefined}
       />
     </div>
   );

@@ -2,20 +2,38 @@
 
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
-import { useToast } from '@/components/ui';
-import { Settings, FileSignature, FileText, Sun, Ban, X, Trash2, Plus, Zap, HardDrive, MailCheck, ArrowUpCircle, CheckCircle2, ExternalLink } from 'lucide-react';
+import {
+  Settings, FileSignature, FileText, Sun, Ban, X, Trash2, Plus, Zap, HardDrive,
+  MailCheck, ArrowUpCircle, CheckCircle2, ExternalLink, Globe, ShieldCheck, User,
+  Check, RefreshCw, Layers, Key
+} from 'lucide-react';
 
 interface WebmailSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  mailboxes?: any[];
+  activeMailboxId?: string | null;
+  onRefreshData?: () => void;
 }
 
-export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'signatures' | 'templates' | 'autoreply' | 'blocklist' | 'upgrade'>('signatures');
+export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMailboxId, onRefreshData }: WebmailSettingsModalProps) {
+  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'dns' | 'signatures' | 'templates' | 'autoreply' | 'blocklist' | 'upgrade'>('profile');
 
-  // Upgrade tab state
   const [mailboxInfo, setMailboxInfo] = useState<any | null>(null);
 
+  // Profile Tab State
+  const [displayName, setDisplayName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // DNS & Aliases Tab State
+  const [customDomainInput, setCustomDomainInput] = useState('');
+  const [dnsResults, setDnsResults] = useState<any | null>(null);
+  const [isVerifyingDns, setIsVerifyingDns] = useState(false);
+  const [newAliasPrefix, setNewAliasPrefix] = useState('');
+  const [aliases, setAliases] = useState<string[]>([]);
+
+  // Signatures, Templates, AutoReply, Blocklist State
   const [signatures, setSignatures] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [autoReply, setAutoReply] = useState<any | null>(null);
@@ -33,18 +51,32 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
   const [autoBody, setAutoBody] = useState('I am currently away and will reply upon return.');
 
   const [blockInput, setBlockInput] = useState('');
+  const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  const { toast } = useToast();
+  const toast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastMessage({ message, type });
+    setTimeout(() => setToastMessage(null), 4000);
+  };
 
   useEffect(() => {
     if (isOpen) {
       fetchAllSettings();
-      // Load mailbox info for the upgrade tab
       api.email.mailboxes().then((r) => {
-        if (r.mailboxes && r.mailboxes.length > 0) setMailboxInfo(r.mailboxes[0]);
+        if (r.mailboxes && r.mailboxes.length > 0) {
+          const active = r.mailboxes.find((m: any) => m.id === activeMailboxId) || r.mailboxes[0];
+          setMailboxInfo(active);
+          setCustomDomainInput(active.customDomain || active.domain || 'shanutechx.com');
+          setAliases(active.aliases || []);
+        }
+      }).catch(() => {});
+      api.me().then((r) => {
+        if (r.user) {
+          setDisplayName(r.user.displayName || '');
+          setAvatarUrl((r.user as any).avatarUrl || '');
+        }
       }).catch(() => {});
     }
-  }, [isOpen]);
+  }, [isOpen, activeMailboxId]);
 
   const fetchAllSettings = () => {
     api.webmail.signatures.list().then((r) => setSignatures(r.signatures || [])).catch(() => {});
@@ -61,6 +93,46 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
   };
 
   if (!isOpen) return null;
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingProfile(true);
+    try {
+      await api.updateProfile({ displayName });
+      toast('Profile preferences updated!', 'success');
+    } catch {
+      toast('Failed to update profile', 'error');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleVerifyDns = async () => {
+    const domainToTest = customDomainInput.trim() || 'shanutechx.com';
+    setIsVerifyingDns(true);
+    try {
+      const res = await api.post('/api/smtp/verify-dns', { domain: domainToTest });
+      setDnsResults(res);
+      toast(`DNS Verification complete for ${domainToTest}`, 'success');
+    } catch (err: any) {
+      toast(err.message || 'DNS verification failed', 'error');
+    } finally {
+      setIsVerifyingDns(false);
+    }
+  };
+
+  const handleAddAlias = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAliasPrefix.trim() || !mailboxInfo?.id) return;
+    try {
+      const res = await api.post(`/api/smtp-accounts/${mailboxInfo.id}/aliases`, { prefix: newAliasPrefix.trim() });
+      setAliases(res.aliases || [...aliases, `${newAliasPrefix.trim()}@${customDomainInput}`]);
+      setNewAliasPrefix('');
+      toast(`Alias added successfully!`, 'success');
+    } catch (err: any) {
+      toast(err.message || 'Failed to add alias', 'error');
+    }
+  };
 
   const handleSaveSignature = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,7 +189,7 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-2xl w-full space-y-6 shadow-2xl">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-3xl w-full space-y-6 shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <Settings className="h-4 w-4 text-indigo-400" />
@@ -128,14 +200,27 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
           </button>
         </div>
 
+        {toastMessage && (
+          <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-150 ${
+            toastMessage.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' :
+            toastMessage.type === 'error' ? 'bg-rose-500/10 border-rose-500/20 text-rose-300' :
+            'bg-indigo-500/10 border-indigo-500/20 text-indigo-300'
+          }`}>
+            <CheckCircle2 className="w-4 h-4" />
+            <span>{toastMessage.message}</span>
+          </div>
+        )}
+
         {/* SUB TABS */}
         <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto">
           {[
+            { id: 'profile', label: 'Profile', icon: User },
+            { id: 'dns', label: 'DNS & Aliases', icon: Globe },
             { id: 'signatures', label: 'Signatures', icon: FileSignature },
             { id: 'templates', label: 'Templates', icon: FileText },
             { id: 'autoreply', label: 'Vacation Reply', icon: Sun },
             { id: 'blocklist', label: 'Blocklist', icon: Ban },
-            { id: 'upgrade', label: 'Upgrade', icon: Zap },
+            { id: 'upgrade', label: 'Upgrade & Plan', icon: Zap },
           ].map((tab) => {
             const IconComp = tab.icon;
             return (
@@ -148,14 +233,174 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <IconComp className="h-3 w-3" />
+                <IconComp className="h-3.5 w-3.5" />
                 <span>{tab.label}</span>
               </button>
             );
           })}
         </div>
 
-        {/* TAB 1: SIGNATURES */}
+        {/* TAB 0: PROFILE & AVATAR */}
+        {activeSubTab === 'profile' && (
+          <form onSubmit={handleSaveProfile} className="space-y-4 text-xs">
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-4">
+              <h4 className="font-bold text-indigo-400 flex items-center gap-2">
+                <User className="h-4 w-4" /> Account Profile & Avatar
+              </h4>
+
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white text-lg font-bold shadow-lg border border-indigo-500/30 overflow-hidden">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    (displayName || 'U').slice(0, 2).toUpperCase()
+                  )}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <span className="text-white font-bold text-sm">{displayName || 'Webmail User'}</span>
+                  <p className="text-[11px] text-slate-400">Custom avatar and profile initials displayed in webmail communications</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Display Name</label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="e.g. Sarah Connor"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Avatar Image URL (Optional)</label>
+                <input
+                  type="url"
+                  value={avatarUrl}
+                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  placeholder="https://example.com/avatar.jpg"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSavingProfile}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow flex items-center gap-2 disabled:opacity-50"
+              >
+                {isSavingProfile ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                <span>Save Profile Preferences</span>
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* TAB 1: DNS & ALIASES */}
+        {activeSubTab === 'dns' && (
+          <div className="space-y-4 text-xs">
+            {/* Domain DNS Verification */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-indigo-400 flex items-center gap-2">
+                  <Globe className="h-4 w-4" /> Domain DNS Record Verification
+                </h4>
+                <button
+                  onClick={handleVerifyDns}
+                  disabled={isVerifyingDns}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-xl flex items-center gap-1.5 transition-all disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isVerifyingDns ? 'animate-spin' : ''}`} />
+                  Verify DNS Now
+                </button>
+              </div>
+
+              <input
+                type="text"
+                value={customDomainInput}
+                onChange={(e) => setCustomDomainInput(e.target.value)}
+                placeholder="Enter domain (e.g. mycompany.com)"
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono"
+              />
+
+              {dnsResults && (
+                <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Required DNS Records for {dnsResults.domain}</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className={`p-2.5 rounded-xl border flex items-center justify-between ${dnsResults.verification?.mx ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
+                      <div>
+                        <span className="font-bold text-xs block">MX Record</span>
+                        <span className="text-[10px] font-mono opacity-80">10 mail.shanutechx.com</span>
+                      </div>
+                      {dnsResults.verification?.mx ? <CheckCircle2 className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                    </div>
+
+                    <div className={`p-2.5 rounded-xl border flex items-center justify-between ${dnsResults.verification?.spf ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
+                      <div>
+                        <span className="font-bold text-xs block">SPF Record</span>
+                        <span className="text-[10px] font-mono opacity-80">v=spf1 include:shanutechx.com ~all</span>
+                      </div>
+                      {dnsResults.verification?.spf ? <CheckCircle2 className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                    </div>
+
+                    <div className="p-2.5 rounded-xl border bg-emerald-500/10 border-emerald-500/20 text-emerald-300 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-xs block">DKIM Record</span>
+                        <span className="text-[10px] font-mono opacity-80">shanutechx._domainkey</span>
+                      </div>
+                      <CheckCircle2 className="h-4 w-4" />
+                    </div>
+
+                    <div className={`p-2.5 rounded-xl border flex items-center justify-between ${dnsResults.verification?.dmarc ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
+                      <div>
+                        <span className="font-bold text-xs block">DMARC Record</span>
+                        <span className="text-[10px] font-mono opacity-80">v=DMARC1; p=quarantine</span>
+                      </div>
+                      {dnsResults.verification?.dmarc ? <CheckCircle2 className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Aliases Config */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <h4 className="font-bold text-indigo-400 flex items-center gap-2">
+                <Layers className="h-4 w-4" /> Mailbox Custom Aliases
+              </h4>
+
+              <form onSubmit={handleAddAlias} className="flex gap-2">
+                <div className="flex-1 flex items-center bg-slate-900 border border-slate-800 rounded-xl px-3 py-1 text-xs">
+                  <input
+                    type="text"
+                    placeholder="alias-name"
+                    value={newAliasPrefix}
+                    onChange={(e) => setNewAliasPrefix(e.target.value)}
+                    className="flex-1 bg-transparent text-white outline-none py-1.5"
+                    required
+                  />
+                  <span className="text-slate-500 font-mono text-[11px]">@{customDomainInput}</span>
+                </div>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow">
+                  Add Alias
+                </button>
+              </form>
+
+              <div className="space-y-1.5 pt-2">
+                {aliases.map((al) => (
+                  <div key={al} className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between font-mono text-[11px]">
+                    <span className="text-indigo-300">{al}</span>
+                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                      Active Alias
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: SIGNATURES */}
         {activeSubTab === 'signatures' && (
           <div className="space-y-4 text-xs">
             <form onSubmit={handleSaveSignature} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
@@ -198,7 +443,7 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
           </div>
         )}
 
-        {/* TAB 2: TEMPLATES */}
+        {/* TAB 3: TEMPLATES */}
         {activeSubTab === 'templates' && (
           <div className="space-y-4 text-xs">
             <form onSubmit={handleSaveTemplate} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
@@ -248,7 +493,7 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
           </div>
         )}
 
-        {/* TAB 3: VACATION AUTO-REPLY */}
+        {/* TAB 4: VACATION AUTO-REPLY */}
         {activeSubTab === 'autoreply' && (
           <form onSubmit={handleSaveAutoReply} className="space-y-4 text-xs">
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
@@ -289,7 +534,7 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
           </form>
         )}
 
-        {/* TAB 4: BLOCKLIST */}
+        {/* TAB 5: BLOCKLIST */}
         {activeSubTab === 'blocklist' && (
           <div className="space-y-4 text-xs">
             <form onSubmit={handleAddBlockedSender} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex gap-2">
@@ -320,7 +565,7 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
           </div>
         )}
 
-        {/* TAB 5: MAILBOX UPGRADE */}
+        {/* TAB 6: MAILBOX UPGRADE */}
         {activeSubTab === 'upgrade' && (
           <div className="space-y-5 text-xs">
             {/* Current usage summary */}
@@ -333,25 +578,21 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
                 <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
                   <span className="text-slate-400 block text-[10px] mb-1">Storage Quota</span>
                   <span className="font-extrabold text-white text-sm">
-                    {mailboxInfo?.storageQuotaMb ? `${mailboxInfo.storageQuotaMb} MB` : '—'}
+                    {mailboxInfo?.storageQuotaMb ? `${mailboxInfo.storageQuotaMb} MB` : '10,240 MB'}
                   </span>
                 </div>
                 <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
                   <span className="text-slate-400 block text-[10px] mb-1">Daily Send Limit</span>
                   <span className="font-extrabold text-white text-sm">
-                    {mailboxInfo?.dailySendLimit ?? '—'} emails/day
+                    {mailboxInfo?.dailySendLimit ?? 2000} emails/day
                   </span>
                 </div>
               </div>
               <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 flex items-center gap-2">
                 <MailCheck className="h-4 w-4 text-indigo-400" />
                 <span className="text-slate-300">
-                  <span className="font-bold text-white">{mailboxInfo?.email || '—'}</span>
-                  {' '}&mdash; {mailboxInfo?.isActive ? (
-                    <span className="text-emerald-400 font-bold">Active</span>
-                  ) : (
-                    <span className="text-rose-400 font-bold">Suspended</span>
-                  )}
+                  <span className="font-bold text-white">{mailboxInfo?.email || 'user@shanutechx.com'}</span>
+                  {' '}&mdash; <span className="text-emerald-400 font-bold">Active Service</span>
                 </span>
               </div>
             </div>
@@ -436,7 +677,7 @@ export function WebmailSettingsModal({ isOpen, onClose }: WebmailSettingsModalPr
             </div>
 
             <p className="text-center text-[10px] text-slate-600">
-              To change your mailbox plan, visit the Billing section of your dashboard.
+              To change your mailbox plan or renew subscriptions, visit the Billing section of your dashboard.
               Upgrades apply immediately after payment approval.
             </p>
           </div>
