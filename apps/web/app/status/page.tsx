@@ -562,7 +562,7 @@ export default function StatusPage() {
                                   AVG LATENCY
                                 </span>
                                 <span className="text-sm font-black text-white">
-                                  {item.avgResponseTimeMs ? `${item.avgResponseTimeMs}ms` : '4ms'}
+                                  {item.avgResponseTimeMs ? `${item.avgResponseTimeMs}ms` : '< 1ms'}
                                 </span>
                               </div>
                               <div className="bg-[#0e0f24] border border-white/10 rounded-2xl p-4 space-y-1">
@@ -579,12 +579,20 @@ export default function StatusPage() {
                                 <span className="uppercase tracking-wider flex items-center gap-1.5">
                                   <TrendingUp className="h-3.5 w-3.5 text-purple-400" /> REAL RESPONSE TIME LATENCY (MS)
                                 </span>
-                                <span className="text-slate-500 font-normal">Last 20 Probes</span>
+                                <span className="text-slate-500 font-normal">Last {item.latencyHistory?.length || 0} Probes</span>
                               </div>
 
                               {(() => {
                                 const latencyGraph = item.latencyHistory || [];
-                                const maxLatency = Math.max(...latencyGraph.map((l) => l.latencyMs), 20);
+                                const maxLatency = Math.max(...latencyGraph.map((l) => l.latencyMs), 10);
+
+                                if (latencyGraph.length === 0) {
+                                  return (
+                                    <div className="py-6 text-center text-xs font-mono text-slate-500 italic">
+                                      Collecting live probe telemetry for {item.name}...
+                                    </div>
+                                  );
+                                }
 
                                 return (
                                   <>
@@ -594,10 +602,7 @@ export default function StatusPage() {
                                       <span className="absolute -left-6 bottom-0">0ms</span>
 
                                       <div className="w-full h-full flex items-end gap-1.5 pt-2">
-                                        {(latencyGraph.length > 0
-                                          ? latencyGraph
-                                          : Array.from({ length: 20 }, (_, i) => ({ time: `${i}:00`, latencyMs: 4 }))
-                                        ).map((point, idx) => {
+                                        {latencyGraph.map((point, idx) => {
                                           const hPct = Math.min(100, Math.max(10, (point.latencyMs / maxLatency) * 100));
                                           return (
                                             <div
@@ -612,11 +617,11 @@ export default function StatusPage() {
                                     </div>
 
                                     <div className="flex justify-between text-[10px] font-mono text-slate-500 pt-1">
-                                      <span>{latencyGraph[0]?.time || '11:00 AM'}</span>
+                                      <span>{latencyGraph[0]?.time || 'Start'}</span>
                                       <span>
-                                        {latencyGraph[Math.floor(latencyGraph.length / 2)]?.time || '11:30 AM'}
+                                        {latencyGraph[Math.floor(latencyGraph.length / 2)]?.time || ''}
                                       </span>
-                                      <span>{latencyGraph[latencyGraph.length - 1]?.time || '12:00 PM'}</span>
+                                      <span>{latencyGraph[latencyGraph.length - 1]?.time || 'Now'}</span>
                                     </div>
                                   </>
                                 );

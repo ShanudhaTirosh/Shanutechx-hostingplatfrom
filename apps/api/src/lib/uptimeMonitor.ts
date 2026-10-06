@@ -154,11 +154,66 @@ export async function checkHttpEndpoint(url: string, timeoutMs = 8000): Promise<
   }
 }
 
+// In-memory ring buffer of recent real probe telemetry for platform components & nodes
+export interface LiveProbeTelemetry {
+  targetId: string;
+  isUp: boolean;
+  responseTimeMs: number;
+  timestamp: Date;
+}
+
+const probeTelemetryCache = new Map<string, LiveProbeTelemetry[]>();
+
+export function recordProbeTelemetry(targetId: string, isUp: boolean, responseTimeMs: number) {
+  const existing = probeTelemetryCache.get(targetId) || [];
+  existing.push({
+    targetId,
+    isUp,
+    responseTimeMs: Math.max(1, responseTimeMs),
+    timestamp: new Date(),
+  });
+  // Keep last 30 probes
+  if (existing.length > 30) {
+    existing.shift();
+  }
+  probeTelemetryCache.set(targetId, existing);
+}
+
+export function getProbeTelemetry(targetId: string): LiveProbeTelemetry[] {
+  return probeTelemetryCache.get(targetId) || [];
+}
+
 /**
  * Synthetic monitor execution runner for platform infrastructure and customer deployments.
  * Fires notifications to Discord & user on state transition UP -> DOWN or DOWN -> UP.
  */
 export async function runUptimeChecks(): Promise<{ checked: number; up: number; down: number }> {
+  // 1. Probe core platform services & PostgreSQL database
+  const apiHealthUrl = `http://127.0.0.1:${env.port}/api/health`;
+  const dbResult = await checkPostgresHealth();
+  recordProbeTelemetry('core-postgres', dbResult.isUp, dbResult.responseTimeMs);
+
+  const apiResult = await checkHttpEndpoint(apiHealthUrl, 5000);
+  recordProbeTelemetry('core-api', apiResult.isUp, apiResult.responseTimeMs);
+
+  // 2. Probe active compute nodes
+  const nodes = await prisma.node.findMany({ where: { isActive: true } });
+  for (const node of nodes) {
+    const nodePort = env.nodeAgentPort || 4001;
+    const nodeCheck = await checkTcpPort(node.ip, nodePort, 3000);
+    recordProbeTelemetry(`node-${node.id}`, nodeCheck.isUp, nodeCheck.responseTimeMs);
+
+    // Update node health timestamp
+    await prisma.node.update({
+      where: { id: node.id },
+      data: {
+        lastSeenAt: new Date(),
+        isActive: nodeCheck.isUp,
+      },
+    }).catch(() => {});
+  }
+
+  // 3. Probe customer deployments
   const deployments = await prisma.deployment.findMany({
     where: {
       status: 'running',
@@ -191,7 +246,8 @@ export async function runUptimeChecks(): Promise<{ checked: number; up: number; 
       logger.warn({ deploymentId: deployment.id, url, err }, 'HTTP Uptime check failed');
     }
 
-    const responseTimeMs = Date.now() - start;
+    const responseTimeMs = Math.max(1, Date.now() - start);
+    recordProbeTelemetry(`dep-${deployment.id}`, isUp, responseTimeMs);
 
     // Check previous check to detect downtime / recovery transition
     const lastCheck = await prisma.uptimeCheck.findFirst({

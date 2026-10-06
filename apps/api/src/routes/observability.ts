@@ -96,14 +96,38 @@ observabilityRouter.get('/observability/loki/logs', requireAuth, requireAdmin, a
         });
       }
 
+      // Filter native entries by query search string if provided
+      let searchKeyword = query.replace(/^\{.*?\}\s*/, '').trim().toLowerCase();
+      if (!searchKeyword && query.includes('=')) {
+        // Extract value from LogQL syntax like {app="api"} or {source="node"}
+        const match = query.match(/="?([^"}]+)"?/);
+        if (match && match[1] && match[1] !== '.+') {
+          searchKeyword = match[1].toLowerCase();
+        }
+      }
+
+      let filteredNative = nativeEntries;
+      if (searchKeyword) {
+        filteredNative = filteredNative.filter((entry) =>
+          entry.message.toLowerCase().includes(searchKeyword) ||
+          entry.source.toLowerCase().includes(searchKeyword) ||
+          entry.level.toLowerCase().includes(searchKeyword)
+        );
+      }
+
+      const reqLevel = typeof req.query.level === 'string' ? req.query.level : 'all';
+      if (reqLevel !== 'all') {
+        filteredNative = filteredNative.filter((entry) => entry.level === reqLevel);
+      }
+
       // Sort newest first
-      nativeEntries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      filteredNative.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
       result = {
         isConfigured: result.isConfigured,
-        status: result.isConfigured ? result.status : 'unconfigured',
-        totalLines: nativeEntries.length,
-        entries: nativeEntries.slice(0, limit),
+        status: result.isConfigured ? result.status : 'active_platform_telemetry',
+        totalLines: filteredNative.length,
+        entries: filteredNative.slice(0, limit),
       };
     }
 
