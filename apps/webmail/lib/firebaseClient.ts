@@ -18,6 +18,4 @@ export const githubProvider = new GithubAuthProvider();
 githubProvider.addScope('read:user');
 githubProvider.addScope('user:email');
 
-export const discordProvider = new OAuthProvider('discord.com');
-discordProvider.addScope('identify');
-discordProvider.addScope('email');
+
