@@ -28,19 +28,18 @@ import jwt from 'jsonwebtoken';
  */
 
 export const gitConnectRouter = Router();
-gitConnectRouter.use(requireAuth);
 
 const providerParam = z.enum(['github', 'gitlab']);
 
 /** GET /api/git/config — which providers are configured on this deployment, for the frontend to show/hide "Connect X" buttons. */
-gitConnectRouter.get('/git/config', (_req: AuthedRequest, res: Response) => {
+gitConnectRouter.get('/git/config', requireAuth, (_req: AuthedRequest, res: Response) => {
   res.json({
     providers: listProviders().map((p) => ({ provider: p.provider, configured: p.isConfigured() })),
   });
 });
 
 /** GET /api/git/accounts — every connected account across every provider. */
-gitConnectRouter.get('/git/accounts', async (req: AuthedRequest, res: Response) => {
+gitConnectRouter.get('/git/accounts', requireAuth, async (req: AuthedRequest, res: Response) => {
   const userId = req.user!.id;
   const allAccounts = (
     await Promise.all(listProviders().map((p) => p.listConnectedAccounts(userId)))
@@ -56,7 +55,7 @@ gitConnectRouter.get('/git/accounts', async (req: AuthedRequest, res: Response) 
  * directly (window.location.href = url); it never sees or handles a
  * token as part of this flow.
  */
-gitConnectRouter.get('/git/connect/:provider/start', (req: AuthedRequest, res: Response) => {
+gitConnectRouter.get('/git/connect/:provider/start', requireAuth, (req: AuthedRequest, res: Response) => {
   const parsedProvider = providerParam.safeParse(req.params.provider);
   if (!parsedProvider.success) return res.status(400).json({ error: 'Unsupported git provider' });
 
@@ -148,7 +147,7 @@ gitConnectRouter.get('/git/gitlab/callback', async (req, res: Response) => {
 });
 
 /** GET /api/git/repos?accountId=... — repos/projects visible through one connected account. */
-gitConnectRouter.get('/git/repos', async (req: AuthedRequest, res: Response) => {
+gitConnectRouter.get('/git/repos', requireAuth, async (req: AuthedRequest, res: Response) => {
   const { accountId, provider } = req.query as { accountId?: string; provider?: string };
   if (!accountId) return res.status(400).json({ error: 'accountId is required' });
 
@@ -179,7 +178,7 @@ const disconnectSchema = z.object({
 });
 
 /** POST /api/git/disconnect — revoke and remove a connected account. */
-gitConnectRouter.post('/git/disconnect', async (req: AuthedRequest, res: Response) => {
+gitConnectRouter.post('/git/disconnect', requireAuth, async (req: AuthedRequest, res: Response) => {
   const parsed = disconnectSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 

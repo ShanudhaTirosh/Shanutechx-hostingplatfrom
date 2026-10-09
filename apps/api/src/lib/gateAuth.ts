@@ -8,9 +8,8 @@ import crypto from 'crypto';
  * unequal lengths, so we guard first).
  */
 export function verifySharedSecret(submitted: unknown, expected: string): boolean {
-  if (typeof submitted !== 'string' || submitted.length === 0) return false;
-  const a = Buffer.from(submitted, 'utf8');
-  const b = Buffer.from(expected, 'utf8');
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
+  if (typeof submitted !== 'string' || submitted.length === 0 || !expected) return false;
+  const hashA = crypto.createHash('sha256').update(submitted).digest();
+  const hashB = crypto.createHash('sha256').update(expected).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
 }

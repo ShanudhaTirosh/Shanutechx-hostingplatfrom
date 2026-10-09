@@ -1226,6 +1226,7 @@ managedDatabasesRouter.get('/managed-databases/:id/schema', async (req: AuthedRe
         ORDER BY t.table_name, c.ordinal_position;
       `;
     } else if (db.type === 'mysql') {
+      const safeDbName = (db.dbName || 'mysql').replace(/[^a-zA-Z0-9_]/g, '');
       schemaQuery = `
         SELECT 
           TABLE_NAME as table_name,
@@ -1235,7 +1236,7 @@ managedDatabasesRouter.get('/managed-databases/:id/schema', async (req: AuthedRe
           COLUMN_DEFAULT as column_default,
           COLUMN_KEY as constraint_type
         FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = '${db.dbName || 'mysql'}'
+        WHERE TABLE_SCHEMA = '${safeDbName || 'mysql'}'
         ORDER BY TABLE_NAME, ORDINAL_POSITION;
       `;
     } else {

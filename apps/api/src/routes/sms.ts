@@ -20,15 +20,19 @@ const incomingSmsSchema = z.object({
   nonce: z.string().optional(),
 });
 
+// Middleware: Verify HMAC signature before rate limiting to prevent DoS token exhaustion
+const verifySmsHmac = (req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => {
+  if (!verifySmsSignature(req, env.smsWebhookSecret)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  next();
+};
+
 smsRouter.post(
   '/sms/incoming',
+  verifySmsHmac,
   smsWebhookLimiter,
   asyncHandler(async (req, res) => {
-    // 1. Verify HMAC Signature
-    if (!verifySmsSignature(req, env.smsWebhookSecret)) {
-      return res.status(401).json({ error: 'Invalid signature' });
-    }
-
     const parsed = incomingSmsSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.flatten() });

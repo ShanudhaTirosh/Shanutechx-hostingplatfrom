@@ -336,7 +336,7 @@ internalBotRouter.post('/internal/open-ticket', async (req: Request, res: Respon
  * Claim ticket. Enforces anti-double-claim unless force=true.
  */
 internalBotRouter.post('/internal/claim-ticket', async (req: Request, res: Response) => {
-  const { ticketId, staffUserLabel, staffUserId, force } = req.body || {};
+  const { ticketId, staffUserLabel, staffUserId, staffPhone, force } = req.body || {};
 
   if (!ticketId) return res.status(400).json({ error: 'ticketId is required' });
 
@@ -347,15 +347,24 @@ internalBotRouter.post('/internal/claim-ticket', async (req: Request, res: Respo
 
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
 
-  if (ticket.claimedById && !force && ticket.claimedById !== staffUserId) {
+  let staffUser = staffUserId ? await prisma.user.findUnique({ where: { id: staffUserId } }) : null;
+  if (!staffUser && staffPhone) {
+    const cleanPhone = String(staffPhone).replace(/[^0-9]/g, '');
+    staffUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ phoneNumber: cleanPhone }, { phoneNumber: `+${cleanPhone}` }],
+        role: { in: ['admin', 'dev', 'support'] },
+      },
+    });
+  }
+  if (!staffUser) {
+    staffUser = await prisma.user.findFirst({ where: { role: { in: ['admin', 'dev', 'support'] } } });
+  }
+
+  if (ticket.claimedById && !force && ticket.claimedById !== staffUser?.id) {
     return res.status(409).json({
       error: `Ticket is already claimed by ${ticket.claimedBy?.displayName || ticket.claimedBy?.email || 'another staff member'}. Pass force=true to transfer.`,
     });
-  }
-
-  let staffUser = staffUserId ? await prisma.user.findUnique({ where: { id: staffUserId } }) : null;
-  if (!staffUser) {
-    staffUser = await prisma.user.findFirst({ where: { role: { in: ['admin', 'dev', 'support'] } } });
   }
 
   const updated = await prisma.ticket.update({
@@ -618,24 +627,52 @@ internalBotRouter.post('/internal/announcements/send', async (req: Request, res:
  * Generates branded PDF invoice and delivers to customer via WhatsApp/Discord DM
  */
 internalBotRouter.post('/internal/invoices/generate-and-send', async (req: Request, res: Response) => {
-  const { orderId } = req.body || {};
-  if (!orderId) return res.status(400).json({ error: 'orderId is required' });
+  const { orderId, userEmail, items: reqItems, createdBy } = req.body || {};
 
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
-      user: true,
-      items: { include: { plan: { include: { product: true } }, service: true } },
-    },
-  });
+  let order: any = null;
+  if (orderId) {
+    order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        user: true,
+        items: { include: { plan: { include: { product: true } }, service: true } },
+      },
+    });
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+  } else if (userEmail) {
+    const user = await prisma.user.findUnique({ where: { email: userEmail.trim().toLowerCase() } });
+    if (!user) return res.status(404).json({ error: `Customer account not found for ${userEmail}` });
 
-  if (!order) return res.status(404).json({ error: 'Order not found' });
+    const rawItems: Array<{ name: string; amount?: number; unitPrice?: number; quantity?: number }> = Array.isArray(reqItems) && reqItems.length > 0
+      ? reqItems
+      : [{ name: 'Platform Hosting Service', amount: 0, quantity: 1 }];
 
-  const items = order.items.map((i) => ({
-    name: i.plan?.name ?? i.service?.name ?? 'Cloud Hosting Service',
-    quantity: i.quantity,
-    unitPrice: i.plan?.price ?? i.service?.price ?? 0,
-  }));
+    const calcTotal = rawItems.reduce((acc, i) => acc + Math.round((i.amount ?? i.unitPrice ?? 0) * (i.quantity ?? 1) * 100), 0);
+
+    order = await prisma.order.create({
+      data: {
+        userId: user.id,
+        total: calcTotal,
+        totalLkr: calcTotal,
+        status: 'paid',
+        currency: 'USD',
+      },
+      include: {
+        user: true,
+        items: true,
+      },
+    });
+  } else {
+    return res.status(400).json({ error: 'Either orderId or userEmail is required' });
+  }
+
+  const items = Array.isArray(order.items) && order.items.length > 0
+    ? order.items.map((i: any) => ({
+        name: i.plan?.name ?? i.service?.name ?? 'Cloud Hosting Service',
+        quantity: i.quantity,
+        unitPrice: i.plan?.price ?? i.service?.price ?? 0,
+      }))
+    : (Array.isArray(reqItems) ? reqItems.map((i: any) => ({ name: i.name || 'Cloud Hosting Service', quantity: i.quantity || 1, unitPrice: i.amount ?? i.unitPrice ?? 0 })) : [{ name: 'Cloud Hosting Service', quantity: 1, unitPrice: order.total / 100 }]);
 
   const pdfBytes = await generateInvoicePdf({
     invoiceId: `INV-${new Date(order.createdAt).getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`,

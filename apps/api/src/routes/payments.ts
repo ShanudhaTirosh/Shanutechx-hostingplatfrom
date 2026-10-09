@@ -199,12 +199,13 @@ paymentsRouter.post('/payments/:id/review', requireAdmin, async (req: AuthedRequ
 
       let isRenewal = false;
       if (orderWithItems?.items) {
-        for (const item of orderWithItems.items) {
-          const config = item.configJson as { renewalSubscriptionId?: string } | null;
-          if (config?.renewalSubscriptionId) {
-            isRenewal = true;
-            await extendSubscription(config.renewalSubscriptionId, tx);
-          }
+        const renewalSubIds = orderWithItems.items
+          .map((item) => (item.configJson as { renewalSubscriptionId?: string } | null)?.renewalSubscriptionId)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+        if (renewalSubIds.length > 0) {
+          isRenewal = true;
+          await Promise.all(renewalSubIds.map((subId) => extendSubscription(subId, tx)));
         }
       }
 

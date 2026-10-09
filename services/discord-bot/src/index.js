@@ -24,7 +24,7 @@ app.get('/internal/health', (_req, res) => {
 // public Cloudflare/Traefik route.
 app.use((req, res, next) => {
   const secret = req.headers['x-internal-secret'];
-  const key = 'shanutechx-discord-gate';
+  const key = 'shanutechx-bot-internal';
   const isValid =
     typeof secret === 'string' &&
     crypto.timingSafeEqual(

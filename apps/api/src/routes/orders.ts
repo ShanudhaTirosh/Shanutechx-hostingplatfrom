@@ -56,6 +56,16 @@ async function recalculateTotal(orderId: string) {
   });
   type ItemWithPricing = (typeof items)[number];
 
+  const validItems: ItemWithPricing[] = [];
+  for (const item of items) {
+    if (!item.plan && !item.service) {
+      logger.warn({ orderItemId: item.id, orderId }, 'Removing orphaned OrderItem referencing deleted catalog plan/service');
+      await prisma.orderItem.delete({ where: { id: item.id } }).catch(() => null);
+    } else {
+      validItems.push(item);
+    }
+  }
+
   function priceOf(item: ItemWithPricing): { price: number; currency: Currency } {
     if (item.plan) {
       return { price: item.plan.price, currency: item.plan.currency as Currency };
@@ -63,18 +73,14 @@ async function recalculateTotal(orderId: string) {
     if (item.service) {
       return { price: item.service.price, currency: item.service.currency as Currency };
     }
-    // BUG-M04 FIX: Guard against data-corruption where an OrderItem has neither
-    // a plan nor a service (e.g. after a hard-delete). Return zero-price to avoid
-    // a runtime crash and let the order proceed; log for investigation.
-    logger.error({ orderItemId: item.id, orderId }, 'OrderItem has neither plan nor service \u2014 using zero price. Data may be corrupted.');
     return { price: 0, currency: 'LKR' as Currency };
   }
 
-  const currency: Currency = items[0] ? priceOf(items[0]).currency : 'LKR';
-  const total = items.reduce((sum: number, item: ItemWithPricing) => sum + priceOf(item).price * item.quantity, 0);
+  const currency: Currency = validItems[0] ? priceOf(validItems[0]).currency : 'LKR';
+  const total = validItems.reduce((sum: number, item: ItemWithPricing) => sum + priceOf(item).price * item.quantity, 0);
   const totalLkr = convertToLkr(total, currency);
 
-  for (const item of items) {
+  for (const item of validItems) {
     const p = priceOf(item);
     const itemLkr = convertToLkr(p.price, p.currency);
     await prisma.orderItem.update({

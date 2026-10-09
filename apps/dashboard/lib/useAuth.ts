@@ -67,7 +67,18 @@ export async function getAuthToken(): Promise<string> {
 export async function apiFetch(path: string, init: RequestInit = {}) {
   const token = await getAuthToken();
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
-  const impersonatedUserId = typeof window !== 'undefined' ? localStorage.getItem('stx_impersonate_user_id') : null;
+  let impersonatedUserId: string | null = null;
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem('shanutechx_user_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.role === 'admin' || parsed?.role === 'dev') {
+          impersonatedUserId = localStorage.getItem('stx_impersonate_user_id');
+        }
+      }
+    } catch {}
+  }
 
   return fetch(`${API_BASE}${path}`, {
     ...init,

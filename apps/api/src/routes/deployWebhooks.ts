@@ -261,8 +261,8 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
 
   // Fire the actual rebuild in the background.
   void (async () => {
-    await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'building' } });
     try {
+      await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'building' } });
       const result = await buildAndRun(
         deployment.node,
         {
@@ -308,7 +308,7 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
       });
     } catch (err: any) {
       logger.error({ err, deploymentId: deployment.id }, 'Webhook-triggered redeploy failed');
-      await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'failed' } });
+      await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'failed' } }).catch(() => null);
       void notifyDiscordChannel('deployment_failed', {
         Deployment: deployment.id,
         Branch: pushedBranch ?? '(default)',
