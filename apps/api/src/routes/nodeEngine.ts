@@ -96,18 +96,30 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/packages/install', async (req: Auth
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   const { packageName } = req.body || {};
+  if (!packageName || typeof packageName !== 'string' || !/^[a-z0-9][a-z0-9+.-]*$/.test(packageName.trim())) {
+    return res.status(400).json({ error: 'Valid package name required' });
+  }
+
+  const cleanPackage = packageName.trim().toLowerCase();
+  const isStaff = ['dev', 'admin'].includes(req.user?.role || '');
+
+  // Block dangerous network exploitation / pivoting tools for non-staff
+  const RESTRICTED_PACKAGES = ['nmap', 'netcat', 'nc', 'socat', 'ettercap', 'wireshark', 'tcpdump', 'aircrack-ng', 'hydra', 'john', 'tor'];
+  if (!isStaff && RESTRICTED_PACKAGES.includes(cleanPackage)) {
+    return res.status(403).json({ error: 'Security tools and packet sniffing utilities cannot be installed' });
+  }
 
   try {
     const r = await fetch(agentUrl(node.ip, '/agent/engine/packages/install'), {
       method: 'POST',
       headers: agentHeaders(),
-      body: JSON.stringify({ packageName }),
+      body: JSON.stringify({ packageName: cleanPackage }),
     });
     const data = await r.json();
 
     if (r.ok) {
       await prisma.auditLog.create({
-        data: { adminId: req.user!.id, action: 'nodeEngine.package_install', target: `${node.id}:${packageName}` },
+        data: { adminId: req.user!.id, action: 'nodeEngine.package_install', target: `${node.id}:${cleanPackage}` },
       });
     }
 
@@ -175,12 +187,29 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/services/action', async (req: Authe
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   const { action, serviceName } = req.body || {};
+  const validActions = ['start', 'stop', 'restart', 'status', 'reload'];
+  if (!action || typeof action !== 'string' || !validActions.includes(action.toLowerCase())) {
+    return res.status(400).json({ error: `Valid action required (${validActions.join(', ')})` });
+  }
+
+  if (!serviceName || typeof serviceName !== 'string' || !/^[a-zA-Z0-9@_.-]+$/.test(serviceName.trim())) {
+    return res.status(400).json({ error: 'Valid service name required' });
+  }
+
+  const cleanAction = action.toLowerCase();
+  const cleanService = serviceName.trim().toLowerCase();
+  const isStaff = ['dev', 'admin'].includes(req.user?.role || '');
+
+  const PROTECTED_SERVICES = ['ssh', 'sshd', 'ufw', 'iptables', 'fail2ban', 'shanutechx-agent', 'node-agent', 'docker', 'systemd-journald'];
+  if (!isStaff && PROTECTED_SERVICES.includes(cleanService) && cleanAction !== 'status') {
+    return res.status(403).json({ error: 'Core platform and security services cannot be modified by customers' });
+  }
 
   try {
     const r = await fetch(agentUrl(node.ip, '/agent/engine/services/action'), {
       method: 'POST',
       headers: agentHeaders(),
-      body: JSON.stringify({ action, serviceName }),
+      body: JSON.stringify({ action: cleanAction, serviceName: cleanService }),
     });
     const data = await r.json();
 
@@ -189,7 +218,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/services/action', async (req: Authe
         data: {
           adminId: req.user!.id,
           action: 'nodeEngine.service_action',
-          target: `${node.id}:${serviceName}:${action}`,
+          target: `${node.id}:${cleanService}:${cleanAction}`,
         },
       });
     }
@@ -460,6 +489,30 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/docker/compose', async (req: Authed
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   const { yamlContent, projectName } = req.body || {};
+  if (!yamlContent || typeof yamlContent !== 'string' || !yamlContent.trim()) {
+    return res.status(400).json({ error: 'Valid YAML content is required' });
+  }
+
+  const isStaff = ['dev', 'admin'].includes(req.user?.role || '');
+  if (!isStaff) {
+    const lower = yamlContent.toLowerCase();
+    if (
+      lower.includes('network_mode: "host"') ||
+      lower.includes("network_mode: 'host'") ||
+      lower.includes('network_mode: host') ||
+      lower.includes('privileged: true') ||
+      lower.includes('/var/run/docker.sock') ||
+      lower.includes('/etc:') ||
+      lower.includes('/root:') ||
+      lower.includes('/proc:') ||
+      lower.includes('/sys:') ||
+      lower.includes('cap_add:')
+    ) {
+      return res.status(403).json({
+        error: 'Privileged Docker capabilities, host networking, and root filesystem mounts are restricted for safety',
+      });
+    }
+  }
 
   try {
     const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/compose'), {

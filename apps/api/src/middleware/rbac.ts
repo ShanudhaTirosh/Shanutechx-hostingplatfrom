@@ -73,6 +73,11 @@ export async function canAccessResource(
     return owner.assignedAdminId === req.user.id;
   }
 
+  // Support staff have read-only visibility into customer resources for ticket investigation (MED-05)
+  if (req.user.role === 'support') {
+    return action === 'read';
+  }
+
   if (req.user.id) {
     const membership = await prisma.teamMember.findFirst({
       where: {

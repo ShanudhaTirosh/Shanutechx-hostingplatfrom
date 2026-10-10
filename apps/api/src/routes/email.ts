@@ -13,6 +13,7 @@ import dns from 'dns';
 import { getServerIp, buildSpfRecord } from '../lib/mailAuth';
 import { getWebmailClusterConfig, updateWebmailClusterConfig, verifyS3StorageConnection } from '../lib/webmailS3Storage';
 import crypto from 'crypto';
+import { isSsrfTargetAsync } from './smtp';
 
 export const emailRouter = Router();
 
@@ -301,14 +302,39 @@ emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
   const isStaff = role === 'admin' || role === 'dev';
 
   if (!isStaff) {
-    // Check if customer has an active paid SMTP subscription
-    const smtpSubscription = await prisma.smtpAccount.findFirst({
+    const existingCount = await prisma.smtpAccount.count({
       where: { userId: req.user!.id },
     });
 
-    if (!smtpSubscription) {
+    const paidOrders = await prisma.order.findMany({
+      where: {
+        userId: req.user!.id,
+        status: 'paid',
+      },
+      include: { items: true },
+    });
+
+    let allowedMailboxes = 0;
+    for (const ord of paidOrders) {
+      for (const item of ord.items) {
+        const cfg = (item.configJson || {}) as any;
+        if (cfg.serviceType === 'smtp_hosting' || cfg.type === 'smtp_hosting' || cfg.category === 'email') {
+          allowedMailboxes += Math.max(1, Number(cfg.maxMailboxes || cfg.seats || item.quantity || 1));
+        }
+      }
+    }
+
+    if (allowedMailboxes === 0 && existingCount === 0) {
+      // First-time users need an active plan
       return res.status(403).json({
         error: 'You need to purchase an SMTP Hosting plan first. Visit the Catalog to get started.',
+        purchaseRequired: true,
+      });
+    }
+
+    if (existingCount >= Math.max(allowedMailboxes, 1)) {
+      return res.status(403).json({
+        error: `You have reached your mailbox limit (${existingCount}/${Math.max(allowedMailboxes, 1)}). Purchase an additional mailbox package to create more email accounts.`,
         purchaseRequired: true,
       });
     }
@@ -451,6 +477,43 @@ emailRouter.post('/email/mailboxes/:id/renew', async (req: AuthedRequest, res) =
     }
 
     const months = Math.min(18, Math.max(1, Number(req.body?.months) || 1));
+
+    if (!isStaff && !isInternal) {
+      const pricePerMonthLkr = 1500;
+      const totalLkr = pricePerMonthLkr * months;
+      const renewalOrder = await prisma.order.create({
+        data: {
+          userId: account.userId,
+          status: 'awaiting_payment',
+          total: Math.round(totalLkr / 300),
+          totalLkr,
+          currency: 'LKR',
+          items: {
+            create: [
+              {
+                quantity: 1,
+                priceLkr: totalLkr,
+                configJson: {
+                  type: 'mailbox_renewal',
+                  mailboxId: account.id,
+                  username: account.smtpUsername,
+                  months,
+                },
+              },
+            ],
+          },
+        },
+      });
+
+      return res.json({
+        ok: true,
+        requiresPayment: true,
+        orderId: renewalOrder.id,
+        totalLkr,
+        message: `Renewal order #${renewalOrder.id} generated for ${months} month(s). Please submit payment proof to activate renewal.`,
+      });
+    }
+
     const baseDate = account.expiresAt && account.expiresAt.getTime() > Date.now() ? account.expiresAt : new Date();
     const newExpiresAt = new Date(baseDate.getTime() + months * 30 * 24 * 60 * 60 * 1000);
     const updated = await prisma.smtpAccount.update({
@@ -1409,7 +1472,18 @@ emailRouter.post('/admin/mail/config', requireAdminOrDev, async (req: AuthedRequ
  * Dev/Admin endpoint to verify S3/R2 object storage connectivity.
  */
 emailRouter.post('/admin/mail/s3/verify', requireAdminOrDev, async (req: AuthedRequest, res) => {
-  const result = await verifyS3StorageConnection(req.body || {});
+  const { s3Endpoint, s3Region, s3BucketName, s3AccessKeyId, s3SecretAccessKey } = req.body || {};
+  if (s3Endpoint) {
+    try {
+      const u = new URL(s3Endpoint);
+      if (await isSsrfTargetAsync(u.hostname)) {
+        return res.status(400).json({ ok: false, error: 'S3 endpoint cannot point to private or internal addresses' });
+      }
+    } catch {
+      return res.status(400).json({ ok: false, error: 'Invalid S3 endpoint URL' });
+    }
+  }
+  const result = await verifyS3StorageConnection({ s3Endpoint, s3Region, s3BucketName, s3AccessKeyId, s3SecretAccessKey });
   res.json(result);
 });
 
@@ -1562,7 +1636,7 @@ emailRouter.post('/admin/email/hosts', requireAdminOrDev, async (req: AuthedRequ
  * POST /api/admin/email/hosts/:id/test
  * Test connection to a specific mail host node and update status.
  */
-emailRouter.post('/api/admin/email/hosts/:id/test', requireAdminOrDev, async (req: AuthedRequest, res) => {
+emailRouter.post('/admin/email/hosts/:id/test', requireAdminOrDev, async (req: AuthedRequest, res) => {
   try {
     const host = await prisma.mailHost.findUnique({ where: { id: req.params.id } });
     if (!host) return res.status(404).json({ error: 'Mail host not found' });
@@ -1671,6 +1745,11 @@ emailRouter.post('/admin/email/mailboxes/bulk', requireAdminOrDev, async (req: A
   for (const username of listToCreate) {
     try {
       const fullEmail = `${username}@${domainStr}`;
+      const mailboxPassword = password
+        ? `${password}.${crypto.randomBytes(4).toString('hex')}`
+        : crypto.randomBytes(12).toString('base64');
+      const mailboxCredRef = encryptSecret(mailboxPassword, env.secretsEncryptionKey);
+
       let wildduckUserId: string | undefined;
       let wildduckAddressId: string | undefined;
 
@@ -1678,7 +1757,7 @@ emailRouter.post('/admin/email/mailboxes/bulk', requireAdminOrDev, async (req: A
         const wdUser = await wildduckClient.createUser(
           {
             username: fullEmail,
-            password,
+            password: mailboxPassword,
             name: targetUser.displayName || targetUser.email,
             quotaGb: Math.max(1, Math.ceil(storageQuotaMb / 1024)),
           },
@@ -1703,7 +1782,7 @@ emailRouter.post('/admin/email/mailboxes/bulk', requireAdminOrDev, async (req: A
           smtpHost,
           smtpPort: 587,
           smtpUsername: username,
-          credentialRef,
+          credentialRef: mailboxCredRef,
           webmailUrl,
           storageQuotaMb,
           dailySendLimit,

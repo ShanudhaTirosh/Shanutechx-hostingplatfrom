@@ -239,17 +239,25 @@ paymentsRouter.post('/payments/:id/review', requireAdmin, async (req: AuthedRequ
 
     // Run automated fulfillment pipeline safely outside transaction
     // (external service calls; failures are retried by the ops team)
+    let fulfillmentSucceeded = true;
     try {
       await fulfillOrder(payment.orderId);
     } catch (fulfillErr: any) {
+      fulfillmentSucceeded = false;
       logger.error({ fulfillErr, orderId: payment.orderId }, 'Order fulfillment error after approval — manual retry required');
     }
 
-
-    void notifyCustomer(
-      payment.order.user,
-      `Your payment for order ${payment.orderId} has been confirmed. Your products have been provisioned!`
-    );
+    if (fulfillmentSucceeded) {
+      void notifyCustomer(
+        payment.order.user,
+        `Your payment for order ${payment.orderId} has been confirmed. Your products have been provisioned!`
+      );
+    } else {
+      void notifyCustomer(
+        payment.order.user,
+        `Your payment for order ${payment.orderId} has been confirmed. Provisioning is currently in progress, and your services will be ready shortly.`
+      );
+    }
 
     // Send automatic PDF & HTML invoice delivery email to customer
     if (orderWithItems) {

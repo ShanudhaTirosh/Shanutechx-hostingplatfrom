@@ -16,7 +16,7 @@ export const smsRouter = Router();
 
 const incomingSmsSchema = z.object({
   text: z.string().min(1),
-  timestamp: z.number().or(z.string()).optional(),
+  timestamp: z.number().or(z.string()),
   nonce: z.string().optional(),
 });
 
@@ -38,22 +38,25 @@ smsRouter.post(
       return res.status(400).json({ error: parsed.error.flatten() });
     }
 
-    // 2. Validate timestamp freshness (prevent replay attacks if provided)
-    if (parsed.data.timestamp) {
-      const ts = typeof parsed.data.timestamp === 'string' ? Number(parsed.data.timestamp) : parsed.data.timestamp;
-      if (!isNaN(ts) && Math.abs(Date.now() - ts) > 5 * 60 * 1000) {
-        return res.status(401).json({ error: 'Request timestamp expired (replay protection)' });
-      }
+    // 2. Validate timestamp freshness (prevent replay attacks) (MED-13)
+    const ts = typeof parsed.data.timestamp === 'string' ? Number(parsed.data.timestamp) : parsed.data.timestamp;
+    if (isNaN(ts) || Math.abs(Date.now() - ts) > 5 * 60 * 1000) {
+      return res.status(401).json({ error: 'Request timestamp expired or invalid (replay protection)' });
     }
 
     const { source, amount, reference } = parseSms(parsed.data.text);
 
-    // 3. Check for duplicate SMS event processing
-    const duplicateSms = await prisma.smsEvent.findFirst({
-      where: {
-        rawText: parsed.data.text,
-      },
-    });
+    // 3. Check for duplicate SMS event processing (scoped to 10-minute window or nonce) (MED-15)
+    const duplicateSms = parsed.data.nonce
+      ? await prisma.smsEvent.findFirst({
+          where: { rawText: { contains: parsed.data.nonce } },
+        })
+      : await prisma.smsEvent.findFirst({
+          where: {
+            rawText: parsed.data.text,
+            createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
+          },
+        });
 
     if (duplicateSms) {
       return res.status(200).json({ smsEvent: duplicateSms, matched: false, reason: 'Duplicate SMS event ignored' });
@@ -95,9 +98,17 @@ smsRouter.post(
 
     let bestMatch: { order: (typeof candidates)[number]; score: number } | null = null;
 
+    // Dynamically derive extraction confidence from parse quality (MED-14)
+    let dynamicExtractionConfidence = 45;
+    if (source !== 'unknown' && reference) {
+      dynamicExtractionConfidence = 95;
+    } else if (source !== 'unknown' || reference) {
+      dynamicExtractionConfidence = 75;
+    }
+
     for (const order of candidates) {
       const { confidenceScore, decision } = scorePayment(
-        { amount, reference, source, extractionConfidence: 85 },
+        { amount, reference, source, extractionConfidence: dynamicExtractionConfidence },
         { expectedAmount: order.totalLkr }
       );
 

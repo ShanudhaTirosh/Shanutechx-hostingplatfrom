@@ -112,7 +112,8 @@ webmailRouter.get('/webmail/messages', async (req: AuthedRequest, res: Response)
     }
   }
 
-  const targetAccount = smtpAccountId ? accessibleAccounts.find((a) => a.id === smtpAccountId) : accessibleAccounts[0];
+  const ownAccount = accessibleAccounts.find((a) => a.userId === userId) || accessibleAccounts[0];
+  const targetAccount = smtpAccountId ? accessibleAccounts.find((a) => a.id === smtpAccountId) : ownAccount;
 
   if (targetAccount && targetAccount.wildduckUserId) {
     try {
@@ -1621,20 +1622,30 @@ webmailRouter.post('/webmail/domains', async (req: AuthedRequest, res: Response)
     // Verify limit
     const smtpAccounts = await prisma.smtpAccount.findMany({ where: { userId } });
     const existingDomains = new Set(smtpAccounts.map(a => a.customDomain).filter(Boolean));
-    existingDomains.add(cleanDomain);
 
     let maxDomains = req.user!.role === 'dev' ? 9999 : 3;
-    if (existingDomains.size > maxDomains) {
+    if (!existingDomains.has(cleanDomain) && existingDomains.size >= maxDomains) {
       return res.status(403).json({ error: `Domain limit reached (${maxDomains} domains allowed on your plan)` });
     }
 
-    // Try creating in WildDuck API if configured
+    // Try creating / getting DKIM key in WildDuck API if configured
     let dkimSelector = 'shanutechx';
-    let dkimPublicKey = 'v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC3...';
+    let dkimPublicKey = '';
     try {
-      await wildduckClient.createDomain(cleanDomain);
+      let dkimRes = await wildduckClient.getDkimKey(cleanDomain);
+      if (!dkimRes) {
+        dkimRes = await wildduckClient.createDkimKey(cleanDomain, dkimSelector);
+      }
+      if (dkimRes) {
+        dkimSelector = dkimRes.selector || dkimSelector;
+        dkimPublicKey = dkimRes.txtRecord || (dkimRes.publicKey ? `v=DKIM1; k=rsa; p=${dkimRes.publicKey}` : '');
+      }
     } catch (e: any) {
-      logger.info({ domain: cleanDomain, err: e.message }, 'Wildduck domain creation fallback');
+      logger.info({ domain: cleanDomain, err: e.message }, 'Wildduck DKIM generation fallback');
+    }
+
+    if (!dkimPublicKey) {
+      dkimPublicKey = 'v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC3...';
     }
 
     const dnsRecords = {
@@ -1662,6 +1673,26 @@ webmailRouter.post('/webmail/domains', async (req: AuthedRequest, res: Response)
 webmailRouter.post('/webmail/domains/:domain/verify', async (req: AuthedRequest, res: Response) => {
   try {
     const { domain } = req.params;
+    const userRole = req.user!.role;
+    const userId = req.user!.id;
+    const cleanDomain = (domain || '').trim().toLowerCase();
+
+    if (!cleanDomain) {
+      return res.status(400).json({ error: 'Valid domain name required' });
+    }
+
+    if (userRole !== 'dev' && userRole !== 'admin') {
+      const owned = await prisma.smtpAccount.findFirst({
+        where: {
+          userId,
+          customDomain: cleanDomain,
+        },
+      });
+      if (!owned) {
+        return res.status(403).json({ error: 'You do not have permission to verify this domain' });
+      }
+    }
+
     const resolver = new Resolver();
     const rootDomain = env.rootDomain || 'shanutechx.com';
 
@@ -1671,24 +1702,24 @@ webmailRouter.post('/webmail/domains/:domain/verify', async (req: AuthedRequest,
     let dmarcVerified = false;
 
     try {
-      const mxRecords = await resolver.resolveMx(domain);
+      const mxRecords = await resolver.resolveMx(cleanDomain);
       mxVerified = mxRecords.some(r => r.exchange.includes(rootDomain) || r.exchange.includes('mail.'));
     } catch (e) {}
 
     try {
-      const txtRecords = await resolver.resolveTxt(domain);
+      const txtRecords = await resolver.resolveTxt(cleanDomain);
       const joined = txtRecords.map(r => r.join('')).join(' ');
       spfVerified = joined.includes('v=spf1');
     } catch (e) {}
 
     try {
-      const dkimRecords = await resolver.resolveTxt(`shanutechx._domainkey.${domain}`);
+      const dkimRecords = await resolver.resolveTxt(`shanutechx._domainkey.${cleanDomain}`);
       const joined = dkimRecords.map(r => r.join('')).join(' ');
       dkimVerified = joined.includes('v=DKIM1');
     } catch (e) {}
 
     try {
-      const dmarcRecords = await resolver.resolveTxt(`_dmarc.${domain}`);
+      const dmarcRecords = await resolver.resolveTxt(`_dmarc.${cleanDomain}`);
       const joined = dmarcRecords.map(r => r.join('')).join(' ');
       dmarcVerified = joined.includes('v=DMARC1');
     } catch (e) {}
@@ -1696,7 +1727,7 @@ webmailRouter.post('/webmail/domains/:domain/verify', async (req: AuthedRequest,
     const overallVerified = mxVerified && (spfVerified || dkimVerified);
 
     return res.json({
-      domain,
+      domain: cleanDomain,
       verified: overallVerified,
       checks: {
         mx: mxVerified,
@@ -1721,22 +1752,39 @@ webmailRouter.post('/webmail/aliases', async (req: AuthedRequest, res: Response)
   try {
     const userId = req.user!.id;
     const { smtpAccountId, aliasEmail } = req.body;
-    if (!smtpAccountId || !aliasEmail) {
-      return res.status(400).json({ error: 'smtpAccountId and aliasEmail required' });
+    if (!smtpAccountId || !aliasEmail || typeof aliasEmail !== 'string') {
+      return res.status(400).json({ error: 'smtpAccountId and valid aliasEmail required' });
+    }
+
+    const cleanAlias = aliasEmail.trim().toLowerCase();
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    if (!emailRegex.test(cleanAlias)) {
+      return res.status(400).json({ error: 'Invalid alias email format' });
     }
 
     const smtpAccount = await prisma.smtpAccount.findFirst({
-      where: { id: smtpAccountId, userId },
+      where: req.user!.role === 'dev' ? { id: smtpAccountId } : { id: smtpAccountId, userId },
     });
 
     if (!smtpAccount) return res.status(404).json({ error: 'Mailbox not found' });
 
+    // Validate alias domain matches mailbox custom domain or username domain
+    const aliasDomain = cleanAlias.split('@')[1];
+    const mailboxDomain = smtpAccount.customDomain || smtpAccount.smtpUsername.split('@')[1];
+    if (aliasDomain !== mailboxDomain && req.user!.role !== 'dev') {
+      return res.status(400).json({ error: `Alias domain must match mailbox domain (@${mailboxDomain})` });
+    }
+
     const currentAliases = smtpAccount.aliases || [];
+    if (currentAliases.includes(cleanAlias)) {
+      return res.status(400).json({ error: 'Alias already registered on this mailbox' });
+    }
+
     if (currentAliases.length >= smtpAccount.maxAliases) {
       return res.status(403).json({ error: `Alias limit reached (${smtpAccount.maxAliases} aliases max)` });
     }
 
-    const updatedAliases = [...currentAliases, aliasEmail.toLowerCase().trim()];
+    const updatedAliases = [...currentAliases, cleanAlias];
     await prisma.smtpAccount.update({
       where: { id: smtpAccountId },
       data: { aliases: updatedAliases },
@@ -1833,14 +1881,26 @@ webmailRouter.post('/webmail/support/unlock-account', requireRole('support', 'ad
 webmailRouter.post('/webmail/support/quota-bump', requireRole('support', 'admin', 'dev'), async (req: AuthedRequest, res: Response) => {
   try {
     const { smtpAccountId, additionalMb, reason } = req.body;
-    if (!smtpAccountId || !additionalMb) return res.status(400).json({ error: 'smtpAccountId and additionalMb required' });
+    if (!smtpAccountId || additionalMb === undefined || additionalMb === null) {
+      return res.status(400).json({ error: 'smtpAccountId and additionalMb required' });
+    }
+
+    const numMb = Number(additionalMb);
+    if (!Number.isFinite(numMb) || numMb <= 0 || numMb > 51200) {
+      return res.status(400).json({ error: 'additionalMb must be a positive integer up to 51200 (50 GB)' });
+    }
 
     const acc = await prisma.smtpAccount.findUnique({ where: { id: smtpAccountId } });
     if (!acc) return res.status(404).json({ error: 'Mailbox not found' });
 
+    const maxAllowedQuotaMb = 102400; // 100 GB absolute maximum ceiling
+    if (acc.storageQuotaMb + numMb > maxAllowedQuotaMb) {
+      return res.status(400).json({ error: `Quota bump would exceed absolute maximum mailbox quota (${maxAllowedQuotaMb} MB)` });
+    }
+
     const updated = await prisma.smtpAccount.update({
       where: { id: smtpAccountId },
-      data: { storageQuotaMb: acc.storageQuotaMb + Number(additionalMb) },
+      data: { storageQuotaMb: acc.storageQuotaMb + numMb },
     });
 
     await prisma.webmailAuditLog.create({
@@ -1914,13 +1974,56 @@ webmailRouter.get('/webmail/business/analytics', async (req: AuthedRequest, res:
 webmailRouter.post('/webmail/business/mail-merge', async (req: AuthedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { recipients, subject, bodyTemplate } = req.body;
+    const role = req.user!.role;
+    const { recipients, subject, bodyTemplate, smtpAccountId } = req.body;
     if (!Array.isArray(recipients) || !subject || !bodyTemplate) {
       return res.status(400).json({ error: 'recipients array, subject, and bodyTemplate required' });
     }
 
+    if (recipients.length === 0 || recipients.length > 100) {
+      return res.status(400).json({ error: 'Recipients count must be between 1 and 100 per mail merge job' });
+    }
+
+    // Resolve sender mailbox account
+    let account: any = null;
+    if (smtpAccountId) {
+      account = await prisma.smtpAccount.findUnique({ where: { id: smtpAccountId } });
+    } else {
+      account = await prisma.smtpAccount.findFirst({
+        where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+        orderBy: { createdAt: 'asc' },
+      });
+    }
+
+    if (!account || !(await canAccessMailbox(account, userId, role))) {
+      return res.status(400).json({
+        error: 'No accessible mailbox provisioned for sending mail merge. Contact administrator.',
+      });
+    }
+
+    if (account.isSuspended) {
+      return res.status(403).json({ error: 'Mailbox account is suspended. Sending is disabled.' });
+    }
+
+    if (account.dailySendLimit > 0 && account.dailySendCount + recipients.length > account.dailySendLimit) {
+      return res.status(429).json({
+        error: `Mail merge would exceed daily send limit (${account.dailySendCount}/${account.dailySendLimit}). Limit allows ${Math.max(0, account.dailySendLimit - account.dailySendCount)} more emails today.`,
+      });
+    }
+
+    const senderEmail = account.smtpUsername;
+    const rawSenderName = (req.user as any)?.displayName || req.user?.email || senderEmail;
+    const senderName = String(rawSenderName).replace(/[\r\n]/g, '').trim();
+
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+
     let dispatchedCount = 0;
     for (const r of recipients) {
+      const recipientEmail = typeof r?.email === 'string' ? r.email.trim().toLowerCase() : '';
+      if (!recipientEmail || !emailRegex.test(recipientEmail)) {
+        continue;
+      }
+
       let personalizedBody = bodyTemplate;
       if (r.variables && typeof r.variables === 'object') {
         for (const [k, v] of Object.entries(r.variables)) {
@@ -1929,32 +2032,63 @@ webmailRouter.post('/webmail/business/mail-merge', async (req: AuthedRequest, re
         }
       }
 
+      // Record in webmail messages
       await prisma.webmailMessage.create({
         data: {
-          userId,
+          userId: account.userId,
+          smtpAccountId: account.id,
           folder: 'sent',
-          senderName: (req.user as any)?.displayName || 'User',
-          senderEmail: req.user!.email,
-          recipientEmail: r.email,
+          senderName,
+          senderEmail,
+          recipientEmail,
           subject,
-          snippet: personalizedBody.slice(0, 100),
+          snippet: personalizedBody.replace(/<[^>]+>/g, '').slice(0, 100) + '...',
           htmlBody: personalizedBody,
           isRead: true,
         },
       });
-      dispatchedCount++;
+
+      // Actually deliver the email
+      try {
+        if (account.wildduckUserId) {
+          await wildduckClient.submitMessage(account.wildduckUserId, {
+            from: `"${senderName}" <${senderEmail}>`,
+            to: [recipientEmail],
+            subject,
+            html: personalizedBody,
+            text: personalizedBody.replace(/<[^>]+>/g, ''),
+          });
+        } else {
+          const password = decryptSecret(account.credentialRef, env.secretsEncryptionKey);
+          await sendSmtpEmail(
+            { host: account.smtpHost, port: account.smtpPort, user: account.smtpUsername, pass: password },
+            { from: `"${senderName}" <${senderEmail}>`, to: recipientEmail, subject, html: personalizedBody }
+          );
+        }
+        dispatchedCount++;
+      } catch (sendErr: any) {
+        logger.error({ err: sendErr.message, recipientEmail }, 'Mail merge individual message dispatch failed');
+      }
+    }
+
+    if (dispatchedCount > 0) {
+      await prisma.smtpAccount.update({
+        where: { id: account.id },
+        data: { dailySendCount: { increment: dispatchedCount } },
+      });
     }
 
     await prisma.webmailAuditLog.create({
       data: {
         userId,
         action: 'mail_merge_dispatched',
-        details: { count: dispatchedCount, subject },
+        details: { count: dispatchedCount, subject, attempted: recipients.length },
       },
     });
 
-    return res.json({ ok: true, dispatchedCount });
-  } catch (err) {
+    return res.json({ ok: true, dispatchedCount, totalAttempted: recipients.length });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, 'Mail merge dispatch failed');
     return res.status(500).json({ error: 'Mail merge dispatch failed' });
   }
 });

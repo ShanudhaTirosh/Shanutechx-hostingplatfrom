@@ -8,6 +8,7 @@ import { env } from '../env';
 import { verifySharedSecret } from '../lib/gateAuth';
 import { UptimeKumaClient } from '../lib/uptimeKuma';
 import { GrafanaClient } from '../lib/grafana';
+import { isSsrfTargetAsync } from './smtp';
 
 export const statusRouter = Router();
 
@@ -19,6 +20,19 @@ let runtimeMonitoringConfig = {
   grafanaApiKey: env.grafanaApiKey,
   grafanaDashboardUid: env.grafanaDashboardUid,
 };
+
+function maskConfig(cfg: typeof runtimeMonitoringConfig) {
+  return {
+    uptimeKumaUrl: cfg.uptimeKumaUrl,
+    uptimeKumaSlug: cfg.uptimeKumaSlug,
+    uptimeKumaApiKey: cfg.uptimeKumaApiKey ? '••••••••' : undefined,
+    grafanaUrl: cfg.grafanaUrl,
+    grafanaApiKey: cfg.grafanaApiKey ? '••••••••' : undefined,
+    grafanaDashboardUid: cfg.grafanaDashboardUid,
+    isUptimeKumaConfigured: Boolean(cfg.uptimeKumaApiKey),
+    isGrafanaConfigured: Boolean(cfg.grafanaApiKey),
+  };
+}
 
 const DEFAULT_SYSTEM_COMPONENTS = [
   {
@@ -234,9 +248,9 @@ statusRouter.get('/status/public', async (_req, res) => {
 
       formattedComponents.push({
         id: `node-${node.id}`,
-        name: `${node.label} (${node.ip})`,
+        name: `${node.label} (Region Node)`,
         group: 'VPS SERVERS',
-        description: `CPU: ${node.cpuCores} Cores | RAM: ${node.ramMb} MB | Disk: ${node.diskGb} GB`,
+        description: `High-Availability VPS Compute Node (${node.cpuCores} vCPU)`,
         order: 10,
         status: nodeStatus,
         uptimePct90d: node.isActive ? 100 : 0,
@@ -431,7 +445,7 @@ statusRouter.get('/admin/monitoring/status', requireAuth, requireAdmin, async (_
   ]);
 
   res.json({
-    config: runtimeMonitoringConfig,
+    config: maskConfig(runtimeMonitoringConfig),
     uptimeKuma: {
       isConfigured: kumaClient.isConfigured(),
       monitorCount: monitors.length,
@@ -451,7 +465,7 @@ statusRouter.post('/admin/monitoring/config', requireAuth, requireAdmin, async (
   if (grafanaApiKey !== undefined) runtimeMonitoringConfig.grafanaApiKey = grafanaApiKey;
   if (grafanaDashboardUid !== undefined) runtimeMonitoringConfig.grafanaDashboardUid = grafanaDashboardUid;
 
-  res.json({ ok: true, config: runtimeMonitoringConfig });
+  res.json({ ok: true, config: maskConfig(runtimeMonitoringConfig) });
 });
 
 /** Admin — POST /api/admin/monitoring/sync */
@@ -580,8 +594,18 @@ statusRouter.post('/status/subscribe', async (req, res) => {
     return res.status(400).json({ error: 'Please enter a valid email address' });
   }
 
-  if (type === 'webhook' && !target.startsWith('http://') && !target.startsWith('https://')) {
-    return res.status(400).json({ error: 'Please enter a valid HTTP/HTTPS webhook URL' });
+  if (type === 'webhook') {
+    try {
+      const parsedUrl = new URL(target);
+      if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+        return res.status(400).json({ error: 'Please enter a valid HTTP/HTTPS webhook URL' });
+      }
+      if (await isSsrfTargetAsync(parsedUrl.hostname)) {
+        return res.status(400).json({ error: 'Webhook URL cannot point to internal or private addresses' });
+      }
+    } catch {
+      return res.status(400).json({ error: 'Please enter a valid HTTP/HTTPS webhook URL' });
+    }
   }
 
   const secretToken = crypto.randomBytes(16).toString('hex');

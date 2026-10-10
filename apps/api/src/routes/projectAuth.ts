@@ -114,13 +114,6 @@ async function validateProjectRedirectUrl(
     return true;
   }
 
-  const isLocalhost = (parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1') &&
-    (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test');
-
-  if (isLocalhost) {
-    return true;
-  }
-
   // Check if redirect matches any deployments owned by the project's user
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -155,7 +148,7 @@ const magicLinkRequestSchema = z.object({ email: z.string().email(), redirectUrl
  * https://myapp.example.com/auth/callback) — this endpoint appends
  * `?token=...` to it and emails that full URL.
  */
-projectAuthRouter.post('/projects/:id/auth/magic-link', async (req, res) => {
+projectAuthRouter.post('/projects/:id/auth/magic-link', authRateLimiter, async (req, res) => {
   const parsed = magicLinkRequestSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -200,7 +193,6 @@ projectAuthRouter.post('/projects/:id/auth/magic-link', async (req, res) => {
   res.status(202).json({
     sent: !mailError,
     mailError,
-    debugLink: process.env.NODE_ENV === 'development' ? link : undefined,
   });
 });
 

@@ -132,15 +132,16 @@ analyticsRouter.get('/admin/analytics', async (req, res) => {
     ]);
 
     // Financial Metrics
+    const LKR_PER_USD = Math.max(1, Number(process.env.LKR_TO_USD_RATE || process.env.EXCHANGE_RATE_LKR_USD) || 300);
     const revenueRangeLkr = paidOrdersCurrentWindow._sum.totalLkr ?? 0;
     const revenuePrevRangeLkr = paidOrdersPreviousWindow._sum.totalLkr ?? 0;
-    const revenueRangeUsd = Math.round(revenueRangeLkr / 300);
+    const revenueRangeUsd = Math.round(revenueRangeLkr / LKR_PER_USD);
     const revenueAllTimeLkr = paidOrdersAll._sum.totalLkr ?? 0;
-    const revenueAllTimeUsd = Math.round(revenueAllTimeLkr / 300);
+    const revenueAllTimeUsd = Math.round(revenueAllTimeLkr / LKR_PER_USD);
 
     const orderCountRange = paidOrdersCurrentWindow._count.id ?? 0;
     const averageOrderValueLkr = orderCountRange > 0 ? Math.round(revenueRangeLkr / orderCountRange) : 0;
-    const averageOrderValueUsd = Math.round(averageOrderValueLkr / 300);
+    const averageOrderValueUsd = Math.round(averageOrderValueLkr / LKR_PER_USD);
 
     // Revenue Growth % (vs prior period of equal length)
     let revenueGrowthPct = 0;
@@ -155,14 +156,14 @@ analyticsRouter.get('/admin/analytics', async (req, res) => {
       const p = s.orderItem?.priceLkr ?? s.orderItem?.plan?.price ?? 0;
       return sum + p;
     }, 0);
-    const mrrUsd = Math.round(mrrLkr / 300);
+    const mrrUsd = Math.round(mrrLkr / LKR_PER_USD);
     const arrLkr = mrrLkr * 12;
     const arrUsd = mrrUsd * 12;
 
     // Average Revenue Per User (ARPU)
     const activeSubsCount = activeSubscriptionsList.length;
     const arpuLkr = activeSubsCount > 0 ? Math.round(mrrLkr / activeSubsCount) : 0;
-    const arpuUsd = Math.round(arpuLkr / 300);
+    const arpuUsd = Math.round(arpuLkr / LKR_PER_USD);
 
     // Churn Rate %
     const totalSubsBase = activeSubsCount + cancelledSubscriptionsRange;

@@ -12,6 +12,13 @@ export const teamsRouter = Router();
  * GET /api/teams/public/invites/:token
  * Public unauthenticated endpoint to inspect invitation details before login/signup.
  */
+function maskEmail(email: string): string {
+  if (!email || !email.includes('@')) return '***@***.com';
+  const [local, domain] = email.split('@');
+  const maskedLocal = local.length <= 2 ? local[0] + '***' : local[0] + '***' + local[local.length - 1];
+  return `${maskedLocal}@${domain}`;
+}
+
 teamsRouter.get('/teams/public/invites/:token', async (req: Request, res: Response) => {
   const token = req.params.token;
   const invite = await prisma.teamInvite.findUnique({
@@ -31,11 +38,8 @@ teamsRouter.get('/teams/public/invites/:token', async (req: Request, res: Respon
     id: invite.id,
     teamId: invite.teamId,
     teamName: invite.team.name,
-    inviterName: invite.invitedByUser.displayName || invite.invitedByUser.email,
-    inviterEmail: invite.invitedByUser.email,
-    email: invite.email,
+    inviterName: invite.invitedByUser.displayName || maskEmail(invite.invitedByUser.email),
     role: invite.role,
-    resourcePermissions: invite.resourcePermissions,
     expiresAt: invite.expiresAt,
     status: invite.status,
   });
@@ -149,10 +153,10 @@ teamsRouter.get('/teams/:id', async (req: AuthedRequest, res) => {
     return res.status(403).json({ error: 'Access denied' });
   }
 
-  // Fetch resources owned by team owner (deployments, databases, VPS, SMTP)
+  // Fetch resources assigned to this team
   let [deployments, databases, vpsInstances, smtpAccounts] = await Promise.all([
-    prisma.deployment.findMany({ where: { userId: team.ownerId }, select: { id: true, subdomain: true, status: true } }),
-    prisma.managedDatabase.findMany({ where: { userId: team.ownerId }, select: { id: true, type: true, status: true, internalHost: true } }),
+    prisma.deployment.findMany({ where: { teamId: team.id }, select: { id: true, subdomain: true, status: true } }),
+    prisma.managedDatabase.findMany({ where: { userId: team.ownerId, projectId: { not: null } }, select: { id: true, type: true, status: true, internalHost: true } }),
     prisma.vpsProvision.findMany({ where: { userId: team.ownerId }, select: { id: true, status: true, provider: true } }),
     prisma.smtpAccount.findMany({ where: { userId: team.ownerId }, select: { id: true, smtpHost: true, smtpUsername: true } }),
   ]);
@@ -294,19 +298,35 @@ teamsRouter.post('/teams/:id/invites/:inviteId/resend', async (req: AuthedReques
 
   if (!canInvite) return res.status(403).json({ error: 'Permission denied' });
 
+  if (invite.status !== 'pending') {
+    return res.status(400).json({ error: 'Only pending invitations can be re-sent' });
+  }
+
+  // Refresh expiration: extend by 7 days from now and rotate token for hygiene (MED-07)
+  const newToken = crypto.randomBytes(32).toString('hex');
+  const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  const updatedInvite = await prisma.teamInvite.update({
+    where: { id: invite.id },
+    data: {
+      token: newToken,
+      expiresAt: newExpiresAt,
+    },
+  });
+
   const appBaseUrl = process.env.APP_URL || 'http://localhost:3000';
-  const inviteLink = `${appBaseUrl}/team/accept?token=${invite.token}`;
+  const inviteLink = `${appBaseUrl}/team/accept?token=${updatedInvite.token}`;
   const inviterName = (req.user as any).displayName || req.user!.email;
 
   await sendTeamInviteNotification({
-    email: invite.email,
+    email: updatedInvite.email,
     teamName: team.name,
     inviterName,
-    role: invite.role,
+    role: updatedInvite.role,
     inviteLink,
   });
 
-  res.json({ ok: true, message: `Invitation email re-sent to ${invite.email}` });
+  res.json({ ok: true, message: `Invitation email re-sent to ${updatedInvite.email}` });
 });
 
 /**
@@ -328,9 +348,15 @@ teamsRouter.delete('/teams/:id/invites/:inviteId', async (req: AuthedRequest, re
   const myMembership = team.members.find((m: any) => m.userId === userId);
   const canRevoke = isOwner || myMembership?.role === 'admin' || req.user!.role === 'dev';
 
-  if (!canRevoke) return res.status(403).json({ error: 'Permission denied' });
+  const invite = await prisma.teamInvite.findUnique({
+    where: { id: inviteId },
+  });
 
-  await prisma.teamInvite.delete({ where: { id: inviteId } });
+  if (!invite || invite.teamId !== teamId) {
+    return res.status(404).json({ error: 'Invitation not found in this team' });
+  }
+
+  await prisma.teamInvite.delete({ where: { id: invite.id } });
   res.json({ ok: true, deletedId: inviteId });
 });
 
@@ -352,7 +378,15 @@ teamsRouter.get('/teams/invites/accept/:token', async (req: AuthedRequest, res) 
     return res.status(410).json({ error: 'This invitation link has expired or has already been used' });
   }
 
-  res.json({ invite });
+  const isTargetRecipient = invite.email.toLowerCase() === req.user!.email.toLowerCase() || req.user!.role === 'dev';
+  const safeInvite = isTargetRecipient
+    ? invite
+    : {
+        ...invite,
+        email: invite.email.replace(/(?<=.).(?=[^@]*?@)/g, '*'),
+      };
+
+  res.json({ invite: safeInvite });
 });
 
 /**
@@ -467,31 +501,37 @@ teamsRouter.patch('/teams/:id/members/:memberId', async (req: AuthedRequest, res
     return res.status(403).json({ error: 'Only the team owner can edit member roles' });
   }
 
-  const updatedMember = await prisma.teamMember.update({
-    where: { id: memberId },
-    data: {
-      role: parsed.data.role,
-    },
-  });
+  if (parsed.data.permissions && parsed.data.permissions.length > 0) {
+    const check = await validateTeamResourcePermissions(team.ownerId, parsed.data.permissions);
+    if (!check.valid) {
+      return res.status(400).json({ error: check.error });
+    }
+  }
 
-  // Update granular resource permissions if passed
-  if (parsed.data.permissions) {
-    if (parsed.data.permissions.length > 0) {
-      const check = await validateTeamResourcePermissions(team.ownerId, parsed.data.permissions);
-      if (!check.valid) {
-        return res.status(400).json({ error: check.error });
+  const updatedMember = await prisma.$transaction(async (tx) => {
+    const member = await tx.teamMember.update({
+      where: { id: memberId },
+      data: {
+        role: parsed.data.role,
+      },
+    });
+
+    if (parsed.data.permissions) {
+      await tx.resourcePermission.deleteMany({ where: { teamMemberId: memberId } });
+      if (parsed.data.permissions.length > 0) {
+        await tx.resourcePermission.createMany({
+          data: parsed.data.permissions.map((p: any) => ({
+            teamMemberId: memberId,
+            resourceType: p.resourceType,
+            resourceId: p.resourceId,
+            permission: p.permission,
+          })),
+        });
       }
     }
-    await prisma.resourcePermission.deleteMany({ where: { teamMemberId: memberId } });
-    await prisma.resourcePermission.createMany({
-      data: parsed.data.permissions.map((p: any) => ({
-        teamMemberId: memberId,
-        resourceType: p.resourceType,
-        resourceId: p.resourceId,
-        permission: p.permission,
-      })),
-    });
-  }
+
+    return member;
+  });
 
   res.json({ member: updatedMember });
 });

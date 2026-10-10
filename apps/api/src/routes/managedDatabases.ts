@@ -337,9 +337,32 @@ managedDatabasesRouter.post('/managed-databases/:id/query', async (req: AuthedRe
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, 'database', db.id, 'write'))) return res.status(404).json({ error: 'Not found' });
   if (db.status !== 'running' || !db.containerId || !db.node) {
     return res.status(400).json({ error: 'Database instance must be running to execute queries' });
+  }
+
+  const rawQuery = parsed.data.query.trim();
+  const isDev = req.user!.role === 'dev';
+
+  if (!isDev) {
+    if (db.type === 'postgres' || db.type === 'mysql') {
+      if (
+        /\b(drop\s+database|copy\s+.*to\s+program|pg_read_file|pg_write_file|pg_ls_dir)\b/i.test(rawQuery) ||
+        /\b(grant\s+superuser|alter\s+system)\b/i.test(rawQuery)
+      ) {
+        return res.status(403).json({ error: 'System-level and destructive database administrative commands are prohibited via web query console' });
+      }
+    } else if (db.type === 'redis') {
+      const firstToken = rawQuery.split(/\s+/)[0]?.toUpperCase();
+      if (['FLUSHALL', 'FLUSHDB', 'CONFIG', 'DEBUG', 'MODULE', 'SHUTDOWN', 'SLAVEOF', 'REPLICAOF'].includes(firstToken)) {
+        return res.status(403).json({ error: `Command "${firstToken}" is prohibited via the web query console` });
+      }
+    } else if (db.type === 'mongodb') {
+      if (/(dropDatabase|shutdownServer|runCommand\s*\(\s*\{\s*shutdown)/i.test(rawQuery)) {
+        return res.status(403).json({ error: 'Destructive database administration commands are prohibited via web query console' });
+      }
+    }
   }
 
   let masterPassword: string | undefined;
@@ -884,22 +907,19 @@ managedDatabasesRouter.post('/managed-databases/:id/renew', async (req: AuthedRe
 
   const { months } = parsed.data;
 
-  if (db.status === 'stopped') {
-    await prisma.managedDatabase.update({ where: { id: db.id }, data: { status: 'running' } });
-  }
-
+  const totalLkr = 3600 * months;
   const renewalOrder = await prisma.order.create({
     data: {
       userId: db.userId,
-      status: 'paid',
+      status: 'awaiting_payment',
       total: 12 * months,
-      totalLkr: 3600 * months,
+      totalLkr,
       currency: 'LKR',
       items: {
         create: [
           {
             quantity: 1,
-            priceLkr: 3600 * months,
+            priceLkr: totalLkr,
             configJson: {
               type: 'database_renewal',
               databaseId: db.id,
@@ -912,19 +932,28 @@ managedDatabasesRouter.post('/managed-databases/:id/renew', async (req: AuthedRe
     },
   });
 
+  const payment = await prisma.payment.create({
+    data: {
+      orderId: renewalOrder.id,
+      method: 'manual',
+      status: 'manual_review',
+    },
+  });
+
   await prisma.auditLog.create({
     data: {
       adminId: req.user!.id,
-      action: 'managed_database.renewed',
+      action: 'managed_database.renew_requested',
       target: `Database ${db.id} (${db.type}) - ${months} Month(s)`,
       actorRole: req.user!.role === 'customer' ? 'customer' : null,
     },
   });
 
-  res.json({
+  res.status(202).json({
     ok: true,
-    message: `Managed ${db.type.toUpperCase()} database renewed for ${months} month(s).`,
+    message: `Managed ${db.type.toUpperCase()} database renewal order created (${months} month(s)). Please submit payment to complete renewal.`,
     orderId: renewalOrder.id,
+    paymentId: payment.id,
   });
 });
 
@@ -1025,6 +1054,14 @@ managedDatabasesRouter.post('/managed-databases/:id/s3-backups', async (req: Aut
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
+  if (parsed.data.s3Endpoint) {
+    const { isSafeWebhookUrl } = await import('../lib/webhooks');
+    const safeCheck = await isSafeWebhookUrl(parsed.data.s3Endpoint);
+    if (!safeCheck.safe) {
+      return res.status(400).json({ error: `Prohibited or unsafe S3 endpoint URL: ${safeCheck.reason}` });
+    }
+  }
+
   const db = await prisma.managedDatabase.findUnique({
     where: { id: req.params.id },
     include: { node: true },
@@ -1071,12 +1108,23 @@ managedDatabasesRouter.post('/managed-databases/:id/s3-backups', async (req: Aut
 
     if (s3Client) {
       const { PutObjectCommand } = await import('@aws-sdk/client-s3');
-      const dummyDumpBuffer = Buffer.from(JSON.stringify(backupResult));
+      const downloadRes = await fetch(
+        `http://${db.node.ip}:${env.nodeAgentPort}/agent/managed-databases/${db.id}/backups/${backupResult.filename}`,
+        {
+          headers: { 'x-agent-secret': env.nodeAgentSecret },
+          signal: AbortSignal.timeout(60_000),
+        }
+      );
+      if (!downloadRes.ok) {
+        throw new Error(`Failed to retrieve backup dump file from node agent (HTTP ${downloadRes.status})`);
+      }
+      const dumpBuffer = Buffer.from(await downloadRes.arrayBuffer());
+
       await s3Client.send(
         new PutObjectCommand({
           Bucket: parsed.data.s3Bucket,
           Key: s3Key,
-          Body: dummyDumpBuffer,
+          Body: dumpBuffer,
           ContentType: 'application/octet-stream',
         })
       );
@@ -1339,6 +1387,13 @@ managedDatabasesRouter.post('/managed-databases/:id/extensions/toggle', async (r
   if (db.type !== 'postgres') return res.status(400).json({ error: 'Extensions are supported on PostgreSQL only' });
 
   const { extensionName, enable } = parsed.data;
+
+  const allowed = SUPPORTED_EXTENSIONS.map((e) => e.name);
+  if (!allowed.includes(extensionName)) {
+    return res.status(400).json({
+      error: `Unsupported extension "${extensionName}". Supported extensions: ${allowed.join(', ')}`,
+    });
+  }
 
   if (db.status === 'running' && db.containerId && db.node) {
     let masterPassword: string | undefined;

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
@@ -171,7 +172,7 @@ catalogRouter.get('/catalog', (_req, res) => {
 });
 
 function isValidSlug(slug: string): boolean {
-  return typeof slug === 'string' && /^[a-z0-9-]+$/i.test(slug);
+  return typeof slug === 'string' && /^[a-z0-9-]+$/.test(slug);
 }
 
 /**
@@ -285,19 +286,59 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
   }
 
   const isAdmin = req.user!.role === 'admin' || req.user!.role === 'dev';
+  if (!isAdmin && inputNodeId && inputNodeId !== 'default') {
+    return res.status(403).json({ error: 'Explicit node selection is restricted to administrators and dev staff' });
+  }
+
   let node;
   try {
     node = await selectNodeForDeployment({
       requiredTag: 'node-hosting',
       isAdminDeployment: isAdmin,
-      explicitNodeId: inputNodeId !== 'default' ? inputNodeId : undefined,
+      explicitNodeId: isAdmin && inputNodeId !== 'default' ? inputNodeId : undefined,
     });
   } catch (err) {
     if (err instanceof NodeSelectionError) return res.status(409).json({ error: err.message });
     throw err;
   }
 
-  const nodeId = node.id;
+  const targetSubdomain = meta.requiresExposedPort !== false ? composeName : null;
+
+  // Verify uniqueness before calling node agent to prevent concurrent name collisions (MED-04)
+  const existingDeployment = await prisma.deployment.findFirst({
+    where: {
+      OR: [
+        { containerId: composeName },
+        ...(targetSubdomain ? [{ subdomain: targetSubdomain }] : []),
+      ],
+    },
+  });
+  if (existingDeployment) {
+    return res.status(409).json({ error: `Deployment with project name or subdomain "${composeName}" already exists` });
+  }
+
+  // Pre-reserve deployment record in pending status
+  let deployment;
+  try {
+    deployment = await prisma.deployment.create({
+      data: {
+        userId: req.user!.id,
+        teamId: teamId ?? null,
+        nodeId: node.id,
+        status: 'pending',
+        containerId: composeName,
+        subdomain: targetSubdomain,
+        repoUrl: `template:${slug}`,
+        internalPort: meta.port ?? 80,
+        exposureMode: meta.recommendedExposureMode || 'ssl_with_proxy',
+      },
+    });
+  } catch (createErr: any) {
+    if (createErr?.code === 'P2002') {
+      return res.status(409).json({ error: `Subdomain or deployment name "${composeName}" is already reserved` });
+    }
+    throw createErr;
+  }
 
   try {
     const agentRes = await fetch(nodeAgentUrl(node.ip, '/agent/compose/up'), {
@@ -311,13 +352,13 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
     });
 
     if (!agentRes.ok) {
+      await prisma.deployment.delete({ where: { id: deployment.id } }).catch(() => {});
       const body = (await agentRes.json().catch(() => ({}))) as Record<string, unknown>;
       return res.status(agentRes.status).json({ error: (body.error as string) ?? 'Agent error' });
     }
 
     const agentData = await agentRes.json() as Record<string, unknown>;
 
-    const targetSubdomain = meta.requiresExposedPort !== false ? composeName : null;
     if (targetSubdomain && node.ip) {
       try {
         await createSubdomainRecord(targetSubdomain, node.ip, true);
@@ -327,18 +368,9 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
       }
     }
 
-    const deployment = await prisma.deployment.create({
-      data: {
-        userId: req.user!.id,
-        teamId: teamId ?? null,
-        nodeId,
-        status: 'running',
-        containerId: composeName,
-        subdomain: targetSubdomain,
-        repoUrl: `template:${slug}`,
-        internalPort: meta.port ?? 80,
-        exposureMode: meta.recommendedExposureMode || 'ssl_with_proxy',
-      },
+    await prisma.deployment.update({
+      where: { id: deployment.id },
+      data: { status: 'running' },
     });
 
     const managedDatabasesCreated: any[] = [];
@@ -365,7 +397,7 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
       const mDb = await prisma.managedDatabase.create({
         data: {
           userId: req.user!.id,
-          nodeId,
+          nodeId: node.id,
           type: dbMeta.type,
           status: 'running',
           containerId: `${composeName}-${hostName}`,
@@ -385,7 +417,7 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
       },
     });
 
-    logger.info({ slug, nodeId, deploymentId: deployment.id, databases: managedDatabasesCreated.length }, 'Template deployed with automated database wiring');
+    logger.info({ slug, nodeId: node.id, deploymentId: deployment.id, databases: managedDatabasesCreated.length }, 'Template deployed with automated database wiring');
     res.status(201).json({
       deployment,
       agent: agentData,
@@ -393,7 +425,7 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
       ...(Object.keys(generatedSecrets).length > 0 ? { generatedSecrets } : {}),
     });
   } catch (err: any) {
-    logger.error({ err, slug, nodeId }, 'Failed to deploy template');
+    logger.error({ err, slug, nodeId: node?.id }, 'Failed to deploy template');
     res.status(500).json({ error: err.message ?? 'Deploy failed' });
   }
 });
@@ -415,14 +447,15 @@ const createTemplateSchema = z.object({
 });
 
 catalogRouter.post('/catalog/:slug', requireRole('admin', 'dev'), async (req: AuthedRequest, res) => {
-  if (!isValidSlug(req.params.slug)) return res.status(400).json({ error: 'Invalid template slug format' });
+  const rawSlug = String(req.params.slug || '').trim().toLowerCase();
+  if (!isValidSlug(rawSlug)) return res.status(400).json({ error: 'Invalid template slug format' });
   try {
     const parsed = createTemplateSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: 'Invalid template data', details: parsed.error.flatten() });
     }
 
-    const { slug } = req.params;
+    const slug = rawSlug;
     const { yaml, name, slogan, category, tags, logo, port, documentation } = parsed.data;
 
     // Check if template already exists
@@ -436,20 +469,19 @@ catalogRouter.post('/catalog/:slug', requireRole('admin', 'dev'), async (req: Au
 
     // Validate YAML syntax and structure
     let templateDetails;
+    const tempPath = path.join(os.tmpdir(), `.stx-temp-${slug}-${Date.now()}.yaml`);
     try {
-      // Create temporary file to parse
-      const tempPath = path.join(TEMPLATES_DIR, `.temp-${slug}.yaml`);
       fs.writeFileSync(tempPath, yaml, 'utf8');
-      
       templateDetails = parseTemplateYaml(tempPath);
-      
-      // Clean up temp file
-      fs.unlinkSync(tempPath);
     } catch (parseError: any) {
       return res.status(400).json({ 
         error: 'Invalid YAML syntax', 
         details: parseError.message 
       });
+    } finally {
+      try {
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+      } catch {}
     }
 
     // Validate template structure
@@ -573,13 +605,11 @@ catalogRouter.patch('/catalog/:slug', requireRole('admin', 'dev'), async (req: A
     let finalYaml: string;
     
     if (updates.yaml) {
-      // Full YAML replacement - validate new YAML
+      const tempPath = path.join(os.tmpdir(), `.stx-temp-${slug}-${Date.now()}.yaml`);
       try {
-        const tempPath = path.join(TEMPLATES_DIR, `.temp-${slug}.yaml`);
         fs.writeFileSync(tempPath, updates.yaml, 'utf8');
         
         const newTemplateDetails = parseTemplateYaml(tempPath);
-        fs.unlinkSync(tempPath);
         
         const validation = validateTemplateStructure(newTemplateDetails);
         if (!validation.valid) {
@@ -595,6 +625,10 @@ catalogRouter.patch('/catalog/:slug', requireRole('admin', 'dev'), async (req: A
           error: 'Invalid YAML syntax', 
           details: parseError.message 
         });
+      } finally {
+        try {
+          if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        } catch {}
       }
     } else {
       // Metadata-only update - preserve existing YAML content

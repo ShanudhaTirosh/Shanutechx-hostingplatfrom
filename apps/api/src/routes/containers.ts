@@ -34,17 +34,26 @@ containersRouter.get('/nodes/:nodeId/containers', async (req: AuthedRequest, res
 
 const actionSchema = z.object({ action: z.enum(['start', 'stop', 'restart']) });
 
+function isValidContainerId(containerId: string): boolean {
+  return typeof containerId === 'string' && /^[a-zA-Z0-9_\-\.]{1,128}$/.test(containerId);
+}
+
 containersRouter.post('/nodes/:nodeId/containers/:containerId/action', async (req: AuthedRequest, res) => {
+  const { containerId, nodeId } = req.params;
+  if (!isValidContainerId(containerId)) {
+    return res.status(400).json({ error: 'Invalid container ID format' });
+  }
+
   const parsed = actionSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  const node = await prisma.node.findUnique({ where: { id: nodeId } });
   if (!node) return res.status(404).json({ error: 'Node not found' });
 
   try {
-    await containerAction(node, req.params.containerId, parsed.data.action);
+    await containerAction(node, containerId, parsed.data.action);
     await prisma.auditLog.create({
-      data: { adminId: req.user!.id, action: `container.${parsed.data.action}`, target: req.params.containerId },
+      data: { adminId: req.user!.id, action: `container.${parsed.data.action}`, target: containerId },
     });
     res.json({ ok: true });
   } catch (err: any) {
@@ -53,11 +62,16 @@ containersRouter.post('/nodes/:nodeId/containers/:containerId/action', async (re
 });
 
 containersRouter.get('/nodes/:nodeId/containers/:containerId/logs', async (req: AuthedRequest, res) => {
-  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  const { containerId, nodeId } = req.params;
+  if (!isValidContainerId(containerId)) {
+    return res.status(400).json({ error: 'Invalid container ID format' });
+  }
+
+  const node = await prisma.node.findUnique({ where: { id: nodeId } });
   if (!node) return res.status(404).json({ error: 'Node not found' });
 
   try {
-    const logs = await getContainerLogs(node, req.params.containerId, req.query.tail ? Number(req.query.tail) : 200);
+    const logs = await getContainerLogs(node, containerId, req.query.tail ? Number(req.query.tail) : 200);
     res.json({ logs });
   } catch (err: any) {
     res.status(502).json({ error: err.message });
@@ -69,21 +83,38 @@ containersRouter.get('/nodes/:nodeId/containers/:containerId/logs', async (req: 
  * Tails a container's logs live over Server-Sent Events, instead of the one-shot snapshot GET .../logs returns.
  */
 containersRouter.get('/nodes/:nodeId/containers/:containerId/logs/stream', async (req: AuthedRequest, res) => {
-  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  const { containerId, nodeId } = req.params;
+  if (!isValidContainerId(containerId)) {
+    return res.status(400).json({ error: 'Invalid container ID format' });
+  }
+
+  const node = await prisma.node.findUnique({ where: { id: nodeId } });
   if (!node) return res.status(404).json({ error: 'Node not found' });
-  await streamNodeAgentSSE(node, `/agent/deployments/${req.params.containerId}/logs/stream`, req, res);
+  await streamNodeAgentSSE(node, `/agent/deployments/${containerId}/logs/stream`, req, res);
 });
+
+const PROTECTED_SYSTEM_CONTAINERS = new Set(['traefik', 'postgresql', 'redis', 'shanutechx-agent', 'shanutechx-api', 'agent']);
+
+function isProtectedContainer(containerId: string): boolean {
+  const lower = containerId.toLowerCase();
+  return PROTECTED_SYSTEM_CONTAINERS.has(lower) || Array.from(PROTECTED_SYSTEM_CONTAINERS).some((p) => lower.includes(p));
+}
 
 /**
  * POST /nodes/:nodeId/containers/:containerId/exec-ticket
  * Issues a ticket token for live WebSocket terminal docker exec session.
  */
 containersRouter.post('/nodes/:nodeId/containers/:containerId/exec-ticket', async (req: AuthedRequest, res) => {
-  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  const { containerId, nodeId } = req.params;
+  if (!isValidContainerId(containerId)) {
+    return res.status(400).json({ error: 'Invalid container ID format' });
+  }
+
+  const node = await prisma.node.findUnique({ where: { id: nodeId } });
   if (!node) return res.status(404).json({ error: 'Node not found' });
 
   const { issueContainerExecTicket } = await import('../lib/containerExecGateway');
-  const ticketInfo = await issueContainerExecTicket(node.id, req.params.containerId, req.user!.id);
+  const ticketInfo = await issueContainerExecTicket(node.id, containerId, req.user!.id);
   res.json(ticketInfo);
 });
 
@@ -92,13 +123,18 @@ containersRouter.post('/nodes/:nodeId/containers/:containerId/exec-ticket', asyn
  * Fetches real-time memory, CPU, and network stats for a container via node-agent.
  */
 containersRouter.get('/nodes/:nodeId/containers/:containerId/stats', async (req: AuthedRequest, res) => {
-  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  const { containerId, nodeId } = req.params;
+  if (!isValidContainerId(containerId)) {
+    return res.status(400).json({ error: 'Invalid container ID format' });
+  }
+
+  const node = await prisma.node.findUnique({ where: { id: nodeId } });
   if (!node) return res.status(404).json({ error: 'Node not found' });
 
   try {
     const { getResourceUsage } = await import('../lib/nodeAgentClient');
-    const metrics = await getResourceUsage(node, req.params.containerId);
-    res.json({ containerId: req.params.containerId, ...metrics });
+    const metrics = await getResourceUsage(node, containerId);
+    res.json({ containerId, ...metrics });
   } catch (err: any) {
     res.status(502).json({ error: err.message || 'Failed to fetch container metrics from node' });
   }
@@ -109,13 +145,22 @@ containersRouter.get('/nodes/:nodeId/containers/:containerId/stats', async (req:
  * Removes/destroys a container from node.
  */
 containersRouter.delete('/nodes/:nodeId/containers/:containerId', async (req: AuthedRequest, res) => {
-  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  const { containerId, nodeId } = req.params;
+  if (!isValidContainerId(containerId)) {
+    return res.status(400).json({ error: 'Invalid container ID format' });
+  }
+
+  if (isProtectedContainer(containerId)) {
+    return res.status(403).json({ error: 'Deletion of platform core infrastructure containers is forbidden' });
+  }
+
+  const node = await prisma.node.findUnique({ where: { id: nodeId } });
   if (!node) return res.status(404).json({ error: 'Node not found' });
 
   try {
-    await removeNodeContainer(node, req.params.containerId);
+    await removeNodeContainer(node, containerId);
     await prisma.auditLog.create({
-      data: { adminId: req.user!.id, action: 'container.remove', target: req.params.containerId },
+      data: { adminId: req.user!.id, action: 'container.remove', target: containerId },
     });
     res.json({ ok: true });
   } catch (err: any) {
@@ -126,51 +171,61 @@ containersRouter.delete('/nodes/:nodeId/containers/:containerId', async (req: Au
 // ── Container Extended Management ──────────────────────────────────────────
 
 containersRouter.post('/nodes/:nodeId/containers/:containerId/pause', async (req: AuthedRequest, res) => {
-  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  const { containerId, nodeId } = req.params;
+  if (!isValidContainerId(containerId)) return res.status(400).json({ error: 'Invalid container ID format' });
+  const node = await prisma.node.findUnique({ where: { id: nodeId } });
   if (!node) return res.status(404).json({ error: 'Node not found' });
   try {
     const { pauseContainer } = await import('../lib/nodeAgentClient');
-    await pauseContainer(node, req.params.containerId);
+    await pauseContainer(node, containerId);
     res.json({ ok: true });
   } catch (err: any) { res.status(502).json({ error: err.message }); }
 });
 
 containersRouter.post('/nodes/:nodeId/containers/:containerId/unpause', async (req: AuthedRequest, res) => {
-  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  const { containerId, nodeId } = req.params;
+  if (!isValidContainerId(containerId)) return res.status(400).json({ error: 'Invalid container ID format' });
+  const node = await prisma.node.findUnique({ where: { id: nodeId } });
   if (!node) return res.status(404).json({ error: 'Node not found' });
   try {
     const { unpauseContainer } = await import('../lib/nodeAgentClient');
-    await unpauseContainer(node, req.params.containerId);
+    await unpauseContainer(node, containerId);
     res.json({ ok: true });
   } catch (err: any) { res.status(502).json({ error: err.message }); }
 });
 
 containersRouter.put('/nodes/:nodeId/containers/:containerId/rename', async (req: AuthedRequest, res) => {
-  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  const { containerId, nodeId } = req.params;
+  if (!isValidContainerId(containerId)) return res.status(400).json({ error: 'Invalid container ID format' });
+  const node = await prisma.node.findUnique({ where: { id: nodeId } });
   if (!node) return res.status(404).json({ error: 'Node not found' });
   try {
     const { renameContainer } = await import('../lib/nodeAgentClient');
-    await renameContainer(node, req.params.containerId, req.body.name);
+    await renameContainer(node, containerId, req.body.name);
     res.json({ ok: true });
   } catch (err: any) { res.status(502).json({ error: err.message }); }
 });
 
 containersRouter.get('/nodes/:nodeId/containers/:containerId/top', async (req: AuthedRequest, res) => {
-  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  const { containerId, nodeId } = req.params;
+  if (!isValidContainerId(containerId)) return res.status(400).json({ error: 'Invalid container ID format' });
+  const node = await prisma.node.findUnique({ where: { id: nodeId } });
   if (!node) return res.status(404).json({ error: 'Node not found' });
   try {
     const { containerTop } = await import('../lib/nodeAgentClient');
-    const result = await containerTop(node, req.params.containerId);
+    const result = await containerTop(node, containerId);
     res.json(result);
   } catch (err: any) { res.status(502).json({ error: err.message }); }
 });
 
 containersRouter.get('/nodes/:nodeId/containers/:containerId/changes', async (req: AuthedRequest, res) => {
-  const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });
+  const { containerId, nodeId } = req.params;
+  if (!isValidContainerId(containerId)) return res.status(400).json({ error: 'Invalid container ID format' });
+  const node = await prisma.node.findUnique({ where: { id: nodeId } });
   if (!node) return res.status(404).json({ error: 'Node not found' });
   try {
     const { containerChanges } = await import('../lib/nodeAgentClient');
-    const result = await containerChanges(node, req.params.containerId);
+    const result = await containerChanges(node, containerId);
     res.json(result);
   } catch (err: any) { res.status(502).json({ error: err.message }); }
 });

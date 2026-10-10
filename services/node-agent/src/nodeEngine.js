@@ -492,15 +492,17 @@ async function createDockerNetwork(name, driver = 'bridge') {
 
 const REGEX_PROJECT_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
 
+const os = require('os');
+
 async function deployDockerCompose(yamlContent, projectName = 'stx-stack') {
   if (!REGEX_PROJECT_NAME.test(projectName)) {
     throw new Error('Invalid project name format. Only alphanumeric characters, dashes, and underscores are allowed.');
   }
 
-  const targetDir = path.join('/tmp', `stx-compose-${Date.now()}`);
-  await fs.mkdir(targetDir, { recursive: true });
+  const baseDir = path.join(os.tmpdir(), 'stx-compose-');
+  const targetDir = await fs.mkdtemp(baseDir);
   const composePath = path.join(targetDir, 'docker-compose.yml');
-  await fs.writeFile(composePath, yamlContent, 'utf8');
+  await fs.writeFile(composePath, yamlContent, { encoding: 'utf8', mode: 0o600 });
 
   try {
     const { stdout, stderr } = await execFileAsync('docker', ['compose', '-f', composePath, '-p', projectName, 'up', '-d']);

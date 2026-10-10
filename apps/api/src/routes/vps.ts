@@ -356,28 +356,76 @@ vpsRouter.post('/vps-provisions/:id/renew', async (req: AuthedRequest, res: Resp
   const { months, notes } = parsed.data;
   const isStaff = ['admin', 'dev'].includes(req.user!.role);
 
-  const updated = await prisma.vpsProvision.update({
-    where: { id: provision.id },
-    data: {
-      status: 'provisioned',
-      notes: notes
-        ? `${provision.notes ? provision.notes + '\n' : ''}[Renewed ${months}m]: ${notes}`
-        : provision.notes,
-    },
-  });
+  if (isStaff) {
+    const updated = await prisma.vpsProvision.update({
+      where: { id: provision.id },
+      data: {
+        status: 'provisioned',
+        notes: notes
+          ? `${provision.notes ? provision.notes + '\n' : ''}[Renewed ${months}m by staff]: ${notes}`
+          : provision.notes,
+      },
+    });
 
+    const renewalOrder = await prisma.order.create({
+      data: {
+        userId: provision.userId,
+        status: 'paid',
+        total: 15 * months,
+        totalLkr: 4500 * months,
+        currency: 'LKR',
+        items: {
+          create: [
+            {
+              quantity: 1,
+              priceLkr: 4500 * months,
+              configJson: {
+                type: 'vps_renewal',
+                vpsProvisionId: provision.id,
+                months,
+                renewedBy: req.user!.email,
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'vps.renewed',
+        target: `VPS ${provision.id} (${provision.ip || 'Pending IP'}) - ${months} Month(s)`,
+        actorRole: null,
+      },
+    });
+
+    if (provision.user) {
+      notifyCustomer(
+        provision.user,
+        `Your VPS (${provision.ip || provision.id}) has been renewed for ${months} month(s) by staff.`,
+        undefined,
+        '🚀 VPS Subscription Renewed!'
+      ).catch(() => {});
+    }
+
+    return res.json({ ok: true, message: `VPS provision renewed for ${months} month(s).`, provision: updated });
+  }
+
+  // Non-staff customer path: Create awaiting_payment order and manual_review payment record
+  const totalLkr = 4500 * months;
   const renewalOrder = await prisma.order.create({
     data: {
       userId: provision.userId,
-      status: 'paid',
+      status: 'awaiting_payment',
       total: 15 * months,
-      totalLkr: 4500 * months,
+      totalLkr,
       currency: 'LKR',
       items: {
         create: [
           {
             quantity: 1,
-            priceLkr: 4500 * months,
+            priceLkr: totalLkr,
             configJson: {
               type: 'vps_renewal',
               vpsProvisionId: provision.id,
@@ -390,29 +438,28 @@ vpsRouter.post('/vps-provisions/:id/renew', async (req: AuthedRequest, res: Resp
     },
   });
 
-  await prisma.auditLog.create({
+  const payment = await prisma.payment.create({
     data: {
-      adminId: req.user!.id,
-      action: 'vps.renewed',
-      target: `VPS ${provision.id} (${provision.ip || 'Pending IP'}) - ${months} Month(s)`,
-      actorRole: isStaff ? null : 'customer',
+      orderId: renewalOrder.id,
+      method: 'manual',
+      status: 'manual_review',
     },
   });
 
-  if (provision.user) {
-    notifyCustomer(
-      provision.user,
-      `Your VPS (${provision.ip || provision.id}) has been renewed for ${months} month(s).`,
-      undefined,
-      '🚀 VPS Subscription Renewed!'
-    ).catch(() => {});
-  }
+  await prisma.auditLog.create({
+    data: {
+      adminId: req.user!.id,
+      action: 'vps.renew_requested',
+      target: `VPS ${provision.id} - ${months} Month(s)`,
+      actorRole: 'customer',
+    },
+  });
 
-  res.json({
+  res.status(202).json({
     ok: true,
-    message: `VPS subscription successfully renewed for ${months} month(s).`,
-    provision: updated,
+    message: `VPS renewal order created for ${months} month(s). Please submit payment to complete renewal.`,
     orderId: renewalOrder.id,
+    paymentId: payment.id,
   });
 });
 

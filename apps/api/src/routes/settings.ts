@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { env } from '../env';
+import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 
 import { authRateLimiter } from '../middleware/rateLimit';
 
@@ -159,12 +160,22 @@ const githubBackupSchema = z.object({
  * Get GitHub Backup credentials overview (masked).
  */
 settingsRouter.get('/github-backup', requireAdminOrDev, async (req: AuthedRequest, res) => {
-  const token = env.backupGithubToken || process.env.BACKUP_GITHUB_TOKEN || '';
-  const org = env.backupGithubOrg || process.env.BACKUP_GITHUB_ORG || '';
+  let token = env.backupGithubToken || process.env.BACKUP_GITHUB_TOKEN || '';
+  let org = env.backupGithubOrg || process.env.BACKUP_GITHUB_ORG || '';
 
-  const maskedToken = token
-    ? `${token.slice(0, 4)}...${token.slice(-4)}`
-    : '';
+  if (!token) {
+    try {
+      const dbItem = await prisma.secretItem.findFirst({
+        where: { key: 'BACKUP_GITHUB_TOKEN' },
+      });
+      if (dbItem?.valueEnc) {
+        token = decryptSecret(dbItem.valueEnc, env.secretsEncryptionKey);
+        env.backupGithubToken = token;
+      }
+    } catch {}
+  }
+
+  const maskedToken = token ? `••••••••••••${token.slice(-4)}` : '';
 
   return res.json({
     configured: !!token,
@@ -190,6 +201,37 @@ settingsRouter.post('/github-backup', requireAdminOrDev, async (req: AuthedReque
     process.env.BACKUP_GITHUB_ORG = org;
     env.backupGithubOrg = org;
   }
+
+  try {
+    let systemProject = await prisma.secretProject.findFirst({
+      where: { name: 'Platform System Integrations' },
+    });
+    if (!systemProject) {
+      systemProject = await prisma.secretProject.create({
+        data: {
+          name: 'Platform System Integrations',
+          environment: 'production',
+        },
+      });
+    }
+
+    await prisma.secretItem.upsert({
+      where: {
+        projectId_key: {
+          projectId: systemProject.id,
+          key: 'BACKUP_GITHUB_TOKEN',
+        },
+      },
+      update: {
+        valueEnc: encryptSecret(token, env.secretsEncryptionKey),
+      },
+      create: {
+        projectId: systemProject.id,
+        key: 'BACKUP_GITHUB_TOKEN',
+        valueEnc: encryptSecret(token, env.secretsEncryptionKey),
+      },
+    });
+  } catch {}
 
   await prisma.auditLog.create({
     data: {

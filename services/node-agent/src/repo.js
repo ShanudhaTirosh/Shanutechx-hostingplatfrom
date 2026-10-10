@@ -28,14 +28,26 @@ function splitCredentials(rawUrl) {
  * it is never persisted to disk. This is the same mechanism GitHub's own checkout action uses.
  */
 function authEnv(auth) {
-  const env = { GIT_TERMINAL_PROMPT: '0' };
-  if (!auth) return env;
+  const env = {
+    GIT_TERMINAL_PROMPT: '0',
+    GCM_INTERACTIVE: 'never',
+  };
+  if (!auth) {
+    return {
+      ...env,
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'credential.helper',
+      GIT_CONFIG_VALUE_0: '',
+    };
+  }
   const basic = Buffer.from(`${auth.username}:${auth.password}`).toString('base64');
   return {
     ...env,
-    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_COUNT: '2',
     GIT_CONFIG_KEY_0: 'http.extraHeader',
     GIT_CONFIG_VALUE_0: `Authorization: Basic ${basic}`,
+    GIT_CONFIG_KEY_1: 'credential.helper',
+    GIT_CONFIG_VALUE_1: '',
   };
 }
 

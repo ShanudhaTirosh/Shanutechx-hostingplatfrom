@@ -32,14 +32,26 @@ function agentHeaders() {
   return { 'x-agent-secret': env.nodeAgentSecret, 'Content-Type': 'application/json' };
 }
 
+function isSafeWorkspacePath(p: unknown): boolean {
+  if (typeof p !== 'string') return false;
+  if (p.includes('\0')) return false;
+  const normalized = p.replace(/\\/g, '/');
+  const segments = normalized.split('/');
+  return !segments.some((seg) => seg === '..');
+}
+
 // ── List directory ─────────────────────────────────────────────────────────
 
 filesystemRouter.get('/fs/:deploymentId/list', async (req: AuthedRequest, res) => {
   if (!(await canAccessFs(req, req.params.deploymentId))) return res.status(404).json({ error: 'Deployment not found' });
+  const pathParam = String(req.query.path ?? '');
+  if (pathParam && !isSafeWorkspacePath(pathParam)) {
+    return res.status(400).json({ error: 'Invalid or unsafe path' });
+  }
   const result = await getNodeForDeployment(req.params.deploymentId);
   if (!result?.node) return res.status(404).json({ error: 'No node assigned' });
 
-  const url = agentUrl(result.node.ip, `/agent/fs/${req.params.deploymentId}/list?path=${encodeURIComponent(String(req.query.path ?? ''))}`);
+  const url = agentUrl(result.node.ip, `/agent/fs/${req.params.deploymentId}/list?path=${encodeURIComponent(pathParam)}`);
   const r = await fetch(url, { headers: agentHeaders() });
   const data = await r.json();
   res.status(r.ok ? 200 : r.status).json(data);
@@ -49,10 +61,14 @@ filesystemRouter.get('/fs/:deploymentId/list', async (req: AuthedRequest, res) =
 
 filesystemRouter.get('/fs/:deploymentId/read', async (req: AuthedRequest, res) => {
   if (!(await canAccessFs(req, req.params.deploymentId))) return res.status(404).json({ error: 'Deployment not found' });
+  const pathParam = String(req.query.path ?? '');
+  if (!pathParam || !isSafeWorkspacePath(pathParam)) {
+    return res.status(400).json({ error: 'Invalid or unsafe path' });
+  }
   const result = await getNodeForDeployment(req.params.deploymentId);
   if (!result?.node) return res.status(404).json({ error: 'No node assigned' });
 
-  const url = agentUrl(result.node.ip, `/agent/fs/${req.params.deploymentId}/read?path=${encodeURIComponent(String(req.query.path ?? ''))}`);
+  const url = agentUrl(result.node.ip, `/agent/fs/${req.params.deploymentId}/read?path=${encodeURIComponent(pathParam)}`);
   const r = await fetch(url, { headers: agentHeaders() });
   const data = await r.json();
   res.status(r.ok ? 200 : r.status).json(data);
@@ -62,6 +78,9 @@ filesystemRouter.get('/fs/:deploymentId/read', async (req: AuthedRequest, res) =
 
 filesystemRouter.put('/fs/:deploymentId/write', async (req: AuthedRequest, res) => {
   if (!(await canAccessFs(req, req.params.deploymentId))) return res.status(404).json({ error: 'Deployment not found' });
+  if (!req.body?.path || !isSafeWorkspacePath(req.body.path)) {
+    return res.status(400).json({ error: 'Invalid or unsafe path' });
+  }
   const result = await getNodeForDeployment(req.params.deploymentId);
   if (!result?.node) return res.status(404).json({ error: 'No node assigned' });
 
@@ -88,6 +107,9 @@ filesystemRouter.put('/fs/:deploymentId/write', async (req: AuthedRequest, res) 
 
 filesystemRouter.post('/fs/:deploymentId/mkdir', async (req: AuthedRequest, res) => {
   if (!(await canAccessFs(req, req.params.deploymentId))) return res.status(404).json({ error: 'Deployment not found' });
+  if (!req.body?.path || !isSafeWorkspacePath(req.body.path)) {
+    return res.status(400).json({ error: 'Invalid or unsafe path' });
+  }
   const result = await getNodeForDeployment(req.params.deploymentId);
   if (!result?.node) return res.status(404).json({ error: 'No node assigned' });
 
@@ -113,6 +135,10 @@ filesystemRouter.post('/fs/:deploymentId/mkdir', async (req: AuthedRequest, res)
 
 filesystemRouter.delete('/fs/:deploymentId/delete', async (req: AuthedRequest, res) => {
   if (!(await canAccessFs(req, req.params.deploymentId))) return res.status(404).json({ error: 'Deployment not found' });
+  const cleanPath = String(req.body?.path ?? '').trim();
+  if (!cleanPath || cleanPath === '/' || !isSafeWorkspacePath(cleanPath)) {
+    return res.status(400).json({ error: 'Invalid or unsafe path' });
+  }
   const result = await getNodeForDeployment(req.params.deploymentId);
   if (!result?.node) return res.status(404).json({ error: 'No node assigned' });
 
@@ -138,6 +164,9 @@ filesystemRouter.delete('/fs/:deploymentId/delete', async (req: AuthedRequest, r
 
 filesystemRouter.post('/fs/:deploymentId/rename', async (req: AuthedRequest, res) => {
   if (!(await canAccessFs(req, req.params.deploymentId))) return res.status(404).json({ error: 'Deployment not found' });
+  if (!req.body?.oldPath || !isSafeWorkspacePath(req.body.oldPath) || !req.body?.newPath || !isSafeWorkspacePath(req.body.newPath)) {
+    return res.status(400).json({ error: 'Invalid or unsafe paths provided' });
+  }
   const result = await getNodeForDeployment(req.params.deploymentId);
   if (!result?.node) return res.status(404).json({ error: 'No node assigned' });
 
@@ -163,6 +192,9 @@ filesystemRouter.post('/fs/:deploymentId/rename', async (req: AuthedRequest, res
 
 filesystemRouter.post('/fs/:deploymentId/upload-binary', async (req: AuthedRequest, res) => {
   if (!(await canAccessFs(req, req.params.deploymentId))) return res.status(404).json({ error: 'Deployment not found' });
+  if (!req.body?.path || !isSafeWorkspacePath(req.body.path)) {
+    return res.status(400).json({ error: 'Invalid or unsafe path' });
+  }
   const result = await getNodeForDeployment(req.params.deploymentId);
   if (!result?.node) return res.status(404).json({ error: 'No node assigned' });
 
@@ -188,6 +220,12 @@ filesystemRouter.post('/fs/:deploymentId/upload-binary', async (req: AuthedReque
 
 filesystemRouter.post('/fs/:deploymentId/extract', async (req: AuthedRequest, res) => {
   if (!(await canAccessFs(req, req.params.deploymentId))) return res.status(404).json({ error: 'Deployment not found' });
+  if (!req.body?.archivePath || !isSafeWorkspacePath(req.body.archivePath)) {
+    return res.status(400).json({ error: 'Invalid or unsafe archive path' });
+  }
+  if (req.body?.targetPath && !isSafeWorkspacePath(req.body.targetPath)) {
+    return res.status(400).json({ error: 'Invalid or unsafe target path' });
+  }
   const result = await getNodeForDeployment(req.params.deploymentId);
   if (!result?.node) return res.status(404).json({ error: 'No node assigned' });
 
@@ -238,8 +276,8 @@ filesystemRouter.post('/fs/:deploymentId/git-commit-push', async (req: AuthedReq
     accountId?: string;
   };
 
-  if (!filePath || content === undefined) {
-    return res.status(400).json({ error: 'filePath and content are required' });
+  if (!filePath || !isSafeWorkspacePath(filePath) || content === undefined) {
+    return res.status(400).json({ error: 'filePath and content are required, and filePath must be safe' });
   }
 
   // Step 1: Write file to node workspace
@@ -297,6 +335,7 @@ filesystemRouter.post('/fs/:deploymentId/git-commit-push', async (req: AuthedReq
   const repoUrl = result.deployment.repoUrl ?? '';
   const branch = result.deployment.branch ?? 'main';
   const token = await getProvider(matchedProvider)!.getScopedToken(matchedAccountId, repoUrl);
+  const safeEncodedPath = filePath.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
 
   try {
     if (matchedProvider === 'github') {
@@ -307,14 +346,14 @@ filesystemRouter.post('/fs/:deploymentId/git-commit-push', async (req: AuthedReq
       const cleanRepo = repo.replace(/\.git$/, '');
 
       // Get current file SHA (required for updates)
-      const getUrl = `https://api.github.com/repos/${owner}/${cleanRepo}/contents/${filePath}?ref=${branch}`;
+      const getUrl = `https://api.github.com/repos/${owner}/${cleanRepo}/contents/${safeEncodedPath}?ref=${encodeURIComponent(branch)}`;
       const getRes = await fetch(getUrl, {
         headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'ShanuTechX-Platform', Accept: 'application/vnd.github+json' },
       });
       const existing: any = getRes.ok ? await getRes.json() : null;
 
       // Create or update file
-      const putRes = await fetch(`https://api.github.com/repos/${owner}/${cleanRepo}/contents/${filePath}`, {
+      const putRes = await fetch(`https://api.github.com/repos/${owner}/${cleanRepo}/contents/${safeEncodedPath}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'ShanuTechX-Platform', 'Content-Type': 'application/json', Accept: 'application/vnd.github+json' },
         body: JSON.stringify({
@@ -349,13 +388,13 @@ filesystemRouter.post('/fs/:deploymentId/git-commit-push', async (req: AuthedReq
       const projectPath = encodeURIComponent(match[1]);
 
       // Get current file to check if it exists
-      const getRes = await fetch(`https://gitlab.com/api/v4/projects/${projectPath}/repository/files/${encodeURIComponent(filePath)}?ref=${branch}`, {
+      const getRes = await fetch(`https://gitlab.com/api/v4/projects/${projectPath}/repository/files/${encodeURIComponent(safeEncodedPath)}?ref=${encodeURIComponent(branch)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const fileExists = getRes.ok;
 
       const method = fileExists ? 'PUT' : 'POST';
-      const glRes = await fetch(`https://gitlab.com/api/v4/projects/${projectPath}/repository/files/${encodeURIComponent(filePath)}`, {
+      const glRes = await fetch(`https://gitlab.com/api/v4/projects/${projectPath}/repository/files/${encodeURIComponent(safeEncodedPath)}`, {
         method,
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({

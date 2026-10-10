@@ -150,7 +150,8 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
               connectOpts.privateKey = decrypted;
             }
           } catch (err: any) {
-            fail(`Failed to decrypt SSH key: ${err?.message || 'Invalid key reference or encryption key'}`);
+            logger.error({ err, vpsId: entry.vpsId }, 'Failed to decrypt SSH key for terminal gateway');
+            fail('SSH credential error — unable to authenticate with remote host.');
             return;
           }
         }

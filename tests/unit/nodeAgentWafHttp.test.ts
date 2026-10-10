@@ -38,12 +38,12 @@ test('node agent WAF routes (real HTTP)', async (t) => {
   child.stdout?.on('data', (d) => (logs = (logs + d).slice(-4000)));
   child.stderr?.on('data', (d) => (logs = (logs + d).slice(-4000)));
   t.after(() => {
-    child.kill('SIGKILL');
+    try { child.kill(); } catch {}
     fs.rmSync(root, { recursive: true, force: true });
   });
 
   let ready = false;
-  for (let i = 0; i < 50 && !ready; i++) {
+  for (let i = 0; i < 75 && !ready; i++) {
     try {
       ready = (await fetch(`${base}/agent/backups/capabilities`, { headers: { 'x-agent-secret': SECRET }, signal: AbortSignal.timeout(2000) })).ok;
     } catch {

@@ -897,6 +897,20 @@ app.get('/agent/managed-databases/:databaseId/backups', async (req, res) => {
   }
 });
 
+app.get('/agent/managed-databases/:databaseId/backups/:filename', async (req, res) => {
+  const { databaseId, filename } = req.params;
+  const safeFilename = path.basename(filename);
+  if (!safeFilename.startsWith(`snap_${databaseId}_`) || !safeFilename.endsWith('.dump')) {
+    return res.status(400).json({ error: 'Invalid backup filename requested' });
+  }
+  const backupDir = process.env.MANAGED_DB_BACKUP_DIR || path.join(process.cwd(), 'backups', 'managed-db');
+  const filePath = path.join(backupDir, safeFilename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Backup snapshot file not found' });
+  }
+  res.sendFile(filePath);
+});
+
 app.post('/agent/managed-databases/:containerId/restore', async (req, res) => {
   const { containerId } = req.params;
   const { type, databaseId, backupId, masterPassword } = req.body || {};

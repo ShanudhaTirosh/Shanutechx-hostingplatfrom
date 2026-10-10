@@ -1,4 +1,6 @@
 import { Router, Response } from 'express';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { requireAuth, requireDev, AuthedRequest } from '../middleware/auth';
 import { logger } from '../lib/logger';
 import { prisma } from '../lib/prisma';
@@ -12,10 +14,6 @@ export const supabaseRouter = Router();
 
 const SUPABASE_KONG_URL = process.env.SUPABASE_KONG_URL || 'http://localhost:8001';
 const SUPABASE_META_URL = process.env.SUPABASE_META_URL || 'http://localhost:8080';
-// NOTE: These keys MUST be provided via env. There is deliberately NO fallback
-// to a demo/public JWT here — a hardcoded service-role key would let arbitrary
-// admin SQL run against the platform Postgres if the env var were ever unset.
-// If unset, the key is empty and Supabase calls fail closed upstream.
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 
@@ -110,20 +108,20 @@ function serializeProject(p: any): ClientProject {
   };
 }
 
-/** Reads the singleton GoTrue/Auth SMTP config row, creating it (from the
- * old hardcoded defaults) on first access if it doesn't exist yet. */
+/** Reads the singleton GoTrue/Auth SMTP config row, creating it on first access if it doesn't exist yet. */
 async function getAuthSmtpConfig() {
   const existing = await prisma.supabaseAuthSmtpConfig.findUnique({ where: { id: 'global' } });
   if (existing) return existing;
 
+  const defaultPass = process.env.SMTP_PASS || crypto.randomBytes(16).toString('hex');
   return prisma.supabaseAuthSmtpConfig.create({
     data: {
       id: 'global',
-      host: 'mail.shanutechx.com',
-      port: 587,
-      user: 'smtp_auth_user',
-      passwordEnc: encryptSecret('smtp_secret_pass_2026', env.secretsEncryptionKey),
-      senderEmail: 'noreply@shanutechx.com',
+      host: process.env.SMTP_HOST || 'mail.shanutechx.com',
+      port: Number(process.env.SMTP_PORT || 587),
+      user: process.env.SMTP_USER || 'smtp_auth_user',
+      passwordEnc: encryptSecret(defaultPass, env.secretsEncryptionKey),
+      senderEmail: process.env.SMTP_SENDER_EMAIL || 'noreply@shanutechx.com',
       senderName: 'ShanuTechX Platform Mailer',
       enableEmailSignup: true,
       enableAutoconfirm: true,
@@ -345,8 +343,17 @@ supabaseRouter.post('/supabase/projects', requireAuth, requireDev, async (req: A
   const cleanSlug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '');
   const id = `proj_${slug}_${Date.now().toString().slice(-4)}`;
 
-  const projJwtSecret = process.env.JWT_SECRET || (await import('crypto')).randomBytes(32).toString('hex');
+  const projJwtSecret = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
   const jwtSecretEnc = encryptSecret(projJwtSecret, env.secretsEncryptionKey);
+
+  const anonKey = jwt.sign(
+    { role: 'anon', iss: 'supabase', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 10 * 365 * 86400 },
+    projJwtSecret
+  );
+  const serviceKey = jwt.sign(
+    { role: 'service_role', iss: 'supabase', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 10 * 365 * 86400 },
+    projJwtSecret
+  );
 
   let newProject: any = await prisma.supabaseClientProject.create({
     data: {
@@ -356,8 +363,8 @@ supabaseRouter.post('/supabase/projects', requireAuth, requireDev, async (req: A
       dbName: `db_${slug}`,
       region: region || 'ap-southeast-1 (Local)',
       status: 'PROVISIONING',
-      anonKey: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.anon_${id}`,
-      serviceKey: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.service_${id}`,
+      anonKey,
+      serviceKey,
       jwtSecretEnc,
       smtpConfigured: true,
       poolerSettingsJson: { mode: 'transaction', poolSize: 20, reservePoolSize: 5, port: 6543 },

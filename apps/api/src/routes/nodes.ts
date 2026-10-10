@@ -476,18 +476,14 @@ async function runNodeProvisioningSteps(
   log('🛡️ [4/6] Configuring sudoers permissions...');
   const sudoersContent = [
     '# ShanuTechX Node Agent narrowly-scoped sudo privileges',
-    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl list-units *',
-    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl start *',
-    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop *',
-    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart *',
-    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable *',
-    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl disable *',
-    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/journalctl -u *',
-    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/useradd *',
-    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/userdel *',
-    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/usermod *',
-    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/passwd *',
-    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/ufw *',
+    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl list-units',
+    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl start shanutechx-node-agent',
+    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop shanutechx-node-agent',
+    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart shanutechx-node-agent',
+    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/journalctl -u shanutechx-node-agent',
+    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/ufw status*',
+    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/ufw allow *',
+    'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/sbin/ufw delete allow *',
   ].join('\n');
   const base64Sudoers = Buffer.from(sudoersContent).toString('base64');
   await sshExec(ssh, [
@@ -498,11 +494,17 @@ async function runNodeProvisioningSteps(
 
   // Step 5: Download and install the node agent
   log('🤖 [5/6] Deploying ShanuTechX Node Agent...');
+  const cleanLabel = label.replace(/[^a-zA-Z0-9_\-\. ]/g, '');
+  const cleanRoleTags = roleTags.map((t) => t.replace(/[^a-zA-Z0-9_\-]/g, '')).join(',');
+  const secretB64 = Buffer.from(CLUSTER_SECRET).toString('base64');
   const installCmd = [
+    'TMP_SEC=$(mktemp /tmp/.stx-sec.XXXXXX)',
+    'trap "rm -f $TMP_SEC" EXIT',
+    'chmod 0600 $TMP_SEC',
+    `printf '%s' '${secretB64}' | base64 -d > $TMP_SEC`,
     `curl -sSL "${apiUrl}/api/nodes/install.sh" -o /tmp/shanutechx-install.sh`,
-    `printf '%s' '${CLUSTER_SECRET.replace(/'/g, "'\\''")}' > /tmp/.shanutechx-secret`,
-    `SECRET=$(cat /tmp/.shanutechx-secret) bash /tmp/shanutechx-install.sh "${apiUrl}" "$SECRET" "${label}" "${roleTags.join(',')}" 2>&1`,
-    `rm -f /tmp/.shanutechx-secret`,
+    `SECRET=$(cat $TMP_SEC) bash /tmp/shanutechx-install.sh "${apiUrl}" "$SECRET" "${cleanLabel}" "${cleanRoleTags}" 2>&1`,
+    'rm -f $TMP_SEC',
   ].join(' && ');
   await sshExec(ssh, installCmd, log);
 
@@ -511,10 +513,10 @@ async function runNodeProvisioningSteps(
   // which is absent on older Debian (they use /usr/bin/nodejs) and some Ubuntu/Alpine builds
   // that install Node via nvm or n into /usr/local/bin/node.
   log('⚙️ [6/6] Configuring systemd service...');
-  const envFileContent = `NODE_AGENT_SECRET=${CLUSTER_SECRET}`;
-  const escapedEnvFile = envFileContent.replace(/'/g, "'\\''" );
+  const envFileContent = `NODE_AGENT_SECRET=${CLUSTER_SECRET}\n`;
+  const envB64 = Buffer.from(envFileContent, 'utf-8').toString('base64');
   await sshExec(ssh, [
-    `printf '%s' '${escapedEnvFile}' > /etc/shanutechx-agent.env`,
+    `printf '%s' '${envB64}' | base64 -d > /etc/shanutechx-agent.env`,
     'chmod 0600 /etc/shanutechx-agent.env',
     'chown shanutechx-agent:shanutechx-agent /etc/shanutechx-agent.env',
   ].join(' && '), log);

@@ -101,73 +101,87 @@ const handleArchiveUpload = async (req: AuthedRequest, res: any) => {
       if (isZip) {
         if (process.platform === 'win32') {
           try {
-            await execFileAsync('powershell', [
-              '-NoProfile',
-              '-NonInteractive',
-              '-Command',
-              'param($src, $dst) Expand-Archive -LiteralPath $src -DestinationPath $dst -Force',
-              tempArchivePath,
-              targetDir,
-            ], execOpts);
+            await execFileAsync(
+              'powershell',
+              [
+                '-NoProfile',
+                '-NonInteractive',
+                '-Command',
+                '[System.IO.Compression.ZipFile]::ExtractToDirectory($env:STX_ARCHIVE, $env:STX_TARGET, $true)',
+              ],
+              {
+                ...execOpts,
+                env: { ...process.env, STX_ARCHIVE: tempArchivePath, STX_TARGET: targetDir },
+              }
+            );
           } catch {
-            await execFileAsync('unzip', ['-o', tempArchivePath, '-d', targetDir], execOpts).catch(() =>
-              execFileAsync('7z', ['x', '-y', `-o${targetDir}`, tempArchivePath], execOpts)
+            await execFileAsync('unzip', ['-o', '--', tempArchivePath, '-d', targetDir], execOpts).catch(() =>
+              execFileAsync('7z', ['x', '-y', `-o${targetDir}`, '--', tempArchivePath], execOpts)
             );
           }
         } else {
           try {
-            await execFileAsync('unzip', ['-o', tempArchivePath, '-d', targetDir], execOpts);
+            await execFileAsync('unzip', ['-o', '--', tempArchivePath, '-d', targetDir], execOpts);
           } catch {
-            await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, tempArchivePath], execOpts);
+            await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, '--', tempArchivePath], execOpts);
           }
         }
       } else if (isTar || isSingleCompressed) {
         try {
-          await execFileAsync('tar', ['-xf', tempArchivePath, '-C', targetDir], execOpts);
+          await execFileAsync('tar', ['-C', targetDir, '-xf', tempArchivePath], execOpts);
         } catch {
           if (filename.endsWith('.tar.gz') || filename.endsWith('.tgz')) {
-            await execFileAsync('tar', ['-xzf', tempArchivePath, '-C', targetDir], execOpts);
+            await execFileAsync('tar', ['-C', targetDir, '-xzf', tempArchivePath], execOpts);
           } else if (filename.endsWith('.tar.bz2') || filename.endsWith('.tbz2')) {
-            await execFileAsync('tar', ['-xjf', tempArchivePath, '-C', targetDir], execOpts);
+            await execFileAsync('tar', ['-C', targetDir, '-xjf', tempArchivePath], execOpts);
           } else if (filename.endsWith('.tar.xz') || filename.endsWith('.txz')) {
-            await execFileAsync('tar', ['-xJf', tempArchivePath, '-C', targetDir], execOpts);
+            await execFileAsync('tar', ['-C', targetDir, '-xJf', tempArchivePath], execOpts);
           }
         }
       } else if (isRar) {
         try {
-          await execFileAsync('unrar', ['x', '-o+', tempArchivePath, targetDir + path.sep], execOpts);
+          await execFileAsync('unrar', ['x', '-o+', '--', tempArchivePath, targetDir + path.sep], execOpts);
         } catch {
           try {
-            await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, tempArchivePath], execOpts);
+            await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, '--', tempArchivePath], execOpts);
           } catch {
             try {
-              await execFileAsync('bsdtar', ['-xf', tempArchivePath, '-C', targetDir], execOpts);
+              await execFileAsync('bsdtar', ['-C', targetDir, '-xf', tempArchivePath], execOpts);
             } catch {
-              await execFileAsync('unar', ['-o', targetDir, '-f', tempArchivePath], execOpts);
+              await execFileAsync('unar', ['-o', targetDir, '-f', '--', tempArchivePath], execOpts);
             }
           }
         }
       } else if (is7z) {
         try {
-          await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, tempArchivePath], execOpts);
+          await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, '--', tempArchivePath], execOpts);
         } catch {
           try {
-            await execFileAsync('7za', ['x', '-y', `-o${targetDir}`, tempArchivePath], execOpts);
+            await execFileAsync('7za', ['x', '-y', `-o${targetDir}`, '--', tempArchivePath], execOpts);
           } catch {
-            await execFileAsync('bsdtar', ['-xf', tempArchivePath, '-C', targetDir], execOpts);
+            await execFileAsync('bsdtar', ['-C', targetDir, '-xf', tempArchivePath], execOpts);
           }
         }
       } else if (isSingleCompressed) {
         try {
           if (filename.endsWith('.gz')) {
-            await execFileAsync('gzip', ['-d', '-c', tempArchivePath], execOpts);
+            await execFileAsync('gzip', ['-d', '-c', '--', tempArchivePath], execOpts);
           } else if (filename.endsWith('.bz2')) {
-            await execFileAsync('bzip2', ['-d', '-c', tempArchivePath], execOpts);
+            await execFileAsync('bzip2', ['-d', '-c', '--', tempArchivePath], execOpts);
           } else if (filename.endsWith('.xz')) {
-            await execFileAsync('xz', ['-d', '-c', tempArchivePath], execOpts);
+            await execFileAsync('xz', ['-d', '-c', '--', tempArchivePath], execOpts);
           }
         } catch {
           // Non-fatal fallback
+        }
+      }
+
+      // Verify extracted entries do not escape targetDir (Zip Slip protection)
+      const extractedEntries = await fs.readdir(targetDir, { recursive: true }).catch(() => []);
+      for (const entry of extractedEntries) {
+        const resolved = path.resolve(targetDir, String(entry));
+        if (resolved !== targetDir && !resolved.startsWith(targetDir + path.sep)) {
+          throw new Error(`Path escape detected in archive entry: ${entry}`);
         }
       }
     } finally {

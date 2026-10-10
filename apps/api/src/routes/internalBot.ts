@@ -9,6 +9,9 @@ import { generateInvoicePdf } from '../lib/invoicePdf';
 
 export const internalBotRouter = Router();
 
+let isSweepingTickets = false;
+let lastSweepTimestamp = 0;
+
 // Middleware: Verify internal secret from either Discord or WhatsApp bot
 internalBotRouter.use((req: Request, res: Response, next) => {
   const secret = req.headers['x-internal-secret'];
@@ -77,7 +80,7 @@ internalBotRouter.get('/internal/customer-summary', async (req: Request, res: Re
     }),
   ]);
 
-  res.json({ user: { id: user.id, email: user.email, displayName: user.displayName }, deployments, tickets });
+  res.json({ user: { id: user.id, email: user.email, displayName: user.displayName, role: user.role }, deployments, tickets });
 });
 
 /**
@@ -281,11 +284,7 @@ internalBotRouter.post('/internal/open-ticket', async (req: Request, res: Respon
   }
 
   if (!user) {
-    user = await prisma.user.findFirst({ where: { role: { in: ['admin', 'dev'] } } });
-  }
-
-  if (!user) {
-    return res.status(404).json({ error: 'Could not resolve a user account for this ticket' });
+    return res.status(404).json({ error: 'Customer account not found for provided contact info. Please register or verify account email/phone.' });
   }
 
   const validPriority = ['low', 'medium', 'high', 'urgent'].includes(priority) ? priority : 'medium';
@@ -358,7 +357,7 @@ internalBotRouter.post('/internal/claim-ticket', async (req: Request, res: Respo
     });
   }
   if (!staffUser) {
-    staffUser = await prisma.user.findFirst({ where: { role: { in: ['admin', 'dev', 'support'] } } });
+    return res.status(403).json({ error: 'Valid staff account (admin, dev, or support) required to claim ticket' });
   }
 
   if (ticket.claimedById && !force && ticket.claimedById !== staffUser?.id) {
@@ -654,7 +653,7 @@ internalBotRouter.post('/internal/invoices/generate-and-send', async (req: Reque
         userId: user.id,
         total: calcTotal,
         totalLkr: calcTotal,
-        status: 'paid',
+        status: 'awaiting_payment',
         currency: 'USD',
       },
       include: {
@@ -742,27 +741,36 @@ internalBotRouter.get('/internal/invoices/list', async (req: Request, res: Respo
  * Auto-close tickets inactive >24 hours
  */
 internalBotRouter.post('/internal/sweep-inactive-tickets', async (_req: Request, res: Response) => {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const now = Date.now();
+  if (isSweepingTickets) {
+    return res.status(409).json({ error: 'Ticket sweep is already in progress' });
+  }
+  if (now - lastSweepTimestamp < 60000) {
+    return res.status(429).json({ error: 'Ticket sweep cooldown active (try again in 60s)' });
+  }
 
-  const staleTickets = await prisma.ticket.findMany({
-    where: {
-      status: { in: ['open', 'pending'] },
-      lastActivityAt: { lt: cutoff },
-    },
-  });
+  isSweepingTickets = true;
+  lastSweepTimestamp = now;
 
-  let closedCount = 0;
-  for (const t of staleTickets) {
-    await prisma.ticket.update({
-      where: { id: t.id },
+  try {
+    const cutoff = new Date(now - 24 * 60 * 60 * 1000);
+
+    const updateResult = await prisma.ticket.updateMany({
+      where: {
+        status: { in: ['open', 'pending'] },
+        lastActivityAt: { lt: cutoff },
+      },
       data: {
         status: 'closed',
         closeReason: 'Auto-closed after 24h of inactivity',
-        closedAt: new Date(),
+        closedAt: new Date(now),
       },
     });
-    closedCount++;
-  }
 
-  res.json({ ok: true, closedCount, totalScanned: staleTickets.length });
+    res.json({ ok: true, closedCount: updateResult.count });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to sweep inactive tickets', details: err?.message });
+  } finally {
+    isSweepingTickets = false;
+  }
 });

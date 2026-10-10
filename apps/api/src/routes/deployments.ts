@@ -1137,22 +1137,19 @@ deploymentsRouter.post('/deployments/:id/renew', async (req: AuthedRequest, res)
 
   const { months } = parsed.data;
 
-  if (['stopped', 'failed'].includes(deployment.status)) {
-    await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'running' } });
-  }
-
+  const totalLkr = 3000 * months;
   const renewalOrder = await prisma.order.create({
     data: {
       userId: deployment.userId,
-      status: 'paid',
+      status: 'awaiting_payment',
       total: 10 * months,
-      totalLkr: 3000 * months,
+      totalLkr,
       currency: 'LKR',
       items: {
         create: [
           {
             quantity: 1,
-            priceLkr: 3000 * months,
+            priceLkr: totalLkr,
             configJson: {
               type: 'deployment_renewal',
               deploymentId: deployment.id,
@@ -1165,19 +1162,28 @@ deploymentsRouter.post('/deployments/:id/renew', async (req: AuthedRequest, res)
     },
   });
 
+  const payment = await prisma.payment.create({
+    data: {
+      orderId: renewalOrder.id,
+      method: 'manual',
+      status: 'manual_review',
+    },
+  });
+
   await prisma.auditLog.create({
     data: {
       adminId: req.user!.id,
-      action: 'deployment.renewed',
+      action: 'deployment.renew_requested',
       target: `Deployment ${deployment.id} (${deployment.subdomain || 'app'}) - ${months} Month(s)`,
       actorRole: req.user!.role === 'customer' ? 'customer' : null,
     },
   });
 
-  res.json({
+  res.status(202).json({
     ok: true,
-    message: `Deployment subscription successfully renewed for ${months} month(s).`,
+    message: `Deployment renewal order created (${months} month(s)). Please submit payment to complete renewal.`,
     orderId: renewalOrder.id,
+    paymentId: payment.id,
   });
 });
 

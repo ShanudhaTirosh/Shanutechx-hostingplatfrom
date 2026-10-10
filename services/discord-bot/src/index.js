@@ -61,19 +61,29 @@ app.post('/internal/send-dm', async (req, res) => {
   }
 });
 
+const DISCORD_SNOWFLAKE_REGEX = /^\d{17,20}$/;
+
 /** Posts an alert to the configured admin channel — new orders, payments needing review, node issues, etc. */
 app.post('/internal/send-channel', async (req, res) => {
   const { message, channelId } = req.body || {};
   if (!message) return res.status(400).json({ error: 'message is required' });
 
   const targetChannelId = channelId || ADMIN_ALERT_CHANNEL_ID;
-  if (!targetChannelId) {
-    return res.status(400).json({ error: 'No channelId provided and no ADMIN_ALERT_CHANNEL_ID configured' });
+  if (!targetChannelId || !DISCORD_SNOWFLAKE_REGEX.test(targetChannelId)) {
+    return res.status(400).json({ error: 'Invalid or missing target channel ID format (must be a valid Discord snowflake)' });
   }
 
   try {
     const client = getClient();
     const channel = await client.channels.fetch(targetChannelId);
+    if (!channel) {
+      return res.status(404).json({ error: 'Target Discord channel not found' });
+    }
+
+    if (process.env.DISCORD_GUILD_ID && channel.guildId && channel.guildId !== process.env.DISCORD_GUILD_ID) {
+      return res.status(403).json({ error: 'Target channel is outside authorized guild' });
+    }
+
     await channel.send(message);
     res.json({ ok: true });
   } catch (err) {
@@ -87,13 +97,22 @@ app.post('/internal/send-ticket-embed', async (req, res) => {
   const { embed, actionRow, channelId } = req.body || {};
   if (!embed) return res.status(400).json({ error: 'embed object is required' });
 
+  const targetChannelId = channelId || ADMIN_ALERT_CHANNEL_ID;
+  if (!targetChannelId || !DISCORD_SNOWFLAKE_REGEX.test(targetChannelId)) {
+    return res.status(400).json({ error: 'Invalid or missing target channel ID format (must be a valid Discord snowflake)' });
+  }
+
   try {
     const client = getClient();
-    const targetChannelId = channelId || ADMIN_ALERT_CHANNEL_ID;
-    if (!targetChannelId) {
-      return res.status(400).json({ error: 'No target channelId or ADMIN_ALERT_CHANNEL_ID configured' });
-    }
     const channel = await client.channels.fetch(targetChannelId);
+    if (!channel) {
+      return res.status(404).json({ error: 'Target Discord channel not found' });
+    }
+
+    if (process.env.DISCORD_GUILD_ID && channel.guildId && channel.guildId !== process.env.DISCORD_GUILD_ID) {
+      return res.status(403).json({ error: 'Target channel is outside authorized guild' });
+    }
+
     await channel.send({
       embeds: [embed],
       components: actionRow ? [actionRow] : [],
@@ -110,6 +129,10 @@ app.post('/internal/create-ticket-channel', async (req, res) => {
   const { ticketId, subject, customerEmail, customerDiscordUserId, embed, actionRow } = req.body || {};
   if (!ticketId || !subject) {
     return res.status(400).json({ error: 'ticketId and subject are required' });
+  }
+
+  if (customerDiscordUserId && !DISCORD_SNOWFLAKE_REGEX.test(String(customerDiscordUserId))) {
+    return res.status(400).json({ error: 'Invalid customerDiscordUserId format (must be a Discord snowflake)' });
   }
 
   try {
@@ -140,7 +163,7 @@ app.post('/internal/create-ticket-channel', async (req, res) => {
       },
     ];
 
-    if (process.env.DISCORD_STAFF_ROLE_ID) {
+    if (process.env.DISCORD_STAFF_ROLE_ID && DISCORD_SNOWFLAKE_REGEX.test(process.env.DISCORD_STAFF_ROLE_ID)) {
       overwrites.push({
         id: process.env.DISCORD_STAFF_ROLE_ID,
         allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'EmbedLinks', 'AttachFiles'],
@@ -149,7 +172,7 @@ app.post('/internal/create-ticket-channel', async (req, res) => {
 
     if (customerDiscordUserId) {
       overwrites.push({
-        id: customerDiscordUserId,
+        id: String(customerDiscordUserId),
         allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'EmbedLinks', 'AttachFiles'],
       });
     }

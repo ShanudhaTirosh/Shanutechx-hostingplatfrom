@@ -8,6 +8,7 @@ import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
 import { env } from '../env';
 import { provisionProjectBucket } from '../lib/r2Storage';
+import { logger } from '../lib/logger';
 
 export const projectsRouter = Router();
 
@@ -251,10 +252,18 @@ async function provisionProject(
       },
     });
   } catch (err: any) {
+    logger.error({ projectId, err: err?.message || err }, 'Background project provisioning failed on compute node');
     await prisma.project.update({
       where: { id: projectId },
       data: { status: 'failed' },
     });
+    await prisma.auditLog.create({
+      data: {
+        action: 'project.provision_failed',
+        target: `Project ${projectId}: ${err?.message || 'Unknown node agent failure'}`,
+        actorRole: 'system',
+      },
+    }).catch(() => null);
   }
 }
 
@@ -264,7 +273,8 @@ projectsRouter.get('/projects/:id', async (req: AuthedRequest, res) => {
   if (!access) return res.status(404).json({ error: 'Project not found or access denied' });
 
   const { project, role } = access;
-  const password = decryptSecret(project.dbPassword, env.secretsEncryptionKey);
+  const canViewCredentials = role === 'owner' || role === 'admin' || req.user!.role === 'dev' || req.user!.role === 'admin';
+  const password = canViewCredentials ? decryptSecret(project.dbPassword, env.secretsEncryptionKey) : null;
 
   // Compute resource usage aggregates across project's databases
   const databases = await prisma.managedDatabase.findMany({
@@ -474,19 +484,50 @@ const sqlSchema = z.object({
   sql: z.string().min(1).max(50_000),
 });
 
+function cleanSqlString(rawSql: string): string {
+  return rawSql
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/--.*$/gm, ' ')
+    .trim();
+}
+
+function containsDangerousSuperuserFunctions(sql: string): boolean {
+  const dangerousPatterns = [
+    /\bpg_read_file\b/i,
+    /\bpg_read_binary_file\b/i,
+    /\bpg_write_file\b/i,
+    /\bpg_ls_dir\b/i,
+    /\bcopy\b[\s\S]+\bprogram\b/i,
+  ];
+  return dangerousPatterns.some((p) => p.test(sql));
+}
+
+function isReadOnlySafeSql(cleanedSql: string): boolean {
+  if (!/^(SELECT|EXPLAIN|SHOW)\b/i.test(cleanedSql)) {
+    return false;
+  }
+  const mutatingKeywords = /\b(DROP|ALTER|DELETE|UPDATE|INSERT|CREATE|TRUNCATE|GRANT|REVOKE|COPY|EXECUTE|CALL)\b/i;
+  return !mutatingKeywords.test(cleanedSql);
+}
+
 projectsRouter.post('/projects/:id/sql', async (req: AuthedRequest, res) => {
   const access = await canAccessProject(req, req.params.id);
   if (!access) return res.status(404).json({ error: 'Project not found' });
 
+  const parsed = sqlSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const cleanedSql = cleanSqlString(parsed.data.sql);
+  if (containsDangerousSuperuserFunctions(cleanedSql)) {
+    return res.status(403).json({ error: 'Execution of dangerous system file/program functions is prohibited' });
+  }
+
   const { project, role } = access;
-  if (role === 'read_only' && /^\s*(DROP|ALTER|DELETE|UPDATE|INSERT|CREATE|TRUNCATE)\b/i.test(req.body.sql)) {
-    return res.status(403).json({ error: 'Read-only members cannot execute data definition or modification statements' });
+  if (role === 'read_only' && !isReadOnlySafeSql(cleanedSql)) {
+    return res.status(403).json({ error: 'Read-only members can only execute SELECT, EXPLAIN, and SHOW queries' });
   }
 
   if (project.status !== 'running') return res.status(400).json({ error: 'Project is not running' });
-
-  const parsed = sqlSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const node = await prisma.node.findUnique({ where: { id: project.nodeId } });
   if (!node) return res.status(500).json({ error: 'Node not found' });

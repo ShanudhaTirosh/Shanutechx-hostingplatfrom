@@ -323,6 +323,9 @@ server.listen(env.port, () => {
 });
 
 async function ensureDefaultMasterNodeRegistered() {
+  if (process.env.NODE_ENV === 'production') {
+    return;
+  }
   try {
     const existing = await prisma.node.findFirst({
       where: { ip: '127.0.0.1', label: 'Local Master Compute Host' },

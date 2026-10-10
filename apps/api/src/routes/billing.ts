@@ -22,6 +22,9 @@ billingRouter.get('/subscriptions', requireAuth, async (req: AuthedRequest, res)
   res.json({ subscriptions });
 });
 
+let isBillingCheckRunning = false;
+let lastBillingCheckCompletedAt = 0;
+
 /**
  * Runs the daily past_due/cancel sweep. Two ways to trigger it, both valid:
  * an admin clicking a button in the dashboard (Firebase-authed, requires
@@ -39,18 +42,40 @@ billingRouter.post('/billing/run-checks', async (req, res) => {
       if ((req as AuthedRequest).user?.role !== 'admin' && (req as AuthedRequest).user?.role !== 'dev') {
         return res.status(403).json({ error: 'Admin access required' });
       }
-      const result = await runBillingChecks();
-      res.json(result);
+
+      if (isBillingCheckRunning) {
+        return res.status(409).json({ error: 'Billing checks are currently already in progress' });
+      }
+      if (Date.now() - lastBillingCheckCompletedAt < 60_000) {
+        return res.status(429).json({ error: 'Billing checks were run recently. Please wait at least 60 seconds.' });
+      }
+
+      isBillingCheckRunning = true;
+      try {
+        const result = await runBillingChecks();
+        res.json(result);
+      } catch (err: any) {
+        res.status(500).json({ error: 'Billing check failed', detail: err?.message });
+      } finally {
+        isBillingCheckRunning = false;
+        lastBillingCheckCompletedAt = Date.now();
+      }
     });
   }
 
-  // BUG-L04 FIX: Wrap runBillingChecks() in try/catch so failures return a
-  // proper HTTP 500 instead of an unhandled rejection with no response body.
+  if (isBillingCheckRunning) {
+    return res.status(409).json({ error: 'Billing checks are currently in progress' });
+  }
+
+  isBillingCheckRunning = true;
   try {
     const result = await runBillingChecks();
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: 'Billing check failed', detail: err?.message });
+  } finally {
+    isBillingCheckRunning = false;
+    lastBillingCheckCompletedAt = Date.now();
   }
 });
 

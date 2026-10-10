@@ -127,9 +127,8 @@ deployWebhooksRouter.post('/deployments/:id/webhook-auto-register', requireAuth,
     });
   }
 
-  const host = req.get('host') || 'localhost:4000';
-  const protocol = req.protocol || 'https';
-  const payloadUrl = `${protocol}://${host}/api/deploy-webhooks/${deployment.id}`;
+  const baseApiUrl = process.env.API_URL || (env.rootDomain ? `https://api.${env.rootDomain}` : `${req.protocol}://${req.get('host') || 'localhost:4000'}`);
+  const payloadUrl = `${baseApiUrl}/api/deploy-webhooks/${deployment.id}`;
 
   try {
     const ghRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/hooks`, {
@@ -208,9 +207,12 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
   let verified = false;
 
   if (githubSignature) {
-    const rawPayload = (req as any).rawBody
-      ? (Buffer.isBuffer((req as any).rawBody) ? (req as any).rawBody : String((req as any).rawBody))
-      : JSON.stringify(req.body || {});
+    const rawBody = (req as any).rawBody;
+    if (!rawBody) {
+      logger.warn({ deploymentId: deployment.id }, 'GitHub webhook rawBody unavailable for signature verification');
+      return res.status(400).json({ error: 'Webhook payload verification failed: rawBody buffer missing' });
+    }
+    const rawPayload = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(String(rawBody), 'utf8');
     const expected =
       'sha256=' +
       crypto.createHmac('sha256', rawSecret).update(rawPayload).digest('hex');

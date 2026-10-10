@@ -8,6 +8,19 @@ import { stopDeployment } from '../lib/nodeAgentClient';
 
 export const prWebhooksRouter = Router();
 
+function getCanonicalRepoUrls(provider: 'github' | 'gitlab', repoFullName: string): string[] {
+  const clean = repoFullName.trim().toLowerCase().replace(/^\/+|\/+$/g, '');
+  const domain = provider === 'github' ? 'github.com' : 'gitlab.com';
+  return [
+    `https://${domain}/${clean}`,
+    `https://${domain}/${clean}.git`,
+    `http://${domain}/${clean}`,
+    `http://${domain}/${clean}.git`,
+    `git@${domain}:${clean}`,
+    `git@${domain}:${clean}.git`,
+  ];
+}
+
 /**
  * POST /api/webhooks/pr-deploy
  * Webhook handler for GitHub pull_request and GitLab merge_request events.
@@ -70,9 +83,10 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
       if (['opened', 'synchronize', 'reopened'].includes(action)) {
         logger.info({ repoFullName, prNumber, headBranch }, 'Triggering automated PR preview deployment');
 
+        const candidates = getCanonicalRepoUrls('github', repoFullName);
         const parent = await prisma.deployment.findFirst({
           where: {
-            repoUrl: { contains: repoFullName },
+            repoUrl: { in: candidates },
             isPreview: false,
           },
           orderBy: { createdAt: 'desc' },
@@ -113,10 +127,11 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
       if (action === 'closed') {
         logger.info({ repoFullName, prNumber }, 'Triggering automated PR preview teardown');
 
+        const candidates = getCanonicalRepoUrls('github', repoFullName);
         const previews = await prisma.deployment.findMany({
           where: {
             isPreview: true,
-            repoUrl: { contains: repoFullName },
+            repoUrl: { in: candidates },
             branch: headBranch || `pr-${prNumber}`,
           },
           include: { node: true },
@@ -149,9 +164,10 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
       if (['open', 'update', 'reopen'].includes(action)) {
         logger.info({ repoFullName, mrIid, headBranch }, 'Triggering automated MR preview deployment');
 
+        const candidates = repoFullName ? getCanonicalRepoUrls('gitlab', repoFullName) : [];
         const parent = await prisma.deployment.findFirst({
           where: {
-            repoUrl: { contains: repoFullName || '' },
+            repoUrl: { in: candidates },
             isPreview: false,
           },
           orderBy: { createdAt: 'desc' },
@@ -192,10 +208,11 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
       if (action === 'close' || action === 'merge') {
         logger.info({ repoFullName, mrIid }, 'Triggering automated MR preview teardown');
 
+        const candidates = repoFullName ? getCanonicalRepoUrls('gitlab', repoFullName) : [];
         const previews = await prisma.deployment.findMany({
           where: {
             isPreview: true,
-            repoUrl: { contains: repoFullName || '' },
+            repoUrl: { in: candidates },
             branch: headBranch || `mr-${mrIid}`,
           },
           include: { node: true },

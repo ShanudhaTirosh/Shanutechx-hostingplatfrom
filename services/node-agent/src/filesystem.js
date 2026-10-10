@@ -120,10 +120,10 @@ async function extractArchive(deploymentId, relPath) {
   try {
     if (lower.endsWith('.zip')) {
       try {
-        const { stdout } = await execFileAsync('unzip', ['-Z1', archive]);
+        const { stdout } = await execFileAsync('unzip', ['-Z1', '--', archive]);
         entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
       } catch {
-        const { stdout } = await execFileAsync('7z', ['l', '-ba', archive]);
+        const { stdout } = await execFileAsync('7z', ['l', '-ba', '--', archive]);
         entries = stdout.split('\n').map((l) => l.trim().split(/\s+/).pop()).filter(Boolean);
       }
     } else if (lower.endsWith('.tar.gz') || lower.endsWith('.tgz')) {
@@ -140,11 +140,11 @@ async function extractArchive(deploymentId, relPath) {
       entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
     } else if (lower.endsWith('.rar')) {
       try {
-        const { stdout } = await execFileAsync('unrar', ['l', '-bare', archive]);
+        const { stdout } = await execFileAsync('unrar', ['l', '-bare', '--', archive]);
         entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
       } catch {
         try {
-          const { stdout } = await execFileAsync('7z', ['l', '-ba', archive]);
+          const { stdout } = await execFileAsync('7z', ['l', '-ba', '--', archive]);
           entries = stdout.split('\n').map((l) => l.trim().split(/\s+/).pop()).filter(Boolean);
         } catch {
           const { stdout } = await execFileAsync('bsdtar', ['-tf', archive]);
@@ -153,7 +153,7 @@ async function extractArchive(deploymentId, relPath) {
       }
     } else if (lower.endsWith('.7z')) {
       try {
-        const { stdout } = await execFileAsync('7z', ['l', '-ba', archive]);
+        const { stdout } = await execFileAsync('7z', ['l', '-ba', '--', archive]);
         entries = stdout.split('\n').map((l) => l.trim().split(/\s+/).pop()).filter(Boolean);
       } catch {
         const { stdout } = await execFileAsync('bsdtar', ['-tf', archive]);
@@ -181,71 +181,75 @@ async function extractArchive(deploymentId, relPath) {
   if (lower.endsWith('.zip')) {
     if (process.platform === 'win32') {
       try {
-        await execFileAsync('powershell', [
-          '-NoProfile',
-          '-NonInteractive',
-          '-Command',
-          'param($src, $dst) Expand-Archive -LiteralPath $src -DestinationPath $dst -Force',
-          archive,
-          targetDir,
-        ]);
+        await execFileAsync(
+          'powershell',
+          [
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            '[System.IO.Compression.ZipFile]::ExtractToDirectory($env:STX_ARCHIVE, $env:STX_TARGET, $true)',
+          ],
+          {
+            env: { ...process.env, STX_ARCHIVE: archive, STX_TARGET: targetDir },
+          }
+        );
         return;
       } catch {}
     }
     try {
-      await execFileAsync('unzip', ['-o', archive, '-d', targetDir]);
+      await execFileAsync('unzip', ['-o', '--', archive, '-d', targetDir]);
     } catch {
-      await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, archive]);
+      await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, '--', archive]);
     }
   } else if (lower.endsWith('.tar.gz') || lower.endsWith('.tgz')) {
-    await execFileAsync('tar', ['-xzf', archive, '-C', targetDir]);
+    await execFileAsync('tar', ['-C', targetDir, '-xzf', archive]);
   } else if (lower.endsWith('.tar.bz2') || lower.endsWith('.tbz2')) {
-    await execFileAsync('tar', ['-xjf', archive, '-C', targetDir]);
+    await execFileAsync('tar', ['-C', targetDir, '-xjf', archive]);
   } else if (lower.endsWith('.tar.xz') || lower.endsWith('.txz')) {
-    await execFileAsync('tar', ['-xJf', archive, '-C', targetDir]);
+    await execFileAsync('tar', ['-C', targetDir, '-xJf', archive]);
   } else if (lower.endsWith('.tar')) {
-    await execFileAsync('tar', ['-xf', archive, '-C', targetDir]);
+    await execFileAsync('tar', ['-C', targetDir, '-xf', archive]);
   } else if (lower.endsWith('.rar')) {
     try {
-      await execFileAsync('unrar', ['x', '-o+', archive, targetDir + path.sep]);
+      await execFileAsync('unrar', ['x', '-o+', '--', archive, targetDir + path.sep]);
     } catch {
       try {
-        await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, archive]);
+        await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, '--', archive]);
       } catch {
         try {
-          await execFileAsync('bsdtar', ['-xf', archive, '-C', targetDir]);
+          await execFileAsync('bsdtar', ['-C', targetDir, '-xf', archive]);
         } catch {
-          await execFileAsync('unar', ['-o', targetDir, '-f', archive]);
+          await execFileAsync('unar', ['-o', targetDir, '-f', '--', archive]);
         }
       }
     }
   } else if (lower.endsWith('.7z')) {
     try {
-      await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, archive]);
+      await execFileAsync('7z', ['x', '-y', `-o${targetDir}`, '--', archive]);
     } catch {
       try {
-        await execFileAsync('7za', ['x', '-y', `-o${targetDir}`, archive]);
+        await execFileAsync('7za', ['x', '-y', `-o${targetDir}`, '--', archive]);
       } catch {
-        await execFileAsync('bsdtar', ['-xf', archive, '-C', targetDir]);
+        await execFileAsync('bsdtar', ['-C', targetDir, '-xf', archive]);
       }
     }
   } else if (lower.endsWith('.gz')) {
     try {
-      await execFileAsync('tar', ['-xzf', archive, '-C', targetDir]);
+      await execFileAsync('tar', ['-C', targetDir, '-xzf', archive]);
     } catch {
-      await execFileAsync('gzip', ['-d', '-k', '-f', archive]);
+      await execFileAsync('gzip', ['-d', '-k', '-f', '--', archive]);
     }
   } else if (lower.endsWith('.bz2')) {
     try {
-      await execFileAsync('tar', ['-xjf', archive, '-C', targetDir]);
+      await execFileAsync('tar', ['-C', targetDir, '-xjf', archive]);
     } catch {
-      await execFileAsync('bzip2', ['-d', '-k', '-f', archive]);
+      await execFileAsync('bzip2', ['-d', '-k', '-f', '--', archive]);
     }
   } else if (lower.endsWith('.xz')) {
     try {
-      await execFileAsync('tar', ['-xJf', archive, '-C', targetDir]);
+      await execFileAsync('tar', ['-C', targetDir, '-xJf', archive]);
     } catch {
-      await execFileAsync('xz', ['-d', '-k', '-f', archive]);
+      await execFileAsync('xz', ['-d', '-k', '-f', '--', archive]);
     }
   }
 }

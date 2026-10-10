@@ -110,6 +110,16 @@ authRouter.post('/auth/login', async (req, res) => {
     });
   }
 
+  // Revoke previous OAuth session tokens for this user to prevent token accumulation
+  await prisma.apiKey.updateMany({
+    where: {
+      userId: user.id,
+      label: { startsWith: 'OAuth Session Token' },
+      revokedAt: null,
+    },
+    data: { revokedAt: new Date() },
+  }).catch(() => null);
+
   const { rawKey, keyHash, keyPrefix } = generateApiKey();
   await prisma.apiKey.create({
     data: {

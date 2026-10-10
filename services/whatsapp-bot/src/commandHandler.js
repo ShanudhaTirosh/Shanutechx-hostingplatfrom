@@ -214,7 +214,26 @@ async function handleCommand(senderPhone, messageText) {
     return `Thank you! Your ${rating}-star rating has been recorded for ticket #${ticketId.slice(0, 8).toUpperCase()}.`;
   }
 
+async function isStaffUser(phone) {
+  const data = await apiFetch(`/api/internal/customer-summary?phone=${encodeURIComponent(phone)}`);
+  return Boolean(data && data.user && ['admin', 'dev', 'support'].includes(data.user.role));
+}
+
   // 7. Staff Commands (Claim, Unclaim, Close, Broadcast, Invoice)
+  const isStaffCommand =
+    text.startsWith('!claim ') ||
+    text.startsWith('!unclaim ') ||
+    text.startsWith('!close ') ||
+    text.startsWith('!broadcast ') ||
+    text.startsWith('!invoice ');
+
+  if (isStaffCommand) {
+    const isStaff = await isStaffUser(cleanPhone);
+    if (!isStaff) {
+      return `❌ Access Denied: This command is restricted to ShanuTechX staff members.`;
+    }
+  }
+
   if (text.startsWith('!claim ')) {
     const ticketId = text.slice('!claim '.length).trim();
     const res = await apiFetch('/api/internal/claim-ticket', {
