@@ -83,27 +83,28 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden">
       {/* Top Toolbar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/60">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-slate-800 bg-slate-900/60 gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={onBack}
-            className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
+            className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1 text-xs"
             title="Back to Inbox"
           >
             <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline font-medium">Inbox</span>
           </button>
-          <div className="h-4 w-px bg-slate-800" />
+          <div className="h-4 w-px bg-slate-800 mx-0.5" />
           <button
             onClick={() => onReply(latestMsg.senderEmail, `Re: ${subject}`, latestMsg.id)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded-lg text-xs font-semibold border border-indigo-500/30 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded-lg text-xs font-semibold border border-indigo-500/30 transition-colors"
           >
-            <Reply className="w-3.5 h-3.5" /> Reply
+            <Reply className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Reply</span>
           </button>
           <button
             onClick={() => onForward(`Fwd: ${subject}`, latestMsg.htmlBody)}
-            className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium border border-slate-800 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium border border-slate-800 transition-colors"
           >
-            <Forward className="w-3.5 h-3.5" /> Forward
+            <Forward className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Forward</span>
           </button>
         </div>
 
@@ -121,7 +122,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
           </button>
           <button
             onClick={handlePrint}
-            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
+            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors hidden sm:flex"
             title="Print"
           >
             <Printer className="w-4 h-4" />

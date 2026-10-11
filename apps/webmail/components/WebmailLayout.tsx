@@ -29,6 +29,7 @@ import {
   RotateCcw,
   X,
   Key,
+  Menu,
 } from 'lucide-react';
 import { MailboxSwitcher, Mailbox } from './MailboxSwitcher';
 import { ThreadList, WebmailMessage } from './ThreadList';
@@ -81,6 +82,13 @@ export const WebmailLayout: React.FC = () => {
   const [customFolders, setCustomFolders] = useState<any[]>([]);
   const [customLabels, setCustomLabels] = useState<any[]>([]);
 
+  // Mobile Drawer & Dynamic Storage
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [storageUsage, setStorageUsage] = useState<{ usedMb: number; limitMb: number }>({
+    usedMb: 0,
+    limitMb: 10240,
+  });
+
   // Toast System
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
@@ -94,9 +102,22 @@ export const WebmailLayout: React.FC = () => {
     }, 6000);
   };
 
+  const loadPlanUsage = async () => {
+    try {
+      const res = await api.webmail.planUsage();
+      if (res?.quotas?.storageMb) {
+        setStorageUsage({
+          usedMb: res.quotas.storageMb.used || 0,
+          limitMb: res.quotas.storageMb.limit || 10240,
+        });
+      }
+    } catch (_) {}
+  };
+
   useEffect(() => {
     loadMailboxes();
     loadFoldersAndLabels();
+    loadPlanUsage();
     api.me().then((res) => {
       if (res?.user?.role) setUserRole(res.user.role);
     }).catch(() => {});
@@ -104,6 +125,7 @@ export const WebmailLayout: React.FC = () => {
 
   useEffect(() => {
     loadMessages();
+    loadPlanUsage();
   }, [activeFolder, activeCategory, searchQuery, activeMailboxId]);
 
   // Update document title with unread badge count
@@ -251,17 +273,18 @@ export const WebmailLayout: React.FC = () => {
     }
   };
 
-  // Bulk actions
+  // Bulk actions & Quick row actions
   const handleBulkAction = async (action: string, payload?: any) => {
-    if (selectedIds.length === 0) return;
+    const ids = payload?.messageIds || selectedIds;
+    if (ids.length === 0) return;
     const previousState = [...messages];
     try {
       await api.webmail.bulkAction({
-        messageIds: selectedIds,
+        messageIds: ids,
         action,
         ...payload,
       });
-      addToast(`${selectedIds.length} message(s) updated`, 'success', () => {
+      addToast(`${ids.length} message(s) updated`, 'success', () => {
         setMessages(previousState);
       });
       setSelectedIds([]);
@@ -335,13 +358,34 @@ export const WebmailLayout: React.FC = () => {
     { id: 'trash', label: 'Trash', icon: Trash2 },
   ];
 
+  const formatStorage = (mb: number) => {
+    if (mb >= 1024) {
+      return `${(mb / 1024).toFixed(1)} GB`;
+    }
+    return `${mb} MB`;
+  };
+
+  const storagePercent = Math.min(
+    100,
+    Math.max(1, Math.round((storageUsage.usedMb / Math.max(1, storageUsage.limitMb)) * 100))
+  );
+
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans selection:bg-indigo-500/30 selection:text-indigo-300 relative">
       {/* Top Application Header */}
-      <header className="h-14 bg-slate-900 border-b border-slate-800/80 px-4 flex items-center justify-between z-30 shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="h-14 bg-slate-900 border-b border-slate-800/80 px-3 sm:px-4 flex items-center justify-between z-30 shrink-0 gap-2">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Mobile Drawer Hamburger Button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 lg:hidden transition-colors"
+            title="Open Menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-white/10 p-1 flex items-center justify-center border border-white/10 shadow-lg shadow-indigo-600/20 backdrop-blur-sm">
+            <div className="w-8 h-8 rounded-xl bg-white/10 p-1 flex items-center justify-center border border-white/10 shadow-lg shadow-indigo-600/20 backdrop-blur-sm shrink-0">
               <img
                 src="/STX.png"
                 alt="ShanuTechX"
@@ -353,18 +397,20 @@ export const WebmailLayout: React.FC = () => {
             </span>
           </div>
 
-          <div className="h-5 w-px bg-slate-800 mx-1 hidden sm:block" />
+          <div className="h-5 w-px bg-slate-800 mx-1 hidden md:block" />
 
-          {/* Mailbox Switcher */}
-          <MailboxSwitcher
-            mailboxes={mailboxes}
-            activeMailboxId={activeMailboxId}
-            onSelectMailbox={(id) => setActiveMailboxId(id)}
-          />
+          {/* Desktop Mailbox Switcher */}
+          <div className="hidden md:block">
+            <MailboxSwitcher
+              mailboxes={mailboxes}
+              activeMailboxId={activeMailboxId}
+              onSelectMailbox={(id) => setActiveMailboxId(id)}
+            />
+          </div>
         </div>
 
         {/* Global Search Bar */}
-        <div className="relative flex-1 max-w-xl mx-4">
+        <div className="relative flex-1 max-w-xl mx-1 sm:mx-4">
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -410,10 +456,10 @@ export const WebmailLayout: React.FC = () => {
         </div>
 
         {/* Right Header Actions */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <button
             onClick={() => setShowKeyboardHelp(true)}
-            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
+            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors hidden sm:flex"
             title="Keyboard Shortcuts (?)"
           >
             <Keyboard className="w-4 h-4" />
@@ -427,7 +473,7 @@ export const WebmailLayout: React.FC = () => {
           </button>
           <button
             onClick={() => setIsCredentialsOpen(true)}
-            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-indigo-400 transition-colors"
+            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-indigo-400 transition-colors hidden sm:flex"
             title="Developer Credentials & REST API"
           >
             <Key className="w-4 h-4" />
@@ -449,10 +495,166 @@ export const WebmailLayout: React.FC = () => {
         </div>
       </header>
 
+      {/* Mobile Drawer Overlay */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden flex">
+          <div
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          <div className="relative w-72 max-w-[85vw] bg-slate-900 border-r border-slate-800 p-4 flex flex-col justify-between h-full z-10 shadow-2xl animate-in slide-in-from-left duration-200">
+            <div className="space-y-4 overflow-y-auto pr-1">
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-white/10 p-1 flex items-center justify-center border border-white/10">
+                    <img src="/STX.png" alt="ShanuTechX" className="w-full h-full object-contain filter brightness-0 invert" />
+                  </div>
+                  <span className="font-bold text-xs tracking-tight text-slate-100">
+                    ShanuTechX <span className="text-indigo-400 font-medium">Webmail</span>
+                  </span>
+                </div>
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Mailbox Switcher inside Drawer */}
+              <div>
+                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Mailbox Account</p>
+                <MailboxSwitcher
+                  mailboxes={mailboxes}
+                  activeMailboxId={activeMailboxId}
+                  onSelectMailbox={(id) => {
+                    setActiveMailboxId(id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                />
+              </div>
+
+              {/* Compose Action in Drawer */}
+              <button
+                onClick={() => {
+                  setComposerDefaultRecipient('');
+                  setComposerDefaultSubject('');
+                  setComposerDefaultBody('');
+                  setComposerThreadId(undefined);
+                  setComposerInReplyTo(undefined);
+                  setIsComposerOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/20"
+              >
+                <PenSquare className="w-4 h-4" /> Compose Mail
+              </button>
+
+              {/* System Folders Tree */}
+              <nav className="space-y-0.5">
+                {navFolders.map((f) => {
+                  const Icon = f.icon;
+                  const isActive = activeFolder === f.id;
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => {
+                        setActiveFolder(f.id);
+                        setSelectedMessageId(null);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                        isActive
+                          ? 'bg-indigo-600/15 text-indigo-400 border border-indigo-500/20'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon className="w-4 h-4" />
+                        <span>{f.label}</span>
+                      </div>
+                      {f.badge !== undefined && f.badge > 0 && (
+                        <span className="text-[10px] font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded-full shadow-sm">
+                          {f.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {/* Custom Folders Section */}
+              {customFolders.length > 0 && (
+                <div className="pt-2 border-t border-slate-800/80">
+                  <p className="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                    Custom Folders
+                  </p>
+                  <div className="space-y-0.5">
+                    {customFolders.map((cf) => (
+                      <button
+                        key={cf.id}
+                        onClick={() => {
+                          setActiveFolder(cf.name);
+                          setSelectedMessageId(null);
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                      >
+                        <Folder className="w-3.5 h-3.5 text-indigo-400" />
+                        <span className="truncate">{cf.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Custom Labels Section */}
+              {customLabels.length > 0 && (
+                <div className="pt-2 border-t border-slate-800/80">
+                  <p className="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                    Labels
+                  </p>
+                  <div className="space-y-0.5">
+                    {customLabels.map((lbl) => (
+                      <button
+                        key={lbl.id}
+                        onClick={() => {
+                          setSearchQuery(`label:${lbl.name}`);
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                      >
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: lbl.color || '#6366f1' }} />
+                        <span className="truncate">{lbl.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Storage Quota in Drawer */}
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1.5 mt-3 shrink-0">
+              <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+                <span className="flex items-center gap-1.5"><HardDrive className="w-3 h-3 text-indigo-400" /> Storage</span>
+                <span>{formatStorage(storageUsage.usedMb)} / {formatStorage(storageUsage.limitMb)}</span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-indigo-500 to-violet-500"
+                  style={{ width: `${storagePercent}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main App Body */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Navigation Sidebar */}
-        <aside className="w-56 bg-slate-900/80 border-r border-slate-800/80 p-3 flex flex-col justify-between shrink-0 select-none">
+        {/* Desktop Left Navigation Sidebar */}
+        <aside className="hidden lg:flex w-60 bg-slate-900/80 border-r border-slate-800/80 p-3 flex-col justify-between shrink-0 select-none">
           <div className="space-y-4">
             {/* Primary Action Compose Button */}
             <button
@@ -551,16 +753,19 @@ export const WebmailLayout: React.FC = () => {
           <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1.5">
             <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
               <span className="flex items-center gap-1.5"><HardDrive className="w-3 h-3 text-indigo-400" /> Mail Storage</span>
-              <span>1.2 GB / 10 GB</span>
+              <span>{formatStorage(storageUsage.usedMb)} / {formatStorage(storageUsage.limitMb)}</span>
             </div>
             <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 w-[12%]" />
+              <div
+                className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-300"
+                style={{ width: `${storagePercent}%` }}
+              />
             </div>
           </div>
         </aside>
 
         {/* Center Thread List Pane */}
-        <div className={`w-full sm:w-96 shrink-0 h-full ${selectedMessageId ? 'hidden sm:block' : 'block'}`}>
+        <div className={`w-full lg:w-96 shrink-0 h-full ${selectedMessageId ? 'hidden lg:block' : 'block'}`}>
           <ThreadList
             messages={messages}
             selectedMessageId={selectedMessageId}
@@ -585,7 +790,7 @@ export const WebmailLayout: React.FC = () => {
         </div>
 
         {/* Right Detail Pane */}
-        <div className={`flex-1 h-full min-w-0 ${selectedMessageId ? 'block' : 'hidden sm:block'}`}>
+        <div className={`flex-1 h-full min-w-0 ${selectedMessageId ? 'block' : 'hidden lg:block'}`}>
           {selectedMessageId ? (
             <ThreadViewer
               messages={selectedThreadMessages}
@@ -609,6 +814,25 @@ export const WebmailLayout: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Mobile Floating Compose Button */}
+      {!selectedMessageId && (
+        <button
+          onClick={() => {
+            setComposerDefaultRecipient('');
+            setComposerDefaultSubject('');
+            setComposerDefaultBody('');
+            setComposerThreadId(undefined);
+            setComposerInReplyTo(undefined);
+            setIsComposerOpen(true);
+          }}
+          className="fixed bottom-6 right-6 z-30 lg:hidden shadow-2xl rounded-2xl p-3.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 text-white flex items-center gap-2 text-xs font-bold border border-indigo-400/30 active:scale-95 transition-transform"
+          title="Compose Email"
+        >
+          <PenSquare className="w-5 h-5" />
+          <span>Compose</span>
+        </button>
+      )}
 
       {/* Keyboard Shortcuts Cheat-sheet Modal */}
       {showKeyboardHelp && (

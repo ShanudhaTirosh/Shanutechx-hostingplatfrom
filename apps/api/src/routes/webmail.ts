@@ -298,30 +298,107 @@ webmailRouter.get('/webmail/messages/scheduled', async (req: AuthedRequest, res:
   }
 });
 
-// 1.5 Get Single Message Details
+// 1.5 Get Single Message Details (Prisma & WildDuck Native Bridge)
 webmailRouter.get('/webmail/messages/:id', async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   const userId = req.user!.id;
   const role = req.user!.role;
 
   const msg = await prisma.webmailMessage.findUnique({ where: { id } });
-  if (!msg) return res.status(404).json({ error: 'Message not found' });
 
-  if (msg.smtpAccountId) {
-    const account = await prisma.smtpAccount.findUnique({ where: { id: msg.smtpAccountId } });
-    if (!(await canAccessMailbox(account, userId, role))) {
+  if (msg && msg.htmlBody) {
+    if (msg.smtpAccountId) {
+      const account = await prisma.smtpAccount.findUnique({ where: { id: msg.smtpAccountId } });
+      if (!(await canAccessMailbox(account, userId, role))) {
+        return res.status(404).json({ error: 'Message not found' });
+      }
+    } else if (msg.userId !== userId && role !== 'dev') {
       return res.status(404).json({ error: 'Message not found' });
     }
-  } else if (msg.userId !== userId && role !== 'dev') {
-    return res.status(404).json({ error: 'Message not found' });
+
+    if (!msg.isRead) {
+      await prisma.webmailMessage.update({ where: { id }, data: { isRead: true } });
+      msg.isRead = true;
+    }
+
+    return res.json({ message: msg });
   }
 
-  if (!msg.isRead) {
-    await prisma.webmailMessage.update({ where: { id }, data: { isRead: true } });
-    msg.isRead = true;
+  // If not found in DB or missing htmlBody, query accessible WildDuck mailboxes
+  const accessibleAccounts = await prisma.smtpAccount.findMany({
+    where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+  });
+
+  for (const acc of accessibleAccounts) {
+    if (acc.wildduckUserId) {
+      try {
+        const wdMsg = await wildduckClient.getMessage(acc.wildduckUserId, id);
+        if (wdMsg) {
+          const domain = acc.customDomain || acc.smtpHost.replace(/^mail\./, '');
+          const defaultEmail = `${acc.smtpUsername}@${domain}`;
+          const formatted = {
+            id: wdMsg.id,
+            userId: acc.userId,
+            smtpAccountId: acc.id,
+            folder: (wdMsg.mailbox || 'inbox').toLowerCase(),
+            senderName: wdMsg.from?.name || wdMsg.from?.address?.split('@')[0] || 'Unknown',
+            senderEmail: wdMsg.from?.address || 'unknown@domain.com',
+            recipientEmail: wdMsg.to?.[0]?.address || defaultEmail,
+            subject: wdMsg.subject || '(No Subject)',
+            snippet: wdMsg.intro || '',
+            htmlBody: wdMsg.html || (wdMsg.text ? `<pre style="font-family:inherit;white-space:pre-wrap;">${wdMsg.text}</pre>` : `<p>${wdMsg.intro || ''}</p>`),
+            category: 'primary',
+            priority: 'normal',
+            isRead: true,
+            isStarred: !!wdMsg.flagged,
+            isPinned: false,
+            hasAttachments: Array.isArray(wdMsg.attachments) && wdMsg.attachments.length > 0,
+            attachmentsJson: wdMsg.attachments?.map((a: any) => ({
+              filename: a.filename || 'attachment',
+              sizeStr: a.size ? `${(a.size / 1024).toFixed(1)} KB` : 'Unknown',
+              url: `/api/webmail/messages/${id}/attachments/${encodeURIComponent(a.filename || 'file')}`,
+            })) || [],
+            createdAt: wdMsg.date,
+            updatedAt: wdMsg.date,
+          };
+
+          // Mark as seen on WildDuck
+          void wildduckClient.updateMessageFlags(acc.wildduckUserId, id, { seen: true }).catch(() => {});
+
+          // Cache in Prisma
+          try {
+            await prisma.webmailMessage.upsert({
+              where: { id: wdMsg.id },
+              create: {
+                id: wdMsg.id,
+                userId: acc.userId,
+                smtpAccountId: acc.id,
+                folder: (wdMsg.mailbox || 'inbox').toLowerCase(),
+                senderName: formatted.senderName,
+                senderEmail: formatted.senderEmail,
+                recipientEmail: formatted.recipientEmail,
+                subject: formatted.subject,
+                snippet: formatted.snippet,
+                htmlBody: formatted.htmlBody,
+                isRead: true,
+                isStarred: formatted.isStarred,
+                hasAttachments: formatted.hasAttachments,
+                attachmentsJson: formatted.attachmentsJson,
+              },
+              update: {
+                htmlBody: formatted.htmlBody,
+                isRead: true,
+              },
+            });
+          } catch {}
+
+          return res.json({ message: formatted });
+        }
+      } catch {}
+    }
   }
 
-  res.json({ message: msg });
+  return res.status(404).json({ error: 'Message not found' });
 });
 
 // =====================================================================
@@ -583,7 +660,28 @@ webmailRouter.patch('/webmail/messages/:id', async (req: AuthedRequest, res: Res
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const existing = await prisma.webmailMessage.findUnique({ where: { id } });
-  if (!existing) return res.status(404).json({ error: 'Message not found' });
+
+  if (!existing) {
+    // If not found in DB, check accessible WildDuck mailboxes
+    const accessibleAccounts = await prisma.smtpAccount.findMany({
+      where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+    });
+
+    for (const acc of accessibleAccounts) {
+      if (acc.wildduckUserId) {
+        if (parsed.data.isStarred !== undefined || parsed.data.isRead !== undefined) {
+          try {
+            await wildduckClient.updateMessageFlags(acc.wildduckUserId, id, {
+              flagged: parsed.data.isStarred,
+              seen: parsed.data.isRead,
+            });
+            return res.json({ message: { id, isStarred: parsed.data.isStarred, isRead: parsed.data.isRead } });
+          } catch {}
+        }
+      }
+    }
+    return res.status(404).json({ error: 'Message not found' });
+  }
 
   if (existing.userId !== userId && role !== 'dev') {
     return res.status(404).json({ error: 'Message not found' });
@@ -593,20 +691,55 @@ webmailRouter.patch('/webmail/messages/:id', async (req: AuthedRequest, res: Res
   if (parsed.data.snoozedUntil) data.snoozedUntil = new Date(parsed.data.snoozedUntil);
 
   const message = await prisma.webmailMessage.update({ where: { id }, data });
+
+  // Sync flags to WildDuck if linked to an SMTP account
+  if (existing.smtpAccountId && (parsed.data.isStarred !== undefined || parsed.data.isRead !== undefined)) {
+    const account = await prisma.smtpAccount.findUnique({ where: { id: existing.smtpAccountId } });
+    if (account?.wildduckUserId) {
+      void wildduckClient.updateMessageFlags(account.wildduckUserId, id, {
+        flagged: parsed.data.isStarred,
+        seen: parsed.data.isRead,
+      }).catch(() => {});
+    }
+  }
+
   res.json({ message });
 });
 
-// 2.5 Delete Single Message
+// 2.5 Delete Single Message (Trash & WildDuck Cleanup)
 webmailRouter.delete('/webmail/messages/:id', async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   const userId = req.user!.id;
   const role = req.user!.role;
 
   const existing = await prisma.webmailMessage.findUnique({ where: { id } });
-  if (!existing) return res.status(404).json({ error: 'Message not found' });
+
+  if (!existing) {
+    // Attempt delete directly on accessible WildDuck accounts
+    const accessibleAccounts = await prisma.smtpAccount.findMany({
+      where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+    });
+
+    for (const acc of accessibleAccounts) {
+      if (acc.wildduckUserId) {
+        try {
+          const ok = await wildduckClient.deleteMessage(acc.wildduckUserId, id);
+          if (ok) return res.json({ ok: true, deletedId: id });
+        } catch {}
+      }
+    }
+    return res.status(404).json({ error: 'Message not found' });
+  }
 
   if (existing.userId !== userId && role !== 'dev') {
     return res.status(404).json({ error: 'Message not found' });
+  }
+
+  if (existing.smtpAccountId) {
+    const account = await prisma.smtpAccount.findUnique({ where: { id: existing.smtpAccountId } });
+    if (account?.wildduckUserId) {
+      void wildduckClient.deleteMessage(account.wildduckUserId, id).catch(() => {});
+    }
   }
 
   if (existing.folder === 'trash') {
@@ -639,7 +772,7 @@ webmailRouter.post('/webmail/folders', async (req: AuthedRequest, res: Response)
     data: {
       userId: req.user!.id,
       name,
-      icon: icon || '📁',
+      icon: icon || 'folder',
       color: color || '#6366f1',
       parentId: parentId || null,
     },
@@ -1569,9 +1702,30 @@ webmailRouter.get('/webmail/plan-usage', async (req: AuthedRequest, res: Respons
       if (specs.maxAliases) maxAliases = specs.maxAliases;
     }
 
-    const smtpAccounts = await prisma.smtpAccount.findMany({ where: { userId } });
+    const smtpAccounts = await prisma.smtpAccount.findMany({
+      where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+    });
     const usedMailboxes = smtpAccounts.length;
-    const usedStorageMb = smtpAccounts.reduce((acc, a) => acc + (a.storageUsedMb || 0), 0);
+
+    let usedStorageMb = 0;
+    for (const acc of smtpAccounts) {
+      if (acc.wildduckUserId) {
+        try {
+          const wdUser = await wildduckClient.getUser(acc.wildduckUserId, acc.mailHostId);
+          if (wdUser && typeof wdUser.usage === 'number') {
+            const calculatedMb = Math.round(wdUser.usage / (1024 * 1024));
+            usedStorageMb += calculatedMb;
+            // update in DB asynchronously
+            prisma.smtpAccount.update({
+              where: { id: acc.id },
+              data: { storageUsedMb: calculatedMb },
+            }).catch(() => {});
+            continue;
+          }
+        } catch (_) {}
+      }
+      usedStorageMb += (acc.storageUsedMb || 0);
+    }
 
     const domains = new Set<string>();
     smtpAccounts.forEach(a => { if (a.customDomain) domains.add(a.customDomain); });

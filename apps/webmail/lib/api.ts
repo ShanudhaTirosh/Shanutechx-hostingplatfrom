@@ -67,6 +67,7 @@ export const api = {
 
   webmail: {
     getCredentials: () => request<any>('/webmail/account/credentials'),
+    planUsage: () => request<any>('/webmail/plan-usage'),
     listMessages: (folder = 'inbox', search = '', smtpAccountId?: string) => {
       const q = new URLSearchParams({ folder });
       if (search) q.append('search', search);

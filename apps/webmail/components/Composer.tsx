@@ -191,7 +191,7 @@ export const Composer: React.FC<ComposerProps> = ({
   if (isMinimized) {
     return (
       <div
-        className="fixed bottom-0 right-6 z-50 w-72 bg-slate-900 border border-slate-700 rounded-t-xl shadow-2xl flex items-center justify-between px-4 py-3 text-slate-200 cursor-pointer"
+        className="fixed bottom-0 right-2 sm:right-6 z-50 w-64 sm:w-72 bg-slate-900 border border-slate-700 rounded-t-xl shadow-2xl flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 text-slate-200 cursor-pointer"
         onClick={() => setIsMinimized(false)}
       >
         <div className="flex items-center gap-2 truncate text-sm font-semibold">
@@ -228,10 +228,10 @@ export const Composer: React.FC<ComposerProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`fixed z-50 transition-all duration-200 shadow-2xl flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden ${
+      className={`fixed z-50 transition-all duration-200 shadow-2xl flex flex-col bg-slate-900 border border-slate-800 overflow-hidden ${
         isMaximized
-          ? 'inset-4 sm:inset-10'
-          : 'bottom-0 right-4 sm:right-6 w-full max-w-2xl h-[620px] rounded-b-none border-b-0'
+          ? 'inset-0 sm:inset-6 md:inset-10 sm:rounded-xl'
+          : 'inset-0 sm:inset-auto sm:bottom-0 sm:right-6 sm:w-full sm:max-w-2xl sm:h-[620px] sm:rounded-t-xl sm:rounded-b-none sm:border-b-0'
       }`}
     >
       {/* Drag & Drop Overlay */}
@@ -251,7 +251,7 @@ export const Composer: React.FC<ComposerProps> = ({
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setIsMaximized(!isMaximized)}
-            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
+            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors hidden sm:inline-flex"
           >
             {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
