@@ -16,11 +16,13 @@ import {
   Globe,
   Package,
   ShoppingBag,
+  ShoppingCart,
   ShieldCheck,
   ArrowRight,
   Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useCart } from '@/context/CartContext';
 
 interface Plan {
   id: string;
@@ -63,79 +65,10 @@ const CATEGORY_KEYS = [
   { id: 'smtp', label: 'Business Email / SMTP', icon: Zap },
 ];
 
-// Fallback catalog matching genuine platform plans from seedProducts.ts
-const STATIC_CATALOG: Product[] = [
-  {
-    id: 'p-vps',
-    name: 'High-Performance Cloud VPS',
-    category: 'vps',
-    description: 'Dedicated NVMe SSD compute nodes with unmetered 1Gbps bandwidth, root SSH control, and dedicated IPv4.',
-    isPopular: true,
-    badge: 'Flagship Compute',
-    plans: [
-      { id: 'plan-vps-micro', name: 'VPS Micro (1 vCPU, 2GB RAM, 30GB NVMe)', price: 250000, billingType: 'monthly' },
-      { id: 'plan-vps-std', name: 'VPS Standard (2 vCPU, 4GB RAM, 80GB NVMe)', price: 500000, billingType: 'monthly', isPopular: true, badge: 'Best Seller' },
-      { id: 'plan-vps-pro', name: 'VPS Pro (4 vCPU, 8GB RAM, 160GB NVMe)', price: 950000, billingType: 'monthly' },
-    ],
-  },
-  {
-    id: 'p-web-hosting',
-    name: 'Static & Dynamic Web Hosting',
-    category: 'web',
-    description: 'Cloud web hosting with automated GitHub deployment (Public & Private repos), free SSL certificates, and custom domains.',
-    plans: [
-      { id: 'plan-web-starter', name: 'Starter Web Hosting (1GB NVMe, 100GB Bandwidth)', price: 85000, billingType: 'monthly' },
-      { id: 'plan-web-pro', name: 'Pro Web Hosting (5GB NVMe, 500GB Bandwidth)', price: 195000, billingType: 'monthly', isPopular: true, badge: 'Popular' },
-      { id: 'plan-web-ent', name: 'Enterprise Web Hosting (20GB NVMe, 2TB Bandwidth)', price: 450000, billingType: 'monthly' },
-    ],
-  },
-  {
-    id: 'p-app-node',
-    name: 'Node.js & Next.js App Hosting',
-    category: 'web',
-    description: 'Nixpacks-powered container hosting with automatic SSL, zero-config domain routing, and environment secrets.',
-    plans: [
-      { id: 'plan-app-dev', name: 'Developer Node Plan (512MB RAM, 0.5 vCPU)', price: 120000, billingType: 'monthly' },
-      { id: 'plan-app-biz', name: 'Business Node Plan (2GB RAM, 1.5 vCPU)', price: 280000, billingType: 'monthly' },
-    ],
-  },
-  {
-    id: 'p-bot-hosting',
-    name: '24/7 Discord & WhatsApp Bot Hosting',
-    category: 'bot',
-    description: 'Continuous process runner with auto-restart on disconnect, live real-time logs, and persistent volume storage.',
-    plans: [
-      { id: 'plan-bot-discord-start', name: 'Discord Bot Starter (512MB RAM)', price: 80000, billingType: 'monthly' },
-      { id: 'plan-bot-discord-pro', name: 'Discord Bot Pro (2GB RAM)', price: 180000, billingType: 'monthly' },
-      { id: 'plan-bot-wa-starter', name: 'WhatsApp Bot Starter (1GB RAM, Persistent Session)', price: 150000, billingType: 'monthly' },
-    ],
-  },
-  {
-    id: 'p-db-cluster',
-    name: 'Managed Databases & Cache',
-    category: 'database',
-    description: 'Managed PostgreSQL 16, MySQL 8, Redis 7 & MongoDB clusters with automated daily Cloudflare R2 snapshots.',
-    plans: [
-      { id: 'plan-db-redis', name: 'Managed Redis 7 Cache Cluster', price: 120000, billingType: 'monthly' },
-      { id: 'plan-db-postgres', name: 'Managed PostgreSQL 16 Cluster', price: 280000, billingType: 'monthly' },
-      { id: 'plan-db-ha', name: 'High-Availability Database Cluster', price: 650000, billingType: 'monthly' },
-    ],
-  },
-  {
-    id: 'p-smtp-email',
-    name: 'Enterprise Outbound SMTP & Business Email',
-    category: 'smtp',
-    description: 'High-reputation SMTP mailer with webmail client, custom domain support, DKIM/SPF auto-validation, and forwarding rules.',
-    plans: [
-      { id: 'plan-smtp-1', name: 'Starter Email (1GB Storage, 1 Mailbox)', price: 450000, billingType: 'quarterly' },
-      { id: 'plan-smtp-2', name: 'Standard Email (5GB Storage, 5 Aliases)', price: 1050000, billingType: 'quarterly' },
-      { id: 'plan-smtp-3', name: 'Pro Email (20GB Storage, 10 Aliases)', price: 2250000, billingType: 'quarterly' },
-    ],
-  },
-];
-
 export default function PricingPage() {
-  const [products, setProducts] = useState<Product[]>(STATIC_CATALOG);
+  const { addItem } = useCart();
+  const [products, setProducts] = useState<Product[] | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortOption, setSortOption] = useState<'default' | 'price-low' | 'price-high' | 'name'>('default');
@@ -144,10 +77,11 @@ export default function PricingPage() {
   const apiBase = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
+    setLoading(true);
     fetch(`${apiBase}/api/products`)
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
       .then((data) => {
-        if (Array.isArray(data.products) && data.products.length > 0) {
+        if (Array.isArray(data.products)) {
           // Filter out any third-party or proxy products from hosting catalog
           const valid = data.products.filter(
             (p: Product) =>
@@ -155,13 +89,17 @@ export default function PricingPage() {
               p.category !== 'digital' &&
               !p.name.toLowerCase().includes('v2ray')
           );
-          if (valid.length > 0) {
-            setProducts(valid);
-          }
+          setProducts(valid);
+        } else {
+          setProducts([]);
         }
       })
-      .catch(() => {
-        // Fallback to static catalog if API server is offline
+      .catch((err) => {
+        console.error('[PricingPage] Failed to fetch products from DB:', err);
+        setProducts([]);
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, [apiBase]);
 
@@ -173,6 +111,7 @@ export default function PricingPage() {
 
   // Filtered & Sorted Products list
   const filteredProducts = useMemo(() => {
+    if (!products) return [];
     return products
       .filter((product) => {
         // Search filter
@@ -180,7 +119,7 @@ export default function PricingPage() {
           searchQuery === '' ||
           product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          product.plans.some((plan) => plan.name.toLowerCase().includes(searchQuery.toLowerCase()));
+          (product.plans || []).some((plan) => plan.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
         // Category filter
         const cat = product.category ? product.category.toLowerCase() : '';
@@ -331,7 +270,18 @@ export default function PricingPage() {
         </div>
 
         {/* Products Grid */}
-        {filteredProducts.length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-[#08091c]/90 border border-white/10 rounded-3xl p-7 space-y-6 animate-pulse">
+                <div className="h-4 w-28 bg-white/10 rounded" />
+                <div className="h-6 w-48 bg-white/10 rounded" />
+                <div className="h-16 w-full bg-white/5 rounded-xl" />
+                <div className="h-10 w-full bg-white/10 rounded-xl" />
+              </div>
+            ))}
+          </div>
+        ) : filteredProducts.length === 0 ? (
           <div className="bg-[#08091c] border border-white/10 rounded-3xl p-12 text-center space-y-3">
             <Package className="h-10 w-10 text-purple-400 mx-auto" />
             <p className="text-sm font-bold text-white">No products match your search or filter criteria</p>
@@ -412,11 +362,30 @@ export default function PricingPage() {
                                   </span>
                                 )}
                               </div>
-                              <div className="text-right font-mono">
-                                <span className="text-teal-300 font-extrabold">{formatPrice(plan.price)}</span>
-                                <span className="text-[10px] text-slate-400 ml-1">
-                                  {BILLING_LABEL[plan.billingType] ?? plan.billingType}
-                                </span>
+                              <div className="flex items-center gap-3">
+                                <div className="text-right font-mono">
+                                  <span className="text-teal-300 font-extrabold">{formatPrice(plan.price)}</span>
+                                  <span className="text-[10px] text-slate-400 ml-1">
+                                    {BILLING_LABEL[plan.billingType] ?? plan.billingType}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    addItem({
+                                      id: plan.id,
+                                      name: `${product.name} — ${plan.name}`,
+                                      category: product.category,
+                                      price: plan.price,
+                                      currency: 'LKR',
+                                      billingType: plan.billingType || 'monthly',
+                                    })
+                                  }
+                                  className="p-1.5 rounded-lg bg-white/5 hover:bg-purple-600/30 border border-white/10 hover:border-purple-500/40 text-purple-300 hover:text-white transition-all cursor-pointer"
+                                  title="Add plan to cart"
+                                >
+                                  <ShoppingCart className="h-3.5 w-3.5" />
+                                </button>
                               </div>
                             </div>
                           ))}
@@ -426,13 +395,33 @@ export default function PricingPage() {
                   </div>
 
                   {/* Order Button CTA */}
-                  <div className="pt-4 border-t border-white/10">
-                    <a
-                      href={`${dashboardUrl}/catalog`}
-                      className="w-full py-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/40 text-purple-200 font-bold text-xs font-mono transition-all flex items-center justify-center gap-2 shadow-glow-violet"
-                    >
-                      Order {product.name} <ArrowRight className="h-4 w-4" />
-                    </a>
+                  <div className="pt-4 border-t border-white/10 flex gap-2">
+                    {product.plans && product.plans.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const primaryPlan = product.plans.find((p) => p.isPopular) || product.plans[0];
+                          addItem({
+                            id: primaryPlan.id,
+                            name: `${product.name} — ${primaryPlan.name}`,
+                            category: product.category,
+                            price: primaryPlan.price,
+                            currency: 'LKR',
+                            billingType: primaryPlan.billingType || 'monthly',
+                          });
+                        }}
+                        className="w-full py-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/40 text-purple-200 font-bold text-xs font-mono transition-all flex items-center justify-center gap-2 shadow-glow-violet cursor-pointer"
+                      >
+                        <ShoppingCart className="h-4 w-4" /> Add to Cart — {product.name}
+                      </button>
+                    ) : (
+                      <a
+                        href={`${dashboardUrl}/catalog`}
+                        className="w-full py-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/40 text-purple-200 font-bold text-xs font-mono transition-all flex items-center justify-center gap-2 shadow-glow-violet"
+                      >
+                        Order {product.name} <ArrowRight className="h-4 w-4" />
+                      </a>
+                    )}
                   </div>
                 </div>
               );

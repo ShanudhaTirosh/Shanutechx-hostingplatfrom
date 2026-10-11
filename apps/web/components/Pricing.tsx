@@ -44,93 +44,36 @@ function formatPrice(cents: number) {
 interface Plan { id: string; name: string; price: number; billingType: string; }
 interface Product { id: string; name: string; category: string; description: string | null; plans: Plan[]; }
 
-const DEFAULT_PRODUCTS: Product[] = [
-  {
-    id: 'prod-vps',
-    name: 'High-Performance Cloud VPS',
-    category: 'vps',
-    description: 'Dedicated virtual private servers with NVMe SSDs, 1Gbps unmetered bandwidth, and root SSH control.',
-    plans: [
-      { id: 'plan-vps-1', name: 'VPS Micro (1 vCPU, 2GB RAM, 30GB NVMe)', price: 250000, billingType: 'monthly' },
-      { id: 'plan-vps-2', name: 'VPS Standard (2 vCPU, 4GB RAM, 80GB NVMe)', price: 500000, billingType: 'monthly' },
-      { id: 'plan-vps-3', name: 'VPS Pro (4 vCPU, 8GB RAM, 160GB NVMe)', price: 950000, billingType: 'monthly' },
-    ],
-  },
-  {
-    id: 'prod-web-hosting',
-    name: 'Static & Dynamic Web Hosting',
-    category: 'web_hosting',
-    description: 'High-speed cloud web hosting with GitHub auto-deployment, free SSL certificates, and custom domains.',
-    plans: [
-      { id: 'plan-web-1', name: 'Starter Web Hosting (1GB NVMe, 100GB BW)', price: 85000, billingType: 'monthly' },
-      { id: 'plan-web-2', name: 'Pro Web Hosting (5GB NVMe, 500GB BW)', price: 195000, billingType: 'monthly' },
-      { id: 'plan-web-3', name: 'Enterprise Web Hosting (20GB NVMe, 2TB BW)', price: 450000, billingType: 'monthly' },
-    ],
-  },
-  {
-    id: 'prod-app-hosting',
-    name: 'Node.js & Next.js App Hosting',
-    category: 'app_catalog',
-    description: 'Nixpacks-powered container hosting with automatic SSL, custom domain routing, and environment secrets.',
-    plans: [
-      { id: 'plan-app-1', name: 'Developer Node Plan (512MB RAM)', price: 120000, billingType: 'monthly' },
-      { id: 'plan-app-2', name: 'Business Node Plan (2GB RAM)', price: 280000, billingType: 'monthly' },
-    ],
-  },
-  {
-    id: 'prod-database',
-    name: 'Managed Databases & Cache',
-    category: 'database',
-    description: 'Automated daily Cloudflare R2 backups, SSL connection strings, and instant web database studio.',
-    plans: [
-      { id: 'plan-db-1', name: 'Managed Redis Cache Cluster', price: 120000, billingType: 'monthly' },
-      { id: 'plan-db-2', name: 'Managed PostgreSQL 16 Cluster', price: 280000, billingType: 'monthly' },
-    ],
-  },
-  {
-    id: 'prod-email',
-    name: 'Enterprise Outbound SMTP & Email',
-    category: 'smtp',
-    description: 'High-reputation SMTP mailer with webmail client, custom domain support, and DKIM/SPF signatures.',
-    plans: [
-      { id: 'plan-smtp-1', name: 'Starter Email 1GB (LKR 1,500/mo)', price: 450000, billingType: 'quarterly' },
-      { id: 'plan-smtp-2', name: 'Standard Email 5GB (LKR 3,500/mo)', price: 1050000, billingType: 'quarterly' },
-    ],
-  },
-  {
-    id: 'prod-bots',
-    name: '24/7 Discord & WhatsApp Bot Hosting',
-    category: 'bot_hosting',
-    description: 'Continuous bot process supervisor with auto-restart on disconnect and persistent session volumes.',
-    plans: [
-      { id: 'plan-bot-1', name: 'Discord Bot Starter (512MB RAM)', price: 80000, billingType: 'monthly' },
-      { id: 'plan-bot-2', name: 'Discord Bot Pro (2GB RAM)', price: 180000, billingType: 'monthly' },
-    ],
-  },
-];
-
 export default function Pricing() {
   const [products, setProducts] = useState<Product[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const { addItem } = useCart();
   const apiBase = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
     fetch(`${apiBase}/api/products`)
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((d) => {
-        if (Array.isArray(d.products) && d.products.length > 0) {
+        if (Array.isArray(d.products)) {
           setProducts(d.products);
         } else {
-          setProducts(DEFAULT_PRODUCTS);
+          setProducts([]);
         }
       })
-      .catch(() => setProducts(DEFAULT_PRODUCTS));
+      .catch((err) => {
+        console.error('[Pricing] Failed to fetch live products from database:', err);
+        setProducts([]);
+        setError('Unable to load pricing catalog. Please ensure the API is connected.');
+      });
   }, [apiBase]);
 
   const displayed = (products && products.length > 0
     ? products.filter((p) => p.plans && p.plans.length > 0)
-    : DEFAULT_PRODUCTS
+    : []
   ).slice(0, 6);
 
   return (
