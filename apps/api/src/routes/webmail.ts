@@ -11,6 +11,15 @@ import { env } from '../env';
 import { Resolver } from 'dns/promises';
 import { validateDomainForUser } from '../lib/smtpProvisioner';
 import { getUserEmailPlanQuotas } from '../lib/emailPlanQuotas';
+import {
+  canAccessMailbox as checkMailboxAccess,
+  getUserMailboxPermissions,
+  normalizeMailboxAcl,
+  normalizeMailboxProfile,
+  updateMailboxAcl,
+  revokeMailboxAcl,
+  MailboxPermission,
+} from '../lib/mailboxAcl';
 
 export const webmailRouter = Router();
 
@@ -21,12 +30,14 @@ const FOLDERS = ['inbox', 'starred', 'drafts', 'sent', 'spam', 'trash', 'archive
 /**
  * Helper to check if the authenticated user has access to a given SmtpAccount.
  */
-async function canAccessMailbox(account: any, userId: string, userRole?: string): Promise<boolean> {
+function canAccessMailbox(
+  account: any,
+  userId: string,
+  userRole?: string,
+  requiredPermission: MailboxPermission = 'read'
+): boolean {
   if (!account) return false;
-  if (userRole === 'dev') return true;
-  if (account.userId === userId) return true;
-  if (Array.isArray(account.allowedAdminIds) && account.allowedAdminIds.includes(userId)) return true;
-  return false;
+  return checkMailboxAccess(account, userId, userRole, requiredPermission).allowed;
 }
 
 /**
@@ -460,10 +471,15 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
     });
   }
 
-  if (!account || !(await canAccessMailbox(account, userId, role))) {
+  if (!account) {
     return res.status(400).json({
       error: 'No accessible mailbox provisioned for sending. Contact dev administrator for mailbox access.',
     });
+  }
+
+  const accessCheck = checkMailboxAccess(account, userId, role, 'write');
+  if (!accessCheck.allowed) {
+    return res.status(403).json({ error: accessCheck.reason });
   }
 
   if (account.isSuspended) {
@@ -477,7 +493,8 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
   }
 
   const senderEmail = account.smtpUsername;
-  const rawSenderName = (req.user as any)?.displayName || req.user?.email || senderEmail;
+  const profile = normalizeMailboxProfile(account.profileJson, (req.user as any)?.displayName || req.user?.email, senderEmail);
+  const rawSenderName = profile.displayName || (req.user as any)?.displayName || req.user?.email || senderEmail;
   const senderName = String(rawSenderName).replace(/[\r\n]/g, '').trim();
 
   const generatedThreadId = threadId || `thread-${Date.now()}`;
@@ -1186,51 +1203,68 @@ webmailRouter.post('/webmail/ai/translate', async (req: AuthedRequest, res: Resp
 
 webmailRouter.post('/webmail/delegations', async (req: AuthedRequest, res: Response) => {
   if (req.user?.role !== 'dev') {
-    return res.status(403).json({ error: 'Only dev users can delegate mailbox access to admin staff.' });
+    return res.status(403).json({ error: 'Only dev users can delegate mailbox access to admin or support staff.' });
   }
 
-  const { smtpAccountId, adminUserId } = req.body || {};
+  const { smtpAccountId, adminUserId, permissions = ['read', 'write'] } = req.body || {};
   if (!smtpAccountId || !adminUserId) {
     return res.status(400).json({ error: 'smtpAccountId and adminUserId are required' });
   }
 
-  const account = await prisma.smtpAccount.findUnique({ where: { id: smtpAccountId } });
+  const account: any = await prisma.smtpAccount.findUnique({ where: { id: smtpAccountId } });
   if (!account) return res.status(404).json({ error: 'SmtpAccount not found' });
-  if (account.userId !== req.user!.id && req.user?.role !== 'dev') {
-    return res.status(403).json({ error: 'You do not own this mailbox account' });
-  }
 
-  const adminUser = await prisma.user.findUnique({ where: { id: adminUserId } });
-  if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'support')) {
+  const targetUser = await prisma.user.findUnique({ where: { id: adminUserId } });
+  if (!targetUser || (targetUser.role !== 'admin' && targetUser.role !== 'support')) {
     return res.status(400).json({ error: 'Target user must be an admin or support staff member.' });
   }
 
-  const currentAllowed = account.allowedAdminIds || [];
-  if (!currentAllowed.includes(adminUserId)) {
-    const updated = await prisma.smtpAccount.update({
-      where: { id: smtpAccountId },
-      data: { allowedAdminIds: { push: adminUserId } },
-    });
-    return res.json({ ok: true, message: `Access granted to admin ${adminUser.email}`, account: updated });
-  }
+  const syncResult = updateMailboxAcl(account.mailboxAcl, {
+    userId: targetUser.id,
+    userEmail: targetUser.email,
+    userName: targetUser.displayName || undefined,
+    role: targetUser.role as 'admin' | 'support',
+    permissions: Array.isArray(permissions) ? permissions : ['read', 'write'],
+    grantedBy: req.user!.email || req.user!.id,
+  });
 
-  res.json({ ok: true, message: `Admin ${adminUser.email} already has access`, account });
+  const updated: any = await (prisma.smtpAccount as any).update({
+    where: { id: smtpAccountId },
+    data: {
+      mailboxAcl: syncResult.mailboxAcl as any,
+      allowedAdminIds: syncResult.allowedAdminIds,
+    },
+  });
+
+  return res.json({
+    ok: true,
+    message: `Access granted to ${targetUser.email} with [${syncResult.mailboxAcl.find((m) => m.userId === targetUser.id)?.permissions.join(', ')}] permissions`,
+    account: updated,
+    mailboxAcl: syncResult.mailboxAcl,
+  });
 });
 
 webmailRouter.get('/webmail/delegations', async (req: AuthedRequest, res: Response) => {
   const userId = req.user!.id;
   const isDev = req.user?.role === 'dev';
 
-  const accounts = isDev
-    ? await prisma.smtpAccount.findMany({
-        select: { id: true, smtpUsername: true, customDomain: true, allowedAdminIds: true, userId: true, user: { select: { email: true } } },
+  const accounts: any[] = isDev
+    ? await (prisma.smtpAccount as any).findMany({
+        include: { user: { select: { email: true, displayName: true } } },
       })
-    : await prisma.smtpAccount.findMany({
+    : await (prisma.smtpAccount as any).findMany({
         where: { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
-        select: { id: true, smtpUsername: true, customDomain: true, allowedAdminIds: true, userId: true, user: { select: { email: true } } },
+        include: { user: { select: { email: true, displayName: true } } },
       });
 
-  res.json({ accounts });
+  const mapped = accounts.map((acc: any) => ({
+    ...acc,
+    profile: normalizeMailboxProfile(acc.profileJson, acc.user?.displayName, acc.smtpUsername),
+    mailboxAcl: normalizeMailboxAcl(acc.mailboxAcl),
+    myPermissions: Array.from(getUserMailboxPermissions(acc, userId, req.user?.role)),
+  }));
+
+  res.json({ accounts: mapped });
 });
 
 // ─── ADMIN ROUTES ─────────────────────────────────────────────────────────
@@ -2171,10 +2205,15 @@ webmailRouter.post('/webmail/business/mail-merge', async (req: AuthedRequest, re
       });
     }
 
-    if (!account || !(await canAccessMailbox(account, userId, role))) {
+    if (!account) {
       return res.status(400).json({
         error: 'No accessible mailbox provisioned for sending mail merge. Contact administrator.',
       });
+    }
+
+    const accessCheck = checkMailboxAccess(account, userId, role, 'write');
+    if (!accessCheck.allowed) {
+      return res.status(403).json({ error: accessCheck.reason });
     }
 
     if (account.isSuspended) {

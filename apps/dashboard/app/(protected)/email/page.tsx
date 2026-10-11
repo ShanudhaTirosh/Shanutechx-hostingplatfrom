@@ -36,7 +36,11 @@ import {
   Layers,
   ArrowUpRight,
   Zap,
+  UserCircle,
+  Shield,
 } from 'lucide-react';
+import { MailboxProfileModal, type MailboxProfileData } from '@/components/email/MailboxProfileModal';
+import { MailboxStaffAccessModal } from '@/components/email/MailboxStaffAccessModal';
 
 export interface EmailPlanQuotas {
   isDev: boolean;
@@ -87,6 +91,10 @@ interface Mailbox {
   aliases?: string[];
   maxAliases?: number;
   mailHostId?: string;
+  isInternal?: boolean;
+  profile?: MailboxProfileData;
+  mailboxAcl?: any[];
+  myPermissions?: ('read' | 'write' | 'manage')[];
 }
 
 interface DomainRecord {
@@ -143,6 +151,12 @@ export default function BusinessEmailManagementDashboard() {
   const [quotaModalMailbox, setQuotaModalMailbox] = useState<Mailbox | null>(null);
   const [targetQuotaMb, setTargetQuotaMb] = useState<number>(1024);
   const [updatingQuota, setUpdatingQuota] = useState(false);
+
+  // Profile modal state
+  const [profileModalMailbox, setProfileModalMailbox] = useState<Mailbox | null>(null);
+
+  // Staff Access delegation modal state (dev role)
+  const [staffAccessMailbox, setStaffAccessMailbox] = useState<Mailbox | null>(null);
 
   // Website Connect & API modal state
   const [websiteConnectMailbox, setWebsiteConnectMailbox] = useState<Mailbox | null>(null);
@@ -881,13 +895,57 @@ EOF`;
                       selectedMailboxId === mb.id ? 'border-indigo-500 shadow-indigo-500/10' : 'border-slate-800 hover:border-slate-700'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <span className="font-mono font-bold text-sm text-indigo-400 block truncate">{mb.email}</span>
-                        <span className="text-[11px] text-slate-400 font-sans block mt-0.5">{mb.planName || 'Pro Business Email'}</span>
+                    <div className="flex items-start gap-3.5">
+                      {/* Avatar / Initials */}
+                      <div className="relative shrink-0">
+                        {mb.profile?.avatarUrl ? (
+                          <img
+                            src={mb.profile.avatarUrl}
+                            alt={mb.profile?.displayName || mb.username}
+                            className="h-12 w-12 rounded-2xl object-cover border-2 border-indigo-500/40 shadow-md shadow-indigo-500/10"
+                          />
+                        ) : (
+                          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 text-white font-bold text-base flex items-center justify-center border-2 border-indigo-500/30 shadow-md">
+                            {(mb.profile?.displayName || mb.username || 'M').charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        {mb.isInternal && (
+                          <span
+                            className="absolute -bottom-1 -right-1 bg-amber-500 text-slate-950 p-0.5 rounded-full ring-2 ring-slate-900 shadow-sm"
+                            title="System Mailbox"
+                          >
+                            <Shield className="h-3 w-3" />
+                          </span>
+                        )}
                       </div>
+
+                      {/* Display Name & Email */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm text-white truncate">
+                            {mb.profile?.displayName || mb.username}
+                          </span>
+                          {mb.isInternal && (
+                            <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              System
+                            </span>
+                          )}
+                          {mb.myPermissions && userRole !== 'dev' && (
+                            <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              {mb.myPermissions.includes('write') ? 'Read & Write' : 'Read-Only'}
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-mono text-xs text-indigo-400 block truncate mt-0.5">{mb.email}</span>
+                        {mb.profile?.jobTitle && (
+                          <span className="text-[11px] text-slate-400 font-sans block truncate mt-0.5">
+                            {mb.profile.jobTitle} {mb.profile.company ? `• ${mb.profile.company}` : ''}
+                          </span>
+                        )}
+                      </div>
+
                       <span
-                        className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                        className={`shrink-0 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider ${
                           mb.isSuspended ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         }`}
                       >
@@ -951,13 +1009,37 @@ EOF`;
 
                     {/* Action Footer */}
                     <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2 flex-wrap">
-                      <button
-                        onClick={() => handleOpenWebsiteConnect(mb)}
-                        className="px-3 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white font-bold text-xs transition-all flex items-center gap-1.5 border border-indigo-500/30"
-                      >
-                        <Plug className="h-3.5 w-3.5 text-indigo-400" />
-                        <span>Connect Website & API</span>
-                      </button>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Profile & Branding Button */}
+                        <button
+                          onClick={() => setProfileModalMailbox(mb)}
+                          className="px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-white font-bold text-xs transition-all flex items-center gap-1.5 border border-purple-500/30"
+                          title="Configure Mailbox Profile Picture & Info"
+                        >
+                          <UserCircle className="h-3.5 w-3.5 text-purple-400" />
+                          <span>Profile & Branding</span>
+                        </button>
+
+                        {/* Dev Staff Access Delegation Button */}
+                        {userRole === 'dev' && (
+                          <button
+                            onClick={() => setStaffAccessMailbox(mb)}
+                            className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-white font-bold text-xs transition-all flex items-center gap-1.5 border border-amber-500/30"
+                            title="Manage Staff Access (Dev Superuser)"
+                          >
+                            <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
+                            <span>Staff Access</span>
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleOpenWebsiteConnect(mb)}
+                          className="px-3 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white font-bold text-xs transition-all flex items-center gap-1.5 border border-indigo-500/30"
+                        >
+                          <Plug className="h-3.5 w-3.5 text-indigo-400" />
+                          <span>Connect & API</span>
+                        </button>
+                      </div>
 
                       <div className="flex items-center gap-2 ml-auto">
                         <button
@@ -2232,6 +2314,34 @@ EOF`;
             ) : null}
           </div>
         </div>
+      )}
+
+      {/* Profile & Avatar Modal */}
+      {profileModalMailbox && (
+        <MailboxProfileModal
+          mailbox={profileModalMailbox}
+          onClose={() => setProfileModalMailbox(null)}
+          onSaved={(updatedProfile) => {
+            setMailboxes((prev) =>
+              prev.map((m) =>
+                m.id === profileModalMailbox.id ? { ...m, profile: updatedProfile } : m
+              )
+            );
+            setProfileModalMailbox(null);
+            fetchData();
+          }}
+        />
+      )}
+
+      {/* Dev Staff Access Delegation Modal */}
+      {staffAccessMailbox && (
+        <MailboxStaffAccessModal
+          mailbox={staffAccessMailbox}
+          onClose={() => setStaffAccessMailbox(null)}
+          onUpdate={() => {
+            fetchData();
+          }}
+        />
       )}
     </div>
   );

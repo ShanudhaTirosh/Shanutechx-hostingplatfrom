@@ -7,6 +7,7 @@ import { logger } from '../lib/logger';
 import { wildduckClient } from '../lib/wildduckClient';
 import { sendSmtpEmail } from '../lib/smtpDispatcher';
 import { decryptSecret } from '../lib/secretsVault';
+import { canAccessMailbox } from '../lib/mailboxAcl';
 
 export const emailsV1Router = Router();
 
@@ -167,6 +168,17 @@ emailsV1Router.post('/emails', async (req: AuthedRequest, res: Response) => {
       message: `The sender address "${senderEmail}" is not associated with any active mailbox or verified domain in your account. Please configure a mailbox for "${senderDomain}" first.`,
       from: senderEmail,
     });
+  }
+
+  if (account) {
+    const accessCheck = canAccessMailbox(account, userId, userRole, 'write');
+    if (!accessCheck.allowed) {
+      return res.status(403).json({
+        statusCode: 403,
+        name: 'forbidden',
+        message: accessCheck.reason,
+      });
+    }
   }
 
   if (account?.isSuspended) {

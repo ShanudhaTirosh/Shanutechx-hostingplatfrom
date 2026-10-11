@@ -15,6 +15,21 @@ import { getWebmailClusterConfig, updateWebmailClusterConfig, verifyS3StorageCon
 import crypto from 'crypto';
 import { isSsrfTargetAsync } from './smtp';
 import { getUserEmailPlanQuotas, validateMailboxCreationQuota } from '../lib/emailPlanQuotas';
+import {
+  canAccessMailbox,
+  getUserMailboxPermissions,
+  normalizeMailboxAcl,
+  normalizeMailboxProfile,
+  updateMailboxAcl,
+  revokeMailboxAcl,
+  MailboxPermission,
+} from '../lib/mailboxAcl';
+import {
+  avatarUploadMiddleware,
+  validateImageMagicBytes,
+  saveMailboxAvatar,
+  deleteLocalAvatarIfExists,
+} from '../lib/avatarUpload';
 
 export const emailRouter = Router();
 
@@ -31,7 +46,7 @@ emailRouter.get('/email/mailboxes', async (req: AuthedRequest, res) => {
     let where: any = {};
     if (req.user!.role === 'dev') {
       where = {};
-    } else if (req.user!.role === 'admin') {
+    } else if (req.user!.role === 'admin' || req.user!.role === 'support') {
       where = {
         OR: [
           { userId: req.user!.id },
@@ -91,6 +106,10 @@ emailRouter.get('/email/mailboxes', async (req: AuthedRequest, res) => {
         aliases: acc.aliases || [],
         maxAliases: acc.maxAliases || 10,
         allowedAdminIds: acc.allowedAdminIds || [],
+        profile: normalizeMailboxProfile(acc.profileJson, acc.user.displayName, acc.smtpUsername),
+        mailboxAcl: normalizeMailboxAcl(acc.mailboxAcl),
+        myPermissions: Array.from(getUserMailboxPermissions(acc, req.user!.id, req.user!.role)),
+        isInternal: Boolean(acc.isInternal),
         expiresAt: acc.expiresAt ? acc.expiresAt.toISOString() : null,
         isExpired,
         isSuspended,
@@ -123,9 +142,10 @@ emailRouter.get('/email/mailboxes/:id/credentials', async (req: AuthedRequest, r
     const isOwner = account.userId === req.user!.id;
     const isDev = req.user!.role === 'dev';
     if (!isOwner && !isDev) {
-      if (req.user!.role !== 'admin') return res.status(403).json({ error: 'Access denied' });
-      const isExplicitlyDelegated = (account.allowedAdminIds || []).includes(req.user!.id);
+      const perms = getUserMailboxPermissions(account, req.user!.id, req.user!.role);
+      const isExplicitlyDelegated = (account.allowedAdminIds || []).includes(req.user!.id) || perms.size > 0;
       if (!isExplicitlyDelegated) {
+        if (req.user!.role !== 'admin' && req.user!.role !== 'support') return res.status(403).json({ error: 'Access denied' });
         const owner = await prisma.user.findUnique({ where: { id: account.userId }, select: { assignedAdminId: true } });
         if (owner?.assignedAdminId !== req.user!.id) {
           return res.status(403).json({ error: 'Access denied: You are not assigned to this account' });
@@ -836,8 +856,147 @@ emailRouter.post('/email/mailboxes/:id/renew', async (req: AuthedRequest, res) =
 });
 
 /**
+ * GET /api/email/mailboxes/:id/access
+ * Dev-only endpoint to inspect current ACL grants and list available Admin/Support staff.
+ */
+emailRouter.get('/email/mailboxes/:id/access', async (req: AuthedRequest, res) => {
+  try {
+    const isDev = req.user!.role === 'dev';
+    const account: any = await prisma.smtpAccount.findUnique({ where: { id: req.params.id } });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const isOwner = account.userId === req.user!.id;
+    if (!isDev && !isOwner) {
+      return res.status(403).json({ error: 'Only dev administrators or mailbox owners can view access lists.' });
+    }
+
+    const staffUsers = await prisma.user.findMany({
+      where: { role: { in: ['admin', 'support'] } },
+      select: { id: true, email: true, displayName: true, role: true, avatarUrl: true },
+      orderBy: [{ role: 'asc' }, { email: 'asc' }],
+    });
+
+    res.json({
+      ok: true,
+      mailboxAcl: normalizeMailboxAcl(account.mailboxAcl),
+      allowedAdminIds: account.allowedAdminIds || [],
+      staffUsers,
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to get mailbox access list');
+    res.status(500).json({ error: err.message || 'Failed to get mailbox access list' });
+  }
+});
+
+/**
+ * POST /api/email/mailboxes/:id/access
+ * Dev-only endpoint to grant or update granular permissions ('read', 'write', 'manage')
+ * to an admin or support staff member for a system mailbox (or any mailbox).
+ */
+const grantAccessSchema = z.object({
+  userId: z.string().min(1),
+  permissions: z.array(z.enum(['read', 'write', 'manage'])).min(1),
+});
+
+emailRouter.post('/email/mailboxes/:id/access', async (req: AuthedRequest, res) => {
+  try {
+    const isDev = req.user!.role === 'dev';
+    if (!isDev) {
+      return res.status(403).json({ error: 'Forbidden: Only dev administrators can configure staff access permissions.' });
+    }
+
+    const account: any = await prisma.smtpAccount.findUnique({ where: { id: req.params.id } });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const parse = grantAccessSchema.safeParse(req.body);
+    if (!parse.success) {
+      return res.status(400).json({ error: 'Invalid permission payload', details: parse.error.format() });
+    }
+
+    const { userId: targetUserId, permissions } = parse.data;
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!targetUser || (targetUser.role !== 'admin' && targetUser.role !== 'support')) {
+      return res.status(400).json({ error: 'Target user must be an active admin or support staff member.' });
+    }
+
+    const syncResult = updateMailboxAcl(account.mailboxAcl, {
+      userId: targetUser.id,
+      userEmail: targetUser.email,
+      userName: targetUser.displayName || undefined,
+      role: targetUser.role as 'admin' | 'support',
+      permissions,
+      grantedBy: req.user!.email || req.user!.id,
+    });
+
+    await (prisma.smtpAccount as any).update({
+      where: { id: account.id },
+      data: {
+        mailboxAcl: syncResult.mailboxAcl as any,
+        allowedAdminIds: syncResult.allowedAdminIds,
+      },
+    });
+
+    logger.info(
+      { mailboxId: account.id, devUser: req.user!.email, targetUser: targetUser.email, permissions },
+      'Dev granted staff access to mailbox'
+    );
+
+    res.json({
+      ok: true,
+      message: `Permissions updated for ${targetUser.email} on ${account.smtpUsername}`,
+      mailboxAcl: syncResult.mailboxAcl,
+      allowedAdminIds: syncResult.allowedAdminIds,
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to grant mailbox access');
+    res.status(500).json({ error: err.message || 'Failed to grant access' });
+  }
+});
+
+/**
+ * DELETE /api/email/mailboxes/:id/access/:userId
+ * Dev-only endpoint to revoke a staff member's access to a mailbox.
+ */
+emailRouter.delete('/email/mailboxes/:id/access/:userId', async (req: AuthedRequest, res) => {
+  try {
+    const isDev = req.user!.role === 'dev';
+    if (!isDev) {
+      return res.status(403).json({ error: 'Forbidden: Only dev administrators can revoke staff access permissions.' });
+    }
+
+    const account: any = await prisma.smtpAccount.findUnique({ where: { id: req.params.id } });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const syncResult = revokeMailboxAcl(account.mailboxAcl, req.params.userId);
+
+    await (prisma.smtpAccount as any).update({
+      where: { id: account.id },
+      data: {
+        mailboxAcl: syncResult.mailboxAcl as any,
+        allowedAdminIds: syncResult.allowedAdminIds,
+      },
+    });
+
+    logger.info(
+      { mailboxId: account.id, devUser: req.user!.email, revokedUserId: req.params.userId },
+      'Dev revoked staff access from mailbox'
+    );
+
+    res.json({
+      ok: true,
+      message: 'Access revoked successfully',
+      mailboxAcl: syncResult.mailboxAcl,
+      allowedAdminIds: syncResult.allowedAdminIds,
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to revoke mailbox access');
+    res.status(500).json({ error: err.message || 'Failed to revoke access' });
+  }
+});
+
+/**
  * PATCH /api/email/mailboxes/:id/access
- * Dev/Admin endpoint to grant or modify admin delegation access (allowedAdminIds).
+ * Backward-compatible endpoint to grant or modify admin delegation access (allowedAdminIds).
  */
 const accessSchema = z.object({
   allowedAdminIds: z.array(z.string()),
@@ -866,6 +1025,196 @@ emailRouter.patch('/email/mailboxes/:id/access', async (req: AuthedRequest, res)
   } catch (err: any) {
     logger.error({ err }, 'Failed to update mailbox access delegation');
     res.status(500).json({ error: err.message || 'Failed to update delegation access' });
+  }
+});
+
+/**
+ * GET /api/email/mailboxes/:id/profile
+ * Get custom profile picture and info for a mailbox.
+ */
+emailRouter.get('/email/mailboxes/:id/profile', async (req: AuthedRequest, res) => {
+  try {
+    const account: any = await prisma.smtpAccount.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { displayName: true, email: true } } },
+    });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const check = canAccessMailbox(account, req.user!.id, req.user!.role, 'read');
+    if (!check.allowed) return res.status(403).json({ error: check.reason });
+
+    const profile = normalizeMailboxProfile(account.profileJson, account.user?.displayName, account.smtpUsername);
+    res.json({ ok: true, profile });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to get mailbox profile');
+    res.status(500).json({ error: err.message || 'Failed to get mailbox profile' });
+  }
+});
+
+/**
+ * PUT /api/email/mailboxes/:id/profile
+ * Update profile picture (avatarUrl), display name, and contact details for a mailbox.
+ * Allowed for mailbox owner, dev superuser, or staff with 'manage' permission.
+ */
+const updateProfileSchema = z.object({
+  avatarUrl: z.string().nullable().optional(),
+  displayName: z.string().max(100).nullable().optional(),
+  jobTitle: z.string().max(100).nullable().optional(),
+  company: z.string().max(100).nullable().optional(),
+  phone: z.string().max(40).nullable().optional(),
+  bio: z.string().max(500).nullable().optional(),
+  website: z.string().max(200).nullable().optional(),
+});
+
+emailRouter.put('/email/mailboxes/:id/profile', async (req: AuthedRequest, res) => {
+  try {
+    const account: any = await prisma.smtpAccount.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { displayName: true, email: true } } },
+    });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const check = canAccessMailbox(account, req.user!.id, req.user!.role, 'manage');
+    if (!check.allowed) return res.status(403).json({ error: check.reason });
+
+    const parse = updateProfileSchema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: 'Invalid profile data', details: parse.error.format() });
+
+    const currentProfile = normalizeMailboxProfile(account.profileJson, account.user?.displayName, account.smtpUsername);
+    const updatedProfileData = {
+      avatarUrl: parse.data.avatarUrl !== undefined ? parse.data.avatarUrl : currentProfile.avatarUrl,
+      displayName: parse.data.displayName !== undefined ? parse.data.displayName : currentProfile.displayName,
+      jobTitle: parse.data.jobTitle !== undefined ? parse.data.jobTitle : currentProfile.jobTitle,
+      company: parse.data.company !== undefined ? parse.data.company : currentProfile.company,
+      phone: parse.data.phone !== undefined ? parse.data.phone : currentProfile.phone,
+      bio: parse.data.bio !== undefined ? parse.data.bio : currentProfile.bio,
+      website: parse.data.website !== undefined ? parse.data.website : currentProfile.website,
+    };
+
+    const updated: any = await (prisma.smtpAccount as any).update({
+      where: { id: account.id },
+      data: { profileJson: updatedProfileData },
+    });
+
+    res.json({
+      ok: true,
+      message: 'Mailbox profile updated successfully',
+      profile: normalizeMailboxProfile(updated.profileJson, account.user?.displayName, account.smtpUsername),
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to update mailbox profile');
+    res.status(500).json({ error: err.message || 'Failed to update mailbox profile' });
+  }
+});
+
+/**
+ * POST /api/email/mailboxes/:id/avatar
+ * Upload and securely inspect a mailbox profile picture avatar.
+ * Enforces:
+ * 1. Authorization: Only mailbox owner, dev user, or staff with 'manage' permission
+ * 2. MIME type whitelist: image/jpeg, image/png, image/webp, image/gif
+ * 3. Binary magic bytes header inspection
+ * 4. Max file size: 5MB
+ * 5. Cryptographic filename randomization & safe path storage
+ * 6. Deletes previous uploaded avatar if any
+ */
+emailRouter.post('/email/mailboxes/:id/avatar', avatarUploadMiddleware, async (req: AuthedRequest, res) => {
+  try {
+    const account: any = await prisma.smtpAccount.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { displayName: true, email: true } } },
+    });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const check = canAccessMailbox(account, req.user!.id, req.user!.role, 'manage');
+    if (!check.allowed) return res.status(403).json({ error: check.reason });
+
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'No avatar image file provided in upload' });
+    }
+
+    // Security Check: Magic Bytes Verification
+    const validation = validateImageMagicBytes(req.file.buffer);
+    if (!validation.valid || !validation.format) {
+      return res.status(400).json({
+        error: validation.error || 'Security verification failed: Corrupt or invalid image file.',
+      });
+    }
+
+    // Delete old local avatar if previously set
+    const currentProfile = normalizeMailboxProfile(account.profileJson, account.user?.displayName, account.smtpUsername);
+    if (currentProfile.avatarUrl) {
+      await deleteLocalAvatarIfExists(currentProfile.avatarUrl);
+    }
+
+    // Persist to disk with cryptographically randomized filename
+    const { avatarUrl } = await saveMailboxAvatar(account.id, req.file.buffer);
+
+    const updatedProfile = {
+      ...currentProfile,
+      avatarUrl,
+    };
+
+    const updated: any = await (prisma.smtpAccount as any).update({
+      where: { id: account.id },
+      data: { profileJson: updatedProfile },
+    });
+
+    logger.info(
+      { mailboxId: account.id, user: req.user!.email, avatarUrl },
+      'Secure mailbox profile picture uploaded successfully'
+    );
+
+    res.json({
+      ok: true,
+      message: 'Profile picture uploaded and verified successfully',
+      avatarUrl,
+      profile: normalizeMailboxProfile(updated.profileJson, account.user?.displayName, account.smtpUsername),
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to upload mailbox avatar');
+    res.status(500).json({ error: err.message || 'Failed to upload profile picture' });
+  }
+});
+
+/**
+ * DELETE /api/email/mailboxes/:id/avatar
+ * Remove profile picture avatar for a mailbox.
+ */
+emailRouter.delete('/email/mailboxes/:id/avatar', async (req: AuthedRequest, res) => {
+  try {
+    const account: any = await prisma.smtpAccount.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { displayName: true, email: true } } },
+    });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const check = canAccessMailbox(account, req.user!.id, req.user!.role, 'manage');
+    if (!check.allowed) return res.status(403).json({ error: check.reason });
+
+    const currentProfile = normalizeMailboxProfile(account.profileJson, account.user?.displayName, account.smtpUsername);
+    if (currentProfile.avatarUrl) {
+      await deleteLocalAvatarIfExists(currentProfile.avatarUrl);
+    }
+
+    const updatedProfile = {
+      ...currentProfile,
+      avatarUrl: null,
+    };
+
+    const updated: any = await (prisma.smtpAccount as any).update({
+      where: { id: account.id },
+      data: { profileJson: updatedProfile },
+    });
+
+    res.json({
+      ok: true,
+      message: 'Profile picture removed successfully',
+      profile: normalizeMailboxProfile(updated.profileJson, account.user?.displayName, account.smtpUsername),
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to remove mailbox avatar');
+    res.status(500).json({ error: err.message || 'Failed to remove profile picture' });
   }
 });
 
@@ -1168,44 +1517,66 @@ const sendEmailSchema = z.object({
   to: z.string().email(),
   subject: z.string().min(1),
   body: z.string().min(1),
+  smtpAccountId: z.string().optional(),
 });
 
 emailRouter.post('/email/send', async (req: AuthedRequest, res) => {
   const parse = sendEmailSchema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: 'Invalid email data', details: parse.error.format() });
 
-  const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
-  let smtpAccount = await prisma.smtpAccount.findFirst({
-    where: { userId: req.user!.id },
-    orderBy: { createdAt: 'asc' },
-  });
+  const { from, to, subject, body, smtpAccountId } = parse.data;
+  const isDev = req.user!.role === 'dev';
 
-  if (!isStaff && !smtpAccount) {
-    return res.status(403).json({
-      error: 'You need an active SMTP Hosting subscription to send emails.',
-      purchaseRequired: true,
+  let smtpAccount: any = null;
+  if (smtpAccountId) {
+    smtpAccount = await prisma.smtpAccount.findUnique({ where: { id: smtpAccountId } });
+  } else {
+    const fromUsername = from.split('@')[0];
+    smtpAccount = await prisma.smtpAccount.findFirst({
+      where: {
+        OR: [
+          { smtpUsername: fromUsername },
+          { smtpUsername: from },
+          { userId: req.user!.id },
+          { allowedAdminIds: { has: req.user!.id } },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
     });
   }
 
-  if (smtpAccount && !isStaff) {
-    const isExpired = smtpAccount.expiresAt ? new Date(smtpAccount.expiresAt) < new Date() : false;
-    if (isExpired || smtpAccount.isSuspended) {
-      return res.status(403).json({
-        error: 'Your Business Email subscription has expired after the 1-month initial period. Please renew your subscription to continue sending emails.',
-        renewRequired: true,
-      });
+  if (smtpAccount) {
+    // Enforce write permissions (dev, owner, or staff granted write)
+    const accessCheck = canAccessMailbox(smtpAccount, req.user!.id, req.user!.role, 'write');
+    if (!accessCheck.allowed) {
+      return res.status(403).json({ error: accessCheck.reason });
     }
-  }
 
-  const { from, to, subject, body } = parse.data;
+    if (!isDev && !smtpAccount.isInternal) {
+      const isExpired = smtpAccount.expiresAt ? new Date(smtpAccount.expiresAt) < new Date() : false;
+      if (isExpired || smtpAccount.isSuspended) {
+        return res.status(403).json({
+          error: 'Your Business Email subscription has expired or is suspended. Please renew your subscription to continue sending emails.',
+          renewRequired: true,
+        });
+      }
+    }
+  } else if (!isDev && req.user!.role !== 'admin') {
+    return res.status(403).json({
+      error: 'You need an active SMTP Hosting subscription or delegated mailbox access to send emails.',
+      purchaseRequired: true,
+    });
+  }
 
   // Real SMTP Dispatch
   try {
     if (smtpAccount) {
       const password = decryptSecret(smtpAccount.credentialRef, env.secretsEncryptionKey);
+      const profile = normalizeMailboxProfile(smtpAccount.profileJson, undefined, smtpAccount.smtpUsername);
+      const senderDisplayName = profile.displayName || from.split('@')[0];
       await sendSmtpEmail(
         { host: smtpAccount.smtpHost, port: smtpAccount.smtpPort, user: smtpAccount.smtpUsername, pass: password },
-        { from: `"${from}" <${smtpAccount.smtpUsername}>`, to, subject, html: body }
+        { from: `"${senderDisplayName}" <${smtpAccount.smtpUsername}>`, to, subject, html: body }
       );
     } else {
       const globalConfig = await prisma.platformSmtpConfig.findUnique({ where: { id: 'global' } });

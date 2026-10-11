@@ -257,6 +257,37 @@ export const api = {
     websiteConnect: (id: string) =>
       apiFetch(`/api/email/mailboxes/${id}/website-connect`).then((r) => asJson<any>(r)),
     planQuotas: () => apiFetch('/api/email/plan-quotas').then((r) => asJson<any>(r)),
+    getMailboxAccess: (id: string) =>
+      apiFetch(`/api/email/mailboxes/${id}/access`).then((r) =>
+        asJson<{ ok: boolean; mailboxAcl: any[]; allowedAdminIds: string[]; staffUsers: any[] }>(r)
+      ),
+    grantMailboxAccess: (id: string, data: { userId: string; permissions: ('read' | 'write' | 'manage')[] }) =>
+      apiFetch(`/api/email/mailboxes/${id}/access`, { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ ok: boolean; message: string; mailboxAcl: any[]; allowedAdminIds: string[] }>(r)
+      ),
+    revokeMailboxAccess: (id: string, userId: string) =>
+      apiFetch(`/api/email/mailboxes/${id}/access/${userId}`, { method: 'DELETE' }).then((r) =>
+        asJson<{ ok: boolean; message: string; mailboxAcl: any[]; allowedAdminIds: string[] }>(r)
+      ),
+    getMailboxProfile: (id: string) =>
+      apiFetch(`/api/email/mailboxes/${id}/profile`).then((r) =>
+        asJson<{ ok: boolean; profile: any }>(r)
+      ),
+    updateMailboxProfile: (id: string, data: { avatarUrl?: string | null; displayName?: string | null; jobTitle?: string | null; company?: string | null; phone?: string | null; bio?: string | null; website?: string | null }) =>
+      apiFetch(`/api/email/mailboxes/${id}/profile`, { method: 'PUT', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ ok: boolean; message: string; profile: any }>(r)
+      ),
+    uploadMailboxAvatar: (id: string, file: File) => {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      return apiFetch(`/api/email/mailboxes/${id}/avatar`, { method: 'POST', body: formData }).then((r) =>
+        asJson<{ ok: boolean; message: string; avatarUrl: string; profile: any }>(r)
+      );
+    },
+    removeMailboxAvatar: (id: string) =>
+      apiFetch(`/api/email/mailboxes/${id}/avatar`, { method: 'DELETE' }).then((r) =>
+        asJson<{ ok: boolean; message: string; profile: any }>(r)
+      ),
     updateQuota: (id: string, storageQuotaMb: number) =>
       apiFetch(`/api/email/mailboxes/${id}/quota`, { method: 'PATCH', body: JSON.stringify({ storageQuotaMb }) }).then((r) => asJson<any>(r)),
     sendTransactional: (data: any) =>

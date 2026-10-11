@@ -5,7 +5,8 @@ import { api } from '@/lib/api';
 import {
   Settings, FileSignature, FileText, Sun, Ban, X, Trash2, Plus, Zap, HardDrive,
   MailCheck, ArrowUpCircle, CheckCircle2, ExternalLink, Globe, ShieldCheck, User,
-  Check, RefreshCw, Layers, Key, Upload, Image, Camera, Code, Copy, Send, Eye, EyeOff, Server
+  Check, RefreshCw, Layers, Key, Upload, Image, Camera, Code, Copy, Send, Eye, EyeOff, Server,
+  Briefcase, Building, Phone, UserCircle, AlertCircle, Sparkles
 } from 'lucide-react';
 
 export interface WebmailSettingsModalProps {
@@ -22,8 +23,16 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
   const [mailboxInfo, setMailboxInfo] = useState<any | null>(null);
 
   // Profile Tab State
+  const [allMailboxes, setAllMailboxes] = useState<any[]>(mailboxes || []);
+  const [profileMailboxId, setProfileMailboxId] = useState<string>(activeMailboxId || '');
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [jobTitle, setJobTitle] = useState('');
+  const [company, setCompany] = useState('');
+  const [phone, setPhone] = useState('');
+  const [bio, setBio] = useState('');
+  const [website, setWebsite] = useState('');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Website Connect Tab State
@@ -73,21 +82,54 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
     if (isOpen) {
       fetchAllSettings();
       api.email.mailboxes().then((r: any) => {
-        if (r.mailboxes && r.mailboxes.length > 0) {
-          const active = r.mailboxes.find((m: any) => m.id === activeMailboxId) || r.mailboxes[0];
+        const list = r.mailboxes || [];
+        setAllMailboxes(list);
+        if (list.length > 0) {
+          const active = list.find((m: any) => m.id === (profileMailboxId || activeMailboxId)) || list[0];
           setMailboxInfo(active);
+          setProfileMailboxId(active.id);
           setCustomDomainInput(active.customDomain || active.domain || 'shanutechx.com');
           setAliases(active.aliases || []);
-        }
-      }).catch(() => {});
-      api.me().then((r: any) => {
-        if (r.user) {
-          setDisplayName(r.user.displayName || '');
-          setAvatarUrl((r.user as any).avatarUrl || '');
+          loadMailboxProfile(active.id, active);
         }
       }).catch(() => {});
     }
   }, [isOpen, activeMailboxId]);
+
+  const loadMailboxProfile = async (mbId: string, initialMb?: any) => {
+    if (initialMb?.profile) {
+      setDisplayName(initialMb.profile.displayName || '');
+      setAvatarUrl(initialMb.profile.avatarUrl || '');
+      setJobTitle(initialMb.profile.jobTitle || '');
+      setCompany(initialMb.profile.company || '');
+      setPhone(initialMb.profile.phone || '');
+      setBio(initialMb.profile.bio || '');
+      setWebsite(initialMb.profile.website || '');
+    }
+    try {
+      const res = await api.email.getMailboxProfile(mbId);
+      if (res?.profile) {
+        setDisplayName(res.profile.displayName || '');
+        setAvatarUrl(res.profile.avatarUrl || '');
+        setJobTitle(res.profile.jobTitle || '');
+        setCompany(res.profile.company || '');
+        setPhone(res.profile.phone || '');
+        setBio(res.profile.bio || '');
+        setWebsite(res.profile.website || '');
+      }
+    } catch {}
+  };
+
+  const handleSelectProfileMailbox = (mbId: string) => {
+    setProfileMailboxId(mbId);
+    const found = allMailboxes.find((m: any) => m.id === mbId);
+    if (found) {
+      setMailboxInfo(found);
+      setCustomDomainInput(found.customDomain || found.domain || 'shanutechx.com');
+      setAliases(found.aliases || []);
+    }
+    loadMailboxProfile(mbId, found);
+  };
 
   const fetchAllSettings = () => {
     api.webmail.signatures.list().then((r: any) => setSignatures(r.signatures || [])).catch(() => {});
@@ -152,34 +194,96 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
 
   if (!isOpen) return null;
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast('Image size exceeds 5MB limit', 'error');
+    const allowedMime = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedMime.includes(file.type)) {
+      toast('Security restriction: Only JPG, PNG, WEBP, or GIF image files are allowed.', 'error');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        setAvatarUrl(result);
-        toast('Image loaded! Click "Save Profile Preferences" to apply.', 'success');
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Security restriction: File size exceeds 5MB limit.', 'error');
+      return;
+    }
+
+    const targetMbId = profileMailboxId || mailboxInfo?.id;
+    if (!targetMbId) {
+      toast('Please select an active mailbox first.', 'error');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const res = await api.email.uploadMailboxAvatar(targetMbId, file);
+      if (res.avatarUrl) {
+        setAvatarUrl(res.avatarUrl);
+        toast('Profile picture uploaded & binary magic bytes verified!', 'success');
+        setAllMailboxes((prev) =>
+          prev.map((m) =>
+            m.id === targetMbId ? { ...m, profile: { ...m.profile, avatarUrl: res.avatarUrl } } : m
+          )
+        );
+        onRefreshData?.();
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      toast(err.message || 'Avatar upload failed. Magic byte inspection rejected the file.', 'error');
+    } finally {
+      setIsUploadingAvatar(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    const targetMbId = profileMailboxId || mailboxInfo?.id;
+    if (!targetMbId) return;
+
+    try {
+      await api.email.removeMailboxAvatar(targetMbId);
+      setAvatarUrl('');
+      setAllMailboxes((prev) =>
+        prev.map((m) =>
+          m.id === targetMbId ? { ...m, profile: { ...m.profile, avatarUrl: null } } : m
+        )
+      );
+      toast('Profile picture removed', 'info');
+      onRefreshData?.();
+    } catch (err: any) {
+      toast(err.message || 'Failed to remove avatar', 'error');
+    }
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    const targetMbId = profileMailboxId || mailboxInfo?.id;
+    if (!targetMbId) {
+      toast('No active mailbox selected', 'error');
+      return;
+    }
+
     setIsSavingProfile(true);
     try {
-      await api.updateProfile({ displayName, avatarUrl });
-      toast('Profile preferences updated!', 'success');
-    } catch {
-      toast('Failed to update profile', 'error');
+      const updatedProfile = {
+        displayName: displayName.trim() || null,
+        avatarUrl: avatarUrl.trim() || null,
+        jobTitle: jobTitle.trim() || null,
+        company: company.trim() || null,
+        phone: phone.trim() || null,
+        bio: bio.trim() || null,
+        website: website.trim() || null,
+      };
+      await api.email.updateMailboxProfile(targetMbId, updatedProfile);
+      setAllMailboxes((prev) =>
+        prev.map((m) =>
+          m.id === targetMbId ? { ...m, profile: updatedProfile } : m
+        )
+      );
+      toast('Mailbox profile preferences saved successfully!', 'success');
+      onRefreshData?.();
+    } catch (err: any) {
+      toast(err.message || 'Failed to update mailbox profile', 'error');
     } finally {
       setIsSavingProfile(false);
     }
@@ -321,86 +425,256 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
 
         {/* TAB 0: PROFILE & AVATAR */}
         {activeSubTab === 'profile' && (
-          <form onSubmit={handleSaveProfile} className="space-y-4 text-xs">
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-4">
-              <h4 className="font-bold text-indigo-400 flex items-center gap-2">
-                <User className="h-4 w-4" /> Account Profile & Avatar
-              </h4>
+          <form onSubmit={handleSaveProfile} className="space-y-5 text-xs max-h-[65vh] overflow-y-auto pr-1">
+            {/* Mailbox Selector */}
+            {allMailboxes.length > 1 && (
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
+                <label className="text-slate-300 font-bold block flex items-center gap-1.5">
+                  <UserCircle className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Configuring Mailbox Profile</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {allMailboxes.map((mb) => (
+                    <button
+                      type="button"
+                      key={mb.id}
+                      onClick={() => handleSelectProfileMailbox(mb.id)}
+                      className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                        profileMailboxId === mb.id
+                          ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-md'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="min-w-0 pr-2">
+                        <span className="font-mono font-bold text-xs block truncate">{mb.email}</span>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          {mb.profile?.displayName || mb.username}
+                        </span>
+                      </div>
+                      {profileMailboxId === mb.id && <Check className="w-4 h-4 text-indigo-400 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white text-lg font-bold shadow-lg border border-indigo-500/30 overflow-hidden">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    (displayName || 'U').slice(0, 2).toUpperCase()
+            {/* Profile Avatar Card */}
+            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-indigo-400 flex items-center gap-2">
+                  <User className="h-4 w-4" /> Mailbox Profile Picture & Branding
+                </h4>
+                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>Magic Byte Verification</span>
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Configure your custom avatar picture and contact information for <span className="font-mono text-indigo-300 font-bold">{mailboxInfo?.email || 'this mailbox'}</span>. Outbound emails will use this display name and branding.
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 pt-1">
+                {/* Avatar Display */}
+                <div className="relative group shrink-0">
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white text-2xl font-black shadow-xl border-2 border-indigo-500/40 overflow-hidden">
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      (displayName || mailboxInfo?.username || 'U').slice(0, 2).toUpperCase()
+                    )}
+                  </div>
+                  {isUploadingAvatar && (
+                    <div className="absolute inset-0 bg-slate-950/80 rounded-2xl flex items-center justify-center">
+                      <RefreshCw className="w-6 h-6 text-indigo-400 animate-spin" />
+                    </div>
                   )}
                 </div>
-                <div className="flex-1 space-y-1">
-                  <span className="text-white font-bold text-sm">{displayName || 'Webmail User'}</span>
-                  <p className="text-[11px] text-slate-400">Custom avatar and profile initials displayed in webmail communications</p>
-                </div>
-              </div>
 
-              <div>
-                <label className="text-slate-400 block mb-1">Display Name</label>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="e.g. Sarah Connor"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
-                />
-              </div>
+                {/* Upload & Security Controls */}
+                <div className="flex-1 space-y-3 w-full">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <label className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md flex items-center gap-2">
+                      {isUploadingAvatar ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="w-3.5 h-3.5" />
+                      )}
+                      <span>{isUploadingAvatar ? 'Scanning & Uploading...' : 'Upload Picture'}</span>
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp, image/gif"
+                        disabled={isUploadingAvatar}
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                    </label>
 
-              <div>
-                <label className="text-slate-400 block mb-1 font-semibold">Profile Avatar Picture</label>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  {/* Upload File Button */}
-                  <label className="flex-1 flex items-center justify-center gap-2 p-2.5 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-800/60 text-slate-200 rounded-xl text-xs font-semibold cursor-pointer transition-all shadow-sm">
-                    <Upload className="w-4 h-4 text-indigo-400" />
-                    <span>Upload Image File</span>
-                    <input
-                      type="file"
-                      accept="image/png, image/jpeg, image/webp, image/gif, image/svg+xml"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                  </label>
-
-                  {/* Or divider */}
-                  <span className="text-[10px] text-slate-500 text-center font-bold uppercase px-1">OR</span>
-
-                  {/* Image URL Input */}
-                  <div className="flex-[2] relative">
-                    <input
-                      type="url"
-                      value={avatarUrl}
-                      onChange={(e) => setAvatarUrl(e.target.value)}
-                      placeholder="Paste image URL (https://...)"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 pr-8 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/60"
-                    />
                     {avatarUrl && (
                       <button
                         type="button"
-                        onClick={() => setAvatarUrl('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-400 p-0.5"
-                        title="Remove avatar image"
+                        onClick={handleRemoveAvatar}
+                        className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Remove Picture</span>
                       </button>
                     )}
                   </div>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-1">Supports PNG, JPEG, WEBP, GIF, or SVG images (Max 5MB)</p>
-              </div>
 
+                  <div className="bg-slate-900/80 border border-slate-800/80 rounded-xl p-2.5 text-[11px] text-slate-400 space-y-1">
+                    <div className="flex items-center gap-1.5 text-slate-300 font-semibold">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Security & Integrity Guard</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      Files are cryptographically sanitized and validated via binary magic bytes (JPEG, PNG, WebP, GIF only). Executables, shell scripts, SVGs, and files exceeding 5MB are strictly rejected.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Profile Fields Grid */}
+            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+              <h4 className="font-bold text-slate-200 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-purple-400" /> Profile Information & RFC 5322 From Header
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Display Name */}
+                <div className="sm:col-span-2">
+                  <label className="text-slate-300 font-bold block mb-1">
+                    Display Name <span className="text-indigo-400 font-normal">(Sender name seen by email recipients)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="e.g. Sarah Connor"
+                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
+                  />
+                </div>
+
+                {/* Job Title */}
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1 flex items-center gap-1">
+                    <Briefcase className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Job Title / Designation</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={jobTitle}
+                    onChange={(e) => setJobTitle(e.target.value)}
+                    placeholder="e.g. Principal Cloud Architect"
+                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
+                  />
+                </div>
+
+                {/* Company */}
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1 flex items-center gap-1">
+                    <Building className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Company / Organization</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    placeholder="e.g. ShanuTechX Global Corp"
+                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1 flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Direct Phone Number</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="e.g. +1 555-0199"
+                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
+                  />
+                </div>
+
+                {/* Website */}
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1 flex items-center gap-1">
+                    <Globe className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Website URL</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="e.g. https://shanutechx.com"
+                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
+                  />
+                </div>
+
+                {/* Bio / Signature Note */}
+                <div className="sm:col-span-2">
+                  <label className="text-slate-300 font-bold block mb-1 flex items-center gap-1">
+                    <FileText className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Bio / Professional Tagline</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder="e.g. Leading enterprise cloud modernization & resilient container orchestration."
+                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Live Recipient Email Header Preview */}
+            <div className="bg-gradient-to-r from-slate-950 to-indigo-950/40 p-4 rounded-2xl border border-indigo-500/30 space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400 block flex items-center gap-1.5">
+                <Eye className="w-3 h-3" />
+                <span>Live Recipient Email Header Preview</span>
+              </span>
+
+              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden shrink-0 border border-indigo-500/30 shadow">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    (displayName || mailboxInfo?.username || 'U').slice(0, 2).toUpperCase()
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-xs text-white truncate">
+                      {displayName || mailboxInfo?.username || 'Sender Display Name'}
+                    </span>
+                    <span className="font-mono text-[11px] text-slate-400 truncate">
+                      &lt;{mailboxInfo?.email || 'user@shanutechx.com'}&gt;
+                    </span>
+                  </div>
+                  {(jobTitle || company) && (
+                    <span className="text-[10px] text-indigo-300 block truncate mt-0.5">
+                      {jobTitle} {company ? `• ${company}` : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="flex justify-end pt-1">
               <button
                 type="submit"
                 disabled={isSavingProfile}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow flex items-center gap-2 disabled:opacity-50"
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/20 flex items-center gap-2 disabled:opacity-50 transition-all text-xs"
               >
-                {isSavingProfile ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                <span>Save Profile Preferences</span>
+                {isSavingProfile ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                <span>Save Mailbox Profile Preferences</span>
               </button>
             </div>
           </form>

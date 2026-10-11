@@ -15,8 +15,9 @@ async function getIdToken(): Promise<string | null> {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = await getIdToken();
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers as Record<string, string>),
   };
 
@@ -54,6 +55,21 @@ export const api = {
     credentials: (id: string) => request<any>(`/email/mailboxes/${id}/credentials`),
     websiteConnect: (id: string) => request<any>(`/email/mailboxes/${id}/website-connect`),
     planQuotas: () => request<any>('/email/plan-quotas'),
+    getMailboxAccess: (id: string) => request<any>(`/email/mailboxes/${id}/access`),
+    grantMailboxAccess: (id: string, data: { userId: string; permissions: string[] }) =>
+      request<any>(`/email/mailboxes/${id}/access`, { method: 'POST', body: JSON.stringify(data) }),
+    revokeMailboxAccess: (id: string, userId: string) =>
+      request<any>(`/email/mailboxes/${id}/access/${userId}`, { method: 'DELETE' }),
+    getMailboxProfile: (id: string) => request<any>(`/email/mailboxes/${id}/profile`),
+    updateMailboxProfile: (id: string, data: any) =>
+      request<any>(`/email/mailboxes/${id}/profile`, { method: 'PUT', body: JSON.stringify(data) }),
+    uploadMailboxAvatar: (id: string, file: File) => {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      return request<any>(`/email/mailboxes/${id}/avatar`, { method: 'POST', body: formData });
+    },
+    removeMailboxAvatar: (id: string) =>
+      request<any>(`/email/mailboxes/${id}/avatar`, { method: 'DELETE' }),
     updateQuota: (id: string, storageQuotaMb: number) => request<any>(`/email/mailboxes/${id}/quota`, { method: 'PATCH', body: JSON.stringify({ storageQuotaMb }) }),
     sendTransactional: (data: any) => request<any>('/v1/emails', { method: 'POST', body: JSON.stringify(data) }),
     domains: () => request<any>('/email/domains'),

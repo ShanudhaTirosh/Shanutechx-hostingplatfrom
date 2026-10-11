@@ -995,6 +995,8 @@ model SmtpAccount {
   maxAliases      Int      @default(10)
   planTier        String   @default("pro")
   allowedAdminIds String[] @default([]) // Dev-assigned admin user IDs allowed to read/write/send via this mailbox
+  mailboxAcl      Json?    // Granular ACL: [{ userId, userEmail, userName, role, permissions: ['read', 'write', 'manage'], grantedAt, grantedBy }]
+  profileJson     Json?    // Per-mailbox profile: { avatarUrl, displayName, jobTitle, company, phone, bio, website }
 
   mailHostId        String?
   mailHost          MailHost?        @relation(fields: [mailHostId], references: [id])
