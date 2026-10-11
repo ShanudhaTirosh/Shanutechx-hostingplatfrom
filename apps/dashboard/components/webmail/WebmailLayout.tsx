@@ -152,8 +152,12 @@ export function WebmailLayout({
       {/* ─── COL 1: Icon Rail (60px) ─── */}
       <aside className="flex flex-col items-center py-3 gap-1 w-[60px] shrink-0 bg-[#13131a] border-r border-white/5 z-20">
         {/* Logo */}
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white font-extrabold text-xs shadow-lg shadow-violet-500/30 mb-2 shrink-0">
-          STX
+        <div className="w-9 h-9 rounded-xl bg-white/10 p-1.5 flex items-center justify-center border border-white/10 shadow-lg shadow-violet-500/20 mb-2 shrink-0 backdrop-blur-sm">
+          <img
+            src="/STX.png"
+            alt="STX"
+            className="w-full h-full object-contain filter brightness-0 invert"
+          />
         </div>
 
         {/* Nav Tabs */}

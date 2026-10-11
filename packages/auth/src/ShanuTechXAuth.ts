@@ -97,10 +97,30 @@ export class ShanuTechXAuth {
   }
 
   /**
+   * Login with a Firebase OAuth ID token.
+   * Stores the token, updates the client, fires auth change listeners.
+   */
+  async loginWithOAuth(idToken: string, provider?: 'google' | 'github' | 'discord'): Promise<AuthSession> {
+    const session = await this.client.loginWithOAuth(idToken, provider);
+    this._applySession(session);
+    return session;
+  }
+
+  /**
    * Register a new account and immediately log in.
    */
   async register(email: string, password: string, name?: string): Promise<AuthSession> {
     const session = await this.client.auth.register({ email, password, name } as RegisterInput);
+    this._applySession(session);
+    return session;
+  }
+
+  /**
+   * Register with a Firebase OAuth ID token.
+   * Stores the token, updates the client, fires auth change listeners.
+   */
+  async registerWithOAuth(idToken: string, provider?: 'google' | 'github' | 'discord'): Promise<AuthSession> {
+    const session = await this.client.registerWithOAuth(idToken, provider);
     this._applySession(session);
     return session;
   }

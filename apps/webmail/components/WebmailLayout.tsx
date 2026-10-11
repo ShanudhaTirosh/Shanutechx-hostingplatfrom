@@ -341,8 +341,12 @@ export const WebmailLayout: React.FC = () => {
       <header className="h-14 bg-slate-900 border-b border-slate-800/80 px-4 flex items-center justify-between z-30 shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-indigo-600/20">
-              <Sparkles className="w-4 h-4 fill-white/20" />
+            <div className="w-8 h-8 rounded-xl bg-white/10 p-1 flex items-center justify-center border border-white/10 shadow-lg shadow-indigo-600/20 backdrop-blur-sm">
+              <img
+                src="/STX.png"
+                alt="ShanuTechX"
+                className="w-full h-full object-contain filter brightness-0 invert"
+              />
             </div>
             <span className="font-bold text-sm tracking-tight text-slate-100 hidden sm:inline">
               ShanuTechX <span className="text-indigo-400 font-medium">Webmail</span>

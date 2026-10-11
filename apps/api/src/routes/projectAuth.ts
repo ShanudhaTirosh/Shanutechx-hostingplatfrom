@@ -3,6 +3,7 @@ import { z } from 'zod';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
+import { canAccessResource } from '../middleware/rbac';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { env } from '../env';
 import { sendSmtpEmail } from '../lib/smtpDispatcher';
@@ -364,7 +365,19 @@ const oauthConfigSchema = z.object({
   redirectUri: z.string().url(),
 });
 
+async function resolveProjectAuthAccess(projectId: string, req: AuthedRequest) {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) return null;
+  if (req.user?.role !== 'dev' && !(await canAccessResource(project.userId, req))) {
+    return null;
+  }
+  return project;
+}
+
 projectAuthRouter.post('/projects/:id/auth/oauth-config', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res) => {
+  const project = await resolveProjectAuthAccess(req.params.id, req);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+
   const parsed = oauthConfigSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -389,6 +402,9 @@ projectAuthRouter.post('/projects/:id/auth/oauth-config', requireAuth, requireAd
 });
 
 projectAuthRouter.get('/projects/:id/auth/oauth-config', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res) => {
+  const project = await resolveProjectAuthAccess(req.params.id, req);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+
   const configs = await prisma.projectOAuthConfig.findMany({
     where: { projectId: req.params.id },
     select: { id: true, provider: true, clientId: true, redirectUri: true },
@@ -397,6 +413,9 @@ projectAuthRouter.get('/projects/:id/auth/oauth-config', requireAuth, requireAdm
 });
 
 projectAuthRouter.get('/projects/:id/auth/users', requireAuth, requireAdminOrDev, async (req: AuthedRequest, res) => {
+  const project = await resolveProjectAuthAccess(req.params.id, req);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+
   const users = await prisma.projectAuthUser.findMany({
     where: { projectId: req.params.id },
     select: { id: true, email: true, emailVerified: true, createdAt: true, lastLoginAt: true },

@@ -592,6 +592,9 @@ teamsRouter.delete('/teams/:id/members/:memberId', async (req: AuthedRequest, re
 
   const member = await prisma.teamMember.findUnique({ where: { id: memberId } });
   if (!member) return res.status(404).json({ error: 'Member not found' });
+  if (member.teamId !== teamId) {
+    return res.status(404).json({ error: 'Member not found in this team' });
+  }
 
   const isOwner = team.ownerId === userId;
   const isSelf = member.userId === userId;

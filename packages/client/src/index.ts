@@ -122,6 +122,26 @@ export class ShanuTechXClient extends BaseClient {
     this.setToken(session.token);
     return session;
   }
+
+  /**
+   * Convenience: login with a verified Firebase OAuth ID token.
+   * @returns The full auth session (token + user)
+   */
+  async loginWithOAuth(idToken: string, provider?: 'google' | 'github' | 'discord') {
+    const session = await this.auth.loginWithOAuth(idToken, provider);
+    this.setToken(session.token);
+    return session;
+  }
+
+  /**
+   * Convenience: register with a verified Firebase OAuth ID token.
+   * @returns The full auth session (token + user)
+   */
+  async registerWithOAuth(idToken: string, provider?: 'google' | 'github' | 'discord') {
+    const session = await this.auth.registerWithOAuth(idToken, provider);
+    this.setToken(session.token);
+    return session;
+  }
 }
 
 // Named exports for tree-shaking / direct sub-resource imports

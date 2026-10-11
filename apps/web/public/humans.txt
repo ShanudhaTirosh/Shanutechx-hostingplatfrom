@@ -1,0 +1,22 @@
+/* TEAM */
+Founder & Lead System Architect: Tirosh Shanudha
+Contact: support@shanutechx.com
+Security: security@shanutechx.com
+Website: https://shanutechx.com
+Location: Sri Lanka
+
+/* THANKS */
+The Global Open Source Ecosystem
+Docker, Node.js, Next.js, React, Tailwind CSS, Prisma, PostgreSQL, Redis, BullMQ, Traefik, Let's Encrypt, Cloudflare
+
+/* SITE & INFRASTRUCTURE */
+Last update: 2026/10/11
+Language: English, Sinhala
+Standards: HTML5, CSS3, ES2024, TypeScript, Next.js 14 App Router, REST, WebSockets, RFC 9116, RFC 8461
+Components: Tailwind CSS, Geist Fonts, Lucide Icons, Framer Motion
+Backend: Node.js 20, Express, Prisma ORM, BullMQ Worker, PostgreSQL 16
+Orchestration: Autonomous Docker Engine, Node Agent RPC, Traefik Edge Routing
+Storage: Cloudflare R2 Encrypted Snapshots
+Live Streaming: LiveKit WebRTC SFU
+Domain & DNS: Cloudflare Automated DNS Records
+Platform: ShanuTechX Autonomous Enterprise Cloud Hosting Platform

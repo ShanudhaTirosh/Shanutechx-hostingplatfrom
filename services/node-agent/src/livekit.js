@@ -26,23 +26,48 @@ const DEFAULT_CONFIG = {
  * a line — a naive append would land outside the `keys:` block and produce
  * a config LiveKit can't parse.
  */
+let lockPromise = Promise.resolve();
+
 async function addKey(apiKey, apiSecret) {
-  let config;
-  try {
-    const existing = await fs.readFile(CONFIG_FILE, 'utf-8');
-    config = yaml.load(existing) || {};
-  } catch (err) {
-    if (err.code !== 'ENOENT') throw err;
-    config = { ...DEFAULT_CONFIG };
-  }
+  return (lockPromise = lockPromise.then(async () => {
+    let config;
+    try {
+      const existing = await fs.readFile(CONFIG_FILE, 'utf-8');
+      config = yaml.load(existing) || {};
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err;
+      config = { ...DEFAULT_CONFIG };
+    }
 
-  config.keys = config.keys || {};
-  config.keys[apiKey] = apiSecret;
+    config.keys = config.keys || {};
+    config.keys[apiKey] = apiSecret;
 
-  await fs.writeFile(CONFIG_FILE, yaml.dump(config), 'utf-8');
+    await fs.writeFile(CONFIG_FILE, yaml.dump(config), 'utf-8');
 
-  const container = docker.getContainer(LIVEKIT_CONTAINER_NAME);
-  await container.restart();
+    const container = docker.getContainer(LIVEKIT_CONTAINER_NAME);
+    await container.restart().catch((err) => {
+      console.warn('[node-agent:livekit] Container restart error after addKey:', err.message || err);
+    });
+  }));
 }
 
-module.exports = { addKey, CONFIG_FILE };
+async function removeKey(apiKey) {
+  return (lockPromise = lockPromise.then(async () => {
+    try {
+      const existing = await fs.readFile(CONFIG_FILE, 'utf-8');
+      const config = yaml.load(existing) || {};
+      if (config.keys && config.keys[apiKey]) {
+        delete config.keys[apiKey];
+        await fs.writeFile(CONFIG_FILE, yaml.dump(config), 'utf-8');
+        const container = docker.getContainer(LIVEKIT_CONTAINER_NAME);
+        await container.restart().catch((err) => {
+          console.warn('[node-agent:livekit] Container restart error after removeKey:', err.message || err);
+        });
+      }
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err;
+    }
+  }));
+}
+
+module.exports = { addKey, removeKey, CONFIG_FILE };

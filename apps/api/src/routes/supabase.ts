@@ -183,7 +183,9 @@ async function resolveProjectContext(req: AuthedRequest): Promise<{
     project = await prisma.supabaseClientProject.findUnique({ where: { id: projectId } });
   }
   if (!project) {
-    project = await prisma.supabaseClientProject.findFirst({ orderBy: { createdAt: 'desc' } });
+    const err: any = new Error('Project ID is required and was not specified or project not found');
+    err.status = 400;
+    throw err;
   }
 
   let nodeIp = project?.nodeIp || null;
@@ -1336,13 +1338,7 @@ supabaseRouter.post('/supabase/storage/buckets', requireAuth, requireDev, async 
   }, ctx.serviceKey);
 
   if (!result.ok) {
-    const newBucket = {
-      id,
-      name,
-      public: !!isPublic,
-      created_at: new Date().toISOString(),
-    };
-    return res.status(201).json(newBucket);
+    return res.status(result.status || 502).json({ error: result.error || 'Failed to create storage bucket' });
   }
   res.status(201).json(result.data);
 });
@@ -1460,9 +1456,16 @@ supabaseRouter.get('/supabase/advisors', requireAuth, requireDev, async (req: Au
   let isFallback = true;
 
   try {
-    const unsecureTables: any = await prisma.$queryRawUnsafe(
-      `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND rowsecurity = false;`
+    const ctx = await resolveProjectContext(req);
+    const metaRes = await fetchJson(
+      `${ctx.metaUrl}/query`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ query: `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND rowsecurity = false;` }),
+      },
+      ctx.serviceKey
     );
+    const unsecureTables = metaRes.ok && Array.isArray(metaRes.data) ? metaRes.data : null;
     if (Array.isArray(unsecureTables)) {
       isFallback = false;
       if (unsecureTables.length > 0) {
@@ -1510,9 +1513,16 @@ supabaseRouter.get('/supabase/observability', requireAuth, requireDev, async (_r
   let isFallback = true;
 
   try {
-    const stats: any = await prisma.$queryRawUnsafe(
-      `SELECT numbackends, blks_hit, blks_read FROM pg_stat_database WHERE datname = current_database();`
+    const ctx = await resolveProjectContext(_req);
+    const statsRes = await fetchJson(
+      `${ctx.metaUrl}/query`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ query: `SELECT numbackends, blks_hit, blks_read FROM pg_stat_database WHERE datname = current_database();` }),
+      },
+      ctx.serviceKey
     );
+    const stats = statsRes.ok && Array.isArray(statsRes.data) ? statsRes.data : null;
     if (Array.isArray(stats) && stats[0]) {
       isFallback = false;
       activeConns = Number(stats[0].numbackends) || activeConns;

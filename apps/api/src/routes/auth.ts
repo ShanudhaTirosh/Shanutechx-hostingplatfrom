@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
+import { authRateLimiter } from '../middleware/rateLimit';
 import { generateApiKey, hashApiKey } from '../lib/apiKeys';
 import { sendWelcomeNotification } from '../lib/notifications';
 import { firebaseAuth } from '../lib/firebaseAdmin';
@@ -33,7 +34,7 @@ async function verifyIdToken(idToken: string) {
  * firebaseAuth.verifyIdToken(). Only the verified email from the decoded
  * token is used for user lookup — client-supplied email is ignored.
  */
-authRouter.post('/auth/login', async (req, res) => {
+authRouter.post('/auth/login', authRateLimiter, async (req, res) => {
   const { idToken, provider } = req.body || {};
 
   // Require a real Firebase ID token
@@ -155,7 +156,7 @@ authRouter.post('/auth/login', async (req, res) => {
  * If an account already exists with a *different* firebaseUid, the request
  * is rejected with 409 to prevent identity hijacking.
  */
-authRouter.post('/auth/register', async (req, res) => {
+authRouter.post('/auth/register', authRateLimiter, async (req, res) => {
   const { idToken, provider } = req.body || {};
 
   if (!idToken) {

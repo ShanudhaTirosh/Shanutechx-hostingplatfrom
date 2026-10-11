@@ -7,7 +7,7 @@ import { ownedResourceWhere, canAccessResource } from '../middleware/rbac';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { generateLiveKitKeyPair, createRoomAccessToken } from '../lib/livekit';
 import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
-import { registerLiveKitKey } from '../lib/nodeAgentClient';
+import { registerLiveKitKey, revokeLiveKitKey } from '../lib/nodeAgentClient';
 import { logger } from '../lib/logger';
 
 export const livekitRouter = Router();
@@ -91,9 +91,8 @@ const tokenSchema = z.object({
 
 livekitRouter.post('/livekit/projects/:id/token', async (req: AuthedRequest, res) => {
   const project = await prisma.liveKitProject.findUnique({ where: { id: req.params.id } });
-  if (!project) return res.status(404).json({ error: 'Project not found' });
-  if (!project.isActive) {
-    return res.status(403).json({ error: 'Cannot generate tokens for a deactivated LiveKit project' });
+  if (!project || !project.isActive) {
+    return res.status(404).json({ error: 'Project not found or deactivated' });
   }
   if (!(await canAccessResource(project.userId, req))) {
     return res.status(404).json({ error: 'Project not found' });
@@ -122,7 +121,9 @@ livekitRouter.post('/livekit/projects/:id/token', async (req: AuthedRequest, res
  * Deprovision a LiveKit project record
  */
 livekitRouter.delete('/livekit/projects/:id', async (req: AuthedRequest, res) => {
-  const project = await prisma.liveKitProject.findUnique({ where: { id: req.params.id } });
+  const project = await prisma.liveKitProject.findUnique({
+    where: { id: req.params.id },
+  });
   if (!project) return res.status(404).json({ error: 'Project not found' });
   if (!(await canAccessResource(project.userId, req))) {
     return res.status(404).json({ error: 'Project not found' });
@@ -132,6 +133,17 @@ livekitRouter.delete('/livekit/projects/:id', async (req: AuthedRequest, res) =>
     where: { id: project.id },
     data: { isActive: false },
   });
+
+  if (project.nodeId) {
+    const node = await prisma.node.findUnique({ where: { id: project.nodeId } });
+    if (node) {
+      try {
+        await revokeLiveKitKey(node, project.apiKey);
+      } catch (err) {
+        logger.error({ projectId: project.id, err }, 'Failed to revoke LiveKit key on node during project deprovisioning');
+      }
+    }
+  }
 
   await prisma.auditLog.create({
     data: { adminId: req.user!.id, action: 'livekit.delete_project', target: project.id },

@@ -1,24 +1,53 @@
-# SHANUTECHX
+# ShanuTechX (STX HOSTING)
 
-> Web, Node.js, Python, and Discord bot hosting platform targeting Sri Lankan
-> customers. Provides managed hosting, VPS reselling, SMTP, LiveKit
-> audio/video, and related developer services.
+> Autonomous Enterprise Cloud Platform & High-Performance Hosting Engine. Deploy NVMe Cloud VPS, Node.js & Python container backends, 24/7 Discord bots, managed databases, V2Ray VPN proxies, and one-click Docker applications in seconds.
 
-## What this site is
+## About the Business
 
-- Marketing site for the SHANUTECHX hosting platform
-- Pricing, service catalog, FAQ, terms, and privacy policy
+ShanuTechX is an autonomous cloud-hosting platform and container orchestration provider. We bridge global enterprise cloud infrastructure with accessible regional pricing, offering full support for Sri Lankan Rupee (LKR) payments (local bank transfers with automated slip approval) alongside international cards and cryptocurrency.
 
-## What this site is not
+## Core Products & Services
 
-- The platform itself (that's at app.shanutechx.com — auth required)
-- An API (the API is at api.shanutechx.com — auth required)
+- [Cloud VPS Hosting](https://shanutechx.com/vps): High-performance KVM virtual private servers with enterprise NVMe storage, 1Gbps-10Gbps uplinks, DDoS protection, and automated instant provisioning across global regions.
+- [App Container Hosting](https://shanutechx.com/app-hosting): Zero-configuration container runtime for Node.js, Python, Bun, Go, Rust, and Docker apps. Features automatic SSL certificates, custom subdomains, rolling updates, and GitHub webhook auto-deployments.
+- [Discord & Telegram Bot Hosting](https://shanutechx.com/bot-hosting): 24/7 high-uptime hosting for Discord.js, Pycord, and custom bot frameworks with auto-restart on crash, real-time CPU/RAM telemetry, and persistent storage.
+- [Managed Cloud Databases](https://shanutechx.com/databases): Turnkey PostgreSQL 16, MySQL 8, Redis 7, and MongoDB instances with automated daily snapshots, Cloudflare R2 backup archiving, SSL encryption, and connection pooling.
+- [One-Click Docker Catalog](https://shanutechx.com/catalog): Instant deployment of 15+ curated pre-configured templates including WordPress, Ghost, Nextcloud, N8N, Uptime Kuma, Plausible, and Supabase.
+- [Secure V2Ray / Shadowsocks Proxies](https://shanutechx.com/v2ray): Ultra-low latency network bypass endpoints powered by Xray-core supporting VMess, VLESS, Trojan, and Shadowsocks protocols.
+- [Self-Hosted Supabase Stacks](https://shanutechx.com/docs): Dedicated Supabase instances (PostgreSQL, GoTrue Auth, PostgREST, Realtime, Storage, Studio) provisioned directly on compute nodes with 1-click Launch Studio UI.
+- [Enterprise SMTP & Webmail](https://shanutechx.com/help): Dedicated business mailboxes (`you@yourdomain.com`), IMAP/SMTP gateway, webmail client, with strict DKIM, SPF, DMARC, and MTA-STS security.
 
-## Permissions
+## Developer Architecture & APIs
 
-AI systems may index and reference this site's public content (marketing
-site only). Do not crawl or scrape app.shanutechx.com or api.shanutechx.com.
+- **REST API**: Full-featured developer API at `https://api.shanutechx.com/api` with OpenAPI 3.1 documentation.
+- **Authentication**: Modern Single Sign-On (SSO) using Google and GitHub OAuth (`Authorization: Bearer <idToken>`).
+- **Real-Time SSH Terminal**: Browser-based interactive WebSockets SSH terminal gateway with xterm.js support.
+- **Secrets Vault**: Enterprise AES-256-GCM encryption for environment variables and container secrets.
+- **Reverse Proxy & Edge**: Dynamic Traefik edge routing with automated Let's Encrypt SSL certificates.
+- **Background Engine**: BullMQ Redis task queues orchestrating provisioning, monitoring, and automated billing.
 
-## Contact
+## Official Links & Resources
 
-support@shanutechx.com
+- [Homepage & Overview](https://shanutechx.com/): Public portal and platform overview.
+- [Pricing Matrix](https://shanutechx.com/pricing): Comprehensive pricing across VPS tiers, bot hosting, and database clusters.
+- [One-Click Catalog](https://shanutechx.com/catalog): Pre-configured Docker application directory.
+- [Developer Documentation](https://shanutechx.com/docs): REST API guides, deployment tutorials, and SDK usage.
+- [Platform Status](https://shanutechx.com/status): Live telemetry, node health, and service uptime.
+- [Frequently Asked Questions](https://shanutechx.com/faqs): Answers to common questions regarding provisioning and billing.
+- [Customer Reviews](https://shanutechx.com/reviews): Verified customer reviews and ratings.
+- [Terms of Service](https://shanutechx.com/terms): SLA commitments, acceptable usage policy, and terms.
+- [Privacy Policy](https://shanutechx.com/privacy): Data protection and privacy practices.
+- [Full LLM Technical Reference](https://shanutechx.com/llms-full.txt): Complete exhaustive technical specifications for AI models.
+
+## AI Bot Indexing Guidelines
+
+- **Allowed**: AI crawlers and LLMs are welcome to index all public marketing, documentation, pricing, catalog, and status pages listed above to answer queries about ShanuTechX services.
+- **Disallowed**: Automated crawling of customer control panels (`/dashboard`), authenticated APIs (`/api`), login portals, or user data vaults is strictly prohibited.
+- **Safe Harbor & Security**: Please review [RFC 9116 Security Policy](https://shanutechx.com/.well-known/security.txt) for vulnerability disclosures.
+
+## Contact & Support
+
+- Support Email: support@shanutechx.com
+- Security Reports: security@shanutechx.com
+- Community Discord: https://discord.gg/shanutechx
+- WhatsApp Support: Available via platform dashboard for active subscribers

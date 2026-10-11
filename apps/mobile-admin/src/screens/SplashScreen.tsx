@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -35,9 +35,13 @@ export function SplashScreen() {
   return (
     <LinearGradient colors={[colors.bgBase, '#14101f', colors.bgBase]} style={styles.container}>
       <Animated.View style={{ transform: [{ scale }], opacity, alignItems: 'center' }}>
-        <LinearGradient colors={[colors.primary, colors.cyan]} style={styles.logo}>
-          <Text style={styles.logoText}>S</Text>
-        </LinearGradient>
+        <View style={styles.logoBadge}>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+        </View>
         <Text style={styles.title}>ShanuTechX</Text>
         <Text style={styles.subtitle}>Admin Console</Text>
       </Animated.View>
@@ -47,18 +51,24 @@ export function SplashScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  logo: {
-    width: 84,
-    height: 84,
+  logoBadge: {
+    width: 90,
+    height: 90,
     borderRadius: 24,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
+    padding: 12,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 8,
   },
-  logoText: {
-    fontFamily: fontFamily.headExtrabold,
-    fontSize: 40,
-    color: '#1a0f33',
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     fontFamily: fontFamily.headExtrabold,

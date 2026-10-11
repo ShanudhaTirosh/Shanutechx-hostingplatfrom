@@ -304,10 +304,12 @@ export function DashboardSidebarView({
     <aside className="stx-sidebar w-[var(--sidebar-width)] shrink-0 flex flex-col h-screen overflow-y-auto">
       {/* ── Brand Header ── */}
       <div className="flex items-center gap-2.5 px-5 h-14 border-b border-[var(--color-border-subtle)] shrink-0">
-        <div className="h-7 w-7 rounded-lg bg-[var(--color-accent)] flex items-center justify-center shrink-0">
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-            <path d="M7 1L13 4.5V9.5L7 13L1 9.5V4.5L7 1Z" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/>
-          </svg>
+        <div className="h-8 w-8 rounded-lg bg-white/10 p-1 flex items-center justify-center shrink-0 border border-white/10 shadow-sm backdrop-blur-sm">
+          <img
+            src="/STX.png"
+            alt="STX"
+            className="w-full h-full object-contain filter brightness-0 invert"
+          />
         </div>
         <span className="font-semibold text-[13.5px] tracking-tight text-[var(--color-text-primary)]">
           STX <span className="text-[var(--color-accent)]">HOSTING</span>

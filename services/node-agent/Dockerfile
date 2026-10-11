@@ -19,7 +19,7 @@
 FROM node:20-bookworm-slim
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends git curl ca-certificates \
+  && apt-get install -y --no-install-recommends git curl ca-certificates unzip p7zip-full tar bzip2 xz-utils iproute2 docker.io docker-compose-plugin \
   && curl -sSL https://mise.run | sh \
   && /root/.local/bin/mise install github:railwayapp/railpack@latest \
   && /root/.local/bin/mise use -g github:railwayapp/railpack@latest \

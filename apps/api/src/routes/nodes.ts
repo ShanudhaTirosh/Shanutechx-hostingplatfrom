@@ -106,31 +106,35 @@ RESPONSE=\$(curl -s -X POST "\$API_URL/api/nodes/register" \\
 
 echo "✅ Registration Response: \$RESPONSE"
 
-# 4. Start ShanuTechX Production Node Agent Container
-echo "🐳 Launching ShanuTechX Node Agent Service on Port 5000..."
-docker stop shanutechx-agent &>/dev/null || true
-docker rm shanutechx-agent &>/dev/null || true
+if [ "\$5" != "--skip-docker-agent" ]; then
+  # 4. Start ShanuTechX Production Node Agent Container
+  echo "🐳 Launching ShanuTechX Node Agent Service on Port 5000..."
+  docker stop shanutechx-agent &>/dev/null || true
+  docker rm shanutechx-agent &>/dev/null || true
 
-# Pull official image or build locally if image registry is unavailable
-if docker pull ghcr.io/shanutechx/node-agent:latest &>/dev/null; then
-  AGENT_IMAGE="ghcr.io/shanutechx/node-agent:latest"
+  # Pull official image or build locally if image registry is unavailable
+  if docker pull ghcr.io/shanutechx/node-agent:latest &>/dev/null; then
+    AGENT_IMAGE="ghcr.io/shanutechx/node-agent:latest"
+  else
+    echo "📦 Preparing standalone Node Agent runtime..."
+    AGENT_IMAGE="node:20-alpine"
+  fi
+
+  docker run -d \
+    --name shanutechx-agent \
+    --restart always \
+    -p 5000:5000 \
+    -e AGENT_PORT=5000 \
+    -e NODE_AGENT_SECRET="\$SECRET" \
+    -e API_URL="\$API_URL" \
+    -e ROOT_DOMAIN="${rootDomain}" \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v /srv/compose:/srv/compose \
+    -v /var/lib/shanutechx:/var/lib/shanutechx \
+    "\$AGENT_IMAGE" sh -c "if [ -f /opt/shanutechx/services/node-agent/src/index.js ]; then node /opt/shanutechx/services/node-agent/src/index.js; elif [ -f /repo/services/node-agent/src/index.js ]; then node /repo/services/node-agent/src/index.js; else echo 'Node Agent entry file not found'; exit 1; fi"
 else
-  echo "📦 Preparing standalone Node Agent runtime..."
-  AGENT_IMAGE="node:20-alpine"
+  echo "⏩ Skipping Docker container launch (--skip-docker-agent requested for native systemd service)"
 fi
-
-docker run -d \\
-  --name shanutechx-agent \\
-  --restart always \\
-  -p 5000:5000 \\
-  -e AGENT_PORT=5000 \\
-  -e NODE_AGENT_SECRET="\$SECRET" \\
-  -e API_URL="\$API_URL" \\
-  -e ROOT_DOMAIN="${rootDomain}" \\
-  -v /var/run/docker.sock:/var/run/docker.sock \\
-  -v /srv/compose:/srv/compose \\
-  -v /var/lib/shanutechx:/var/lib/shanutechx \\
-  "$AGENT_IMAGE" sh -c "if [ -f /opt/shanutechx/services/node-agent/src/index.js ]; then node /opt/shanutechx/services/node-agent/src/index.js; elif [ -f /repo/services/node-agent/src/index.js ]; then node /repo/services/node-agent/src/index.js; else echo 'Node Agent entry file not found'; exit 1; fi"
 
 echo "============================================================"
 echo "🎉 SUCCESS: Compute Node is onboarded & ONLINE in ShanuTechX!"
@@ -503,7 +507,7 @@ async function runNodeProvisioningSteps(
     'chmod 0600 $TMP_SEC',
     `printf '%s' '${secretB64}' | base64 -d > $TMP_SEC`,
     `curl -sSL "${apiUrl}/api/nodes/install.sh" -o /tmp/shanutechx-install.sh`,
-    `SECRET=$(cat $TMP_SEC) bash /tmp/shanutechx-install.sh "${apiUrl}" "$SECRET" "${cleanLabel}" "${cleanRoleTags}" 2>&1`,
+    `SECRET=$(cat $TMP_SEC) bash /tmp/shanutechx-install.sh "${apiUrl}" "$SECRET" "${cleanLabel}" "${cleanRoleTags}" --skip-docker-agent 2>&1`,
     'rm -f $TMP_SEC',
   ].join(' && ');
   await sshExec(ssh, installCmd, log);

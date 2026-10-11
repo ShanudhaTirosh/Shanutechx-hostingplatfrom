@@ -82,6 +82,28 @@ const handleArchiveUpload = async (req: AuthedRequest, res: any) => {
   try {
     res.write(JSON.stringify({ phase: 'fetch', message: `Receiving source archive "${file.originalname}" (${Math.round(file.size / 1024)} KB)...` }) + '\n');
 
+    // Stream archive directly to destination node agent for remote workspace extraction (BUG-142)
+    if (deployment.node) {
+      try {
+        const agentUrl = `http://${deployment.node.ip}:${env.nodeAgentPort}/agent/deployments/${deployment.id}/archive-extract`;
+        const uploadRes = await fetch(agentUrl, {
+          method: 'POST',
+          headers: {
+            'x-agent-secret': env.nodeAgentSecret,
+            'Content-Type': 'application/octet-stream',
+            'x-archive-filename': encodeURIComponent(file.originalname),
+          },
+          body: file.buffer,
+        });
+        if (!uploadRes.ok) {
+          const errText = await uploadRes.text().catch(() => '');
+          logger.warn({ err: errText, deploymentId: deployment.id }, 'Transfer of archive to compute node agent failed, proceeding with local extraction');
+        }
+      } catch (nodeErr: any) {
+        logger.warn({ err: nodeErr.message, deploymentId: deployment.id }, 'Could not contact compute node agent for remote archive extraction');
+      }
+    }
+
     // Determine local workspace directory
     const workspacesDir = process.env.AGENT_WORKSPACES_DIR || '/var/lib/shanutechx/workspaces';
     const targetDir = path.join(workspacesDir, deployment.id);

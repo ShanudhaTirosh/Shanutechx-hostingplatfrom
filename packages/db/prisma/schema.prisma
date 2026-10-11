@@ -726,6 +726,7 @@ model WebmailMessage {
   @@index([userId, isRead])
   @@index([userId, isStarred])
   @@index([smtpAccountId])
+  @@index([userId, subject])
 }
 
 // User-created custom folders

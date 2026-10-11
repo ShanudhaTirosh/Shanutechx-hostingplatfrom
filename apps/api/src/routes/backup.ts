@@ -54,7 +54,7 @@ backupRouter.get('/admin/backup/history', requireAuth, requireAdmin, async (_req
  */
 
 backupRouter.post('/cron/backup', async (req, res) => {
-  const isCronAuthed = verifySharedSecret(req.headers['x-cron-secret'] ?? req.query.secret, env.billingCronSecret);
+  const isCronAuthed = verifySharedSecret(req.headers['x-cron-secret'], env.billingCronSecret);
 
   if (!isCronAuthed) {
     return res.status(401).json({ error: 'Invalid cron secret' });

@@ -1,43 +1,48 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { env } from '../env';
 import { logger } from '../lib/logger';
+import { requireAuth, AuthedRequest } from '../middleware/auth';
 import undici from 'undici';
 
 export const studioPlatformRouter = Router();
 
-// SSO Email Whitelist Guard
-function verifyStudioEmailAccess(req: Request, res: Response, next: () => void) {
-  const allowedList = env.allowedAdminEmails
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-
+// Internal Secret or Authenticated Admin/Dev Guard
+function verifyStudioAccess(req: Request, res: Response, next: NextFunction) {
   // If internal agent secret header is provided
   const internalSecret = req.headers['x-internal-secret'] || req.headers['x-agent-secret'];
   if (internalSecret && (internalSecret === env.discordInternalSecret || internalSecret === env.nodeAgentSecret)) {
     return next();
   }
 
-  // Extract email from authenticated user (if auth middleware was applied) or header
-  const userEmail = (req as any).user?.email?.toLowerCase() || req.headers['x-user-email']?.toString().toLowerCase();
+  // Otherwise, require cryptographic authentication token
+  return requireAuth(req as AuthedRequest, res, () => {
+    const user = (req as AuthedRequest).user;
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required. Missing user identity for Supabase Studio.' });
+    }
 
-  if (!userEmail) {
-    logger.warn('Anonymous unauthenticated attempt on Studio Platform API blocked');
-    res.status(401).json({ error: 'Authentication required. Missing user identity for Supabase Studio.' });
-    return;
-  }
+    if (user.role !== 'dev' && user.role !== 'admin') {
+      logger.warn({ userId: user.id, role: user.role }, 'Non-admin/dev access attempt on Studio Platform API blocked');
+      return res.status(403).json({ error: 'Access denied. Dev or Admin role required for Supabase Admin Studio.' });
+    }
 
-  if (!allowedList.includes(userEmail) && !allowedList.includes('*')) {
-    logger.warn({ userEmail, allowedList }, 'Unauthorized email attempt on Studio Platform API');
-    res.status(403).json({ error: 'Access denied. Email unauthorized for Supabase Admin Studio.' });
-    return;
-  }
+    const allowedList = env.allowedAdminEmails
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
 
-  next();
+    const userEmail = user.email.toLowerCase();
+    if (allowedList.length > 0 && !allowedList.includes(userEmail) && !allowedList.includes('*')) {
+      logger.warn({ userEmail, allowedList }, 'Unauthorized email attempt on Studio Platform API');
+      return res.status(403).json({ error: 'Access denied. Email unauthorized for Supabase Admin Studio.' });
+    }
+
+    next();
+  });
 }
 
-studioPlatformRouter.use(verifyStudioEmailAccess);
+studioPlatformRouter.use(verifyStudioAccess);
 
 // Profile
 studioPlatformRouter.get('/profile', (req: Request, res: Response) => {

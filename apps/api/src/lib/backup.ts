@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { spawn, exec } from 'child_process';
+import { Readable } from 'stream';
 import { env } from '../env';
 import { logger } from './logger';
 
@@ -30,11 +31,20 @@ function dumpDatabase(host: string, port: string, user: string, dbName: string, 
 
     const chunks: Buffer[] = [];
     let errOutput = '';
+    let pgDumpCode: number | null = null;
 
     pgDump.stdout.pipe(gzip.stdin);
 
     pgDump.stderr.on('data', (data) => {
       errOutput += data.toString();
+    });
+
+    pgDump.on('close', (code) => {
+      pgDumpCode = code;
+      if (code !== 0) {
+        gzip.kill();
+        reject(new Error(`pg_dump failed with exit code ${code}: ${errOutput}`));
+      }
     });
 
     gzip.stderr.on('data', (data) => {
@@ -46,8 +56,11 @@ function dumpDatabase(host: string, port: string, user: string, dbName: string, 
     });
 
     gzip.on('close', (code) => {
+      if (pgDumpCode !== null && pgDumpCode !== 0) {
+        return reject(new Error(`pg_dump failed with exit code ${pgDumpCode}: ${errOutput}`));
+      }
       if (code !== 0) {
-        return reject(new Error(`pg_dump/gzip failed with code ${code}: ${errOutput}`));
+        return reject(new Error(`gzip failed with code ${code}: ${errOutput}`));
       }
       resolve(Buffer.concat(chunks));
     });
@@ -62,8 +75,9 @@ function dumpDatabase(host: string, port: string, user: string, dbName: string, 
  */
 export async function runBackup(): Promise<{ key: string; sizeBytes: number; durationMs: number }> {
   const start = Date.now();
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const slot = getSlot();
-  const key = `backups/db-${slot}.sql.gz`;
+  const key = `backups/db-${timestamp}.sql.gz`;
 
   const dbUrl = new URL(env.databaseUrl);
   const pgDumpEnv = {
@@ -108,11 +122,11 @@ export async function runBackup(): Promise<{ key: string; sizeBytes: number; dur
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          key,
           slot,
           timestamp: new Date().toISOString(),
           database: dbName,
           sizeBytes: stdout.length,
-          base64Data: stdout.subarray(0, 100 * 1024).toString('base64'),
         }),
       });
     } catch (e) {
@@ -144,8 +158,7 @@ export async function restoreBackup(key: string): Promise<{ success: boolean; du
     })
   );
 
-  const byteArray = await response.Body?.transformToByteArray();
-  if (!byteArray) {
+  if (!response.Body) {
     throw new Error('Failed to retrieve backup archive');
   }
 
@@ -174,6 +187,10 @@ export async function restoreBackup(key: string): Promise<{ success: boolean; du
     gunzip.on('error', (err) => reject(err));
     psql.on('error', (err) => reject(err));
 
-    gunzip.stdin.end(Buffer.from(byteArray));
+    const bodyStream = response.Body instanceof Readable
+      ? response.Body
+      : Readable.fromWeb(response.Body as any);
+    bodyStream.pipe(gunzip.stdin);
   });
 }
+

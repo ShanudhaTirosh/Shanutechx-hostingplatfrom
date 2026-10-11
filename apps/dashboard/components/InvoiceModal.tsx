@@ -196,9 +196,14 @@ export default function InvoiceModal({ isOpen, onClose, order }: InvoiceModalPro
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 border-b border-white/10 pb-6">
                 {/* Company Side */}
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-black text-xl tracking-tight text-white">
-                      SHANU<span className="text-purple-400">TECHX</span>
+                  <div className="flex items-center gap-2.5">
+                    <img
+                      src="/STX.png"
+                      alt="ShanuTechX"
+                      className="w-7 h-7 object-contain filter brightness-0 invert print:filter-none"
+                    />
+                    <span className="font-black text-xl tracking-tight text-white print:text-black">
+                      SHANU<span className="text-purple-400 print:text-purple-600">TECHX</span>
                     </span>
                     <span className="text-[10px] font-mono bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded border border-purple-500/30">
                       CLOUD

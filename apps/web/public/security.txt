@@ -1,0 +1,28 @@
+# ShanuTechX Security Vulnerability Disclosure Policy
+# Reference: RFC 9116 (https://www.rfc-editor.org/rfc/rfc9116)
+
+Contact: mailto:security@shanutechx.com
+Contact: https://shanutechx.com/contact
+Expires: 2027-12-31T23:59:59.000Z
+Preferred-Languages: en, si
+Canonical: https://shanutechx.com/.well-known/security.txt
+Policy: https://shanutechx.com/terms
+Acknowledgments: https://shanutechx.com/about
+Hiring: https://shanutechx.com/about
+
+# Scope & Safe Harbor:
+# We welcome reports from security researchers and developers.
+# In-scope:
+# - apps/api (REST API endpoints & authentication checks)
+# - apps/web (Public storefront & documentation)
+# - apps/dashboard (Control panel access controls & permission boundaries)
+# - Container isolation & multi-tenant security
+#
+# Out-of-scope / Prohibited:
+# - Denial of Service (DoS / DDoS) attacks
+# - Automated high-volume spamming
+# - Social engineering or phishing of employees or customers
+# - Physical security attacks against server facilities
+# - Degrading platform service availability or exfiltrating private customer data
+#
+# Please provide reproducible proof-of-concept steps. We aim to acknowledge reports within 24-48 hours.

@@ -237,6 +237,23 @@ export async function registerLiveKitKey(
   }
 }
 
+/**
+ * Revokes and deletes a LiveKit API key from the node's LiveKit config
+ * and restarts the LiveKit container.
+ */
+export async function revokeLiveKitKey(
+  node: Node,
+  apiKey: string
+): Promise<void> {
+  const res = await fetch(agentUrl(node, `/agent/livekit/keys/${encodeURIComponent(apiKey)}`), {
+    method: 'DELETE',
+    headers: agentHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to revoke LiveKit key on node (${res.status})`);
+  }
+}
+
 export async function addCustomDomainRoute(
   node: Node,
   deploymentId: string,

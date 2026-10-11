@@ -6,8 +6,16 @@ export class AuthResource extends BaseClient {
     return this.httpPost<AuthSession>('/api/auth/login', input);
   }
 
+  async loginWithOAuth(idToken: string, provider?: 'google' | 'github' | 'discord'): Promise<AuthSession> {
+    return this.httpPost<AuthSession>('/api/auth/login', { idToken, provider });
+  }
+
   async register(input: RegisterInput): Promise<AuthSession> {
     return this.httpPost<AuthSession>('/api/auth/register', input);
+  }
+
+  async registerWithOAuth(idToken: string, provider?: 'google' | 'github' | 'discord'): Promise<AuthSession> {
+    return this.httpPost<AuthSession>('/api/auth/register', { idToken, provider });
   }
 
   async refresh(): Promise<AuthSession> {

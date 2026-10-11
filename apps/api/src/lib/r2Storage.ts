@@ -1,4 +1,5 @@
 import { S3Client, CreateBucketCommand, HeadBucketCommand, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '../env';
 import { logger } from './logger';
 
@@ -69,7 +70,9 @@ export async function uploadDeploymentZip(deploymentId: string, buffer: Buffer, 
         })
       );
       logger.info({ deploymentId, objectKey, bucketName }, 'ZIP archive uploaded to R2 object storage successfully');
-      return `${env.r2Endpoint}/${bucketName}/${objectKey}`;
+      return await getSignedUrl(client, new GetObjectCommand({ Bucket: bucketName, Key: objectKey }), {
+        expiresIn: 3600,
+      });
     } catch (err) {
       logger.error({ err, deploymentId }, 'Failed to upload ZIP archive to R2 object storage');
       throw err;

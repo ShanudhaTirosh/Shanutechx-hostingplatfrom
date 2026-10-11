@@ -122,7 +122,7 @@ async function execSql({ projectId, dbName, sql, dbUsername }) {
 
   const { stdout } = await execFileAsync(
     'docker',
-    ['exec', '-i', POSTGRES_CONTAINER, 'psql', '-U', targetUser, '-d', dbName, '--csv'],
+    ['exec', '-i', POSTGRES_CONTAINER, 'psql', '-U', targetUser, '-d', dbName, '-q', '--csv'],
     { input: guardedSql, maxBuffer: 10 * 1024 * 1024 }
   );
 

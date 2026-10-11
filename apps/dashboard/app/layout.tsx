@@ -12,9 +12,19 @@ export const metadata: Metadata = {
       { url: '/STX.png', type: 'image/png' },
     ],
     shortcut: '/favicon.png',
-    apple: '/favicon.png',
+    apple: '/apple-icon.png',
   },
   manifest: '/manifest.json',
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+    },
+  },
 };
 
 export const viewport: Viewport = {

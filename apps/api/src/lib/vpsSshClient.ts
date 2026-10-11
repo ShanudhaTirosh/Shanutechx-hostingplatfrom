@@ -187,15 +187,33 @@ export async function rebootVpsSsh(provision: VpsProvision): Promise<{ success: 
  */
 export async function changeVpsPasswordSsh(provision: VpsProvision, newPassword: string): Promise<{ success: boolean }> {
   const username = provision.username || 'root';
-  // Escaped password for chpasswd stdin
-  const escapedPassword = newPassword.replace(/'/g, "'\\''");
-  const cmd = `echo '${username}:${escapedPassword}' | sudo chpasswd || echo '${username}:${escapedPassword}' | chpasswd`;
-
-  const res = await execVpsSsh(provision, cmd);
-  if (res.code !== 0 && res.stderr.toLowerCase().includes('error')) {
-    throw new Error(`Remote password update failed: ${res.stderr || 'chpasswd exit error'}`);
+  if (!/^[a-zA-Z0-9_-]{1,32}$/.test(username)) {
+    throw new Error('Invalid username format');
   }
-  return { success: true };
+  if (newPassword.includes('\n') || newPassword.includes('\r')) {
+    throw new Error('Password must not contain newline characters');
+  }
+
+  // Pipe credentials directly via stdin stream to avoid process argument exposure
+  const conn = await connectVpsSsh(provision);
+  return new Promise((resolve, reject) => {
+    conn.exec('sudo chpasswd || chpasswd', (err, stream) => {
+      if (err) {
+        conn.end();
+        return reject(err);
+      }
+      stream.stdin.end(`${username}:${newPassword}\n`);
+      let stderr = '';
+      stream.stderr.on('data', (d: Buffer) => {
+        stderr += d.toString();
+      });
+      stream.on('close', (code: number) => {
+        conn.end();
+        if (code !== 0) return reject(new Error(`chpasswd failed with code ${code}: ${stderr}`));
+        resolve({ success: true });
+      });
+    });
+  });
 }
 
 /**
@@ -376,7 +394,7 @@ export async function renamePathSsh(
   oldPath: string,
   newPath: string
 ): Promise<{ success: boolean }> {
-  const cmd = `mv '${oldPath.replace(/'/g, "'\\''")}' '${newPath.replace(/'/g, "'\\''")}'`;
+  const cmd = `mv -- '${oldPath.replace(/'/g, "'\\''")}' '${newPath.replace(/'/g, "'\\''")}'`;
   const res = await execVpsSsh(provision, cmd);
   if (res.code !== 0) {
     throw new Error(`Rename failed: ${res.stderr || 'mv command error'}`);
@@ -391,7 +409,7 @@ export async function mkdirSsh(
   provision: VpsProvision,
   dirPath: string
 ): Promise<{ success: boolean }> {
-  const cmd = `mkdir -p '${dirPath.replace(/'/g, "'\\''")}'`;
+  const cmd = `mkdir -p -- '${dirPath.replace(/'/g, "'\\''")}'`;
   const res = await execVpsSsh(provision, cmd);
   if (res.code !== 0) {
     throw new Error(`Directory creation failed: ${res.stderr || 'mkdir command error'}`);
@@ -406,7 +424,7 @@ export async function touchFileSsh(
   provision: VpsProvision,
   filePath: string
 ): Promise<{ success: boolean }> {
-  const cmd = `touch '${filePath.replace(/'/g, "'\\''")}'`;
+  const cmd = `touch -- '${filePath.replace(/'/g, "'\\''")}'`;
   const res = await execVpsSsh(provision, cmd);
   if (res.code !== 0) {
     throw new Error(`File creation failed: ${res.stderr || 'touch command error'}`);

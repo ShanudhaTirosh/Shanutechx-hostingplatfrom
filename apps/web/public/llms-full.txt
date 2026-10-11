@@ -1,0 +1,191 @@
+# ShanuTechX (STX HOSTING) — Complete Technical Reference for LLMs
+
+> Comprehensive technical and architectural reference for ShanuTechX Autonomous Cloud Platform, intended for ingestion by Large Language Models, AI developer agents, and search engines.
+
+---
+
+## 1. Company & Platform Overview
+
+- **Legal Entity**: ShanuTechX (Operating as STX HOSTING)
+- **Primary Domain**: https://shanutechx.com
+- **Control Panel**: https://app.shanutechx.com
+- **Public API**: https://api.shanutechx.com
+- **Enterprise Webmail**: https://mail.shanutechx.com
+- **Headquarters**: Sri Lanka with distributed compute infrastructure in North America, Europe, and Asia.
+- **Mission**: Providing ultra-reliable, automated cloud hosting, virtual servers, container orchestration, and developer tooling at affordable regional and international price points.
+
+---
+
+## 2. Infrastructure Architecture & Technology Stack
+
+The ShanuTechX platform is engineered as an npm workspace monorepo designed for high throughput, autonomous operations, and zero-touch provisioning:
+
+- **Edge Proxy**: Dynamic Traefik reverse proxy handling SSL termination (automatic Let's Encrypt certificates), path routing, rate limiting, and DDoS mitigation.
+- **API Engine**: Node.js 20 & Express REST API with TypeScript, Prisma 5.22 ORM, and PostgreSQL 16.
+- **Worker & Queues**: BullMQ with Redis 7 managing async tasks including payment verification, container lifecycle, dunning notices, automated DNS syncing, and daily R2 backups.
+- **Node Agent**: Per-VPS host daemon (`services/node-agent`) managing Docker container lifecycles, resource isolation (cgroups), port bindings, filesystem volumes, and live telemetry over secure RPC.
+- **Storage & Backups**: Cloudflare R2 object storage with automated, AES-encrypted database dumps and volume snapshots.
+- **Real-Time Video/Audio**: LiveKit WebRTC SFU providing programmable audio/video rooms and developer tokens.
+- **Secrets Management**: Secrets Vault with AES-256-GCM symmetric encryption for environment variables, API tokens, and credentials.
+- **Authentication**: Single Sign-On (SSO) exclusively via Google and GitHub OAuth. Passwords and insecure legacy logins are disabled platform-wide.
+
+---
+
+## 3. Product Catalog & Specifications
+
+### 3.1 Cloud VPS Hosting (NVMe KVM)
+- **Virtualization**: KVM with dedicated vCPU allocations.
+- **Storage**: Enterprise PCIe 4.0 NVMe SSD in RAID 10 configurations.
+- **Network**: 1 Gbps to 10 Gbps redundant uplinks, unmetered bandwidth on select plans, DDoS protected.
+- **Operating Systems**: Ubuntu 22.04/24.04 LTS, Debian 12, Rocky Linux 9, Alpine Linux, Arch Linux.
+- **Features**: Instant automated provisioning upon payment approval, root SSH access, web-based VNC/SSH terminal, automated Cloudflare DNS A-record registration, reverse DNS (rDNS) customization, snapshots.
+
+### 3.2 App Container Hosting
+- **Supported Runtimes**: Node.js (18, 20, 22), Python (3.10, 3.11, 3.12), Bun, Go, Rust, and custom Dockerfiles.
+- **Continuous Deployment**: Git webhook triggers (`deployWebhookSecret`) enabling zero-downtime rolling updates on `git push`.
+- **Networking**: Instant free subdomains (`your-app.shanutechx.com`) or custom domains with automated SSL provisioning via Traefik.
+- **Environment**: Secrets vault for `.env` variables with AES-256-GCM encryption.
+
+### 3.3 24/7 Discord & Telegram Bot Hosting
+- **Runtime**: Dedicated isolated Docker containers.
+- **Uptime SLA**: 99.99% uptime with autonomous health monitors that automatically restart crashed processes.
+- **Metrics**: Live real-time memory (RAM), CPU usage, and network I/O charts in the dashboard.
+- **Supported Frameworks**: Discord.js, Pycord, Discord.py, Eris, JDA (Java), Telegraf, python-telegram-bot.
+- **Persistence**: Persistent storage volume mounts for SQLite databases, JSON storage, and logs.
+
+### 3.4 Managed Databases
+- **Engines**:
+  - PostgreSQL 16 (includes pgvector extension for AI embeddings)
+  - MySQL 8.0
+  - Redis 7.2 (in-memory caching and pub/sub)
+  - MongoDB 7.0
+- **Features**: One-click provisioning, direct connection strings (`postgres://...`, `mysql://...`, `redis://...`), internal VPC and external SSL connections, daily automated snapshots backed up to Cloudflare R2, point-in-time recovery.
+
+### 3.5 V2Ray / Shadowsocks Secure Proxies
+- **Core**: Xray-core / V2Ray high-performance routing core.
+- **Protocols**: VMess, VLESS (with XTLS / Reality), Trojan, Shadowsocks (AEAD 2022).
+- **Features**: Obfuscated TLS handshakes, anti-censorship routing, ultra-low latency routes, subscription URLs for Clash, v2rayN, Shadowrocket, and Sing-box clients.
+
+### 3.6 Self-Hosted Supabase Stacks
+- **Components**: PostgreSQL database, GoTrue authentication engine, PostgREST RESTful API layer, Realtime WebSockets server, Storage API, and Supabase Studio dashboard.
+- **Deployment**: Deployed directly on user-selected host compute nodes with direct 1-click Launch Studio UI (`http://<nodeIp>:<studioPort>`).
+
+### 3.7 One-Click Docker App Catalog
+Pre-configured, production-hardened templates available for instant deployment:
+1. **WordPress**: Complete CMS with MySQL backend and Redis object caching.
+2. **Ghost**: High-performance headless publishing platform.
+3. **Nextcloud**: Private cloud file storage, calendar, and office suite.
+4. **N8N**: Fair-code workflow automation tool with hundreds of integrations.
+5. **Uptime Kuma**: Self-hosted monitoring tool with status pages.
+6. **Plausible Analytics**: Lightweight, privacy-friendly Google Analytics alternative.
+7. **Vaultwarden**: Lightweight Bitwarden-compatible password manager server.
+8. **Directus**: Instant REST & GraphQL API engine for any SQL database.
+9. **Strapi**: Open-source headless Node.js CMS.
+10. **Gitea / Forgejo**: Lightweight self-hosted Git service.
+11. **Portainer**: Lightweight container management UI.
+12. **PocketBase**: Single-file backend with SQLite, real-time subscriptions, and auth.
+13. **Metabase**: Business intelligence and dashboarding tool.
+14. **Meilisearch**: Lightning-fast, hyper-relevant search engine.
+15. **MinIO**: High-performance S3-compatible object storage.
+
+---
+
+## 4. Email, Webmail & DNS Standards
+
+### 4.1 Enterprise Webmail Suite
+- Access URL: `https://mail.shanutechx.com`
+- Client: Modern Next.js responsive webmail client with dark mode and IMAP/SMTP sync.
+
+### 4.2 Required DNS Records for Custom Domains
+When connecting a custom domain to ShanuTechX email services, configure the following DNS records:
+- **MX Record**:
+  - Name: `@`
+  - Priority: `10`
+  - Target: `mail.shanutechx.com`
+- **SPF Record (TXT)**:
+  - Name: `@`
+  - Content: `v=spf1 include:_spf.shanutechx.com ~all`
+- **DKIM Record (TXT)**:
+  - Name: `stx._domainkey`
+  - Content: Generated per-domain RSA 2048-bit public key.
+- **DMARC Record (TXT)**:
+  - Name: `_dmarc`
+  - Content: `v=DMARC1; p=quarantine; rua=mailto:dmarc@shanutechx.com; pct=100; adkim=r; aspf=r`
+- **MTA-STS Record (TXT)**:
+  - Name: `_mta-sts`
+  - Content: `v=STSv1; id=20261011001`
+- **MTA-STS Policy**:
+  - Host: `mta-sts.yourdomain.com` or `https://shanutechx.com/.well-known/mta-sts.txt`
+
+---
+
+## 5. Developer REST API Reference
+
+The ShanuTechX REST API is rooted at `https://api.shanutechx.com/api`.
+
+### 5.1 Authentication
+Include your Firebase OAuth JWT or Developer API Key in the `Authorization` header:
+```http
+Authorization: Bearer <your_jwt_or_api_key>
+```
+
+### 5.2 Key Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/health` | API status and database connectivity check |
+| `GET` | `/api/me` | Fetch authenticated user profile, permissions, role |
+| `GET` | `/api/nodes` | List registered compute VPS host nodes |
+| `POST` | `/api/nodes` | Register a new compute node (Dev role only) |
+| `GET` | `/api/deployments` | List all active container deployments for user |
+| `POST` | `/api/deployments` | Create and trigger an automated deployment |
+| `GET` | `/api/deployments/:id` | Fetch deployment details, logs, and container state |
+| `POST` | `/api/deployments/:id/restart` | Restart deployment container |
+| `POST` | `/api/deployments/:id/stop` | Stop deployment container |
+| `DELETE` | `/api/deployments/:id` | Terminate and deallocate deployment |
+| `GET` | `/api/vps` | List provisioned VPS instances |
+| `POST` | `/api/vps` | Provision a new VPS instance |
+| `GET` | `/api/managed-databases` | List user's managed databases |
+| `POST` | `/api/managed-databases` | Provision managed database (PostgreSQL, MySQL, Redis, MongoDB) |
+| `GET` | `/api/catalog` | List available 1-click Docker application templates |
+| `POST` | `/api/catalog/deploy` | Deploy a catalog template |
+| `GET` | `/api/invoices` | List invoices and billing history |
+| `POST` | `/api/invoices/:id/pay` | Submit payment verification or proof of payment |
+| `GET` | `/api/status` | Public status of all platform services and nodes |
+| `GET` | `/api/metrics` | Prometheus metrics scrape endpoint |
+
+---
+
+## 6. Billing, Payments & Currency
+
+- **Supported Currencies**: Sri Lankan Rupee (LKR) and United States Dollar (USD).
+- **Payment Gateways**:
+  - Sri Lankan Bank Transfers (Commercial Bank, Sampath Bank, HNB, BOC): Customers upload transfer receipts; automated OCR and admin workflows approve and trigger instant container deployment.
+  - Credit & Debit Cards (Visa, MasterCard).
+  - Cryptocurrency: USDT (TRC-20), TRX, Bitcoin.
+- **Billing Cycle**: Monthly or annual recurring billing with automated invoice generation 7 days prior to renewal.
+- **Grace Period & Dunning**: 3-day grace period for overdue invoices before automatic container suspension (`isActive: false`). No data is permanently destroyed until 14 days after suspension.
+
+---
+
+## 7. Security Policy & Responsible Disclosure
+
+- **RFC 9116 Policy**: https://shanutechx.com/.well-known/security.txt
+- **Security Contact**: security@shanutechx.com
+- **Bug Bounty & Safe Harbor**: We encourage independent security research. We commit not to pursue legal action against researchers acting in good faith who follow responsible disclosure practices and avoid data exfiltration or service disruption.
+
+---
+
+## 8. Summary of Public vs Private Endpoints for AI Bots
+
+- **Allowed & Public**:
+  - `https://shanutechx.com/*` (Public storefront, pricing, catalog, documentation, blog, reviews, status, legal pages)
+  - `https://shanutechx.com/llms.txt` and `/llms-full.txt`
+  - `https://shanutechx.com/humans.txt`
+  - `https://shanutechx.com/.well-known/security.txt`
+  - `https://shanutechx.com/sitemap.xml`
+- **Private & Protected (DO NOT CRAWL)**:
+  - `https://app.shanutechx.com/*` (Customer and Admin Dashboard)
+  - `https://api.shanutechx.com/*` (Authenticated REST API)
+  - `https://mail.shanutechx.com/*` (Customer Webmail & Mailboxes)
+  - Any internal login or token generation URLs

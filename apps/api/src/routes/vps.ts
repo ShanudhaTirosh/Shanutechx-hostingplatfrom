@@ -3,6 +3,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import { prisma } from '../lib/prisma';
 import { env } from '../env';
+import { logger } from '../lib/logger';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 import { ownedResourceWhere, canAccessResource } from '../middleware/rbac';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
@@ -515,6 +516,25 @@ vpsRouter.post('/vps-provisions/:id/power', async (req: AuthedRequest, res: Resp
   }
 });
 
+const ongoingUpgrades = new Map<string, { status: 'running' | 'completed' | 'failed'; exitCode?: number; output?: string; error?: string; startedAt: Date; finishedAt?: Date }>();
+
+/**
+ * GET /api/vps-provisions/:id/upgrade-packages/status
+ * Check status of an in-progress or completed OS package upgrade.
+ */
+vpsRouter.get('/vps-provisions/:id/upgrade-packages/status', async (req: AuthedRequest, res: Response) => {
+  const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
+  if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
+  if (!(await canAccessResource(provision.userId, req))) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  const job = ongoingUpgrades.get(provision.id);
+  if (!job) {
+    return res.json({ status: 'idle' });
+  }
+  res.json(job);
+});
+
 /**
  * POST /api/vps-provisions/:id/upgrade-packages
  * One-click OS package upgrade action: runs apt update & upgrade over SSH on the target VPS.
@@ -526,24 +546,56 @@ vpsRouter.post('/vps-provisions/:id/upgrade-packages', async (req: AuthedRequest
     return res.status(404).json({ error: 'Not found' });
   }
 
+  const existingJob = ongoingUpgrades.get(provision.id);
+  if (existingJob && existingJob.status === 'running') {
+    return res.status(409).json({ error: 'An OS package upgrade is already running on this VPS', status: 'running' });
+  }
+
   const upgradeCmd = `export DEBIAN_FRONTEND=noninteractive && if command -v apt-get >/dev/null 2>&1; then apt-get update -qq && apt-get upgrade -y; elif command -v dnf >/dev/null 2>&1; then dnf upgrade -y; elif command -v yum >/dev/null 2>&1; then yum update -y; else echo "Unsupported OS package manager" && exit 1; fi 2>&1`;
 
-  try {
-    const result = await execVpsSsh(
-      provision,
-      upgradeCmd,
-      { timeoutMs: 300_000 }
-    );
+  const runUpgrade = async () => {
+    ongoingUpgrades.set(provision.id, { status: 'running', startedAt: new Date() });
+    try {
+      const result = await execVpsSsh(provision, upgradeCmd, { timeoutMs: 300_000 });
+      ongoingUpgrades.set(provision.id, {
+        status: result.code === 0 ? 'completed' : 'failed',
+        exitCode: result.code,
+        output: result.stdout,
+        startedAt: new Date(),
+        finishedAt: new Date(),
+      });
+      await prisma.auditLog.create({
+        data: {
+          adminId: req.user!.id,
+          action: 'vps.upgrade_packages',
+          target: provision.id,
+          actorRole: req.user!.role === 'customer' ? 'customer' : null,
+        },
+      });
+      return result;
+    } catch (err: any) {
+      ongoingUpgrades.set(provision.id, {
+        status: 'failed',
+        error: err.message,
+        startedAt: new Date(),
+        finishedAt: new Date(),
+      });
+      throw err;
+    }
+  };
 
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user!.id,
-        action: 'vps.upgrade_packages',
-        target: provision.id,
-        actorRole: req.user!.role === 'customer' ? 'customer' : null,
-      },
+  const isAsync = req.query.async === 'true' || req.headers['x-async'] === 'true';
+  if (isAsync) {
+    runUpgrade().catch((err) => logger.warn({ provisionId: provision.id, err: err.message }, 'Background package upgrade failed'));
+    return res.status(202).json({
+      ok: true,
+      status: 'running',
+      message: 'OS package upgrade started in the background. Poll /vps-provisions/:id/upgrade-packages/status for progress.',
     });
+  }
 
+  try {
+    const result = await runUpgrade();
     res.json({
       ok: result.code === 0,
       exitCode: result.code,
@@ -723,9 +775,10 @@ vpsRouter.get('/vps-provisions/:id/sftp/download', async (req: AuthedRequest, re
   const remotePath = req.query.path as string;
   if (!remotePath) return res.status(400).json({ error: 'File path query parameter is required' });
 
-  const filename = remotePath.split('/').pop() || 'download';
+  const rawFilename = (remotePath.split('/').pop() || 'download').replace(/[\r\n"]/g, '');
+  const safeFilename = rawFilename.replace(/[^a-zA-Z0-9._-]/g, '_') || 'download';
   res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(rawFilename)}`);
 
   try {
     // Pass `res` as the destination writable — sftpDownloadFile pipes directly into it

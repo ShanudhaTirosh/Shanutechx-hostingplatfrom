@@ -651,7 +651,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/ssh-ticket', async (req: AuthedRequ
 
   try {
     const target = 'sshKeyRef' in node && (node as any).sshKeyRef
-      ? `node:${node.ip}:${(node as any).sshKeyRef}`
+      ? `node:[${node.ip.replace(/^\[|\]$/g, '')}]:${(node as any).sshKeyRef}`
       : node.id;
     const ticket = await issueSshTicket(target, req.user!.id);
 

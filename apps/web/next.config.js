@@ -55,6 +55,23 @@ const nextConfig = {
         destination: `${dashboardUrl}/webmail`,
         permanent: false,
       },
+      {
+        source: '/security.txt',
+        destination: '/.well-known/security.txt',
+        permanent: true,
+      },
+    ];
+  },
+  async headers() {
+    return [
+      {
+        source: '/(.well-known/security.txt|llms.txt|llms-full.txt|humans.txt|.well-known/mta-sts.txt)',
+        headers: [
+          { key: 'Content-Type', value: 'text/plain; charset=utf-8' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' },
+        ],
+      },
     ];
   },
 };

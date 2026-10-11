@@ -27,7 +27,22 @@ export async function createOrGetShadowRepo(deploymentId: string): Promise<Shado
 
   try {
     // 1. Try to fetch existing repository details
-    const checkRes = await fetch(`${GITHUB_API}/repos/${env.backupGithubOrg}/${repoName}`, {
+    let owner = env.backupGithubOrg;
+    if (!owner) {
+      const userRes = await fetch(`${GITHUB_API}/user`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'ShanuTechX-Platform',
+        },
+      });
+      if (userRes.ok) {
+        const u: any = await userRes.json();
+        owner = u.login;
+      }
+    }
+
+    const checkRes = await fetch(`${GITHUB_API}/repos/${owner || 'user'}/${repoName}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/vnd.github+json',
@@ -140,9 +155,22 @@ export async function deleteShadowRepo(deploymentId: string): Promise<boolean> {
   const repoName = `deploy-${deploymentId}`;
 
   try {
-    const deleteUrl = env.backupGithubOrg
-      ? `${GITHUB_API}/repos/${env.backupGithubOrg}/${repoName}`
-      : `${GITHUB_API}/user/repos/${repoName}`;
+    let owner = env.backupGithubOrg;
+    if (!owner) {
+      const userRes = await fetch(`${GITHUB_API}/user`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'ShanuTechX-Platform',
+        },
+      });
+      if (userRes.ok) {
+        const u: any = await userRes.json();
+        owner = u.login;
+      }
+    }
+
+    const deleteUrl = `${GITHUB_API}/repos/${owner || 'user'}/${repoName}`;
 
     const res = await fetch(deleteUrl, {
       method: 'DELETE',

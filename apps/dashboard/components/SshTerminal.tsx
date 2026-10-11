@@ -101,7 +101,7 @@ export function SshTerminal({
         resizeHandler = () => {
           fitAddon?.fit();
           if (ws.readyState === WebSocket.OPEN && term) {
-            ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+            ws.send('__STX_CTL__:' + JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
           }
         };
         window.addEventListener('resize', resizeHandler);

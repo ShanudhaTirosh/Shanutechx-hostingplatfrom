@@ -85,18 +85,22 @@ async function rotateDatabasePassword({ containerId, type, oldPassword, newPassw
   const container = docker.getContainer(containerId);
   const username = masterUsername || (type === 'redis' ? 'default' : type === 'postgres' ? 'postgres' : 'root');
 
+  const escapeSql = (s) => String(s || '').replace(/'/g, "''");
+  const cleanUsername = String(username).replace(/[^a-zA-Z0-9_-]/g, '');
+
   let cmd = [];
   if (type === 'postgres') {
-    const pgUser = username || 'postgres';
-    cmd = ['psql', '-U', pgUser, '-c', `ALTER USER "${pgUser}" WITH PASSWORD '${newPassword}';` ];
+    const pgUser = cleanUsername || 'postgres';
+    cmd = ['psql', '-U', pgUser, '-c', `ALTER USER "${pgUser}" WITH PASSWORD '${escapeSql(newPassword)}';` ];
   } else if (type === 'mysql') {
-    const mysqlUser = username || 'root';
-    cmd = ['mysql', `-u${mysqlUser}`, `-p${oldPassword}`, '-e', `ALTER USER '${mysqlUser}'@'%' IDENTIFIED BY '${newPassword}'; FLUSH PRIVILEGES;` ];
+    const mysqlUser = cleanUsername || 'root';
+    cmd = ['mysql', `-u${mysqlUser}`, `-p${oldPassword}`, '-e', `ALTER USER '${mysqlUser}'@'%' IDENTIFIED BY '${escapeSql(newPassword)}'; FLUSH PRIVILEGES;` ];
   } else if (type === 'redis') {
     cmd = oldPassword ? ['redis-cli', '-a', oldPassword, 'CONFIG', 'SET', 'requirepass', newPassword] : ['redis-cli', 'CONFIG', 'SET', 'requirepass', newPassword];
   } else if (type === 'mongodb') {
-    const mongoUser = username || 'app';
-    cmd = ['mongosh', '-u', mongoUser, '-p', oldPassword, '--eval', `db.changeUserPassword('${mongoUser}', '${newPassword}')` ];
+    const mongoUser = cleanUsername || 'app';
+    const sanitizedPass = JSON.stringify(String(newPassword));
+    cmd = ['mongosh', '-u', mongoUser, '-p', oldPassword, '--eval', `db.changeUserPassword('${mongoUser}', ${sanitizedPass})` ];
   } else {
     throw new Error(`Unsupported database type for password rotation: ${type}`);
   }
@@ -128,34 +132,38 @@ async function rotateDatabasePassword({ containerId, type, oldPassword, newPassw
  */
 async function manageDatabaseUser({ containerId, type, action, username, password, role, masterPassword }) {
   const container = docker.getContainer(containerId);
+  const escapeSql = (s) => String(s || '').replace(/'/g, "''");
+  const cleanUser = String(username || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!cleanUser) throw new Error('Invalid username format');
+
   let cmd = [];
 
   if (type === 'postgres') {
     const pgAdmin = 'postgres';
     if (action === 'create') {
       const superuserFlag = role === 'admin' ? 'SUPERUSER' : 'NOSUPERUSER';
-      cmd = ['psql', '-U', pgAdmin, '-c', `CREATE USER "${username}" WITH PASSWORD '${password}' ${superuserFlag};` ];
+      cmd = ['psql', '-U', pgAdmin, '-c', `CREATE USER "${cleanUser}" WITH PASSWORD '${escapeSql(password)}' ${superuserFlag};` ];
     } else if (action === 'delete') {
-      cmd = ['psql', '-U', pgAdmin, '-c', `DROP USER IF EXISTS "${username}";` ];
+      cmd = ['psql', '-U', pgAdmin, '-c', `DROP USER IF EXISTS "${cleanUser}";` ];
     } else if (action === 'update') {
       const parts = [];
-      if (password) parts.push(`PASSWORD '${password}'`);
+      if (password) parts.push(`PASSWORD '${escapeSql(password)}'`);
       if (role) parts.push(role === 'admin' ? 'SUPERUSER' : 'NOSUPERUSER');
-      cmd = ['psql', '-U', pgAdmin, '-c', `ALTER USER "${username}" WITH ${parts.join(' ')};` ];
+      cmd = ['psql', '-U', pgAdmin, '-c', `ALTER USER "${cleanUser}" WITH ${parts.join(' ')};` ];
     }
   } else if (type === 'mysql') {
     const mysqlPass = masterPassword ? `-p${masterPassword}` : '-proot';
     if (action === 'create') {
       const grant = role === 'read_only' ? 'SELECT' : 'ALL PRIVILEGES';
-      cmd = ['mysql', '-uroot', mysqlPass, '-e', `CREATE USER '${username}'@'%' IDENTIFIED BY '${password}'; GRANT ${grant} ON *.* TO '${username}'@'%'; FLUSH PRIVILEGES;` ];
+      cmd = ['mysql', '-uroot', mysqlPass, '-e', `CREATE USER '${cleanUser}'@'%' IDENTIFIED BY '${escapeSql(password)}'; GRANT ${grant} ON *.* TO '${cleanUser}'@'%'; FLUSH PRIVILEGES;` ];
     } else if (action === 'delete') {
-      cmd = ['mysql', '-uroot', mysqlPass, '-e', `DROP USER IF EXISTS '${username}'@'%'; FLUSH PRIVILEGES;` ];
+      cmd = ['mysql', '-uroot', mysqlPass, '-e', `DROP USER IF EXISTS '${cleanUser}'@'%'; FLUSH PRIVILEGES;` ];
     } else if (action === 'update') {
       const sqlParts = [];
-      if (password) sqlParts.push(`ALTER USER '${username}'@'%' IDENTIFIED BY '${password}';`);
+      if (password) sqlParts.push(`ALTER USER '${cleanUser}'@'%' IDENTIFIED BY '${escapeSql(password)}';`);
       if (role) {
         const grant = role === 'read_only' ? 'SELECT' : 'ALL PRIVILEGES';
-        sqlParts.push(`REVOKE ALL PRIVILEGES, GRANT OPTION FROM '${username}'@'%'; GRANT ${grant} ON *.* TO '${username}'@'%'`);
+        sqlParts.push(`REVOKE ALL PRIVILEGES, GRANT OPTION FROM '${cleanUser}'@'%'; GRANT ${grant} ON *.* TO '${cleanUser}'@'%'`);
       }
       sqlParts.push('FLUSH PRIVILEGES;');
       cmd = ['mysql', '-uroot', mysqlPass, '-e', sqlParts.join(' ') ];
@@ -163,19 +171,19 @@ async function manageDatabaseUser({ containerId, type, action, username, passwor
   } else if (type === 'redis') {
     if (action === 'create' || action === 'update') {
       const aclRule = role === 'read_only' ? '+@read -@write' : '+@all';
-      cmd = ['redis-cli', 'ACL', 'SETUSER', username, 'on', `>${password}`, aclRule];
+      cmd = ['redis-cli', 'ACL', 'SETUSER', cleanUser, 'on', `>${password}`, aclRule];
     } else if (action === 'delete') {
-      cmd = ['redis-cli', 'ACL', 'DELUSER', username];
+      cmd = ['redis-cli', 'ACL', 'DELUSER', cleanUser];
     }
   } else if (type === 'mongodb') {
     const mongoAuth = masterPassword ? ['-u', 'app', '-p', masterPassword] : [];
     if (action === 'create') {
-      const rolesStr = role === 'read_only' ? "['read']" : role === 'admin' ? "['root']" : "['readWrite']";
-      cmd = ['mongosh', ...mongoAuth, '--eval', `db.createUser({user: '${username}', pwd: '${password}', roles: ${rolesStr}})` ];
+      const rolesArr = role === 'read_only' ? ['read'] : role === 'admin' ? ['root'] : ['readWrite'];
+      cmd = ['mongosh', ...mongoAuth, '--eval', `db.createUser({user: ${JSON.stringify(cleanUser)}, pwd: ${JSON.stringify(String(password))}, roles: ${JSON.stringify(rolesArr)}})` ];
     } else if (action === 'delete') {
-      cmd = ['mongosh', ...mongoAuth, '--eval', `db.dropUser('${username}')` ];
+      cmd = ['mongosh', ...mongoAuth, '--eval', `db.dropUser(${JSON.stringify(cleanUser)})` ];
     } else if (action === 'update') {
-      const evalScript = password ? `db.changeUserPassword('${username}', '${password}')` : 'true';
+      const evalScript = password ? `db.changeUserPassword(${JSON.stringify(cleanUser)}, ${JSON.stringify(String(password))})` : 'true';
       cmd = ['mongosh', ...mongoAuth, '--eval', evalScript ];
     }
   } else {
@@ -212,21 +220,28 @@ function ensureBackupDir() {
 /**
  * Executes a raw query/command live inside a database container engine.
  */
-async function executeDatabaseQuery({ containerId, type, query, masterPassword }) {
+async function executeDatabaseQuery({ containerId, type, query, masterPassword, dbName }) {
   const startTime = Date.now();
   const container = docker.getContainer(containerId);
   let cmd = [];
 
   if (type === 'postgres') {
-    cmd = ['psql', '-U', 'postgres', '-d', 'postgres', '-c', query];
+    const targetDb = (dbName && String(dbName).replace(/[^a-zA-Z0-9_-]/g, '')) || 'postgres';
+    cmd = ['psql', '-U', 'postgres', '-d', targetDb, '-c', query];
   } else if (type === 'mysql') {
     const mysqlPass = masterPassword ? `-p${masterPassword}` : '-proot';
-    cmd = ['mysql', '-uroot', mysqlPass, '-e', query];
+    const targetDb = dbName ? ['-D', String(dbName).replace(/[^a-zA-Z0-9_-]/g, '')] : [];
+    cmd = ['mysql', '-uroot', mysqlPass, ...targetDb, '-e', query];
   } else if (type === 'redis') {
     const redisAuth = masterPassword ? ['-a', masterPassword] : [];
-    // Split query string by whitespace into redis-cli args e.g. "KEYS *" -> ["KEYS", "*"]
-    const args = query.trim().split(/\s+/);
-    cmd = ['redis-cli', ...redisAuth, ...args];
+    // Tokenize query arguments respecting quotes
+    const tokens = (query.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || []).map((t) => {
+      if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+        return t.slice(1, -1);
+      }
+      return t;
+    });
+    cmd = ['redis-cli', ...redisAuth, ...tokens];
   } else if (type === 'mongodb') {
     const mongoAuth = masterPassword ? ['-u', 'app', '-p', masterPassword] : [];
     cmd = ['mongosh', ...mongoAuth, '--eval', query];
@@ -268,37 +283,53 @@ async function backupDatabase({ containerId, type, databaseId, masterPassword })
   const filename = `${backupId}.dump`;
   const filePath = path.join(BACKUP_DIR, filename);
 
-  let cmd = [];
-  if (type === 'postgres') {
-    cmd = ['pg_dumpall', '-U', 'postgres'];
-  } else if (type === 'mysql') {
-    const mysqlPass = masterPassword ? `-p${masterPassword}` : '-proot';
-    cmd = ['mysqldump', '-uroot', mysqlPass, '--all-databases'];
-  } else if (type === 'redis') {
-    cmd = masterPassword ? ['redis-cli', '-a', masterPassword, 'SAVE'] : ['redis-cli', 'SAVE'];
-  } else if (type === 'mongodb') {
-    const mongoAuth = masterPassword ? ['-u', 'app', '-p', masterPassword] : [];
-    cmd = ['mongodump', ...mongoAuth, '--archive'];
-  } else {
-    throw new Error(`Unsupported database type for backup: ${type}`);
-  }
+  if (type === 'redis') {
+    // Redis: Trigger SAVE then stream /data/dump.rdb out of the container
+    const saveCmd = masterPassword ? ['redis-cli', '-a', masterPassword, 'SAVE'] : ['redis-cli', 'SAVE'];
+    const saveExec = await container.exec({ Cmd: saveCmd, AttachStdout: true, AttachStderr: true });
+    const saveStream = await saveExec.start();
+    await new Promise((resolve) => { saveStream.on('end', resolve); saveStream.resume(); });
 
-  const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
-  const stream = await exec.start();
-  const writeStream = fs.createWriteStream(filePath);
-  await new Promise((resolve, reject) => {
-    stream.pipe(writeStream);
-    writeStream.on('finish', resolve);
-    stream.on('error', (err) => {
-      writeStream.destroy(err);
-      reject(err);
+    const catExec = await container.exec({ Cmd: ['cat', '/data/dump.rdb'], AttachStdout: true, AttachStderr: true });
+    const stream = await catExec.start();
+    const writeStream = fs.createWriteStream(filePath);
+    await new Promise((resolve, reject) => {
+      stream.pipe(writeStream);
+      writeStream.on('finish', resolve);
+      stream.on('error', (err) => { writeStream.destroy(err); reject(err); });
+      writeStream.on('error', reject);
     });
-    writeStream.on('error', reject);
-  });
+  } else {
+    let cmd = [];
+    if (type === 'postgres') {
+      cmd = ['pg_dumpall', '-U', 'postgres'];
+    } else if (type === 'mysql') {
+      const mysqlPass = masterPassword ? `-p${masterPassword}` : '-proot';
+      cmd = ['mysqldump', '-uroot', mysqlPass, '--all-databases'];
+    } else if (type === 'mongodb') {
+      const mongoAuth = masterPassword ? ['-u', 'app', '-p', masterPassword] : [];
+      cmd = ['mongodump', ...mongoAuth, '--archive'];
+    } else {
+      throw new Error(`Unsupported database type for backup: ${type}`);
+    }
 
-  const inspect = await exec.inspect();
-  if (inspect.ExitCode !== 0 && type !== 'redis') {
-    throw new Error(`Managed database dump failed (exit ${inspect.ExitCode})`);
+    const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
+    const stream = await exec.start();
+    const writeStream = fs.createWriteStream(filePath);
+    await new Promise((resolve, reject) => {
+      stream.pipe(writeStream);
+      writeStream.on('finish', resolve);
+      stream.on('error', (err) => {
+        writeStream.destroy(err);
+        reject(err);
+      });
+      writeStream.on('error', reject);
+    });
+
+    const inspect = await exec.inspect();
+    if (inspect.ExitCode !== 0) {
+      throw new Error(`Managed database dump failed (exit ${inspect.ExitCode})`);
+    }
   }
 
   const stats = fs.statSync(filePath);
@@ -350,14 +381,39 @@ async function restoreDatabase({ containerId, type, databaseId, backupId, master
 
   const container = docker.getContainer(containerId);
 
+  if (type === 'redis') {
+    // Stream RDB file into container's /data/dump.rdb and restart container
+    const writeExec = await container.exec({
+      Cmd: ['sh', '-c', 'cat > /data/dump.rdb'],
+      AttachStdin: true,
+      AttachStdout: true,
+      AttachStderr: true,
+    });
+    const stream = await writeExec.start({ hijack: true, stdin: true });
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(stream);
+    await new Promise((resolve, reject) => {
+      stream.on('end', resolve);
+      stream.on('error', reject);
+      fileStream.on('error', reject);
+    });
+    await container.restart().catch((err) => {
+      console.warn('[node-agent:managedDb] Redis container restart error after restore:', err.message || err);
+    });
+    return { ok: true, containerId, backupId, message: 'Redis snapshot restored and container restarted.' };
+  }
+
   let cmd = [];
   if (type === 'postgres') {
     cmd = ['psql', '-U', 'postgres', '-d', 'postgres'];
   } else if (type === 'mysql') {
     const mysqlPass = masterPassword ? `-p${masterPassword}` : '-proot';
     cmd = ['mysql', '-uroot', mysqlPass];
+  } else if (type === 'mongodb') {
+    const mongoAuth = masterPassword ? ['-u', 'app', '-p', masterPassword] : [];
+    cmd = ['mongorestore', ...mongoAuth, '--archive'];
   } else {
-    throw new Error(`Restore for ${type} is not supported directly via SQL stream`);
+    throw new Error(`Restore for ${type} is not supported directly via stream`);
   }
 
   const exec = await container.exec({

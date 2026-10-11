@@ -43,8 +43,9 @@ const ALLOWED_ORIGINS = [
 export function isOriginAllowed(origin: string): boolean {
   // Exact-match production/development origins, or any production (HTTPS)
   // first-party subdomain of shanutechx.com. The wildcard is TLS-gated so an
-  // http:// downgrade can never be accepted.
-  return ALLOWED_ORIGINS.includes(origin) || /^https:\/\/[a-z0-9-]+\.shanutechx\.com$/.test(origin);
+  const TRUSTED_SUBDOMAINS = ['app', 'admin', 'api', 'status', 'mail', 'webmail', 'dashboard', 'web'];
+  const match = origin.match(/^https:\/\/([a-z0-9-]+)\.shanutechx\.com$/);
+  return ALLOWED_ORIGINS.includes(origin) || (!!match && TRUSTED_SUBDOMAINS.includes(match[1]));
 }
 
 /**

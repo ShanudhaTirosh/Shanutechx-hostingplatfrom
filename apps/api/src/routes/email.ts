@@ -438,9 +438,12 @@ emailRouter.delete('/email/mailboxes/:id', async (req: AuthedRequest, res) => {
     if (!isOwner && !isStaff) return res.status(403).json({ error: 'Access denied' });
 
     if (account.wildduckUserId) {
-      await wildduckClient.deleteUser(account.wildduckUserId).catch((err: any) => {
-        logger.warn({ err: err.message, wildduckUserId: account.wildduckUserId }, 'Failed to delete WildDuck mail user on mailbox removal');
-      });
+      try {
+        await wildduckClient.deleteUser(account.wildduckUserId);
+      } catch (err: any) {
+        logger.error({ err, wildduckUserId: account.wildduckUserId }, 'WildDuck mail user deletion failed — aborting mailbox removal to prevent orphan');
+        return res.status(502).json({ error: 'Failed to deprovision mailbox on mail server. Please retry.' });
+      }
     }
 
     await prisma.smtpAccount.delete({ where: { id: req.params.id } });

@@ -39,7 +39,9 @@ function baseEmailLayout(title: string, contentHtml: string): string {
 <body>
   <div class="container">
     <div class="card">
-      <div class="logo-badge">S</div>
+      <div style="display: inline-block; width: 48px; height: 48px; background-color: #ffffff; border-radius: 12px; padding: 6px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(124,58,237,0.3); text-align: center; vertical-align: middle;">
+        <img src="https://${rootDomain}/STX.png" alt="ShanuTechX" width="36" height="36" style="display: block; margin: 0 auto; width: 36px; height: 36px; object-fit: contain;" />
+      </div>
       ${contentHtml}
     </div>
     <div class="footer">

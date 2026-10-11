@@ -299,53 +299,60 @@ async function streamContainerStats(containerId) {
   const statsStream = await container.stats({ stream: true });
 
   const { Transform } = require('stream');
+  let buffer = '';
   const transform = new Transform({
     readableObjectMode: false,
     writableObjectMode: false,
     transform(chunk, _encoding, callback) {
-      try {
-        const raw = JSON.parse(chunk.toString());
-        const cpuDelta = (raw.cpu_stats?.cpu_usage?.total_usage || 0) - (raw.precpu_stats?.cpu_usage?.total_usage || 0);
-        const sysDelta = (raw.cpu_stats?.system_cpu_usage || 0) - (raw.precpu_stats?.system_cpu_usage || 0);
-        const cpus = raw.cpu_stats?.online_cpus || 1;
-        const cpuPercent = sysDelta > 0 && cpuDelta > 0 ? Math.round((cpuDelta / sysDelta) * cpus * 100 * 100) / 100 : 0;
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // Retain incomplete trailing fragment
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const raw = JSON.parse(line);
+          const cpuDelta = (raw.cpu_stats?.cpu_usage?.total_usage || 0) - (raw.precpu_stats?.cpu_usage?.total_usage || 0);
+          const sysDelta = (raw.cpu_stats?.system_cpu_usage || 0) - (raw.precpu_stats?.system_cpu_usage || 0);
+          const cpus = raw.cpu_stats?.online_cpus || 1;
+          const cpuPercent = sysDelta > 0 && cpuDelta > 0 ? Math.round((cpuDelta / sysDelta) * cpus * 100 * 100) / 100 : 0;
 
-        const memUsed = Math.round((raw.memory_stats?.usage || 0) / (1024 * 1024));
-        const rawLimit = raw.memory_stats?.limit || 0;
-        const memLimit = rawLimit > 0 && rawLimit < 1024 * 1024 * 1024 * 1024 ? Math.round(rawLimit / (1024 * 1024)) : null;
-        const memPercent = memLimit ? Math.round((memUsed / memLimit) * 100 * 100) / 100 : 0;
+          const memUsed = Math.round((raw.memory_stats?.usage || 0) / (1024 * 1024));
+          const rawLimit = raw.memory_stats?.limit || 0;
+          const memLimit = rawLimit > 0 && rawLimit < 1024 * 1024 * 1024 * 1024 ? Math.round(rawLimit / (1024 * 1024)) : null;
+          const memPercent = memLimit ? Math.round((memUsed / memLimit) * 100 * 100) / 100 : 0;
 
-        // Network I/O
-        const nets = raw.networks || {};
-        let rxBytes = 0, txBytes = 0;
-        for (const iface of Object.values(nets)) {
-          rxBytes += iface.rx_bytes || 0;
-          txBytes += iface.tx_bytes || 0;
+          // Network I/O
+          const nets = raw.networks || {};
+          let rxBytes = 0, txBytes = 0;
+          for (const iface of Object.values(nets)) {
+            rxBytes += iface.rx_bytes || 0;
+            txBytes += iface.tx_bytes || 0;
+          }
+
+          // Block I/O
+          const blkStats = raw.blkio_stats?.io_service_bytes_recursive || [];
+          let blkRead = 0, blkWrite = 0;
+          for (const entry of blkStats) {
+            if (entry.op === 'read' || entry.op === 'Read') blkRead += entry.value || 0;
+            if (entry.op === 'write' || entry.op === 'Write') blkWrite += entry.value || 0;
+          }
+
+          const computed = {
+            cpuPercent,
+            memoryUsedMb: memUsed,
+            memoryLimitMb: memLimit,
+            memoryPercent: memPercent,
+            networkRxBytes: rxBytes,
+            networkTxBytes: txBytes,
+            blockReadBytes: blkRead,
+            blockWriteBytes: blkWrite,
+            pids: raw.pids_stats?.current || 0,
+            timestamp: new Date().toISOString(),
+          };
+          this.push(JSON.stringify(computed) + '\n');
+        } catch (_e) {
+          // Skip malformed line
         }
-
-        // Block I/O
-        const blkStats = raw.blkio_stats?.io_service_bytes_recursive || [];
-        let blkRead = 0, blkWrite = 0;
-        for (const entry of blkStats) {
-          if (entry.op === 'read' || entry.op === 'Read') blkRead += entry.value || 0;
-          if (entry.op === 'write' || entry.op === 'Write') blkWrite += entry.value || 0;
-        }
-
-        const computed = {
-          cpuPercent,
-          memoryUsedMb: memUsed,
-          memoryLimitMb: memLimit,
-          memoryPercent: memPercent,
-          networkRxBytes: rxBytes,
-          networkTxBytes: txBytes,
-          blockReadBytes: blkRead,
-          blockWriteBytes: blkWrite,
-          pids: raw.pids_stats?.current || 0,
-          timestamp: new Date().toISOString(),
-        };
-        this.push(JSON.stringify(computed) + '\n');
-      } catch (_e) {
-        // Skip malformed chunks
       }
       callback();
     },

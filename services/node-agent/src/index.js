@@ -19,7 +19,7 @@ const {
   getSystemInfo, getDiskUsage,
 } = require('./docker');
 const { collectStats } = require('./stats');
-const { addKey } = require('./livekit');
+const { addKey, removeKey } = require('./livekit');
 const { addDomainRoute, removeDomainRoute } = require('./customDomain');
 const { provisionDatabase, scaleDatabase, rotateDatabasePassword, manageDatabaseUser, executeDatabaseQuery, backupDatabase, listDatabaseBackups, restoreDatabase } = require('./managedDb');
 const { listDir, readFile, writeFile, writeBinaryFile, extractArchive, makeDir, remove: fsRemove, rename } = require('./filesystem');
@@ -596,7 +596,7 @@ app.get('/agent/deployments/:containerId/logs/stream', async (req, res) => {
   let logStream;
   
   try {
-    logStream = await nodeEngine.getDockerContainerLogStream(containerId);
+    logStream = await streamLogs(containerId);
 
     const cleanup = () => {
       if (logStream && typeof logStream.destroy === 'function') {
@@ -690,6 +690,23 @@ app.post('/agent/livekit/keys', async (req, res) => {
   } catch (err) {
     logger.error({ apiKey, err }, 'Failed to add LiveKit key');
     res.status(500).json({ error: 'Failed to add LiveKit key' });
+  }
+});
+
+/** Revokes and removes a LiveKit key from this node's LiveKit instance and restarts it. */
+app.delete('/agent/livekit/keys/:apiKey', async (req, res) => {
+  const { apiKey } = req.params;
+  if (!apiKey) {
+    return res.status(400).json({ error: 'apiKey parameter is required' });
+  }
+
+  try {
+    await removeKey(apiKey);
+    logger.info({ apiKey }, 'LiveKit key revoked');
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ apiKey, err }, 'Failed to revoke LiveKit key');
+    res.status(500).json({ error: 'Failed to revoke LiveKit key' });
   }
 });
 
@@ -987,8 +1004,9 @@ app.delete('/agent/fs/:deploymentId/delete', async (req, res) => {
 });
 
 app.post('/agent/fs/:deploymentId/rename', async (req, res) => {
-  const { from, to } = req.body || {};
-  if (!from || !to) return res.status(400).json({ error: 'from and to are required' });
+  const from = req.body?.from || req.body?.oldPath;
+  const to = req.body?.to || req.body?.newPath;
+  if (!from || !to) return res.status(400).json({ error: 'from (oldPath) and to (newPath) are required' });
   try {
     await rename(req.params.deploymentId, from, to);
     res.json({ ok: true });
@@ -1019,10 +1037,50 @@ app.post('/agent/fs/:deploymentId/extract', async (req, res) => {
   }
 });
 
+// Extract uploaded archive directly on destination compute node for remote workspace builds
+app.post('/agent/deployments/:deploymentId/archive-extract', async (req, res) => {
+  const safeDepId = path.basename(String(req.params.deploymentId || ''));
+  if (!safeDepId || safeDepId === '.' || safeDepId === '..') {
+    return res.status(400).json({ error: 'Invalid deploymentId' });
+  }
+  const targetDir = path.resolve(WORKSPACES_DIR, safeDepId);
+  if (!targetDir.startsWith(path.resolve(WORKSPACES_DIR) + path.sep)) {
+    return res.status(400).json({ error: 'Path escape detected' });
+  }
+  try {
+    await fs.promises.mkdir(targetDir, { recursive: true });
+    const rawFilename = req.headers['x-archive-filename'] ? decodeURIComponent(String(req.headers['x-archive-filename'])) : 'source.archive';
+    const ext = path.extname(rawFilename) || '.zip';
+    const tempArchivePath = path.join(targetDir, `__upload_source${ext}`);
+    const writeStream = fs.createWriteStream(tempArchivePath);
+    await new Promise((resolve, reject) => {
+      req.pipe(writeStream);
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+      req.on('error', reject);
+    });
+    // Extract archive into workspace
+    await extractArchive(safeDepId, `__upload_source${ext}`);
+    // Clean up archive file
+    await fs.promises.unlink(tempArchivePath).catch(() => {});
+    res.json({ ok: true, message: 'Archive extracted successfully' });
+  } catch (err) {
+    logger.error({ deploymentId: safeDepId, err }, 'Failed to extract uploaded archive');
+    res.status(500).json({ error: err.message || 'Failed to extract archive' });
+  }
+});
+
 // Purge workspace directory for 24h retention cleanup
 app.delete('/agent/fs/:deploymentId/cleanup', async (req, res) => {
   try {
-    const dir = path.join(WORKSPACES_DIR, req.params.deploymentId);
+    const safeDepId = path.basename(String(req.params.deploymentId || ''));
+    if (!safeDepId || safeDepId === '.' || safeDepId === '..') {
+      return res.status(400).json({ error: 'Invalid deploymentId' });
+    }
+    const dir = path.resolve(WORKSPACES_DIR, safeDepId);
+    if (!dir.startsWith(path.resolve(WORKSPACES_DIR) + path.sep) && dir !== path.resolve(WORKSPACES_DIR)) {
+      return res.status(400).json({ error: 'Path escape detected' });
+    }
     if (fs.existsSync(dir)) {
       fs.rmSync(dir, { recursive: true, force: true });
     }

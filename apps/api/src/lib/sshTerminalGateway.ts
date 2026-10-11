@@ -50,7 +50,7 @@ async function consumeSshTicket(ticket: string): Promise<SshTicket | null> {
 }
 
 export function attachSshTerminalGateway(server: HttpServer): void {
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
 
   server.on('upgrade', async (req, socket, head) => {
     const url = new URL(req.url ?? '', 'http://internal');
@@ -102,7 +102,7 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
           return fail('Admin/Dev role required to connect to node terminal.');
         }
 
-        // BUG-19 FIX: Parse node IP and sshKeyRef robustly handling IPv6 addresses or extra colons
+        // BUG-149 & BUG-19 FIX: Parse node IP and sshKeyRef robustly handling IPv6 addresses or extra colons
         const raw = entry.vpsId.slice(5); // strip 'node:'
         let ip: string;
         let sshKeyRef: string;
@@ -114,13 +114,26 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
             sshKeyRef = raw.slice(closingBracket + 2);
           } else {
             const idx = raw.indexOf(':');
-            ip = raw.slice(0, idx);
+            ip = raw.slice(0, idx).replace(/^\[|\]$/g, '');
             sshKeyRef = raw.slice(idx + 1);
           }
         } else {
-          const idx = raw.indexOf(':');
-          ip = raw.slice(0, idx);
-          sshKeyRef = raw.slice(idx + 1);
+          const sshIdx = raw.lastIndexOf(':ssh://');
+          if (sshIdx !== -1) {
+            ip = raw.slice(0, sshIdx).replace(/^\[|\]$/g, '');
+            sshKeyRef = raw.slice(sshIdx + 1);
+          } else {
+            const parts = raw.split(':');
+            if (parts.length >= 4) {
+              // The last 3 parts are encrypted vault components (iv:tag:ciphertext)
+              sshKeyRef = parts.slice(-3).join(':');
+              ip = parts.slice(0, -3).join(':').replace(/^\[|\]$/g, '');
+            } else {
+              const idx = raw.indexOf(':');
+              ip = raw.slice(0, idx).replace(/^\[|\]$/g, '');
+              sshKeyRef = raw.slice(idx + 1);
+            }
+          }
         }
 
         sendStatus(`Connecting to node at ${ip}…`);
@@ -170,10 +183,18 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
             }
             ws.on('message', (data) => {
               const text = data.toString();
-              if (text.startsWith('{')) {
+              if (text.startsWith('__STX_CTL__:')) {
+                try {
+                  const msg = JSON.parse(text.slice(12));
+                  if (msg.type === 'resize' && msg.cols && msg.rows) {
+                    stream.setWindow(msg.rows, msg.cols, 0, 0);
+                    return;
+                  }
+                } catch { /* ignored */ }
+              } else if (text.startsWith('{')) {
                 try {
                   const msg = JSON.parse(text);
-                  if (msg.type === 'resize' && msg.cols && msg.rows) {
+                  if (msg.type === 'resize' && typeof msg.cols === 'number' && typeof msg.rows === 'number' && Object.keys(msg).length <= 4) {
                     stream.setWindow(msg.rows, msg.cols, 0, 0);
                     return;
                   }
@@ -248,10 +269,18 @@ function handleTerminalConnection(ws: WebSocket, entry: SshTicket): void {
           ws.on('message', (data) => {
             // A JSON control message resizes the pty; anything else is raw keystrokes.
             const text = data.toString();
-            if (text.startsWith('{')) {
+            if (text.startsWith('__STX_CTL__:')) {
+              try {
+                const msg = JSON.parse(text.slice(12));
+                if (msg.type === 'resize' && msg.cols && msg.rows) {
+                  stream.setWindow(msg.rows, msg.cols, 0, 0);
+                  return;
+                }
+              } catch { /* ignored */ }
+            } else if (text.startsWith('{')) {
               try {
                 const msg = JSON.parse(text);
-                if (msg.type === 'resize' && msg.cols && msg.rows) {
+                if (msg.type === 'resize' && typeof msg.cols === 'number' && typeof msg.rows === 'number' && Object.keys(msg).length <= 4) {
                   stream.setWindow(msg.rows, msg.cols, 0, 0);
                   return;
                 }

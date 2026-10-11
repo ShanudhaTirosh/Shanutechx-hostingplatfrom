@@ -103,6 +103,14 @@ app.use(
       'X-Idempotency-Key',
       'Cache-Control',
       'Accept',
+      'x-api-key',
+      'x-impersonate-user-id',
+      'x-webmail-token',
+      'x-user-email',
+      'x-project-id',
+      'x-project-ref',
+      'x-internal-secret',
+      'x-cron-secret',
     ],
   })
 );
@@ -244,6 +252,10 @@ app.use('/api', previewToolbarRouter);
 app.use('/api', edgeConfigRouter);
 app.use('/api', speedInsightsRouter);
 
+// Prevent search crawlers and bots from indexing the API
+app.get('/robots.txt', (_req, res) => {
+  res.type('text/plain').send('User-agent: *\nDisallow: /\n');
+});
 
 // Catches any request that didn't match a route above. Without this,
 // Express falls back to its own plain-text/HTML 404 ("Cannot GET /foo"),
