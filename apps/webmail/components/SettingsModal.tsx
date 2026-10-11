@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import {
   Settings, FileSignature, FileText, Sun, Ban, X, Trash2, Plus, Zap, HardDrive,
   MailCheck, ArrowUpCircle, CheckCircle2, ExternalLink, Globe, ShieldCheck, User,
-  Check, RefreshCw, Layers, Key, Upload, Image, Camera
+  Check, RefreshCw, Layers, Key, Upload, Image, Camera, Code, Copy, Send, Eye, EyeOff, Server
 } from 'lucide-react';
 
 export interface WebmailSettingsModalProps {
@@ -17,7 +17,7 @@ export interface WebmailSettingsModalProps {
 }
 
 export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMailboxId, onRefreshData }: WebmailSettingsModalProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'dns' | 'signatures' | 'templates' | 'autoreply' | 'blocklist' | 'upgrade'>('profile');
+  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'connect' | 'dns' | 'signatures' | 'templates' | 'autoreply' | 'blocklist' | 'upgrade'>('profile');
 
   const [mailboxInfo, setMailboxInfo] = useState<any | null>(null);
 
@@ -25,6 +25,17 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Website Connect Tab State
+  const [websiteConnectData, setWebsiteConnectData] = useState<any | null>(null);
+  const [isLoadingConnect, setIsLoadingConnect] = useState(false);
+  const [connectLang, setConnectLang] = useState<'wordpress' | 'resend_api' | 'nextjs' | 'nodejs' | 'laravel' | 'php' | 'python'>('wordpress');
+  const [copiedConnectField, setCopiedConnectField] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [testTo, setTestTo] = useState('');
+  const [testSubject, setTestSubject] = useState('Website Connection Verification');
+  const [isTestingSend, setIsTestingSend] = useState(false);
+  const [testSendResult, setTestSendResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // DNS & Aliases Tab State
   const [customDomainInput, setCustomDomainInput] = useState('');
@@ -90,6 +101,53 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
       }
     }).catch(() => {});
     api.webmail.blockedSenders.list().then((r: any) => setBlockedSenders(r.blockedSenders || [])).catch(() => {});
+  };
+
+  const copyConnectText = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedConnectField(field);
+    setTimeout(() => setCopiedConnectField(null), 2000);
+  };
+
+  const loadWebsiteConnect = async (mailboxId?: string) => {
+    if (!mailboxId) return;
+    setIsLoadingConnect(true);
+    try {
+      const res = await api.email.websiteConnect(mailboxId);
+      setWebsiteConnectData(res);
+    } catch {
+      setWebsiteConnectData(null);
+    } finally {
+      setIsLoadingConnect(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSubTab === 'connect' && mailboxInfo?.id && !websiteConnectData) {
+      void loadWebsiteConnect(mailboxInfo.id);
+    }
+  }, [activeSubTab, mailboxInfo?.id, websiteConnectData]);
+
+  const handleTestSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testTo.trim()) return;
+    setIsTestingSend(true);
+    setTestSendResult(null);
+    try {
+      const res = await api.email.sendTransactional({
+        from: mailboxInfo?.email || 'user@shanutechx.com',
+        to: testTo.trim(),
+        subject: testSubject.trim() || 'Website Connection Test Email',
+        html: `<h3>Test Email from ShanuTechX Webmail</h3><p>Your website connection is verified and operational! Sent at ${new Date().toISOString()}.</p>`,
+      });
+      setTestSendResult({ success: true, message: `Dispatched successfully! Message ID: ${res.id || 'ok'}` });
+      toast('Test email delivered successfully!', 'success');
+    } catch (err: any) {
+      setTestSendResult({ success: false, message: err.message || 'Failed to dispatch test email' });
+      toast(err.message || 'Test send failed', 'error');
+    } finally {
+      setIsTestingSend(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -235,6 +293,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
         <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto">
           {[
             { id: 'profile', label: 'Profile', icon: User },
+            { id: 'connect', label: 'Website Connect', icon: Code },
             { id: 'dns', label: 'DNS & Aliases', icon: Globe },
             { id: 'signatures', label: 'Signatures', icon: FileSignature },
             { id: 'templates', label: 'Templates', icon: FileText },
@@ -347,7 +406,241 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
           </form>
         )}
 
-        {/* TAB 1: DNS & ALIASES */}
+        {/* TAB 1: WEBSITE CONNECT & API */}
+        {activeSubTab === 'connect' && (
+          <div className="space-y-4 text-xs max-h-[60vh] overflow-y-auto pr-1">
+            {/* Mailbox SMTP & REST API Credentials Overview */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-indigo-400 flex items-center gap-2">
+                  <Server className="h-4 w-4" /> Mailbox SMTP & API Credentials
+                </h4>
+                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold">
+                  Autonomous Cluster Ready
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Connect external websites, WordPress, WooCommerce, webhooks, or automated backend services using these dedicated mailbox credentials.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
+                  <span className="text-[10px] text-slate-500 uppercase font-semibold">SMTP Server Host</span>
+                  <div className="flex items-center justify-between font-mono text-white text-xs">
+                    <span>{websiteConnectData?.credentials?.smtpHost || 'mail.shanutechx.com'}</span>
+                    <button
+                      type="button"
+                      onClick={() => copyConnectText(websiteConnectData?.credentials?.smtpHost || 'mail.shanutechx.com', 'smtpHost')}
+                      className="text-slate-400 hover:text-indigo-400"
+                    >
+                      {copiedConnectField === 'smtpHost' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
+                  <span className="text-[10px] text-slate-500 uppercase font-semibold">Port & Encryption</span>
+                  <div className="font-mono text-white text-xs">
+                    465 (SSL/TLS) • 587 (STARTTLS)
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
+                  <span className="text-[10px] text-slate-500 uppercase font-semibold">SMTP Username</span>
+                  <div className="flex items-center justify-between font-mono text-white text-xs">
+                    <span className="truncate">{mailboxInfo?.email || 'user@shanutechx.com'}</span>
+                    <button
+                      type="button"
+                      onClick={() => copyConnectText(mailboxInfo?.email || 'user@shanutechx.com', 'username')}
+                      className="text-slate-400 hover:text-indigo-400 ml-1"
+                    >
+                      {copiedConnectField === 'username' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-500 uppercase font-semibold">SMTP Password</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-slate-400 hover:text-slate-200 text-[10px] flex items-center gap-1"
+                    >
+                      {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      <span>{showPassword ? 'Hide' : 'Reveal'}</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between font-mono text-white text-xs">
+                    <span>
+                      {showPassword
+                        ? (websiteConnectData?.credentials?.password || mailboxInfo?.smtpPassword || '••••••••')
+                        : '••••••••••••'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => copyConnectText(websiteConnectData?.credentials?.password || mailboxInfo?.smtpPassword || '', 'password')}
+                      className="text-slate-400 hover:text-indigo-400"
+                    >
+                      {copiedConnectField === 'password' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Integration Guides & Code Snippets */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h4 className="font-bold text-indigo-400 flex items-center gap-2">
+                  <Code className="h-4 w-4" /> Ready-to-Use Website & API Code
+                </h4>
+                <div className="flex flex-wrap gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-[10px]">
+                  {[
+                    { id: 'wordpress', label: 'WordPress' },
+                    { id: 'resend_api', label: 'Resend API' },
+                    { id: 'nextjs', label: 'Next.js' },
+                    { id: 'nodejs', label: 'Node.js' },
+                    { id: 'laravel', label: 'Laravel' },
+                    { id: 'php', label: 'PHP' },
+                    { id: 'python', label: 'Python' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setConnectLang(item.id as any)}
+                      className={`px-2 py-1 rounded-lg font-mono transition-all ${
+                        connectLang === item.id
+                          ? 'bg-indigo-600 text-white font-bold shadow'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Code Snippet Box */}
+              <div className="relative bg-slate-900 border border-slate-800 rounded-xl p-3 font-mono text-[11px] text-indigo-300 overflow-x-auto max-h-56">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const snippet = websiteConnectData?.codeSnippets?.[
+                      connectLang === 'resend_api' ? 'resendRestApi' :
+                      connectLang === 'nextjs' ? 'nextjs14' :
+                      connectLang === 'nodejs' ? 'nodemailer' :
+                      connectLang === 'laravel' ? 'laravelEnv' :
+                      connectLang === 'php' ? 'phpMailer' :
+                      connectLang === 'python' ? 'python' : 'wordpress'
+                    ];
+                    const textToCopy = typeof snippet === 'object' ? (snippet.curl || JSON.stringify(snippet, null, 2)) : (snippet || '');
+                    copyConnectText(textToCopy, 'activeSnippet');
+                  }}
+                  className="absolute top-2.5 right-2.5 p-1.5 bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 rounded-lg text-slate-300 hover:text-white transition-colors flex items-center gap-1 text-[10px]"
+                >
+                  {copiedConnectField === 'activeSnippet' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedConnectField === 'activeSnippet' ? 'Copied' : 'Copy'}</span>
+                </button>
+                <pre className="whitespace-pre">
+                  {connectLang === 'wordpress' && (
+                    `// WordPress (WP Mail SMTP / FluentSMTP / wp_mail) Settings
+// SMTP Host: ${websiteConnectData?.credentials?.smtpHost || 'mail.shanutechx.com'}
+// SMTP Port: 465 (SSL) or 587 (TLS)
+// Encryption: SSL / TLS
+// Auto TLS: On
+// Authentication: Yes
+// SMTP Username: ${mailboxInfo?.email || 'user@shanutechx.com'}
+// SMTP Password: ${websiteConnectData?.credentials?.password || mailboxInfo?.smtpPassword || '<YOUR_MAILBOX_PASSWORD>'}
+// From Email: ${mailboxInfo?.email || 'user@shanutechx.com'}
+
+// Or add directly to wp-config.php:
+define('WP_MAIL_SMTP_HOST', '${websiteConnectData?.credentials?.smtpHost || 'mail.shanutechx.com'}');
+define('WP_MAIL_SMTP_PORT', 465);
+define('WP_MAIL_SMTP_ENCRYPTION', 'ssl');
+define('WP_MAIL_SMTP_AUTH', true);
+define('WP_MAIL_SMTP_USER', '${mailboxInfo?.email || 'user@shanutechx.com'}');
+define('WP_MAIL_SMTP_PASS', '${websiteConnectData?.credentials?.password || mailboxInfo?.smtpPassword || '<YOUR_PASSWORD>'}');`
+                  )}
+                  {connectLang === 'resend_api' && (websiteConnectData?.codeSnippets?.resendRestApi?.curl || `// Resend-Compatible REST API
+// POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanutechx.com'}/api/v1/emails
+// Header: Authorization: Bearer <ID_TOKEN> or Basic Auth (${mailboxInfo?.email}:<password>)
+curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanutechx.com'}/api/v1/emails \\
+  -H "Authorization: Bearer <API_KEY>" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "from": "${mailboxInfo?.email || 'user@shanutechx.com'}",
+    "to": "client@example.com",
+    "subject": "Platform Automated Notification",
+    "html": "<h3>Automated Message via REST API</h3>"
+  }'`)}
+                  {connectLang === 'nextjs' && (websiteConnectData?.codeSnippets?.nextjs14 || `// Next.js 14 API Route`)}
+                  {connectLang === 'nodejs' && (websiteConnectData?.codeSnippets?.nodemailer || `// Node.js Nodemailer`)}
+                  {connectLang === 'laravel' && (websiteConnectData?.codeSnippets?.laravelEnv || `# Laravel .env`)}
+                  {connectLang === 'php' && (websiteConnectData?.codeSnippets?.phpMailer || `// PHP PHPMailer`)}
+                  {connectLang === 'python' && (websiteConnectData?.codeSnippets?.python || `# Python smtplib`)}
+                </pre>
+              </div>
+            </div>
+
+            {/* Live Test Send */}
+            <form onSubmit={handleTestSend} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-emerald-400 flex items-center gap-2">
+                  <Send className="h-4 w-4" /> Live Website Email Dispatch Test
+                </h4>
+                <span className="text-[10px] text-slate-500">Test actual outbound delivery</span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Send a real test email through your mailbox cluster to confirm your website and SMTP credentials are authenticated.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block text-[10px] mb-1">Recipient Email</label>
+                  <input
+                    type="email"
+                    placeholder="recipient@example.com"
+                    value={testTo}
+                    onChange={(e) => setTestTo(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block text-[10px] mb-1">Subject</label>
+                  <input
+                    type="text"
+                    value={testSubject}
+                    onChange={(e) => setTestSubject(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
+                    required
+                  />
+                </div>
+              </div>
+
+              {testSendResult && (
+                <div className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                  testSendResult.success ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+                }`}>
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{testSendResult.message}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isTestingSend}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow flex items-center gap-2 disabled:opacity-50 transition-all text-xs"
+              >
+                {isTestingSend ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                <span>{isTestingSend ? 'Sending Test Email...' : 'Send Live Test Email'}</span>
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* TAB 2: DNS & ALIASES */}
         {activeSubTab === 'dns' && (
           <div className="space-y-4 text-xs">
             {/* Domain DNS Verification */}
@@ -394,12 +687,12 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
                       {dnsResults.verification?.spf ? <CheckCircle2 className="h-4 w-4" /> : <X className="h-4 w-4" />}
                     </div>
 
-                    <div className="p-2.5 rounded-xl border bg-emerald-500/10 border-emerald-500/20 text-emerald-300 flex items-center justify-between">
+                    <div className={`p-2.5 rounded-xl border flex items-center justify-between ${dnsResults.verification?.dkim ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
                       <div>
                         <span className="font-bold text-xs block">DKIM Record</span>
-                        <span className="text-[10px] font-mono opacity-80">shanutechx._domainkey</span>
+                        <span className="text-[10px] font-mono opacity-80">wildduck._domainkey</span>
                       </div>
-                      <CheckCircle2 className="h-4 w-4" />
+                      {dnsResults.verification?.dkim ? <CheckCircle2 className="h-4 w-4" /> : <X className="h-4 w-4" />}
                     </div>
 
                     <div className={`p-2.5 rounded-xl border flex items-center justify-between ${dnsResults.verification?.dmarc ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>

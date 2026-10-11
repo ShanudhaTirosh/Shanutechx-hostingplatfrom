@@ -52,9 +52,9 @@ export default function DynamicDnsSetupGuide({
     },
     {
       type: 'TXT (DKIM)',
-      name: 'default._domainkey',
+      name: 'wildduck._domainkey',
       value: `v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC3S...`,
-      explanation: 'Cryptographic signature verification record managed automatically by ShanuTechX mail servers.',
+      explanation: 'Cryptographic signature verification record managed automatically by ShanuTechX WildDuck mail cluster.',
     },
     {
       type: 'TXT (DMARC)',

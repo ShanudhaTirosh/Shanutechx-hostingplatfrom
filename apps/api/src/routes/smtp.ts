@@ -230,6 +230,22 @@ smtpRouter.post('/smtp/verify-dns', async (req: AuthedRequest, res) => {
       spfVerified = false;
     }
 
+    // DKIM check (WildDuck uses selector 'wildduck', legacy uses 'default')
+    let dkimVerified = false;
+    let dkimSelector = 'wildduck';
+    try {
+      const dkimTxt = await dnsPromises.resolveTxt(`wildduck._domainkey.${cleanDomain}`);
+      dkimVerified = dkimTxt.some((t) => t.join('').includes('v=DKIM1'));
+    } catch {
+      try {
+        const dkimTxt2 = await dnsPromises.resolveTxt(`default._domainkey.${cleanDomain}`);
+        dkimVerified = dkimTxt2.some((t) => t.join('').includes('v=DKIM1'));
+        if (dkimVerified) dkimSelector = 'default';
+      } catch {
+        dkimVerified = false;
+      }
+    }
+
     // DMARC check
     let dmarcVerified = false;
     try {
@@ -246,8 +262,9 @@ smtpRouter.post('/smtp/verify-dns', async (req: AuthedRequest, res) => {
       verification: {
         mx: mxVerified,
         spf: spfVerified,
+        dkim: dkimVerified,
         dmarc: dmarcVerified,
-        allVerified: mxVerified && spfVerified,
+        allVerified: mxVerified && spfVerified && dkimVerified,
       },
       records: {
         mxRecords,
@@ -256,7 +273,7 @@ smtpRouter.post('/smtp/verify-dns', async (req: AuthedRequest, res) => {
       expectedDns: [
         { type: 'MX', name: '@', value: `${rootHost}`, priority: 10, status: mxVerified ? 'verified' : 'pending' },
         { type: 'TXT (SPF)', name: '@', value: buildSpfRecord(env.rootDomain), status: spfVerified ? 'verified' : 'pending' },
-        { type: 'TXT (DKIM)', name: 'default._domainkey', value: `v=DKIM1; k=rsa; p=<managed by mail server>`, status: 'active' },
+        { type: 'TXT (DKIM)', name: `${dkimSelector}._domainkey`, value: `v=DKIM1; k=rsa; p=<managed by WildDuck mail server>`, status: dkimVerified ? 'verified' : 'pending' },
         { type: 'TXT (DMARC)', name: '_dmarc', value: `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${cleanDomain}`, status: dmarcVerified ? 'verified' : 'pending' },
       ],
     });

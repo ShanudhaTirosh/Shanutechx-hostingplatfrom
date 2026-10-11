@@ -33,6 +33,7 @@ export interface MailOptions {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
   attachments?: MailAttachment[];
 }
 
@@ -188,6 +189,7 @@ export async function sendSmtpEmail(
             let rawLines: string[] = [
               `From: ${mail.from}`,
               `To: ${mail.to}`,
+              ...(mail.replyTo ? [`Reply-To: ${mail.replyTo}`] : []),
               `Subject: ${mail.subject}`,
               `Message-ID: ${messageId}`,
               `Date: ${new Date().toUTCString()}`,

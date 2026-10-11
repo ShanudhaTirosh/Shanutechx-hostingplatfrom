@@ -61,4 +61,5 @@ infra/postal/signing.key
 .turbo/
 coverage/
 .vercel/
+*.tsbuildinfo
 

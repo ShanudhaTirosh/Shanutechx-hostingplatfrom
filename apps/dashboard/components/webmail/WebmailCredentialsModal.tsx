@@ -20,7 +20,7 @@ export function WebmailCredentialsModal({
   selectedMailboxId,
 }: WebmailCredentialsModalProps) {
   const [activeTab, setActiveTab] = useState<'desktop' | 'code' | 'system'>('desktop');
-  const [codeLanguage, setCodeLanguage] = useState<'nodejs' | 'python' | 'curl'>('nodejs');
+  const [codeLanguage, setCodeLanguage] = useState<'wordpress' | 'resend_api' | 'nextjs' | 'nodejs' | 'laravel' | 'php' | 'python'>('wordpress');
   const [creds, setCreds] = useState<any>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -108,6 +108,86 @@ export function WebmailCredentialsModal({
   const userEmail = creds?.email || 'user@shanutechx.com';
   const apiKey = creds?.apiKey || 'stx_live_sk_8932479238479238479';
 
+  const wpSnippet = `// WordPress (WP Mail SMTP / FluentSMTP / wp_mail) Settings
+// SMTP Host: ${smtpHost}
+// SMTP Port: 465 (SSL) or 587 (TLS)
+// Encryption: SSL / TLS
+// Auto TLS: On
+// Authentication: Yes
+// SMTP Username: ${userEmail}
+// SMTP Password: <YOUR_MAILBOX_PASSWORD>
+// From Email: ${userEmail}
+
+// Or add directly to wp-config.php:
+define('WP_MAIL_SMTP_HOST', '${smtpHost}');
+define('WP_MAIL_SMTP_PORT', 465);
+define('WP_MAIL_SMTP_ENCRYPTION', 'ssl');
+define('WP_MAIL_SMTP_AUTH', true);
+define('WP_MAIL_SMTP_USER', '${userEmail}');
+define('WP_MAIL_SMTP_PASS', '<YOUR_MAILBOX_PASSWORD>');`;
+
+  const resendApiSnippet = `// Resend-Style Automated Email REST API
+// POST https://${smtpHost}/api/v1/emails (or https://api.shanutechx.com/api/v1/emails)
+// Header: Authorization: Bearer ${apiKey} (or Basic Auth: ${userEmail}:<password>)
+// Header: Content-Type: application/json
+
+// cURL:
+curl -X POST https://${smtpHost}/api/v1/emails \\
+  -H "Authorization: Bearer ${apiKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "from": "${userEmail}",
+    "to": "customer@example.com",
+    "subject": "Automated Order Notification #1042",
+    "html": "<h1>Welcome</h1><p>Your subscription is active!</p>"
+  }'
+
+// Node.js fetch:
+const response = await fetch('https://${smtpHost}/api/v1/emails', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer ${apiKey}',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    from: '${userEmail}',
+    to: 'customer@example.com',
+    subject: 'Automated Order Notification #1042',
+    html: '<h1>Welcome</h1><p>Your subscription is active!</p>'
+  })
+});
+const result = await response.json();
+console.log('Dispatched message ID:', result.id);`;
+
+  const nextjsSnippet = `// Next.js 14 App Router API Route (app/api/send/route.ts)
+import { NextResponse } from 'next/server';
+import nodemailer from 'nodemailer';
+
+const transporter = nodemailer.createTransport({
+  host: '${smtpHost}',
+  port: 465,
+  secure: true,
+  auth: {
+    user: process.env.SMTP_USER || '${userEmail}',
+    pass: process.env.SMTP_PASSWORD,
+  },
+});
+
+export async function POST(req: Request) {
+  try {
+    const { to, subject, html } = await req.json();
+    const info = await transporter.sendMail({
+      from: '"My Website" <${userEmail}>',
+      to,
+      subject,
+      html,
+    });
+    return NextResponse.json({ success: true, messageId: info.messageId });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}`;
+
   const nodeCodeSnippet = `// Node.js (Nodemailer) Integration for ShanuTechX Webmail
 import nodemailer from 'nodemailer';
 
@@ -133,6 +213,47 @@ async function sendMail() {
 
 sendMail();`;
 
+  const laravelSnippet = `# Laravel .env Configuration
+MAIL_MAILER=smtp
+MAIL_HOST=${smtpHost}
+MAIL_PORT=465
+MAIL_USERNAME=${userEmail}
+MAIL_PASSWORD=\${STX_MAIL_PASSWORD}
+MAIL_ENCRYPTION=ssl
+MAIL_FROM_ADDRESS="${userEmail}"
+MAIL_FROM_NAME="\${APP_NAME}"`;
+
+  const phpSnippet = `<?php
+// PHP (PHPMailer) Integration
+use PHPMailer\\PHPMailer\\PHPMailer;
+use PHPMailer\\PHPMailer\\Exception;
+
+require 'vendor/autoload.php';
+
+$mail = new PHPMailer(true);
+
+try {
+    $mail->isSMTP();
+    $mail->Host       = '${smtpHost}';
+    $mail->SMTPAuth   = true;
+    $mail->Username   = '${userEmail}';
+    $mail->Password   = getenv('STX_MAIL_PASSWORD');
+    $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS; // Port 465
+    $mail->Port       = 465;
+
+    $mail->setFrom('${userEmail}', 'Website Notification');
+    $mail->addAddress('client@example.com');
+
+    $mail->isHTML(true);
+    $mail->Subject = 'Automated Website Notification';
+    $mail->Body    = '<h3>Hello from your website</h3>';
+
+    $mail->send();
+    echo 'Message has been sent successfully';
+} catch (Exception $e) {
+    echo "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
+}`;
+
   const pythonCodeSnippet = `# Python (smtplib & requests) Integration for ShanuTechX Webmail
 import smtplib
 from email.mime.text import MIMEText
@@ -155,15 +276,18 @@ with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
 
 print("Mail dispatched successfully!")`;
 
-  const curlCodeSnippet = `# REST API Integration via cURL
-curl -X POST https://${smtpHost}/api/webmail/send \\
-  -H "Authorization: Bearer ${apiKey}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "recipientEmail": "client@example.com",
-    "subject": "Platform Automated Dispatch",
-    "htmlBody": "<h3>Automated Message via REST API</h3>"
-  }'`;
+  const getActiveSnippet = () => {
+    switch (codeLanguage) {
+      case 'wordpress': return wpSnippet;
+      case 'resend_api': return resendApiSnippet;
+      case 'nextjs': return nextjsSnippet;
+      case 'nodejs': return nodeCodeSnippet;
+      case 'laravel': return laravelSnippet;
+      case 'php': return phpSnippet;
+      case 'python': return pythonCodeSnippet;
+      default: return wpSnippet;
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
@@ -345,31 +469,27 @@ curl -X POST https://${smtpHost}/api/webmail/send \\
                 {/* Snippet Language Selector */}
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-300">Ready-to-copy Program Code Snippet:</span>
-                  <div className="flex gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
-                    <button
-                      onClick={() => setCodeLanguage('nodejs')}
-                      className={`px-2.5 py-1 rounded font-mono transition-all ${
-                        codeLanguage === 'nodejs' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      Node.js
-                    </button>
-                    <button
-                      onClick={() => setCodeLanguage('python')}
-                      className={`px-2.5 py-1 rounded font-mono transition-all ${
-                        codeLanguage === 'python' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      Python
-                    </button>
-                    <button
-                      onClick={() => setCodeLanguage('curl')}
-                      className={`px-2.5 py-1 rounded font-mono transition-all ${
-                        codeLanguage === 'curl' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      cURL
-                    </button>
+                  <div className="flex flex-wrap gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
+                    {[
+                      { id: 'wordpress', label: 'WordPress' },
+                      { id: 'resend_api', label: 'Resend API' },
+                      { id: 'nextjs', label: 'Next.js' },
+                      { id: 'nodejs', label: 'Node.js' },
+                      { id: 'laravel', label: 'Laravel' },
+                      { id: 'php', label: 'PHP' },
+                      { id: 'python', label: 'Python' },
+                    ].map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setCodeLanguage(item.id as any)}
+                        className={`px-2.5 py-1 rounded font-mono transition-all text-[11px] ${
+                          codeLanguage === item.id ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -377,8 +497,7 @@ curl -X POST https://${smtpHost}/api/webmail/send \\
                 <div className="relative bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-[11px] text-indigo-300 overflow-x-auto max-h-64">
                   <button
                     onClick={() => {
-                      const snippet = codeLanguage === 'nodejs' ? nodeCodeSnippet : codeLanguage === 'python' ? pythonCodeSnippet : curlCodeSnippet;
-                      copyToClipboard(snippet, 'codeSnippet');
+                      copyToClipboard(getActiveSnippet(), 'codeSnippet');
                     }}
                     className="absolute top-3 right-3 p-1.5 bg-slate-900 border border-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors flex items-center gap-1 text-[10px]"
                   >
@@ -386,9 +505,7 @@ curl -X POST https://${smtpHost}/api/webmail/send \\
                     <span>{copiedField === 'codeSnippet' ? 'Copied' : 'Copy Code'}</span>
                   </button>
                   <pre className="whitespace-pre">
-                    {codeLanguage === 'nodejs' && nodeCodeSnippet}
-                    {codeLanguage === 'python' && pythonCodeSnippet}
-                    {codeLanguage === 'curl' && curlCodeSnippet}
+                    {getActiveSnippet()}
                   </pre>
                 </div>
               </div>

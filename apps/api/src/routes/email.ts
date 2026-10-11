@@ -14,6 +14,7 @@ import { getServerIp, buildSpfRecord } from '../lib/mailAuth';
 import { getWebmailClusterConfig, updateWebmailClusterConfig, verifyS3StorageConnection } from '../lib/webmailS3Storage';
 import crypto from 'crypto';
 import { isSsrfTargetAsync } from './smtp';
+import { getUserEmailPlanQuotas, validateMailboxCreationQuota } from '../lib/emailPlanQuotas';
 
 export const emailRouter = Router();
 
@@ -144,6 +145,260 @@ emailRouter.get('/email/mailboxes/:id/credentials', async (req: AuthedRequest, r
   } catch (err: any) {
     logger.error({ err }, 'Failed to reveal mailbox credentials');
     res.status(500).json({ error: err.message || 'Failed to reveal credentials' });
+  }
+});
+
+/**
+ * GET /api/email/plan-quotas
+ * Returns customer's plan name, max storage, allocated storage, remaining storage,
+ * mailbox slots, and custom domain allowances.
+ */
+emailRouter.get('/email/plan-quotas', async (req: AuthedRequest, res) => {
+  try {
+    const quotas = await getUserEmailPlanQuotas(req.user!.id, req.user!.role);
+    res.json(quotas);
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to fetch email plan quotas');
+    res.status(500).json({ error: 'Failed to fetch plan quotas' });
+  }
+});
+
+/**
+ * GET /api/email/mailboxes/:id/website-connect
+ * Returns per-mailbox SMTP & IMAP credentials with copy-paste integration configs
+ * for WordPress WP Mail SMTP, Node.js/Nodemailer, Next.js, Laravel .env, Python, PHP, and Resend-style REST API.
+ */
+emailRouter.get('/email/mailboxes/:id/website-connect', async (req: AuthedRequest, res) => {
+  try {
+    const account = await prisma.smtpAccount.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { id: true, email: true, displayName: true } } },
+    });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const isOwner = account.userId === req.user!.id;
+    const isDev = req.user!.role === 'dev';
+    if (!isOwner && !isDev) {
+      if (req.user!.role !== 'admin') return res.status(403).json({ error: 'Access denied' });
+      const isExplicitlyDelegated = (account.allowedAdminIds || []).includes(req.user!.id);
+      if (!isExplicitlyDelegated) {
+        const owner = await prisma.user.findUnique({ where: { id: account.userId }, select: { assignedAdminId: true } });
+        if (owner?.assignedAdminId !== req.user!.id) {
+          return res.status(403).json({ error: 'Access denied: You are not assigned to this account' });
+        }
+      }
+    }
+
+    const password = decryptSecret(account.credentialRef, env.secretsEncryptionKey);
+    const domain = account.customDomain || account.smtpHost.replace(/^mail\./, '');
+    const fullEmail = `${account.smtpUsername}@${domain}`;
+    const imapHost = account.smtpHost.replace(/^mail\./, 'imap.');
+    const appDisplayName = account.user?.displayName || 'Website Application';
+    const apiBaseUrl = process.env.NODE_ENV === 'production' ? `https://api.${env.rootDomain}` : 'http://localhost:4000';
+
+    const credentials = {
+      mailboxId: account.id,
+      email: fullEmail,
+      username: account.smtpUsername,
+      fullUsername: fullEmail,
+      password,
+      domain,
+      smtp: {
+        host: account.smtpHost,
+        portTls: 587,
+        portSsl: 465,
+        encryptionTls: 'STARTTLS',
+        encryptionSsl: 'SSL/TLS',
+        authentication: true,
+      },
+      imap: {
+        host: imapHost,
+        port: 993,
+        encryption: 'SSL/TLS',
+      },
+    };
+
+    const wordpressConfig = {
+      fromEmail: fullEmail,
+      fromName: appDisplayName,
+      mailer: 'Other SMTP',
+      smtpHost: account.smtpHost,
+      encryption: 'TLS',
+      smtpPort: 587,
+      autoTls: 'On',
+      authentication: 'On',
+      smtpUsername: fullEmail,
+      smtpPassword: password,
+      instructions: [
+        '1. In your WordPress Admin panel, install and activate the "WP Mail SMTP" or "FluentSMTP" plugin.',
+        '2. Select "Other SMTP" as your mailer.',
+        `3. Set From Email to "${fullEmail}".`,
+        `4. Set SMTP Host to "${account.smtpHost}" and SMTP Port to 587 (TLS).`,
+        `5. Enable "Authentication" and enter Username "${fullEmail}" with your password.`,
+        '6. Click "Save Settings" and send a test email via the plugin tab to verify.',
+      ],
+    };
+
+    const laravelEnv = `# ShanuTechX Business Email Configuration (.env)
+MAIL_MAILER=smtp
+MAIL_HOST=${account.smtpHost}
+MAIL_PORT=587
+MAIL_USERNAME=${fullEmail}
+MAIL_PASSWORD="${password}"
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS="${fullEmail}"
+MAIL_FROM_NAME="\${APP_NAME}"`;
+
+    const nodejsSnippet = `import nodemailer from 'nodemailer';
+
+// Create reusable transporter object using ShanuTechX SMTP
+export const emailTransporter = nodemailer.createTransport({
+  host: '${account.smtpHost}',
+  port: 587,
+  secure: false, // true for 465, false for 587
+  auth: {
+    user: '${fullEmail}',
+    pass: '${password}',
+  },
+});
+
+export async function sendWebsiteNotification({ to, subject, html, text }: { to: string; subject: string; html?: string; text?: string }) {
+  const info = await emailTransporter.sendMail({
+    from: '"${appDisplayName}" <${fullEmail}>',
+    to,
+    subject,
+    html: html || text,
+    text,
+  });
+  console.log('Email delivered successfully:', info.messageId);
+  return info;
+}`;
+
+    const nextjsSnippet = `// app/api/send-email/route.ts (Next.js 14 App Router)
+import { NextResponse } from 'next/server';
+import nodemailer from 'nodemailer';
+
+const transporter = nodemailer.createTransport({
+  host: '${account.smtpHost}',
+  port: 587,
+  secure: false,
+  auth: {
+    user: '${fullEmail}',
+    pass: '${password}',
+  },
+});
+
+export async function POST(req: Request) {
+  try {
+    const { to, subject, html } = await req.json();
+
+    const info = await transporter.sendMail({
+      from: '"${appDisplayName}" <${fullEmail}>',
+      to,
+      subject,
+      html,
+    });
+
+    return NextResponse.json({ success: true, messageId: info.messageId });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}`;
+
+    const phpSnippet = `<?php
+use PHPMailer\\PHPMailer\\PHPMailer;
+use PHPMailer\\PHPMailer\\Exception;
+
+require 'vendor/autoload.php';
+
+$mail = new PHPMailer(true);
+
+try {
+    // Server settings
+    $mail->isSMTP();
+    $mail->Host       = '${account.smtpHost}';
+    $mail->SMTPAuth   = true;
+    $mail->Username   = '${fullEmail}';
+    $mail->Password   = '${password}';
+    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+    $mail->Port       = 587;
+
+    // Recipients
+    $mail->setFrom('${fullEmail}', '${appDisplayName}');
+    $mail->addAddress('customer@example.com');
+
+    // Content
+    $mail->isHTML(true);
+    $mail->Subject = 'New Order Notification';
+    $mail->Body    = '<h1>Hello!</h1><p>Your order has been received.</p>';
+
+    $mail->send();
+    echo 'Message has been sent';
+} catch (Exception $e) {
+    echo "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
+}`;
+
+    const pythonSnippet = `import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+def send_transactional_email(recipient, subject, html_content):
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = '"${appDisplayName}" <${fullEmail}>'
+    msg['To'] = recipient
+    msg.attach(MIMEText(html_content, 'html'))
+
+    with smtplib.SMTP('${account.smtpHost}', 587) as server:
+        server.starttls()
+        server.login('${fullEmail}', '${password}')
+        server.sendmail('${fullEmail}', [recipient], msg.as_string())
+    print("Email delivered successfully!")`;
+
+    const resendApiSnippet = {
+      apiUrl: `${apiBaseUrl}/api/v1/emails`,
+      curl: `curl -X POST ${apiBaseUrl}/api/v1/emails \\
+  -H "Authorization: Bearer YOUR_SHANUTECHX_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "from": "${appDisplayName} <${fullEmail}>",
+    "to": "customer@example.com",
+    "subject": "Order Confirmation",
+    "html": "<strong>Thank you for your order!</strong>"
+  }'`,
+      fetchJs: `// Resend-style transactional API call
+const response = await fetch('${apiBaseUrl}/api/v1/emails', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_SHANUTECHX_API_KEY',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    from: '${appDisplayName} <${fullEmail}>',
+    to: 'customer@example.com',
+    subject: 'Welcome to our platform!',
+    html: '<p>Your account is ready.</p>',
+  }),
+});
+const data = await response.json();
+console.log('Sent email ID:', data.id);`,
+    };
+
+    res.json({
+      credentials,
+      integrations: {
+        wordpress: wordpressConfig,
+        laravel: laravelEnv,
+        nodejs: nodejsSnippet,
+        nextjs: nextjsSnippet,
+        php: phpSnippet,
+        python: pythonSnippet,
+        resendApi: resendApiSnippet,
+      },
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to generate website connection configs');
+    res.status(500).json({ error: err.message || 'Failed to generate connection configs' });
   }
 });
 
@@ -280,13 +535,13 @@ emailRouter.post('/admin/email/provision', async (req: AuthedRequest, res) => {
 
 /**
  * POST /api/email/mailboxes
- * Customer mailbox creation — customers MUST have an active SMTP subscription.
+ * Customer mailbox creation — hardened with plan subscription limits and customizable storage quota.
  */
 const createMailboxSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  storageQuotaMb: z.number().optional().default(1024),
-  dailySendLimit: z.number().optional().default(1000),
+  storageQuotaMb: z.number().int().min(256).max(1048576).optional().default(1024),
+  dailySendLimit: z.number().int().positive().optional(),
 });
 
 emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
@@ -299,61 +554,32 @@ emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
   const parse = createMailboxSchema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: 'Invalid mailbox data', details: parse.error.format() });
 
-  const isStaff = role === 'admin' || role === 'dev';
-
-  if (!isStaff) {
-    const existingCount = await prisma.smtpAccount.count({
-      where: { userId: req.user!.id },
-    });
-
-    const paidOrders = await prisma.order.findMany({
-      where: {
-        userId: req.user!.id,
-        status: 'paid',
-      },
-      include: { items: true },
-    });
-
-    let allowedMailboxes = 0;
-    for (const ord of paidOrders) {
-      for (const item of ord.items) {
-        const cfg = (item.configJson || {}) as any;
-        if (cfg.serviceType === 'smtp_hosting' || cfg.type === 'smtp_hosting' || cfg.category === 'email') {
-          allowedMailboxes += Math.max(1, Number(cfg.maxMailboxes || cfg.seats || item.quantity || 1));
-        }
-      }
-    }
-
-    if (allowedMailboxes === 0 && existingCount === 0) {
-      // First-time users need an active plan
-      return res.status(403).json({
-        error: 'You need to purchase an SMTP Hosting plan first. Visit the Catalog to get started.',
-        purchaseRequired: true,
-      });
-    }
-
-    if (existingCount >= Math.max(allowedMailboxes, 1)) {
-      return res.status(403).json({
-        error: `You have reached your mailbox limit (${existingCount}/${Math.max(allowedMailboxes, 1)}). Purchase an additional mailbox package to create more email accounts.`,
-        purchaseRequired: true,
-      });
-    }
-  }
-
-  const { email, password, storageQuotaMb, dailySendLimit } = parse.data;
+  const { email, password, storageQuotaMb } = parse.data;
   const username = email.split('@')[0].replace(/[^a-zA-Z0-9_\-\.]/g, '');
   const domainStr = (email.includes('@') ? email.split('@')[1] : env.rootDomain).toLowerCase().trim();
 
-  // Enforce customer domain rule: Customers must use their own verified custom domain. System domains are restricted to system users.
+  // Enforce customer domain rule: Customers must use their own verified custom domain.
   const domainCheck = validateDomainForUser(role, domainStr, env.rootDomain);
   if (!domainCheck.valid) {
     return res.status(403).json({ error: domainCheck.error });
   }
 
+  // Hardened Plan Subscription & Storage Quota validation
+  const quotaValidation = await validateMailboxCreationQuota(req.user!.id, role, storageQuotaMb, domainStr);
+  if (!quotaValidation.allowed) {
+    return res.status(quotaValidation.status || 403).json({
+      error: quotaValidation.error,
+      code: quotaValidation.code,
+      quotas: quotaValidation.quotas,
+      purchaseRequired: quotaValidation.code === 'PURCHASE_REQUIRED',
+    });
+  }
+
+  const finalSendLimit = parse.data.dailySendLimit || quotaValidation.quotas.dailySendLimit;
   const smtpHost = `mail.${domainStr}`;
   const credentialRef = encryptSecret(password, env.secretsEncryptionKey);
   const webmailUrl = process.env.NODE_ENV === 'production' ? `https://mail.${domainStr}` : 'http://localhost:3001/email';
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // First month free trial for customer self-created mailboxes
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   let wildduckUserId: string | undefined;
   let wildduckAddressId: string | undefined;
@@ -389,8 +615,9 @@ emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
         credentialRef,
         webmailUrl,
         storageQuotaMb,
-        dailySendLimit,
-        maxAliases: 10,
+        dailySendLimit: finalSendLimit,
+        maxAliases: quotaValidation.quotas.maxAliases,
+        customDomain: domainStr === env.rootDomain ? null : domainStr,
         expiresAt,
         isSuspended: false,
         storageUsedMb: 0,
@@ -398,29 +625,90 @@ emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
       },
     });
 
-    logger.info({ userId: req.user!.id, email }, 'Mailbox account created successfully');
+    logger.info({ userId: req.user!.id, email, storageQuotaMb }, 'Mailbox account created and quota allocated');
 
     res.status(201).json({
       mailbox: {
         id: newAccount.id,
         email,
         username,
+        domain: domainStr,
         smtpHost,
         smtpPort: 587,
         sslPort: 465,
         storageUsedMb: 0,
         storageQuotaMb,
         dailySendCount: 0,
-        dailySendLimit,
+        dailySendLimit: finalSendLimit,
         status: 'active',
         webmailUrl,
         createdAt: newAccount.createdAt.toISOString(),
       },
-      message: 'Mailbox account created successfully.',
+      message: `Mailbox account ${email} provisioned successfully with ${storageQuotaMb} MB quota.`,
     });
   } catch (err: any) {
     logger.error({ err, email }, 'Failed to create customer mailbox account');
     res.status(500).json({ error: err.message || 'Failed to create mailbox account' });
+  }
+});
+
+/**
+ * PATCH /api/email/mailboxes/:id/quota
+ * Resize mailbox storage quota within user plan's remaining storage pool.
+ */
+const resizeQuotaSchema = z.object({
+  storageQuotaMb: z.number().int().min(256).max(1048576),
+});
+
+emailRouter.patch('/email/mailboxes/:id/quota', async (req: AuthedRequest, res) => {
+  const parse = resizeQuotaSchema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: 'Invalid storage quota value', details: parse.error.format() });
+
+  const { storageQuotaMb } = parse.data;
+  const userId = req.user!.id;
+  const role = req.user!.role;
+
+  try {
+    const account = await prisma.smtpAccount.findUnique({ where: { id: req.params.id } });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    if (role !== 'dev' && account.userId !== userId) {
+      return res.status(403).json({ error: 'Access denied: You do not own this mailbox' });
+    }
+
+    if (role !== 'dev') {
+      const quotas = await getUserEmailPlanQuotas(userId, role);
+      const quotaDifference = storageQuotaMb - account.storageQuotaMb;
+      if (quotaDifference > quotas.remainingStorageMb) {
+        return res.status(403).json({
+          error: `Cannot increase quota by ${quotaDifference} MB. Only ${quotas.remainingStorageMb} MB storage remaining on your plan pool.`,
+          remainingStorageMb: quotas.remainingStorageMb,
+          maxStorageMb: quotas.maxStorageMb,
+        });
+      }
+    }
+
+    // Update in WildDuck cluster
+    if (account.wildduckUserId) {
+      await wildduckClient.updateUser(account.wildduckUserId, {
+        quotaGb: Math.max(1, Math.ceil(storageQuotaMb / 1024)),
+      }).catch((e) => logger.warn({ err: e.message }, 'WildDuck quota update warning'));
+    }
+
+    const updated = await prisma.smtpAccount.update({
+      where: { id: account.id },
+      data: { storageQuotaMb },
+    });
+
+    res.json({
+      success: true,
+      mailboxId: updated.id,
+      storageQuotaMb: updated.storageQuotaMb,
+      message: `Storage quota updated to ${updated.storageQuotaMb} MB.`,
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to resize mailbox quota');
+    res.status(500).json({ error: err.message || 'Failed to update storage quota' });
   }
 });
 
@@ -808,6 +1096,12 @@ emailRouter.post('/email/domains/:id/verify', async (req: AuthedRequest, res) =>
       dkimVerified = dkimTxt.some((t) => t.join('').includes('v=DKIM1') || t.join('').includes('p='));
     } catch {}
 
+    let dmarcVerified = false;
+    try {
+      const dmarcTxt = await dns.promises.resolveTxt(`_dmarc.${domainStr!}`);
+      dmarcVerified = dmarcTxt.some((t) => t.join('').includes('v=DMARC1'));
+    } catch {}
+
     const isVerified = mxVerified && (spfVerified || dkimVerified);
 
     if (isVerified) {
@@ -820,9 +1114,10 @@ emailRouter.post('/email/domains/:id/verify', async (req: AuthedRequest, res) =>
       mxVerified,
       spfVerified,
       dkimVerified,
+      dmarcVerified,
       message: isVerified
         ? 'Domain DNS records verified successfully!'
-        : `DNS verification pending. MX: ${mxVerified ? '✓' : '✗'}, SPF: ${spfVerified ? '✓' : '✗'}, DKIM: ${dkimVerified ? '✓' : '✗'}`,
+        : `DNS verification pending. MX: ${mxVerified ? '✓' : '✗'}, SPF: ${spfVerified ? '✓' : '✗'}, DKIM: ${dkimVerified ? '✓' : '✗'}, DMARC: ${dmarcVerified ? '✓' : '✗'}`,
     });
   } catch (err: any) {
     logger.error({ err }, 'Failed to verify domain DNS');

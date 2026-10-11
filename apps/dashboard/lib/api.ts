@@ -254,18 +254,35 @@ export const api = {
       apiFetch(`/api/email/mailboxes/${id}/credentials`).then((r) =>
         asJson<{ smtpHost: string; smtpPort: number; username: string; password?: string; imapHost: string; imapPort: number }>(r)
       ),
+    websiteConnect: (id: string) =>
+      apiFetch(`/api/email/mailboxes/${id}/website-connect`).then((r) => asJson<any>(r)),
+    planQuotas: () => apiFetch('/api/email/plan-quotas').then((r) => asJson<any>(r)),
+    updateQuota: (id: string, storageQuotaMb: number) =>
+      apiFetch(`/api/email/mailboxes/${id}/quota`, { method: 'PATCH', body: JSON.stringify({ storageQuotaMb }) }).then((r) => asJson<any>(r)),
+    sendTransactional: (data: any) =>
+      apiFetch('/api/v1/emails', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<any>(r)),
     renew: (id: string) =>
       apiFetch(`/api/email/mailboxes/${id}/renew`, { method: 'POST' }).then((r) =>
         asJson<{ ok: boolean; message: string; expiresAt: string }>(r)
       ),
-    createMailbox: (data: { email: string; password: string; storageQuotaMb?: number; dailySendLimit?: number }) =>
+    createMailbox: (data: { email: string; password: string; storageQuotaMb?: number; dailySendLimit?: number; customDomain?: string }) =>
       apiFetch('/api/email/mailboxes', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ mailbox: any }>(r)),
     deleteMailbox: (id: string) => apiFetch(`/api/email/mailboxes/${id}`, { method: 'DELETE' }).then((r) => asJson<{ success: boolean }>(r)),
     domains: () => apiFetch('/api/email/domains').then((r) => asJson<{ domains: any[] }>(r)),
     addDomain: (domain: string) =>
       apiFetch('/api/email/domains', { method: 'POST', body: JSON.stringify({ domain }) }).then((r) => asJson<{ domain: any }>(r)),
     verifyDomain: (id: string) =>
-      apiFetch(`/api/email/domains/${id}/verify`, { method: 'POST' }).then((r) => asJson<{ domain: any; verified: boolean; message: string }>(r)),
+      apiFetch(`/api/email/domains/${id}/verify`, { method: 'POST' }).then((r) =>
+        asJson<{
+          domain: any;
+          verified: boolean;
+          message: string;
+          mxVerified?: boolean;
+          spfVerified?: boolean;
+          dkimVerified?: boolean;
+          dmarcVerified?: boolean;
+        }>(r)
+      ),
     messages: (folder = 'inbox') => apiFetch(`/api/email/messages?folder=${folder}`).then((r) => asJson<{ messages: any[]; total: number }>(r)),
     send: (data: { from: string; to: string; subject: string; body: string }) =>
       apiFetch('/api/email/send', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ message: any; delivered: boolean }>(r)),
@@ -1113,7 +1130,7 @@ export const api = {
           domain: string;
           serverIp: string;
           serverHost: string;
-          verification: { mx: boolean; spf: boolean; dmarc: boolean; allVerified: boolean };
+          verification: { mx: boolean; spf: boolean; dkim?: boolean; dmarc: boolean; allVerified: boolean };
           records: { mxRecords: string[]; txtRecords: string[] };
           expectedDns: Array<{ type: string; name: string; value: string; priority?: number; status: string }>;
         }>(r)
