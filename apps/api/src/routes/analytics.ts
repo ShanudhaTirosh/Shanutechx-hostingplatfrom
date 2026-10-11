@@ -49,7 +49,8 @@ analyticsRouter.get('/admin/analytics', async (req, res) => {
       ticketsOpenCount,
       ticketsResolvedCount,
       auditEventsCount,
-      uptimeChecks,
+      uptimeTotalChecks,
+      uptimeOnlineChecks,
     ] = await Promise.all([
       // Current timeframe orders sum
       prisma.order.aggregate({
@@ -128,7 +129,8 @@ analyticsRouter.get('/admin/analytics', async (req, res) => {
       prisma.ticket.count({ where: { status: { in: ['open', 'pending'] } } }),
       prisma.ticket.count({ where: { status: 'closed', updatedAt: { gte: timeframeStart } } }),
       prisma.auditLog.count({ where: { createdAt: { gte: timeframeStart } } }),
-      prisma.uptimeCheck.findMany({ select: { isUp: true } }),
+      prisma.uptimeCheck.count({ where: { checkedAt: { gte: timeframeStart } } }),
+      prisma.uptimeCheck.count({ where: { isUp: true, checkedAt: { gte: timeframeStart } } }),
     ]);
 
     // Financial Metrics
@@ -290,8 +292,8 @@ analyticsRouter.get('/admin/analytics', async (req, res) => {
       });
 
     // Uptime Stats
-    const totalUptimeChecks = uptimeChecks.length;
-    const onlineUptimeChecks = uptimeChecks.filter((u) => u.isUp).length;
+    const totalUptimeChecks = uptimeTotalChecks;
+    const onlineUptimeChecks = uptimeOnlineChecks;
     const uptimePct = totalUptimeChecks > 0 ? Math.round((onlineUptimeChecks / totalUptimeChecks) * 1000) / 10 : 100;
 
     res.json({

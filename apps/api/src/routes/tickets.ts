@@ -168,3 +168,47 @@ ticketsRouter.patch('/tickets/:id', requireStaff, async (req: AuthedRequest, res
 
   res.json({ ticket });
 });
+
+/** Authenticated endpoints for mobile & web staff to claim, unclaim and close tickets */
+ticketsRouter.post('/tickets/:id/claim', requireStaff, async (req: AuthedRequest, res) => {
+  const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+  const force = Boolean(req.body?.force);
+  if (ticket.claimedById && !force && ticket.claimedById !== req.user!.id) {
+    return res.status(409).json({ error: 'Ticket already claimed' });
+  }
+  const updated = await prisma.ticket.update({
+    where: { id: ticket.id },
+    data: { claimedById: req.user!.id, status: 'pending', updatedAt: new Date() },
+  });
+  await prisma.auditLog.create({
+    data: { adminId: req.user!.id, action: 'ticket.claim', target: ticket.id },
+  });
+  res.json({ ok: true, ticket: updated });
+});
+
+ticketsRouter.post('/tickets/:id/unclaim', requireStaff, async (req: AuthedRequest, res) => {
+  const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+  const updated = await prisma.ticket.update({
+    where: { id: req.params.id },
+    data: { claimedById: null, status: 'open', updatedAt: new Date() },
+  });
+  await prisma.auditLog.create({
+    data: { adminId: req.user!.id, action: 'ticket.unclaim', target: ticket.id },
+  });
+  res.json({ ok: true, ticket: updated });
+});
+
+ticketsRouter.post('/tickets/:id/close', requireStaff, async (req: AuthedRequest, res) => {
+  const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+  const updated = await prisma.ticket.update({
+    where: { id: req.params.id },
+    data: { status: 'closed', updatedAt: new Date() },
+  });
+  await prisma.auditLog.create({
+    data: { adminId: req.user!.id, action: 'ticket.close', target: ticket.id },
+  });
+  res.json({ ok: true, ticket: updated });
+});

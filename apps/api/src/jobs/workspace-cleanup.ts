@@ -11,21 +11,32 @@ export async function executeWorkspaceCleanupJob(): Promise<{ cleanedCount: numb
   try {
     const candidates = await prisma.deployment.findMany({
       where: {
-        backupLastPushedAt: { lte: cutoff },
         OR: [
-          { workspaceCleanedAt: null },
-          { workspaceCleanedAt: { lt: prisma.deployment.fields.backupLastPushedAt } },
+          { backupLastPushedAt: { lte: cutoff } },
+          { lastDeployAt: { lte: cutoff } },
+          { createdAt: { lte: cutoff } },
         ],
+        status: { in: ['running', 'stopped', 'failed', 'deleted'] },
       },
       include: { node: true },
     });
 
-    logger.info({ candidateCount: candidates.length }, 'Running 24h workspace retention cleanup sweep');
+    const validCandidates = candidates.filter((d) => {
+      if (d.workspaceCleanedAt) {
+        if (d.backupLastPushedAt && d.workspaceCleanedAt < d.backupLastPushedAt) {
+          return true;
+        }
+        if (d.lastDeployAt && d.workspaceCleanedAt < d.lastDeployAt) {
+          return true;
+        }
+        return false;
+      }
+      return true;
+    });
 
-    for (const deployment of candidates) {
-      // Only clean up non-Git deployments (those backed up to shadow repos)
-      const isNonGit = !deployment.repoUrl || deployment.repoUrl.startsWith('zip://') || deployment.repoUrl.startsWith('upload://');
-      if (!isNonGit) continue;
+    logger.info({ candidateCount: validCandidates.length }, 'Running 24h workspace retention cleanup sweep');
+
+    for (const deployment of validCandidates) {
 
       try {
         const url = `http://${deployment.node.ip}:${env.nodeAgentPort}/agent/fs/${deployment.id}/cleanup`;

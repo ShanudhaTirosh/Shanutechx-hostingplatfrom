@@ -382,6 +382,26 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/docker/containers', async (req: Aut
   const node = await resolveNodeAccess(req, req.params.nodeId);
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
+  const isStaff = ['dev', 'admin'].includes(req.user?.role || '');
+  if (!isStaff) {
+    const { volumes = [], network, privileged } = req.body || {};
+    if (privileged) {
+      return res.status(403).json({ error: 'Privileged containers are restricted to platform staff' });
+    }
+    if (network === 'host') {
+      return res.status(403).json({ error: 'Host networking mode is restricted to platform staff' });
+    }
+    const RESTRICTED_PATHS = ['/var/run/docker.sock', '/etc', '/root', '/proc', '/sys', '/var/run', '/dev'];
+    if (Array.isArray(volumes)) {
+      for (const v of volumes) {
+        const hp = String(v.hostPath || '').toLowerCase();
+        if (hp === '/' || RESTRICTED_PATHS.some((p) => hp === p || hp.startsWith(p + '/'))) {
+          return res.status(403).json({ error: `Mounting host path "${v.hostPath}" is restricted to platform staff` });
+        }
+      }
+    }
+  }
+
   try {
     const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/containers'), {
       method: 'POST',
@@ -630,8 +650,10 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/ssh-ticket', async (req: AuthedRequ
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const sshKeyRef = 'sshKeyRef' in node ? (node as any).sshKeyRef || 'default' : 'default';
-    const ticket = await issueSshTicket(`node:${node.ip}:${sshKeyRef}`, req.user!.id);
+    const target = 'sshKeyRef' in node && (node as any).sshKeyRef
+      ? `node:${node.ip}:${(node as any).sshKeyRef}`
+      : node.id;
+    const ticket = await issueSshTicket(target, req.user!.id);
 
     await prisma.auditLog.create({
       data: {

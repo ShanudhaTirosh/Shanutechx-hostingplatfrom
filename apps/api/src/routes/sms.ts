@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { env } from '../env';
+import { redis } from '../lib/redis';
 import { parseSms } from '../lib/smsParser';
 import { scorePayment } from '../lib/paymentMatcher';
 import { verifySmsSignature } from '../lib/smsSignature';
@@ -46,17 +47,21 @@ smsRouter.post(
 
     const { source, amount, reference } = parseSms(parsed.data.text);
 
-    // 3. Check for duplicate SMS event processing (scoped to 10-minute window or nonce) (MED-15)
-    const duplicateSms = parsed.data.nonce
-      ? await prisma.smsEvent.findFirst({
-          where: { rawText: { contains: parsed.data.nonce } },
-        })
-      : await prisma.smsEvent.findFirst({
-          where: {
-            rawText: parsed.data.text,
-            createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
-          },
-        });
+    // 3. Check for duplicate SMS event processing (scoped to 10-minute window or nonce) (BUG-009, BUG-055)
+    if (parsed.data.nonce) {
+      const existingNonce = await redis.get(`sms_nonce:${parsed.data.nonce}`).catch(() => null);
+      if (existingNonce) {
+        return res.status(200).json({ matched: false, reason: 'Duplicate SMS nonce ignored' });
+      }
+      await redis.set(`sms_nonce:${parsed.data.nonce}`, '1', 'EX', 600).catch(() => null);
+    }
+
+    const duplicateSms = await prisma.smsEvent.findFirst({
+      where: {
+        rawText: parsed.data.text,
+        createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
+      },
+    });
 
     if (duplicateSms) {
       return res.status(200).json({ smsEvent: duplicateSms, matched: false, reason: 'Duplicate SMS event ignored' });

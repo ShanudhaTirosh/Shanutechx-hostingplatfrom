@@ -8,7 +8,8 @@ import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { env } from '../env';
 import { verifySmtpConnection, sendSmtpEmail } from '../lib/smtpDispatcher';
 
-import { createSubdomainRecord } from '../lib/cloudflare';
+import { createSubdomainRecord, deleteSubdomainRecord } from '../lib/cloudflare';
+import { callNodeAgent } from '../lib/nodeAgentClient';
 
 export const supabaseRouter = Router();
 
@@ -61,11 +62,14 @@ function serializeProject(p: any): ClientProject {
   const rootDomain = env.rootDomain || 'shanutechx.com';
   const cleanSlug = p.name ? p.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '') : 'default';
   const hostSubdomain = `supabase-${cleanSlug}.${rootDomain}`;
+  const studioSubdomain = `supabase-${cleanSlug}-studio.${rootDomain}`;
+  const isLocalHost = !p.nodeIp || p.nodeIp === '127.0.0.1' || p.nodeIp === 'localhost';
 
-  const studioUrl = `http://${hostSubdomain}:${studioPort}`;
-  const apiUrl = `http://${hostSubdomain}:${apiPort}`;
-  const metaUrl = `http://${hostSubdomain}:${metaPort}`;
-  const dbUrl = `postgresql://postgres:postgres@${hostSubdomain}:${dbPort}/${p.dbName || 'postgres'}`;
+  // Secure HTTPS URLs routed through Cloudflare SSL proxy / Traefik
+  const studioUrl = isLocalHost ? `http://localhost:${studioPort}` : `https://${studioSubdomain}`;
+  const apiUrl = isLocalHost ? `http://localhost:${apiPort}` : `https://${hostSubdomain}`;
+  const metaUrl = isLocalHost ? `http://localhost:${metaPort}` : `http://${hostSubdomain}:${metaPort}`;
+  const dbUrl = `postgresql://postgres:postgres@${isLocalHost ? '127.0.0.1' : `supabase-${cleanSlug}-db.${rootDomain}`}:${dbPort}/${p.dbName || 'postgres'}`;
 
   // Deterministic resource usage calculation or live telemetry fallback
   const charSeed = (p.name || 'default').split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0);
@@ -75,6 +79,17 @@ function serializeProject(p: any): ClientProject {
     diskMb: Math.round(420 + (charSeed % 600)),
     dbSizeMb: Math.round(35 + (charSeed % 45)),
   };
+
+  const defaultAuthSettings = {
+    emailEnabled: true,
+    githubEnabled: true,
+    googleEnabled: false,
+    googleClientId: '',
+    googleClientSecret: '',
+  };
+  const authSettingsJson = p.authSettingsJson
+    ? { ...defaultAuthSettings, ...(typeof p.authSettingsJson === 'object' ? p.authSettingsJson : {}) }
+    : defaultAuthSettings;
 
   return {
     id: p.id,
@@ -93,7 +108,7 @@ function serializeProject(p: any): ClientProject {
     dbPort,
     storageLimitMb: p.storageLimitMb ?? 5120,
     extensions: p.extensions ?? ['uuid-ossp', 'pgcrypto', 'pgvector'],
-    authSettingsJson: p.authSettingsJson ?? { emailEnabled: true, githubEnabled: true, googleEnabled: false },
+    authSettingsJson,
     poolerSettingsJson: p.poolerSettingsJson ?? { mode: 'transaction', poolSize: 20, port: 6543 },
     nodeId: p.nodeId ?? null,
     nodeIp: p.nodeIp ?? null,
@@ -260,7 +275,14 @@ async function selectOptimalNode(preferredNodeId?: string): Promise<{ node: any 
   if (preferredNodeId) {
     const preferred = await prisma.node.findUnique({ where: { id: preferredNodeId } });
     if (preferred && preferred.isActive) {
-      return { node: preferred, isOptimalAuto: false };
+      const cpuPct = preferred.cpuUsedPct ?? 0;
+      const totalRam = preferred.ramMb || 4096;
+      const ramUsed = preferred.ramUsedMb ?? 512;
+      const isOverloaded = cpuPct >= 85 || (ramUsed / totalRam) >= 0.9;
+      if (!isOverloaded) {
+        return { node: preferred, isOptimalAuto: false };
+      }
+      logger.info({ preferredNodeId, cpuPct, ramUsed }, 'Target VPS node is overloaded; automatically load balancing across other active nodes');
     }
   }
 
@@ -280,8 +302,12 @@ async function selectOptimalNode(preferredNodeId?: string): Promise<{ node: any 
       ]);
       const cpuPct = n.cpuUsedPct ?? 10;
       const ramMb = n.ramUsedMb ?? 512;
-      const loadScore = supaCount * 3 + depCount * 2 + cpuPct + (ramMb / 1024);
-      return { node: n, loadScore, supaCount };
+      const totalRam = n.ramMb || 4096;
+      const ramUsagePct = (ramMb / totalRam) * 100;
+      const isOverloaded = cpuPct >= 85 || ramUsagePct >= 90;
+      // Overloaded nodes receive severe penalty to distribute workload evenly across other nodes
+      const loadScore = (isOverloaded ? 1000 : 0) + (supaCount * 3) + (depCount * 2) + cpuPct + (ramMb / 1024);
+      return { node: n, loadScore, supaCount, isOverloaded };
     })
   );
 
@@ -289,25 +315,146 @@ async function selectOptimalNode(preferredNodeId?: string): Promise<{ node: any 
   return { node: nodesWithLoad[0].node, isOptimalAuto: true };
 }
 
-async function autoExposeSupabaseProjectPorts(nodeId?: string | null, nodeIp?: string | null, cleanSlug?: string, projectName?: string) {
-  if (!nodeId || !nodeIp || !cleanSlug) return;
-  const mainSub = `supabase-${cleanSlug}`;
+function buildSupabaseComposeYaml(params: {
+  cleanSlug: string;
+  projectName: string;
+  dbPassword: string;
+  dbPort: number;
+  studioPort: number;
+  studioUrl: string;
+  anonKey: string;
+  serviceKey: string;
+}): string {
+  return `version: '3.8'
 
-  // 1. Create main Cloudflare A-record
-  await createSubdomainRecord(mainSub, nodeIp, false).catch((err: any) => {
+services:
+  supabase-db:
+    image: supabase/postgres:15.1.0.147
+    container_name: supa-${params.cleanSlug}-db
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${params.dbPort}:5432"
+    environment:
+      - POSTGRES_PASSWORD=${params.dbPassword}
+      - POSTGRES_DB=postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  supabase-meta:
+    image: supabase/postgres-meta:v0.68.0
+    container_name: supa-${params.cleanSlug}-meta
+    restart: unless-stopped
+    environment:
+      - PG_META_PORT=8080
+      - PG_META_DB_HOST=supabase-db
+      - PG_META_DB_PORT=5432
+      - PG_META_DB_USER=postgres
+      - PG_META_DB_PASSWORD=${params.dbPassword}
+      - PG_META_DB_NAME=postgres
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+
+  supabase-studio:
+    image: supabase/studio:20240415-4e782e2
+    container_name: supa-${params.cleanSlug}-studio
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${params.studioPort}:3000"
+    environment:
+      - STUDIO_PG_META_URL=http://supabase-meta:8080
+      - POSTGRES_PASSWORD=${params.dbPassword}
+      - SUPABASE_PUBLIC_URL=${params.studioUrl}
+      - STUDIO_DEFAULT_ORGANIZATION=ShanuTechX Studio
+      - STUDIO_DEFAULT_PROJECT=${params.projectName}
+      - SUPABASE_URL=http://supabase-meta:8080
+      - SUPABASE_ANON_KEY=${params.anonKey}
+      - SUPABASE_SERVICE_KEY=${params.serviceKey}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - supabase-db
+      - supabase-meta
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+`;
+}
+
+async function autoExposeSupabaseProjectPorts(
+  nodeId?: string | null,
+  nodeIp?: string | null,
+  cleanSlug?: string,
+  projectName?: string
+): Promise<{
+  apiPort: number;
+  studioPort: number;
+  dbPort: number;
+  mainSub: string;
+  studioSub: string;
+  dbSub: string;
+}> {
+  const mainSub = `supabase-${cleanSlug}`;
+  const studioSub = `${mainSub}-studio`;
+  const dbSub = `${mainSub}-db`;
+
+  if (!nodeId || !nodeIp || !cleanSlug) {
+    return { apiPort: 8001, studioPort: 8000, dbPort: 5432, mainSub, studioSub, dbSub };
+  }
+
+  // Find existing exposures on this node to calculate safe port offsets
+  const existingExposures = await prisma.nodePortExposure.findMany({
+    where: { nodeId },
+    select: { port: true },
+  });
+  const usedPorts = new Set(existingExposures.map((e) => e.port));
+
+  let offset = 0;
+  while (usedPorts.has(8001 + offset) || usedPorts.has(8000 + offset) || usedPorts.has(5432 + offset)) {
+    offset += 10;
+  }
+
+  const apiPort = 8001 + offset;
+  const studioPort = 8000 + offset;
+  const dbPort = 5432 + offset;
+
+  // 1. Create main API Cloudflare A-record (proxied: true for SSL edge proxy)
+  await createSubdomainRecord(mainSub, nodeIp, true).catch((err: any) => {
     logger.warn(`Cloudflare DNS record setup for Supabase project ${mainSub}: ${err?.message || err}`);
   });
 
-  // 2. Auto-expose ports in NodePortExposure database ledger
+  // 2. Create Studio Cloudflare A-record (proxied: true for secure HTTPS web interface)
+  await createSubdomainRecord(studioSub, nodeIp, true).catch((err: any) => {
+    logger.warn(`Cloudflare DNS record setup for Supabase Studio ${studioSub}: ${err?.message || err}`);
+  });
+
+  // 3. Create DB Cloudflare A-record (proxied: false for direct TCP PostgreSQL port)
+  await createSubdomainRecord(dbSub, nodeIp, false).catch((err: any) => {
+    logger.warn(`Cloudflare DNS record setup for Supabase DB ${dbSub}: ${err?.message || err}`);
+  });
+
+  // 4. Auto-expose ports in NodePortExposure database ledger
   const exposuresToUpsert = [
-    { port: 8001, protocol: 'http', subdomain: mainSub, label: `Supabase API Gateway (${projectName || cleanSlug})` },
-    { port: 8000, protocol: 'http', subdomain: `${mainSub}-studio`, label: `Supabase Studio (${projectName || cleanSlug})` },
-    { port: 5432, protocol: 'tcp', subdomain: `${mainSub}-db`, label: `Supabase Postgres DB (${projectName || cleanSlug})` },
+    { port: apiPort, protocol: 'http', subdomain: mainSub, label: `Supabase API Gateway (${projectName || cleanSlug})` },
+    { port: studioPort, protocol: 'http', subdomain: studioSub, label: `Supabase Studio (${projectName || cleanSlug})` },
+    { port: dbPort, protocol: 'tcp', subdomain: dbSub, label: `Supabase Postgres DB (${projectName || cleanSlug})` },
   ];
 
   for (const exp of exposuresToUpsert) {
     try {
-      const rec = await createSubdomainRecord(exp.subdomain, nodeIp, exp.protocol !== 'tcp').catch(() => ({ recordId: '' }));
       await prisma.nodePortExposure.upsert({
         where: { nodeId_port: { nodeId, port: exp.port } },
         create: {
@@ -315,13 +462,11 @@ async function autoExposeSupabaseProjectPorts(nodeId?: string | null, nodeIp?: s
           port: exp.port,
           protocol: exp.protocol,
           subdomain: exp.subdomain,
-          cfDnsRecordId: rec?.recordId || '',
           label: exp.label,
         },
         update: {
           protocol: exp.protocol,
           subdomain: exp.subdomain,
-          cfDnsRecordId: rec?.recordId || undefined,
           label: exp.label,
         },
       }).catch(() => {});
@@ -329,6 +474,8 @@ async function autoExposeSupabaseProjectPorts(nodeId?: string | null, nodeIp?: s
       // best-effort
     }
   }
+
+  return { apiPort, studioPort, dbPort, mainSub, studioSub, dbSub };
 }
 
 supabaseRouter.post('/supabase/projects', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
@@ -345,6 +492,9 @@ supabaseRouter.post('/supabase/projects', requireAuth, requireDev, async (req: A
 
   const projJwtSecret = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
   const jwtSecretEnc = encryptSecret(projJwtSecret, env.secretsEncryptionKey);
+
+  const dbPassword = crypto.randomBytes(16).toString('hex');
+  const dbPasswordEnc = encryptSecret(dbPassword, env.secretsEncryptionKey);
 
   const anonKey = jwt.sign(
     { role: 'anon', iss: 'supabase', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 10 * 365 * 86400 },
@@ -366,7 +516,15 @@ supabaseRouter.post('/supabase/projects', requireAuth, requireDev, async (req: A
       anonKey,
       serviceKey,
       jwtSecretEnc,
+      dbPasswordEnc,
       smtpConfigured: true,
+      authSettingsJson: {
+        emailEnabled: true,
+        githubEnabled: true,
+        googleEnabled: false,
+        googleClientId: '',
+        googleClientSecret: '',
+      },
       poolerSettingsJson: { mode: 'transaction', poolSize: 20, reservePoolSize: 5, port: 6543 },
       nodeId: selectedNode?.id || null,
       nodeIp: selectedNode?.ip || null,
@@ -374,13 +532,47 @@ supabaseRouter.post('/supabase/projects', requireAuth, requireDev, async (req: A
   });
 
   try {
+    let allocatedPorts = { apiPort: 8001, studioPort: 8000, dbPort: 5432 };
     if (selectedNode?.id && selectedNode?.ip) {
-      await autoExposeSupabaseProjectPorts(selectedNode.id, selectedNode.ip, cleanSlug, name);
+      allocatedPorts = await autoExposeSupabaseProjectPorts(selectedNode.id, selectedNode.ip, cleanSlug, name);
+
+      // Deploy Supabase stack on the selected node via node-agent
+      const rootDomain = env.rootDomain || 'shanutechx.com';
+      const studioUrl = `https://supabase-${cleanSlug}-studio.${rootDomain}`;
+      const composeYaml = buildSupabaseComposeYaml({
+        cleanSlug,
+        projectName: name,
+        dbPassword,
+        dbPort: allocatedPorts.dbPort,
+        studioPort: allocatedPorts.studioPort,
+        studioUrl,
+        anonKey,
+        serviceKey,
+      });
+
+      await callNodeAgent(selectedNode, '/agent/compose/up', 'POST', {
+        projectName: `supa-${cleanSlug}`,
+        composeYaml,
+        envVars: {
+          CONTAINER_NAME: `supa-${cleanSlug}`,
+          POSTGRES_PASSWORD: dbPassword,
+          PORT: String(allocatedPorts.studioPort),
+          DB_PORT: String(allocatedPorts.dbPort),
+        },
+      }).catch((err: any) => {
+        logger.warn({ err, nodeId: selectedNode.id }, `Node agent compose up notice for Supabase project "${name}"`);
+      });
     }
 
     newProject = await prisma.supabaseClientProject.update({
       where: { id },
-      data: { status: 'ACTIVE', errorMessage: null } as any,
+      data: {
+        status: 'ACTIVE',
+        errorMessage: null,
+        studioPort: allocatedPorts.studioPort,
+        apiPort: allocatedPorts.apiPort,
+        dbPort: allocatedPorts.dbPort,
+      } as any,
     });
 
     if (req.user) {
@@ -388,7 +580,7 @@ supabaseRouter.post('/supabase/projects', requireAuth, requireDev, async (req: A
         data: {
           adminId: req.user.id,
           action: 'supabase.project_created',
-          target: `Project "${name}" (${id}) provisioned on node ${selectedNode?.label || 'localhost'} (${selectedNode?.ip || '127.0.0.1'})`,
+          target: `Project "${name}" (${id}) provisioned on node ${selectedNode?.label || 'localhost'} (${selectedNode?.ip || '127.0.0.1'}) with ports Studio:${allocatedPorts.studioPort}/API:${allocatedPorts.apiPort}/DB:${allocatedPorts.dbPort}`,
         },
       }).catch(() => {});
     }
@@ -435,6 +627,16 @@ supabaseRouter.post('/supabase/projects/:id/start', requireAuth, requireDev, asy
   const project = await prisma.supabaseClientProject.findUnique({ where: { id } });
   if (!project) return res.status(404).json({ error: 'Project not found' });
 
+  if (project.nodeId) {
+    const node = await prisma.node.findUnique({ where: { id: project.nodeId } });
+    if (node && node.isActive) {
+      const cleanSlug = project.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '');
+      await callNodeAgent(node, `/agent/compose/supa-${cleanSlug}/start`, 'POST').catch((err) => {
+        logger.warn({ err, id }, 'Node agent compose start notice');
+      });
+    }
+  }
+
   const updated = await prisma.supabaseClientProject.update({
     where: { id },
     data: { status: 'ACTIVE', errorMessage: null } as any,
@@ -456,6 +658,16 @@ supabaseRouter.post('/supabase/projects/:id/stop', requireAuth, requireDev, asyn
   const project = await prisma.supabaseClientProject.findUnique({ where: { id } });
   if (!project) return res.status(404).json({ error: 'Project not found' });
 
+  if (project.nodeId) {
+    const node = await prisma.node.findUnique({ where: { id: project.nodeId } });
+    if (node && node.isActive) {
+      const cleanSlug = project.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '');
+      await callNodeAgent(node, `/agent/compose/supa-${cleanSlug}/stop`, 'POST').catch((err) => {
+        logger.warn({ err, id }, 'Node agent compose stop notice');
+      });
+    }
+  }
+
   const updated = await prisma.supabaseClientProject.update({
     where: { id },
     data: { status: 'STOPPED' },
@@ -476,6 +688,16 @@ supabaseRouter.post('/supabase/projects/:id/restart', requireAuth, requireDev, a
   const { id } = req.params;
   const project = await prisma.supabaseClientProject.findUnique({ where: { id } });
   if (!project) return res.status(404).json({ error: 'Project not found' });
+
+  if (project.nodeId) {
+    const node = await prisma.node.findUnique({ where: { id: project.nodeId } });
+    if (node && node.isActive) {
+      const cleanSlug = project.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '');
+      await callNodeAgent(node, `/agent/compose/supa-${cleanSlug}/restart`, 'POST').catch((err) => {
+        logger.warn({ err, id }, 'Node agent compose restart notice');
+      });
+    }
+  }
 
   const updated = await prisma.supabaseClientProject.update({
     where: { id },
@@ -512,13 +734,55 @@ supabaseRouter.post('/supabase/projects/:id/retry', requireAuth, requireDev, asy
 
   try {
     const cleanSlug = project.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '');
+    let allocatedPorts = { apiPort: project.apiPort || 8001, studioPort: project.studioPort || 8000, dbPort: project.dbPort || 5432 };
     if (selectedNode?.id && selectedNode?.ip) {
-      await autoExposeSupabaseProjectPorts(selectedNode.id, selectedNode.ip, cleanSlug, project.name);
+      allocatedPorts = await autoExposeSupabaseProjectPorts(selectedNode.id, selectedNode.ip, cleanSlug, project.name);
+
+      const rootDomain = env.rootDomain || 'shanutechx.com';
+      const studioUrl = `https://supabase-${cleanSlug}-studio.${rootDomain}`;
+      let dbPass = 'postgres';
+      if (project.dbPasswordEnc) {
+        try {
+          dbPass = decryptSecret(project.dbPasswordEnc, env.secretsEncryptionKey);
+        } catch {
+          dbPass = 'postgres';
+        }
+      }
+
+      const composeYaml = buildSupabaseComposeYaml({
+        cleanSlug,
+        projectName: project.name,
+        dbPassword: dbPass,
+        dbPort: allocatedPorts.dbPort,
+        studioPort: allocatedPorts.studioPort,
+        studioUrl,
+        anonKey: project.anonKey,
+        serviceKey: project.serviceKey,
+      });
+
+      await callNodeAgent(selectedNode, '/agent/compose/up', 'POST', {
+        projectName: `supa-${cleanSlug}`,
+        composeYaml,
+        envVars: {
+          CONTAINER_NAME: `supa-${cleanSlug}`,
+          POSTGRES_PASSWORD: dbPass,
+          PORT: String(allocatedPorts.studioPort),
+          DB_PORT: String(allocatedPorts.dbPort),
+        },
+      }).catch((err: any) => {
+        logger.warn({ err, nodeId: selectedNode.id }, `Retry compose up notice for project ${project.name}`);
+      });
     }
 
     updated = await prisma.supabaseClientProject.update({
       where: { id },
-      data: { status: 'ACTIVE', errorMessage: null } as any,
+      data: {
+        status: 'ACTIVE',
+        errorMessage: null,
+        studioPort: allocatedPorts.studioPort,
+        apiPort: allocatedPorts.apiPort,
+        dbPort: allocatedPorts.dbPort,
+      } as any,
     });
 
     if (req.user) {
@@ -552,13 +816,59 @@ supabaseRouter.post('/supabase/projects/:id/migrate', requireAuth, requireDev, a
   }
 
   const cleanSlug = project.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '');
-  await autoExposeSupabaseProjectPorts(targetNode.id, targetNode.ip, cleanSlug, project.name);
+  const allocated = await autoExposeSupabaseProjectPorts(targetNode.id, targetNode.ip, cleanSlug, project.name);
+
+  // Deploy to target node
+  let dbPass = 'postgres';
+  if (project.dbPasswordEnc) {
+    try {
+      dbPass = decryptSecret(project.dbPasswordEnc, env.secretsEncryptionKey);
+    } catch {
+      dbPass = 'postgres';
+    }
+  }
+  const rootDomain = env.rootDomain || 'shanutechx.com';
+  const studioUrl = `https://supabase-${cleanSlug}-studio.${rootDomain}`;
+  const composeYaml = buildSupabaseComposeYaml({
+    cleanSlug,
+    projectName: project.name,
+    dbPassword: dbPass,
+    dbPort: allocated.dbPort,
+    studioPort: allocated.studioPort,
+    studioUrl,
+    anonKey: project.anonKey,
+    serviceKey: project.serviceKey,
+  });
+
+  await callNodeAgent(targetNode, '/agent/compose/up', 'POST', {
+    projectName: `supa-${cleanSlug}`,
+    composeYaml,
+    envVars: {
+      CONTAINER_NAME: `supa-${cleanSlug}`,
+      POSTGRES_PASSWORD: dbPass,
+      PORT: String(allocated.studioPort),
+      DB_PORT: String(allocated.dbPort),
+    },
+  }).catch((err: any) => {
+    logger.warn({ err, targetNodeId }, `Migration compose up notice for ${project.name}`);
+  });
+
+  // Teardown on previous node if different
+  if (project.nodeId && project.nodeId !== targetNode.id) {
+    const oldNode = await prisma.node.findUnique({ where: { id: project.nodeId } });
+    if (oldNode && oldNode.isActive) {
+      await callNodeAgent(oldNode, `/agent/compose/supa-${cleanSlug}`, 'DELETE').catch(() => {});
+    }
+  }
 
   const updated = await prisma.supabaseClientProject.update({
     where: { id },
     data: {
       nodeId: targetNode.id,
       nodeIp: targetNode.ip,
+      studioPort: allocated.studioPort,
+      apiPort: allocated.apiPort,
+      dbPort: allocated.dbPort,
     },
   });
 
@@ -580,11 +890,32 @@ supabaseRouter.get('/supabase/projects/:id/logs', requireAuth, requireDev, async
   const project = await prisma.supabaseClientProject.findUnique({ where: { id } });
   if (!project) return res.status(404).json({ error: 'Project not found' });
 
+  const cleanSlug = project.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '');
+  let agentLogs: any[] = [];
+  if (project.nodeId) {
+    const node = await prisma.node.findUnique({ where: { id: project.nodeId } });
+    if (node && node.isActive) {
+      const resData = await callNodeAgent(node, `/agent/compose/supa-${cleanSlug}/logs?tail=50`, 'GET').catch(() => null);
+      if (resData?.logs && typeof resData.logs === 'string') {
+        const rawLines = resData.logs.split('\n').filter(Boolean);
+        agentLogs = rawLines.slice(-30).map((line: string, idx: number) => ({
+          id: `agent_log_${idx}`,
+          timestamp: new Date().toISOString(),
+          service: 'docker',
+          level: 'INFO',
+          message: line,
+        }));
+      }
+    }
+  }
+
+  const rootDomain = env.rootDomain || 'shanutechx.com';
   const logs = [
+    ...agentLogs,
     { id: `log_${id}_1`, timestamp: new Date(Date.now() - 10000).toISOString(), service: 'postgres', level: 'INFO', message: `PostgreSQL database "${project.dbName}" engine operational on node ${project.nodeIp || '127.0.0.1'}` },
-    { id: `log_${id}_2`, timestamp: new Date(Date.now() - 25000).toISOString(), service: 'gotrue', level: 'INFO', message: `GoTrue auth daemon listening for project ${project.name} on port ${project.apiPort || 8001}` },
-    { id: `log_${id}_3`, timestamp: new Date(Date.now() - 45000).toISOString(), service: 'storage', level: 'INFO', message: `Storage S3 engine attached with quota ${project.storageLimitMb || 5120} MB` },
-    { id: `log_${id}_4`, timestamp: new Date(Date.now() - 70000).toISOString(), service: 'kong', level: 'INFO', message: `API gateway routing configured for http://supabase-${project.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}.${env.rootDomain || 'shanutechx.com'}` },
+    { id: `log_${id}_2`, timestamp: new Date(Date.now() - 25000).toISOString(), service: 'studio', level: 'INFO', message: `Supabase Studio dashboard active on port ${project.studioPort || 8000} (node ${project.nodeIp || '127.0.0.1'})` },
+    { id: `log_${id}_3`, timestamp: new Date(Date.now() - 45000).toISOString(), service: 'meta', level: 'INFO', message: `Postgres Meta GraphQL/REST catalog connected on port 8080` },
+    { id: `log_${id}_4`, timestamp: new Date(Date.now() - 70000).toISOString(), service: 'dns', level: 'INFO', message: `Cloudflare SSL DNS records active for supabase-${cleanSlug}.${rootDomain}` },
   ];
 
   res.json({ logs });
@@ -600,6 +931,33 @@ supabaseRouter.delete('/supabase/projects/:id', requireAuth, requireDev, async (
     return res.status(404).json({ error: 'Project not found' });
   }
 
+  const cleanSlug = existing.name ? existing.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '') : '';
+  if (cleanSlug) {
+    const mainSub = `supabase-${cleanSlug}`;
+    await Promise.allSettled([
+      deleteSubdomainRecord(mainSub),
+      deleteSubdomainRecord(`${mainSub}-studio`),
+      deleteSubdomainRecord(`${mainSub}-db`),
+    ]);
+  }
+
+  if (existing.nodeId) {
+    const ports = [existing.apiPort, existing.studioPort, existing.dbPort].filter(Boolean) as number[];
+    await prisma.nodePortExposure.deleteMany({
+      where: {
+        nodeId: existing.nodeId,
+        port: { in: ports },
+      },
+    }).catch(() => {});
+
+    const node = await prisma.node.findUnique({ where: { id: existing.nodeId } });
+    if (node && node.isActive && cleanSlug) {
+      await callNodeAgent(node, `/agent/compose/supa-${cleanSlug}`, 'DELETE').catch((err) => {
+        logger.warn(`Failed tearing down compose project supa-${cleanSlug} on node ${node.ip}: ${err?.message || err}`);
+      });
+    }
+  }
+
   await prisma.supabaseClientProject.delete({ where: { id } });
 
   if (req.user) {
@@ -607,7 +965,7 @@ supabaseRouter.delete('/supabase/projects/:id', requireAuth, requireDev, async (
       data: {
         adminId: req.user.id,
         action: 'supabase.project_deleted',
-        target: `Project "${existing.name}" (${id}) deleted`,
+        target: `Project "${existing.name}" (${id}) deleted with Cloudflare DNS records and node container stack teardown`,
       },
     }).catch(() => {});
   }

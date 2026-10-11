@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import crypto from 'crypto';
+import { Readable } from 'stream';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 import { ownedResourceWhere, canAccessResource } from '../middleware/rbac';
@@ -44,9 +45,21 @@ managedDatabasesRouter.post('/managed-databases', async (req: AuthedRequest, res
 
   const targetUserId = parsed.data.userId || req.user!.id;
 
-  // Non-staff customers can only provision for themselves
-  if (req.user!.role !== 'admin' && req.user!.role !== 'dev' && targetUserId !== req.user!.id) {
-    return res.status(403).json({ error: 'Unauthorized to provision database for another user' });
+  // Non-staff customers can only provision for themselves and require an active subscription
+  if (req.user!.role !== 'admin' && req.user!.role !== 'dev') {
+    if (targetUserId !== req.user!.id) {
+      return res.status(403).json({ error: 'Unauthorized to provision database for another user' });
+    }
+    const activeSub = await prisma.subscription.findFirst({
+      where: {
+        userId: req.user!.id,
+        status: 'active',
+        currentPeriodEnd: { gte: new Date() },
+      },
+    });
+    if (!activeSub) {
+      return res.status(403).json({ error: 'An active hosting subscription is required to provision managed databases.' });
+    }
   }
 
   // Admin can only provision for a customer assigned to them.
@@ -143,6 +156,22 @@ managedDatabasesRouter.get('/managed-databases', async (req: AuthedRequest, res)
     include: { user: { select: { id: true, email: true, displayName: true, role: true } } },
   });
   res.json({ databases: databases.map((d: any) => ({ ...d, credentialRef: undefined })) });
+});
+
+managedDatabasesRouter.get('/managed-databases/:id', async (req: AuthedRequest, res) => {
+  const where = await ownedResourceWhere(req);
+  const db = await prisma.managedDatabase.findFirst({
+    where: { id: req.params.id, ...where },
+    include: {
+      user: { select: { id: true, email: true, displayName: true, role: true } },
+      node: { select: { id: true, label: true, ip: true } },
+      dbUsers: { select: { id: true, username: true, role: true, createdAt: true } },
+      backups: { orderBy: { createdAt: 'desc' }, take: 10 },
+    },
+  });
+  if (!db) return res.status(404).json({ error: 'Database not found' });
+
+  res.json({ database: { ...db, credentialRef: undefined } });
 });
 
 managedDatabasesRouter.get('/managed-databases/:id/reveal-password', async (req: AuthedRequest, res) => {
@@ -1118,13 +1147,13 @@ managedDatabasesRouter.post('/managed-databases/:id/s3-backups', async (req: Aut
       if (!downloadRes.ok) {
         throw new Error(`Failed to retrieve backup dump file from node agent (HTTP ${downloadRes.status})`);
       }
-      const dumpBuffer = Buffer.from(await downloadRes.arrayBuffer());
+      const nodeStream = downloadRes.body ? Readable.fromWeb(downloadRes.body as any) : undefined;
 
       await s3Client.send(
         new PutObjectCommand({
           Bucket: parsed.data.s3Bucket,
           Key: s3Key,
-          Body: dumpBuffer,
+          Body: nodeStream,
           ContentType: 'application/octet-stream',
         })
       );

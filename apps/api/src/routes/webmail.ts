@@ -174,12 +174,37 @@ webmailRouter.get('/webmail/messages', async (req: AuthedRequest, res: Response)
   if (category) where.category = category;
   if (smtpAccountId) where.smtpAccountId = smtpAccountId;
 
-  const [messages, unreadCount] = await Promise.all([
-    prisma.webmailMessage.findMany({ where, orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }] }),
+  const take = Math.min(100, Math.max(1, Number(req.query.take) || 50));
+  const skip = Math.max(0, Number(req.query.skip) || 0);
+
+  const [messages, unreadCount, total] = await Promise.all([
+    prisma.webmailMessage.findMany({
+      where,
+      take,
+      skip,
+      select: {
+        id: true,
+        senderName: true,
+        senderEmail: true,
+        recipientEmail: true,
+        subject: true,
+        snippet: true,
+        folder: true,
+        isRead: true,
+        isStarred: true,
+        isPinned: true,
+        hasAttachments: true,
+        category: true,
+        priority: true,
+        createdAt: true,
+      },
+      orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
+    }),
     prisma.webmailMessage.count({ where: { userId, folder: 'inbox', isRead: false } }),
+    prisma.webmailMessage.count({ where }),
   ]);
 
-  res.json({ messages, unreadCount, total: messages.length });
+  res.json({ messages, unreadCount, total, take, skip });
 });
 
 // 1.2 Threaded Conversation List

@@ -169,7 +169,7 @@ async function extractArchive(deploymentId, relPath) {
     }
   } catch (err) {
     if (err.statusCode === 400) throw err;
-    entries = [];
+    throw Object.assign(new Error('Cannot safely verify archive entries: pre-extraction validation failed (' + (err.message || String(err)) + ')'), { statusCode: 400 });
   }
 
   for (const entry of entries) {

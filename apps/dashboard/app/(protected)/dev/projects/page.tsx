@@ -127,6 +127,9 @@ export default function UnifiedDevProjectsPage() {
   const [editStorageMb, setEditStorageMb] = useState(5120);
   const [isSavingSupabaseSettings, setIsSavingSupabaseSettings] = useState(false);
 
+  // Search filter for projects
+  const [projectSearch, setProjectSearch] = useState('');
+
   useEffect(() => {
     loadAllData();
   }, []);
@@ -577,17 +580,76 @@ export default function UnifiedDevProjectsPage() {
                 </div>
               </div>
 
+              {/* CLOUD MULTI-PROJECT CONTROLLER & QUICK SWITCHER */}
+              {supabaseProjects.length > 0 && (
+                <div className="bg-[#0b0c16] border border-emerald-500/30 rounded-2xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 font-mono shadow-lg">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs text-text-muted uppercase font-bold">Cloud Project Selector:</span>
+                    </div>
+                    <select
+                      value={selectedSupabaseProject?.id || ''}
+                      onChange={(e) => {
+                        const found = supabaseProjects.find((p) => p.id === e.target.value);
+                        if (found) setSelectedSupabaseProject(found);
+                      }}
+                      className="bg-[#121324] border border-emerald-500/40 text-emerald-300 rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-emerald-400"
+                    >
+                      {supabaseProjects.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} [{p.status}] — Node: {p.nodeLabel || p.nodeIp || 'localhost'} (Studio: {p.studioPort || 8000})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {selectedSupabaseProject && (
+                      <a
+                        href={selectedSupabaseProject.studioUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.studioPort || 8000}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-500/20 flex items-center gap-1.5 transition-all"
+                      >
+                        <span>Launch Studio UI</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    <button
+                      onClick={() => {
+                        setCreateCategory('supabase');
+                        setShowCreateModal(true);
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold flex items-center gap-1.5 transition-all"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>New Stack</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* PROJECT CARDS GRID / LIST VIEW */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <h2 className="text-base font-bold text-white flex items-center gap-2">
                     <Layers className="w-4 h-4 text-emerald-400" />
                     <span>Provisioned Supabase Backends</span>
                   </h2>
 
-                  <span className="text-xs text-text-muted font-mono">
-                    Showing {supabaseProjects.length} project{supabaseProjects.length === 1 ? '' : 's'}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      placeholder="Search projects..."
+                      value={projectSearch}
+                      onChange={(e) => setProjectSearch(e.target.value)}
+                      className="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-text-muted focus:outline-none focus:border-emerald-500 font-mono w-44"
+                    />
+                    <span className="text-xs text-text-muted font-mono whitespace-nowrap">
+                      Showing {supabaseProjects.filter((p) => p.name.toLowerCase().includes(projectSearch.toLowerCase()) || (p.nodeLabel || '').toLowerCase().includes(projectSearch.toLowerCase())).length} of {supabaseProjects.length}
+                    </span>
+                  </div>
                 </div>
 
                 {supabaseProjects.length === 0 ? (
@@ -611,7 +673,9 @@ export default function UnifiedDevProjectsPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {supabaseProjects.map((proj) => {
+                    {supabaseProjects
+                      .filter((p) => p.name.toLowerCase().includes(projectSearch.toLowerCase()) || (p.nodeLabel || '').toLowerCase().includes(projectSearch.toLowerCase()))
+                      .map((proj) => {
                       const isSelected = selectedSupabaseProject?.id === proj.id;
                       const isAnonRevealed = revealedKeys[`anon-${proj.id}`];
                       const isServiceRevealed = revealedKeys[`service-${proj.id}`];

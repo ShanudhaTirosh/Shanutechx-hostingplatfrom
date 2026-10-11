@@ -335,7 +335,7 @@ internalBotRouter.post('/internal/open-ticket', async (req: Request, res: Respon
  * Claim ticket. Enforces anti-double-claim unless force=true.
  */
 internalBotRouter.post('/internal/claim-ticket', async (req: Request, res: Response) => {
-  const { ticketId, staffUserLabel, staffUserId, staffPhone, force } = req.body || {};
+  const { ticketId, staffUserLabel, staffUserId, staffPhone, force, discordUserId } = req.body || {};
 
   if (!ticketId) return res.status(400).json({ error: 'ticketId is required' });
 
@@ -354,6 +354,11 @@ internalBotRouter.post('/internal/claim-ticket', async (req: Request, res: Respo
         OR: [{ phoneNumber: cleanPhone }, { phoneNumber: `+${cleanPhone}` }],
         role: { in: ['admin', 'dev', 'support'] },
       },
+    });
+  }
+  if (!staffUser && discordUserId) {
+    staffUser = await prisma.user.findFirst({
+      where: { discordUserId, role: { in: ['admin', 'dev', 'support'] } },
     });
   }
   if (!staffUser) {

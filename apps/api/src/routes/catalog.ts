@@ -215,13 +215,18 @@ function generateStrongSecret(): string {
 
 import { scanTextForAbuse, banUserAndTeardownResources } from '../lib/abuseDetector';
 
-const deploySchema = z.object({
-  slug: z.string().min(1),
-  nodeId: z.string().min(1),
-  envVars: z.record(z.string()).optional(),
-  projectName: z.string().min(1).optional(),
-  teamId: z.string().nullable().optional(),
-});
+const deploySchema = z
+  .object({
+    slug: z.string().min(1).optional(),
+    templateSlug: z.string().min(1).optional(),
+    nodeId: z.string().min(1),
+    envVars: z.record(z.string()).optional(),
+    projectName: z.string().min(1).optional(),
+    teamId: z.string().nullable().optional(),
+  })
+  .refine((data) => data.slug || data.templateSlug, {
+    message: 'slug or templateSlug is required',
+  });
 
 /**
  * POST /api/catalog/deploy
@@ -232,7 +237,8 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
   const parsed = deploySchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const { slug, nodeId: inputNodeId, envVars: customerEnvVars = {}, projectName, teamId } = parsed.data;
+  const slug = parsed.data.slug || parsed.data.templateSlug!;
+  const { nodeId: inputNodeId, envVars: customerEnvVars = {}, projectName, teamId } = parsed.data;
 
   // Abuse protection scan on environment variables & project name
   const abuseScanText = JSON.stringify(customerEnvVars) + (projectName || '') + slug;

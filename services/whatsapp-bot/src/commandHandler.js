@@ -1,6 +1,6 @@
 const { RateLimiter } = require('./utils');
 
-const API_BASE = process.env.API_INTERNAL_URL || 'http://localhost:3000';
+const API_BASE = process.env.API_INTERNAL_URL || 'http://localhost:4000';
 const INTERNAL_SECRET = process.env.WHATSAPP_INTERNAL_SECRET;
 
 const rateLimiter = new RateLimiter(6, 60000); // 6 commands per minute per phone
@@ -70,7 +70,7 @@ async function handleCommand(senderPhone, messageText) {
       const res = await apiFetch('/api/internal/open-ticket', {
         method: 'POST',
         body: JSON.stringify({
-          customerPhone: cleanPhone,
+          phone: cleanPhone,
           category: pending.category,
           subject,
           message,
@@ -131,7 +131,7 @@ async function handleCommand(senderPhone, messageText) {
     const res = await apiFetch('/api/internal/open-ticket', {
       method: 'POST',
       body: JSON.stringify({
-        customerPhone: cleanPhone,
+        phone: cleanPhone,
         category,
         subject,
         message,
@@ -173,7 +173,8 @@ async function handleCommand(senderPhone, messageText) {
       body: JSON.stringify({
         ticketId,
         senderPhone: cleanPhone,
-        message: replyMessage,
+        body: replyMessage,
+        senderRole: 'customer',
         originPlatform: 'whatsapp',
       }),
     });
@@ -304,7 +305,7 @@ async function isStaffUser(phone) {
     });
 
     if (res._error) return `Invoice delivery failed: ${res.error}`;
-    return `*Invoice #${res.invoice.invoiceNumber} Generated & Sent to ${userEmail}* (Total: \$${res.invoice.total.toFixed(2)})`;
+    return `*Invoice #${(res.invoiceId || res.orderId || '').slice(0, 8).toUpperCase()} Generated & Sent to ${userEmail}*`;
   }
 
   // 8. FAQ Auto-replies & Knowledge Base

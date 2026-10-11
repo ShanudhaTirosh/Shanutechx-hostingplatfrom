@@ -96,7 +96,9 @@ export async function canAccessResource(
       }
 
       if (membership.permissions && membership.permissions.length > 0) {
-        const allowedPermissions = action === 'read' ? ['read', 'write', 'admin'] : ['write', 'admin'];
+        const allowedPermissions = action === 'read'
+          ? ['view', 'manage', 'read', 'write', 'admin']
+          : ['manage', 'write', 'admin'];
 
         if (resourceType && resourceId) {
           return membership.permissions.some(

@@ -243,7 +243,7 @@ async function handleInteraction(interaction) {
       await interaction.deferReply({ ephemeral: true });
       const res = await apiFetch('/api/internal/claim-ticket', {
         method: 'POST',
-        body: JSON.stringify({ ticketId, staffUserLabel: userLabel }),
+        body: JSON.stringify({ ticketId, staffUserLabel: userLabel, discordUserId: userId }),
       });
 
       if (res.ok) {
@@ -344,6 +344,27 @@ async function handleInteraction(interaction) {
   // 4. Handle Slash Commands
   if (!interaction.isChatInputCommand()) return;
 
+  const STAFF_ROLES = ['Staff', 'Admin', 'Support', 'Developer'];
+  const isStaff =
+    interaction.member?.roles?.cache?.some((r) => STAFF_ROLES.includes(r.name)) ||
+    interaction.member?.permissions?.has('Administrator');
+  const STAFF_COMMANDS = [
+    'claim-ticket',
+    'unclaim-ticket',
+    'close-ticket',
+    'reply-ticket',
+    'ticket-panel',
+    'announce',
+    'send-invoice',
+    'review-payment',
+  ];
+  if (STAFF_COMMANDS.includes(interaction.commandName) && !isStaff) {
+    return interaction.reply({
+      content: '❌ You do not have permission to execute staff commands.',
+      ephemeral: true,
+    });
+  }
+
   try {
     const { commandName } = interaction;
 
@@ -407,7 +428,7 @@ async function handleInteraction(interaction) {
 
       const res = await apiFetch('/api/internal/claim-ticket', {
         method: 'POST',
-        body: JSON.stringify({ ticketId, staffUserLabel: userLabel, force }),
+        body: JSON.stringify({ ticketId, staffUserLabel: userLabel, force, discordUserId: userId }),
       });
 
       if (res.ok) {
@@ -524,6 +545,30 @@ async function handleInteraction(interaction) {
         await interaction.editReply(`[INVOICE] Official PDF Invoice generated & dispatched for Order #${orderId.slice(0, 8).toUpperCase()}`);
       } else {
         await interaction.editReply(`[ERROR] Failed to send invoice: ${res.error}`);
+      }
+    } else if (commandName === 'review-payment') {
+      await interaction.deferReply();
+      const orderId = interaction.options.getString('order_id');
+      const action = interaction.options.getString('action');
+      const reason = interaction.options.getString('reason');
+
+      const isApprove = action === 'approve';
+      const res = await apiFetch('/api/internal/review-payment', {
+        method: 'POST',
+        body: JSON.stringify({
+          orderId,
+          approve: isApprove,
+          reason,
+          reviewedBy: `Discord:@${userLabel}`,
+        }),
+      });
+
+      if (res.ok) {
+        await interaction.editReply(
+          `[PAYMENT REVIEW] Order #${orderId.slice(0, 8).toUpperCase()} successfully **${isApprove ? 'APPROVED' : 'DECLINED'}**!`
+        );
+      } else {
+        await interaction.editReply(`[ERROR] Review failed: ${res.error}`);
       }
     } else if (commandName === 'status') {
       await interaction.deferReply();

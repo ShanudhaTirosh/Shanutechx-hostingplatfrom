@@ -309,6 +309,18 @@ deploymentsRouter.post('/deployments/:id/launch', async (req: AuthedRequest, res
     envVarsEncrypted = encryptSecret(JSON.stringify(req.body.envVars), env.secretsEncryptionKey);
   }
 
+  let targetSubdomain = deployment.subdomain;
+  if (req.body.subdomain && typeof req.body.subdomain === 'string') {
+    const clean = req.body.subdomain.trim().toLowerCase();
+    if (clean !== deployment.subdomain) {
+      const validation = await validateCustomSubdomain(clean, deployment.id);
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error || 'Subdomain is not available' });
+      }
+      targetSubdomain = clean;
+    }
+  }
+
   const updatedDeployment = await prisma.deployment.update({
     where: { id: deployment.id },
     data: {
@@ -319,7 +331,7 @@ deploymentsRouter.post('/deployments/:id/launch', async (req: AuthedRequest, res
       frameworkPreset: req.body.frameworkPreset !== undefined ? req.body.frameworkPreset : deployment.frameworkPreset,
       internalPort,
       exposureMode: req.body.exposureMode !== undefined ? req.body.exposureMode : deployment.exposureMode,
-      subdomain: req.body.subdomain !== undefined ? req.body.subdomain : deployment.subdomain,
+      subdomain: targetSubdomain,
       envVarsEncrypted,
       status: 'building',
     },
@@ -430,8 +442,11 @@ deploymentsRouter.get('/deployments/:id/logs', async (req: AuthedRequest, res) =
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
   if (!deployment.containerId) return res.json({ logs: '' });
 
+  const rawTail = req.query.tail ?? req.query.lines;
+  const tail = rawTail ? Number(rawTail) : 200;
+
   try {
-    const logs = await fetchLogs(deployment.node, deployment.containerId);
+    const logs = await fetchLogs(deployment.node, deployment.containerId, isNaN(tail) ? 200 : tail);
     res.json({ logs });
   } catch (err) {
     res.status(502).json({ error: 'Failed to fetch logs from node' });
@@ -733,9 +748,20 @@ deploymentsRouter.delete('/deployments/:id', async (req: AuthedRequest, res) => 
     // Teardown shadow backup repo if non-Git deployment
     void deleteShadowRepo(deployment.id);
 
+    if (deployment.subdomain) {
+      void deleteSubdomainRecord(deployment.subdomain);
+    }
+
+    const releasedSubdomain = deployment.subdomain
+      ? `${deployment.subdomain}-del-${Date.now()}`
+      : null;
+
     await prisma.deployment.update({
       where: { id: deployment.id },
-      data: { status: 'deleted' },
+      data: {
+        status: 'deleted',
+        subdomain: releasedSubdomain,
+      },
     });
 
     // Its backups are customer data: remove them (and their GitHub releases) too. Best effort here; the backup sweep

@@ -93,7 +93,7 @@ export function NotificationsScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.action}>{actionLabel(item.action)}</Text>
               <Text style={styles.meta}>
-                {item.admin.email} · {new Date(item.createdAt).toLocaleString()}
+                {item.admin?.email ?? 'System'} · {new Date(item.createdAt).toLocaleString()}
               </Text>
             </View>
           </GlassCard>

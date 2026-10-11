@@ -198,19 +198,18 @@ export const api = {
         asJson<{ ticket: Ticket }>(r)
       ),
     claim: (id: string, force?: boolean) =>
-      apiFetch('/api/internal/claim-ticket', {
+      apiFetch(`/api/tickets/${id}/claim`, {
         method: 'POST',
-        body: JSON.stringify({ ticketId: id, force }),
+        body: JSON.stringify({ force }),
       }).then((r) => asJson<{ ok: boolean }>(r)),
     unclaim: (id: string) =>
-      apiFetch('/api/internal/unclaim-ticket', {
+      apiFetch(`/api/tickets/${id}/unclaim`, {
         method: 'POST',
-        body: JSON.stringify({ ticketId: id }),
       }).then((r) => asJson<{ ok: boolean }>(r)),
     close: (id: string, reason?: string) =>
-      apiFetch('/api/internal/close-ticket', {
+      apiFetch(`/api/tickets/${id}/close`, {
         method: 'POST',
-        body: JSON.stringify({ ticketId: id, reason }),
+        body: JSON.stringify({ reason }),
       }).then((r) => asJson<{ ok: boolean }>(r)),
   },
 

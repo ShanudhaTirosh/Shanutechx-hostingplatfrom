@@ -76,7 +76,8 @@ livekitRouter.post('/livekit/projects', requireAdminOrDev, async (req: AuthedReq
 
 livekitRouter.get('/livekit/projects', async (req: AuthedRequest, res) => {
   // Admin scoped to assigned customers' projects.
-  const where = await ownedResourceWhere(req);
+  const baseWhere = await ownedResourceWhere(req);
+  const where = { ...baseWhere, isActive: true };
   const projects = await prisma.liveKitProject.findMany({ where, orderBy: { createdAt: 'desc' } });
   res.json({
     projects: projects.map((p: (typeof projects)[number]) => ({ ...p, apiSecretRef: undefined })),
@@ -91,6 +92,9 @@ const tokenSchema = z.object({
 livekitRouter.post('/livekit/projects/:id/token', async (req: AuthedRequest, res) => {
   const project = await prisma.liveKitProject.findUnique({ where: { id: req.params.id } });
   if (!project) return res.status(404).json({ error: 'Project not found' });
+  if (!project.isActive) {
+    return res.status(403).json({ error: 'Cannot generate tokens for a deactivated LiveKit project' });
+  }
   if (!(await canAccessResource(project.userId, req))) {
     return res.status(404).json({ error: 'Project not found' });
   }

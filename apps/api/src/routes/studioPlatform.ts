@@ -13,10 +13,22 @@ function verifyStudioEmailAccess(req: Request, res: Response, next: () => void) 
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
 
+  // If internal agent secret header is provided
+  const internalSecret = req.headers['x-internal-secret'] || req.headers['x-agent-secret'];
+  if (internalSecret && (internalSecret === env.discordInternalSecret || internalSecret === env.nodeAgentSecret)) {
+    return next();
+  }
+
   // Extract email from authenticated user (if auth middleware was applied) or header
   const userEmail = (req as any).user?.email?.toLowerCase() || req.headers['x-user-email']?.toString().toLowerCase();
 
-  if (userEmail && !allowedList.includes(userEmail) && !allowedList.includes('*')) {
+  if (!userEmail) {
+    logger.warn('Anonymous unauthenticated attempt on Studio Platform API blocked');
+    res.status(401).json({ error: 'Authentication required. Missing user identity for Supabase Studio.' });
+    return;
+  }
+
+  if (!allowedList.includes(userEmail) && !allowedList.includes('*')) {
     logger.warn({ userEmail, allowedList }, 'Unauthorized email attempt on Studio Platform API');
     res.status(403).json({ error: 'Access denied. Email unauthorized for Supabase Admin Studio.' });
     return;

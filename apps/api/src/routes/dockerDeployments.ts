@@ -46,6 +46,15 @@ dockerDeploymentsRouter.post('/deployments/docker-image', async (req: AuthedRequ
     const { image, preferredName, internalPort, envVars, nodeId: requestedNodeId, exposureMode, cpuLimit, memoryLimit } = parseResult.data;
     const userId = req.user!.id;
 
+    if (req.user!.role !== 'admin' && req.user!.role !== 'dev') {
+      const activeSub = await prisma.subscription.findFirst({
+        where: { userId, status: 'active', currentPeriodEnd: { gte: new Date() } },
+      });
+      if (!activeSub) {
+        return res.status(403).json({ error: 'An active hosting subscription is required to deploy Docker containers.' });
+      }
+    }
+
     // Node selection
     let selectedNode;
     if (requestedNodeId) {
@@ -132,6 +141,20 @@ dockerDeploymentsRouter.post('/deployments/docker-compose', async (req: AuthedRe
     const { composeYaml, preferredName, envVars, nodeId: requestedNodeId } = parseResult.data;
     const userId = req.user!.id;
 
+    if (req.user!.role !== 'admin' && req.user!.role !== 'dev') {
+      const activeSub = await prisma.subscription.findFirst({
+        where: { userId, status: 'active', currentPeriodEnd: { gte: new Date() } },
+      });
+      if (!activeSub) {
+        return res.status(403).json({ error: 'An active hosting subscription is required to deploy Docker Compose stacks.' });
+      }
+    }
+
+    // Validate composeYaml to prevent host root mounts and privileged mode
+    if (/privileged\s*:\s*true/i.test(composeYaml) || /volumes\s*:\s*.*\/:(?!\/)/i.test(composeYaml) || /network_mode\s*:\s*["']?host["']?/i.test(composeYaml)) {
+      return res.status(400).json({ error: 'Privileged containers, host networking, and root host mounts are forbidden.' });
+    }
+
     let selectedNode;
     if (requestedNodeId) {
       selectedNode = await prisma.node.findUnique({ where: { id: requestedNodeId } });
@@ -163,6 +186,7 @@ dockerDeploymentsRouter.post('/deployments/docker-compose', async (req: AuthedRe
     });
 
     const composeResult = await callNodeAgent(selectedNode, '/agent/compose/up', 'POST', {
+      projectName: `proj-${deployment.id}`,
       deploymentId: deployment.id,
       composeYaml,
       envVars: envVars || {},

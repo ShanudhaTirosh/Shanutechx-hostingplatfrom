@@ -96,7 +96,7 @@ export function TicketThread({
               >
                 <div className="flex justify-between items-center gap-6 text-[10px] opacity-75 mb-1.5 font-medium">
                   <span className="flex items-center gap-1">
-                    {message.senderRole === 'admin' ? (
+                    {['admin', 'support', 'dev'].includes(message.senderRole) ? (
                       <>
                         <IconShield size={12} className="text-cyan-300" /> Support Team
                       </>

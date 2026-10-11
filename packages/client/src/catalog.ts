@@ -13,6 +13,12 @@ export class CatalogResource extends BaseClient {
   }
 
   async deploy(input: CatalogDeployInput): Promise<Deployment> {
-    return this.httpPost<Deployment>('/api/catalog/deploy', input);
+    const payload = {
+      slug: (input as any).slug ?? input.templateSlug,
+      nodeId: input.nodeId,
+      envVars: input.envVars,
+      projectName: input.subdomain,
+    };
+    return this.httpPost<Deployment>('/api/catalog/deploy', payload);
   }
 }

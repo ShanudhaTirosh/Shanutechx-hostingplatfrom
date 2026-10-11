@@ -429,7 +429,15 @@ async function getDockerContainerLogStream(containerId, tail = 100) {
 async function createDockerContainer({ name, image, env = [], ports = [], volumes = [], network }) {
   // Pull image if not local
   try {
-    await docker.pull(image);
+    await new Promise((resolve, reject) => {
+      docker.pull(image, (err, stream) => {
+        if (err) return reject(err);
+        docker.modem.followProgress(stream, (pullErr) => {
+          if (pullErr) return reject(pullErr);
+          resolve();
+        });
+      });
+    });
   } catch (e) {
     console.warn(`[nodeEngine] docker.pull for image ${image} encountered notice: ${e?.message || e}. Continuing with local image if available.`);
   }

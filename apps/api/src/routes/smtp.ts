@@ -327,7 +327,10 @@ smtpRouter.post('/smtp-accounts', requireDev, async (req: AuthedRequest, res) =>
   const credentialRef = encryptSecret(smtpPassword, env.secretsEncryptionKey);
   const tier = SMTP_PLAN_TIERS[planTier] || SMTP_PLAN_TIERS.starter;
   const aliases = customAliases || generateDefaultAliases(domain, tier.maxAliases);
-  const expiresAt = isInternal ? null : null; // Dev assigned & internal mailboxes have permanent access
+  const expiresAt =
+    isInternal || billingModel === 'permanent_free'
+      ? null
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   const account = await prisma.smtpAccount.create({
     data: {

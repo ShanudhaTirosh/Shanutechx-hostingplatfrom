@@ -93,10 +93,18 @@ export async function getCached<T>(
 export async function invalidateCache(keyOrPattern: string): Promise<void> {
   try {
     if (keyOrPattern.includes('*')) {
-      const keys = await redis.keys(keyOrPattern);
-      if (keys.length > 0) {
-        await redis.del(...keys);
-      }
+      const stream = redis.scanStream({ match: keyOrPattern, count: 100 });
+      await new Promise<void>((resolve) => {
+        stream.on('data', async (keys: string[]) => {
+          if (keys.length > 0) {
+            const pipeline = redis.pipeline();
+            keys.forEach((k) => pipeline.del(k));
+            await pipeline.exec().catch(() => {});
+          }
+        });
+        stream.on('end', () => resolve());
+        stream.on('error', () => resolve());
+      });
     } else {
       await redis.del(keyOrPattern);
     }

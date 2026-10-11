@@ -381,6 +381,7 @@ model Order {
 
   @@index([userId])
   @@index([teamId])
+  @@index([status, createdAt])
 }
 
 model OrderItem {
@@ -441,6 +442,7 @@ model Payment {
 
   @@index([orderId])
   @@index([reviewedById])
+  @@index([status, createdAt])
 }
 
 model SmsEvent {
@@ -1323,6 +1325,8 @@ model AuditLog {
   actorRole String?
 
   @@index([adminId])
+  @@index([createdAt])
+  @@index([adminId, createdAt])
 }
 
 // Customer support tickets. Separate from the Realtime DB live-chat
@@ -1413,6 +1417,8 @@ model Subscription {
   cancelledAt      DateTime?
 
   @@index([userId])
+  @@index([status, currentPeriodEnd])
+  @@index([status, pastDueAt])
 }
 
 // One row per periodic HTTP check against a deployment's public subdomain
@@ -1430,6 +1436,7 @@ model UptimeCheck {
   errorMessage   String?
 
   @@index([deploymentId, checkedAt])
+  @@index([checkedAt])
 }
 
 // Platform-wide incidents (not per-deployment) for the public status page

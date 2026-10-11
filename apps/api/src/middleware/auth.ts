@@ -1,8 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { firebaseAuth } from '../lib/firebaseAdmin';
 import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
 import { ensureStaffMarkedInRealtimeDb } from '../lib/chatAdminSync';
 import { hashApiKey } from '../lib/apiKeys';
+import { env } from '../env';
 
 export interface AuthedRequest extends Request {
   user?: {
@@ -76,6 +78,13 @@ export async function requireAuth(
 
     let user: { id: string; firebaseUid: string; email: string; role: 'customer' | 'admin' | 'support' | 'dev'; isBanned: boolean; banReason?: string | null } | null = null;
     try {
+      const allowedAdminList = env.allowedAdminEmails
+        ? env.allowedAdminEmails.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+        : [];
+      const isConfiguredDevAdmin = Boolean(
+        decoded.email_verified && decoded.email && allowedAdminList.includes(decoded.email.toLowerCase())
+      );
+
       user = await prisma.user.findUnique({
         where: { firebaseUid: decoded.uid },
       });
@@ -91,13 +100,19 @@ export async function requireAuth(
             where: { email: decoded.email },
           });
 
-          // B-05 FIX: Reject relinking if existing user already has a different firebaseUid
-          if (existingByEmail && (!existingByEmail.firebaseUid || existingByEmail.firebaseUid === decoded.uid)) {
+          // Link if unlinked, matching UID, or bootstrap placeholder from setup
+          if (
+            existingByEmail &&
+            (!existingByEmail.firebaseUid ||
+              existingByEmail.firebaseUid === decoded.uid ||
+              existingByEmail.firebaseUid.startsWith('dev-'))
+          ) {
             user = await prisma.user.update({
               where: { id: existingByEmail.id },
               data: {
                 firebaseUid: decoded.uid,
                 displayName: existingByEmail.displayName || decoded.name || null,
+                ...(isConfiguredDevAdmin ? { role: 'dev' } : {}),
               },
             });
           }
@@ -105,8 +120,7 @@ export async function requireAuth(
       }
 
       if (!user) {
-        // New user: always start as 'customer'. Role elevation must go through
-        // PATCH /admin/staff/:userId/role — never via email address matching.
+        // New user: dev if matched in configured allowedAdminEmails, otherwise customer
         // B-14 FIX: Use unique placeholder if email is absent to avoid P2002 collision on User.email
         const fallbackEmail = decoded.email || `no-email-${decoded.uid}@shanutechx.internal`;
         user = await prisma.user.create({
@@ -114,15 +128,23 @@ export async function requireAuth(
             firebaseUid: decoded.uid,
             email: fallbackEmail,
             displayName: decoded.name ?? null,
-            role: 'customer',
+            role: isConfiguredDevAdmin ? 'dev' : 'customer',
           },
         });
-      } else if (decoded.email && user.email !== decoded.email && !user.email.endsWith('@shanutechx.internal')) {
-        // Keep the stored email in sync if Firebase reports a change.
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: { email: decoded.email },
-        });
+      } else {
+        if (isConfiguredDevAdmin && user.role !== 'dev') {
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { role: 'dev' },
+          });
+        }
+        if (decoded.email && user.email !== decoded.email && !user.email.endsWith('@shanutechx.internal')) {
+          // Keep the stored email in sync if Firebase reports a change.
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { email: decoded.email },
+          });
+        }
       }
     } catch (_dbErr: any) {
       return res.status(503).json({ error: 'Database service temporarily unavailable' });
@@ -149,6 +171,14 @@ export async function requireAuth(
       const targetUser = await prisma.user.findUnique({ where: { id: impersonateUserId } });
       if (targetUser && !targetUser.isBanned && targetUser.role === 'customer') {
         (req as any).adminUser = req.user;
+        await prisma.auditLog.create({
+          data: {
+            adminId: user.id,
+            action: 'user.impersonate',
+            target: `User ${targetUser.id} (${targetUser.email})`,
+            actorRole: user.role,
+          },
+        }).catch((err) => logger.warn({ err }, 'Failed to record impersonation audit log'));
         req.user = {
           id: targetUser.id,
           firebaseUid: targetUser.firebaseUid,

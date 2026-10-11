@@ -81,11 +81,12 @@ export class DeploymentsResource extends BaseClient {
   }
 
   async getLogs(id: string, lines?: number): Promise<string[]> {
-    const res = await this.httpGet<{ logs: string[] }>(
+    const res = await this.httpGet<{ logs: string | string[] }>(
       `/api/deployments/${id}/logs`,
-      { lines },
+      lines !== undefined ? { tail: lines, lines } : undefined,
     );
-    return res.logs;
+    if (Array.isArray(res.logs)) return res.logs;
+    return typeof res.logs === 'string' ? res.logs.split('\n').filter(Boolean) : [];
   }
 
   async getWebhookInfo(id: string): Promise<WebhookInfo> {

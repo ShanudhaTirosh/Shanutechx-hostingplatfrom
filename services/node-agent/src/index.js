@@ -1439,11 +1439,17 @@ function resolveEnvVars(yamlContent, userEnvVars = {}) {
  */
 app.post('/agent/compose/up', async (req, res) => {
   const { composeYaml, projectName, envVars } = req.body || {};
-  if (!composeYaml || !projectName) {
+  const effectiveProject = projectName || (req.body?.deploymentId ? `proj-${req.body.deploymentId}` : '');
+  if (!composeYaml || !effectiveProject) {
     return res.status(400).json({ error: 'composeYaml and projectName are required' });
   }
 
-  const safeProject = projectName.replace(/[^a-z0-9-]/gi, '-').toLowerCase().slice(0, 60);
+  // Security check: block privileged mode, host network, and root host filesystem mounts
+  if (/privileged\s*:\s*true/i.test(composeYaml) || /volumes\s*:\s*.*\/:(?!\/)/i.test(composeYaml) || /network_mode\s*:\s*["']?host["']?/i.test(composeYaml)) {
+    return res.status(400).json({ error: 'Privileged containers, host networking, and root host mounts are forbidden.' });
+  }
+
+  const safeProject = effectiveProject.replace(/[^a-z0-9-]/gi, '-').toLowerCase().slice(0, 60);
   const projectDir = `${COMPOSE_DIR}/${safeProject}`;
 
   try {
@@ -1512,6 +1518,49 @@ app.get('/agent/compose/:project/logs', async (req, res) => {
     res.status(500).json({ error: err.stderr || err.message });
   }
 });
+
+/**
+ * POST /agent/compose/:project/start
+ */
+app.post('/agent/compose/:project/start', async (req, res) => {
+  const safeProject = req.params.project.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+  const projectDir = `${COMPOSE_DIR}/${safeProject}`;
+  try {
+    const { stdout, stderr } = await execFileAsync('docker', ['compose', '-p', safeProject, '-f', `${projectDir}/docker-compose.yml`, 'start']);
+    res.json({ ok: true, stdout, stderr });
+  } catch (err) {
+    res.status(500).json({ error: err.stderr || err.message });
+  }
+});
+
+/**
+ * POST /agent/compose/:project/stop
+ */
+app.post('/agent/compose/:project/stop', async (req, res) => {
+  const safeProject = req.params.project.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+  const projectDir = `${COMPOSE_DIR}/${safeProject}`;
+  try {
+    const { stdout, stderr } = await execFileAsync('docker', ['compose', '-p', safeProject, '-f', `${projectDir}/docker-compose.yml`, 'stop']);
+    res.json({ ok: true, stdout, stderr });
+  } catch (err) {
+    res.status(500).json({ error: err.stderr || err.message });
+  }
+});
+
+/**
+ * POST /agent/compose/:project/restart
+ */
+app.post('/agent/compose/:project/restart', async (req, res) => {
+  const safeProject = req.params.project.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+  const projectDir = `${COMPOSE_DIR}/${safeProject}`;
+  try {
+    const { stdout, stderr } = await execFileAsync('docker', ['compose', '-p', safeProject, '-f', `${projectDir}/docker-compose.yml`, 'restart']);
+    res.json({ ok: true, stdout, stderr });
+  } catch (err) {
+    res.status(500).json({ error: err.stderr || err.message });
+  }
+});
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 

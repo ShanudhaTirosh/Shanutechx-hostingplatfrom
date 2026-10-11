@@ -118,11 +118,19 @@ async function prepareWorkspace(deploymentId, repoUrl, branch = 'main', remoteBa
     repoUrl.startsWith('zip://') ||
     repoUrl.startsWith('upload://') ||
     repoUrl.startsWith('tar://') ||
-    repoUrl.startsWith('archive://')
+    repoUrl.startsWith('archive://') ||
+    repoUrl.startsWith('starter://')
   );
 
-  // Handle uploaded zip/folder/tar archive sources
+  // Handle uploaded zip/folder/tar archive sources or starter templates
   if (isArchive) {
+    if (repoUrl.startsWith('starter://')) {
+      const indexPath = path.join(dir, 'index.html');
+      if (!fs.existsSync(indexPath) && fs.readdirSync(dir).length === 0) {
+        fs.writeFileSync(indexPath, '<!DOCTYPE html><html><head><title>Welcome to ShanuTechX</title></head><body><h1>Welcome to ShanuTechX</h1><p>Your container slot is active and ready for deployment.</p></body></html>\n', 'utf8');
+      }
+      return dir;
+    }
     const filesAfterRestore = fs.readdirSync(dir);
     if (filesAfterRestore.length === 0) {
       throw new Error(`Workspace directory for archive deployment ${deploymentId} is empty and shadow backup repository could not be restored.`);
