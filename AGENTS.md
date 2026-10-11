@@ -9,7 +9,8 @@ ShanuTechX is an autonomous enterprise cloud-hosting platform and container orch
 - **`apps/`**
   - [`api/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api) — Express REST API (TypeScript) with Prisma 5.22 & PostgreSQL 16. Source of truth for platform business logic, auth, payments, billing, and orchestration. Entrypoints: [`src/index.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/index.ts) (Express) and [`src/worker.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/worker.ts) (BullMQ worker).
   - [`dashboard/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard) — Next.js 14 App Router customer & admin control panel dashboard.
-  - [`web/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web) — Next.js 14 App Router public storefront and marketing portal.
+  - [`web/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web) — Next.js 14 App Router public storefront, SEO documentation portal, and AI discovery hub.
+  - [`webmail/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/webmail) — Next.js 14 App Router enterprise business email & mailbox web client.
   - [`mobile-admin/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/mobile-admin) — Standalone Expo / React Native Android & iOS admin app (excluded from root npm workspaces via `!apps/mobile-admin`).
 - **`services/`**
   - [`node-agent/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent) — Plain JavaScript (`.js`) Docker management & telemetry agent running per VPS host node. Core modules: [`filesystem.js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent/src/filesystem.js), [`nodeEngine.js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent/src/nodeEngine.js).
@@ -31,7 +32,7 @@ ShanuTechX is an autonomous enterprise cloud-hosting platform and container orch
 ## 🛠️ Environment & Commands Quick-Start
 
 - **Node Version:** Node 20 required (CI enforces `node-version: 20`).
-- **Dev Servers:** `npm run dev:api` (port 4000), `npm run dev:dashboard` (3001), `npm run dev:web` (3000), `npm run dev:whatsapp`, `npm run dev:discord`, `npm run dev:node-agent`.
+- **Dev Servers:** `npm run dev:api` (port 4000), `npm run dev:dashboard` (3001), `npm run dev:web` (3000), `npm run dev:webmail` (3002), `npm run dev:whatsapp`, `npm run dev:discord`, `npm run dev:node-agent`.
 - **Database & Prisma:** `npm run db:generate`, `npm run db:migrate`, `npm run db:migrate:deploy`.
 - **Tests & Typechecks:**
   - `npm run test:unit` → `tsx --test tests/unit/*.test.ts` (Node test runner — pure functions, **no DB required** — run by CI).
@@ -52,6 +53,7 @@ ShanuTechX is an autonomous enterprise cloud-hosting platform and container orch
 8. **Encrypted Vault:** Secrets encrypted with AES-256-GCM ([`secretsVault.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/secretsVault.ts)).
 9. **Backups & Storage:** Cloudflare R2 backup integration ([`r2Storage.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/r2Storage.ts)).
 10. **Billing & Dunning:** Daily automated checks ([`billing.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/billing.ts)) for subscription renewals and container suspensions.
+11. **SEO, AI Bot Discovery & Security Standards:** Dynamic `sitemap.xml` (20 canonical routes), granular `robots.txt` safely enabling AI crawlers (GPTBot, ClaudeBot, PerplexityBot) on public specs while shielding private panels, `llms.txt` and `llms-full.txt` standard ingestion feeds, `humans.txt` team credits, RFC 9116 `security.txt`, and RFC 8461 `mta-sts.txt` mail transport security.
 
 ---
 

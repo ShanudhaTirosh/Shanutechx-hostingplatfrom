@@ -13,8 +13,9 @@ This guide will help you run the **COMPLETE** ShanuTechX platform locally with *
 ### Core Application Services
 - ✅ **API Server** - Express REST API (Port 4000)
 - ✅ **Worker** - Background job processor (BullMQ)
-- ✅ **Dashboard** - Next.js admin interface (Port 3000)
-- ✅ **Web** - Marketing website (Port 3001)
+- ✅ **Web Storefront** - Marketing website & SEO/AI Discovery Hub (Port 3000)
+- ✅ **Dashboard** - Next.js admin & customer portal (Port 3001)
+- ✅ **Webmail** - Next.js enterprise business email client (Port 3002)
 
 ### Bot Services
 - ✅ **WhatsApp Bot** - Customer support automation (Port 4100)
@@ -24,7 +25,7 @@ This guide will help you run the **COMPLETE** ShanuTechX platform locally with *
 - ✅ **Node Agent** - VPS deployment handler (Port 5000)
 - ✅ **BuildKit** - Docker image builder
 
-**Total: 10 Services** running simultaneously!
+**Total: 11 Services** running simultaneously!
 
 ---
 
@@ -126,7 +127,13 @@ NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
 ```
 
-### 3. WhatsApp Bot Configuration (`services/whatsapp-bot/.env`)
+### 3. Webmail Configuration (`apps/webmail/.env`)
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:4000
+```
+
+### 4. WhatsApp Bot Configuration (`services/whatsapp-bot/.env`)
 
 ```env
 PORT=4100
@@ -137,7 +144,7 @@ API_BASE_URL=http://api:4000
 # Session data will be stored in services/whatsapp-bot/auth/
 ```
 
-### 4. Discord Bot Configuration (`services/discord-bot/.env`)
+### 5. Discord Bot Configuration (`services/discord-bot/.env`)
 
 ```env
 PORT=4200
@@ -150,7 +157,7 @@ DISCORD_GUILD_ID=your-server-id
 DISCORD_NOTIFICATIONS_CHANNEL_ID=your-channel-id
 ```
 
-### 5. Node Agent Configuration (`services/node-agent/.env`)
+### 6. Node Agent Configuration (`services/node-agent/.env`)
 
 ```env
 AGENT_PORT=5000
@@ -214,10 +221,11 @@ Once all services are running:
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| **Dashboard** | http://localhost:3000 | Admin interface |
+| **Web Storefront** | http://localhost:3000 | Storefront & SEO / AI Discovery |
+| **Dashboard** | http://localhost:3001 | Customer & admin control panel |
+| **Webmail** | http://localhost:3002 | Business email web client |
 | **API** | http://localhost:4000 | REST API |
 | **API Health** | http://localhost:4000/api/health | API status |
-| **Web** | http://localhost:3001 | Marketing site |
 | **WhatsApp Bot** | http://localhost:4100 | WhatsApp integration |
 | **Discord Bot** | http://localhost:4200 | Discord integration |
 | **Node Agent** | http://localhost:5000 | Deployment engine |
@@ -298,8 +306,10 @@ curl -X POST http://localhost:4000/auth/register ^
   -d "{\"email\":\"test@test.com\",\"password\":\"password123\",\"name\":\"Test User\"}"
 ```
 
-### 3. Test Dashboard
-Open: http://localhost:3000
+### 3. Test Web, Dashboard & Webmail
+- Open Web Storefront: http://localhost:3000
+- Open Dashboard Portal: http://localhost:3001
+- Open Webmail Client: http://localhost:3002
 
 ### 4. Test Bots
 ```cmd
@@ -406,6 +416,8 @@ docker-compose -f docker-compose.local.yml restart discord-bot
 ```cmd
 netstat -ano | findstr :4000
 netstat -ano | findstr :3000
+netstat -ano | findstr :3001
+netstat -ano | findstr :3002
 netstat -ano | findstr :5432
 ```
 

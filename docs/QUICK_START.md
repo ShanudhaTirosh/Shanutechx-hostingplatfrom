@@ -41,7 +41,9 @@ Choose option **[3]** for API + Dashboard
 
 ### Step 4: Access the Application
 
-- **Dashboard:** http://localhost:3000
+- **Web Storefront:** http://localhost:3000
+- **Dashboard Portal:** http://localhost:3001
+- **Webmail Client:** http://localhost:3002
 - **API Health:** http://localhost:4000/api/health
 
 ---
@@ -62,6 +64,12 @@ npm run dev:api
 
 # Terminal 2
 npm run dev:dashboard
+
+# Terminal 3 (Web Storefront)
+npm run dev:web
+
+# Terminal 4 (Webmail Client)
+npm run dev:webmail
 ```
 
 ### Start Everything with Docker
@@ -83,11 +91,14 @@ docker-compose up --build
 # API Server (Port 4000)
 npm run dev:api
 
-# Dashboard (Port 3000)
+# Web Storefront & SEO/AI Discovery (Port 3000)
+npm run dev:web
+
+# Dashboard (Port 3001)
 npm run dev:dashboard
 
-# Web Landing Page (Port 3001)
-npm run dev:web
+# Webmail Client (Port 3002)
+npm run dev:webmail
 
 # Background Worker
 npm run dev:worker
@@ -193,8 +204,10 @@ npm run db:migrate
 shanutechx/
 ├── apps/
 │   ├── api/           # Express REST API (Port 4000)
-│   ├── dashboard/     # Next.js Admin Dashboard (Port 3000)
-│   └── web/           # Marketing Website (Port 3001)
+│   ├── dashboard/     # Next.js Customer & Admin Portal (Port 3001)
+│   ├── web/           # Marketing Storefront, SEO & AI Discovery (Port 3000)
+│   ├── webmail/       # Enterprise Business Email Client (Port 3002)
+│   └── mobile-admin/  # Expo / React Native Mobile Admin App
 ├── services/
 │   ├── node-agent/    # VPS Deployment Agent (Port 5000)
 │   ├── whatsapp-bot/  # WhatsApp Support Bot (Port 4100)
@@ -210,9 +223,10 @@ shanutechx/
 
 ## 🎯 What to Do Next?
 
-### 1. Create Your First User
+### 1. Sign In to the Platform
 
-Visit: http://localhost:3000/login
+Visit: http://localhost:3001/login (Dashboard) or http://localhost:3000 (Public Storefront).
+Note: Platform authentication enforces Google & GitHub OAuth SSO. Direct email/password input forms are disabled across client portals.
 
 Or use the API:
 

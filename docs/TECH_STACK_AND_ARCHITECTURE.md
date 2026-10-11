@@ -28,24 +28,24 @@ Defect Audit & Vulnerability Report: see [`BUG_AUDIT.md`](file:///c:/Users/tiros
 ShanuTechX is an enterprise-grade cloud-hosting platform and container orchestration engine built as a Node.js npm workspace monorepo. It manages the full lifecycle of compute nodes, application container deployments, managed database clusters, WebRTC video rooms, domain port exposures, and customer billing.
 
 ```text
-                               ┌─────────────────────────────────────────┐
-                               │           Traefik 3.x Ingress           │
-                               │        (Port 80 / 443 + TLS 1.3)        │
-                               └────────────────────┬────────────────────┘
-                                                    │
-             ┌──────────────────────────────────────┼──────────────────────────────────────┐
-             ▼                                      ▼                                      ▼
-┌──────────────────────────┐           ┌──────────────────────────┐           ┌──────────────────────────┐
-│   apps/web (Port 3000)   │           │apps/dashboard (Port 3001)│           │   apps/api (Port 4000)   │
-│ Next.js 14 Public Store  │           │  Next.js 14 Control UI   │           │ Express + Prisma 5.22 API│
-└──────────────────────────┘           └──────────────────────────┘           └────────────┬─────────────┘
-                                                                                           │
-              ┌────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────┐
-              ▼                                                                            ▼                                  ▼
-┌──────────────────────────┐                                                   ┌───────────────────────┐          ┌───────────────────────┐
-│  services/node-agent     │                                                   │ PostgreSQL 16 & Redis │          │ WildDuck Mail Engine │
-│  Container Engine Daemon │                                                   │  Primary DB & Queue   │          │ (MongoDB + IMAP/SMTP) │
-└──────────────────────────┘                                                   └───────────────────────┘          └───────────────────────┘
+                               ┌─────────────────────────────────────────────────────────┐
+                               │                   Traefik 3.x Ingress                   │
+                               │                (Port 80 / 443 + TLS 1.3)                │
+                               └────────────────────────────┬────────────────────────────┘
+                                                            │
+              ┌──────────────────────────────┬──────────────┴────────────────┬──────────────────────────────┐
+              ▼                              ▼                               ▼                              ▼
+┌──────────────────────────┐   ┌──────────────────────────┐    ┌──────────────────────────┐   ┌──────────────────────────┐
+│   apps/web (Port 3000)   │   │apps/dashboard (Port 3001)│    │ apps/webmail (Port 3002) │   │   apps/api (Port 4000)   │
+│ Next.js 14 Public Store  │   │  Next.js 14 Control UI   │    │ Next.js 14 Mail Client   │   │ Express + Prisma 5.22 API│
+└──────────────────────────┘   └──────────────────────────┘    └──────────────────────────┘   └────────────┬─────────────┘
+                                                                                                           │
+              ┌────────────────────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────┐
+              ▼                                                                                            ▼                                  ▼
+┌──────────────────────────┐                                                                   ┌───────────────────────┐          ┌───────────────────────┐
+│  services/node-agent     │                                                                   │ PostgreSQL 16 & Redis │          │ WildDuck Mail Engine │
+│  Container Engine Daemon │                                                                   │  Primary DB & Queue   │          │ (MongoDB + IMAP/SMTP) │
+└──────────────────────────┘                                                                   └───────────────────────┘          └───────────────────────┘
 ```
 
 ---
@@ -66,11 +66,11 @@ ShanuTechX is an enterprise-grade cloud-hosting platform and container orchestra
 
 ---
 
-### 2.2 Frontend Control Panel & Storefront
+### 2.2 Frontend Control Panel, Storefront & Webmail
 
 | Technology | Role / Version | Architectural Rationale (WHY Chosen) |
 | :--- | :--- | :--- |
-| **Next.js 14 App Router** | Full-Stack Web Framework | React Server Components (RSC), standalone Docker bundling, streaming SSR, and file-based route resolution for both marketing storefront (`apps/web`) and control panel studio (`apps/dashboard`). |
+| **Next.js 14 App Router** | Full-Stack Web Framework | React Server Components (RSC), standalone Docker bundling, streaming SSR, and file-based route resolution across marketing storefront (`apps/web`), control panel studio (`apps/dashboard`), and enterprise mail client (`apps/webmail`). |
 | **Tailwind CSS** | Styling System | Utility-first responsive styling with custom glassmorphism design tokens (`glass`, `bg-brand-gradient`, glowing borders) ensuring modern aesthetic. |
 | **Firebase OAuth SSO** | Auth Client | Enforces Single Sign-On (SSO) exclusively via Google, GitHub, and Discord OAuth identities, eliminating direct password input forms and reducing authentication security risks. |
 | **xterm.js & WebSockets** | SSH Terminal UI | Interactive in-browser PTY terminal emulator supporting real-time container log streaming and shell access. |
@@ -126,6 +126,20 @@ ShanuTechX is an enterprise-grade cloud-hosting platform and container orchestra
 | **Grafana 11** | Monitoring Dashboards | Visualizes real-time CPU/RAM utilization, P95/P99 request latency, throughput RPS, and active deployment metrics. |
 | **Loki 3.1 & Promtail 3.1** | Container Log Aggregator | Collects stdout/stderr container logs from `/var/lib/docker/containers/*/*.log` and indexes them by container label for instant LogQL querying. |
 | **Uptime Kuma** | Synthetic Health Probes | Multi-protocol synthetic checks (HTTP/TCP/DNS/SSL) with webhook dispatch to Discord and WhatsApp. |
+
+---
+
+### 2.8 Search Discovery, AI Agent Ingestion & Security Disclosure Architecture
+
+| Technology | Role / Standard | Architectural Rationale (WHY Chosen) |
+| :--- | :--- | :--- |
+| **Next.js Metadata Route `sitemap.ts`** | Dynamic XML Sitemap | Generates `/sitemap.xml` dynamically from TypeScript definitions with lastModified dates, priorities (1.0 for root, 0.9 for core hosting, 0.8 for status/reviews), and change frequencies across all 20 canonical public routes. |
+| **Next.js Metadata Route `robots.ts`** | Granular Crawler Directives | Implements dual policy: standard search bots allowed on public routes and disallowed on private paths (`/dashboard`, `/api`, `/login`, etc.); AI crawlers (`GPTBot`, `ClaudeBot`, `PerplexityBot`, etc.) granted safe read access to marketing, documentation, catalog, and pricing while shielding user data. |
+| **llms.txt (llmstxt.org Standard)** | AI Context Protocol | Lightweight markdown at `/llms.txt` and exhaustive technical reference at `/llms-full.txt` giving LLMs high-density, accurate knowledge about platform capabilities and APIs without hallucination. |
+| **RFC 9116 (`security.txt`)** | Security Vulnerability Disclosure | Standard at `/.well-known/security.txt` and `/security.txt` providing white-hat researchers a responsible disclosure channel, safe harbor guarantees, and 2027 expiration date. |
+| **RFC 8461 (`mta-sts.txt`)** | SMTP MTA Strict Transport Security | Policy at `/.well-known/mta-sts.txt` requiring modern mail servers to deliver incoming emails to `mail.shanutechx.com` strictly over validated TLS, preventing SMTP downgrade attacks. |
+| **RFC `humans.txt`** | Human Credit Standard | Celebrates the founder, architecture team, open source acknowledgments, and platform tech stack at `/humans.txt`. |
+| **Schema.org JSON-LD `@graph`** | Rich Structured Data | Connected schema graph in [`apps/web/app/layout.tsx`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/app/layout.tsx) detailing `Organization`, `WebSite` with search actions, and `SoftwareApplication` with product pricing tiers. |
 
 ---
 

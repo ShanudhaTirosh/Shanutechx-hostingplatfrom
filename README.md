@@ -45,6 +45,13 @@ Defect Audit & Vulnerability Report: see [`BUG_AUDIT.md`](file:///c:/Users/tiros
 - Discord Bot ([`services/discord-bot`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/discord-bot)) handles `/ticket` creation and server monitoring.
 - WhatsApp Bot ([`services/whatsapp-bot`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/whatsapp-bot)) handles account status queries and customer notifications.
 
+### 5. 🌐 SEO, Dynamic Sitemap, AI Bot Discovery & Security Standards
+- **Dynamic Sitemap (`sitemap.xml`)**: Automated sitemap in [`apps/web/app/sitemap.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/app/sitemap.ts) indexing 20 public routes with priorities and update frequencies.
+- **AI Crawler & Bot Governance (`robots.txt`)**: Granular policy safely enabling AI systems (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Google-Extended`, etc.) to index public business offerings and documentation while disallowing private dashboards and APIs.
+- **LLM Context Discovery**: Native [`llms.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/llms.txt) and [`llms-full.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/llms-full.txt) following the llmstxt.org standard.
+- **Security & RFC Compliance**: RFC 9116 [`security.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/.well-known/security.txt) vulnerability disclosure policy, RFC 8461 [`mta-sts.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/.well-known/mta-sts.txt) SMTP TLS enforcement, and [`humans.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/humans.txt) team and architecture credits.
+- **Rich Schema.org Data**: Connected Schema.org `@graph` for `Organization`, `WebSite`, and `SoftwareApplication` with product pricing offers.
+
 ---
 
 ## 📁 Repository Monorepo Structure
@@ -55,6 +62,7 @@ shanutechx/
 │   ├── api/             # Core REST API (Express + Prisma v5.22 + PostgreSQL)
 │   ├── dashboard/       # Control Panel Dashboard Studio (Next.js 14)
 │   ├── web/             # Dark-Theme Marketing & Documentation Site (Next.js 14)
+│   ├── webmail/         # Enterprise Business Email Client (Next.js 14)
 │   └── mobile-admin/    # Expo React Native Mobile Admin App for Android & iOS
 ├── packages/
 │   ├── db/              # Prisma 5.22 Schema & Database Migrations Ledger

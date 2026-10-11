@@ -17,8 +17,12 @@ Welcome to the ShanuTechX documentation hub. This directory contains comprehensi
 ## 📝 Key Documentation Files
 
 - **[`PROJECT_STRUCTURE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/PROJECT_STRUCTURE.md)** — Comprehensive monorepo workspace directory tree.
+- **[`SEO_AND_AI_DISCOVERY.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/SEO_AND_AI_DISCOVERY.md)** — Dynamic sitemap, AI bot governance, LLM standards, and RFC security guidelines.
 - **[`DEPLOYMENT_GUIDE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/DEPLOYMENT_GUIDE.md)** — Production deployment & multi-container orchestration manual.
-- **[`NEW_FEATURES.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/NEW_FEATURES.md)** — Detailed overview of recent platform capabilities.
+- **[`FULL_STACK_GUIDE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/FULL_STACK_GUIDE.md)** — Complete multi-service local stack guide.
+- **[`PORT_EXPOSURE.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/PORT_EXPOSURE.md)** — Dynamic node port exposure engine and Cloudflare DNS automation.
+- **[`WAF_FIREWALL.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/WAF_FIREWALL.md)** — Edge firewall and rate-limiting security documentation.
+- **[`NEW_FEATURES.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/NEW_FEATURES.md)** — Detailed overview of recent platform capabilities (Phases 1-18).
 - **[`COMPREHENSIVE_AUDIT_AND_RESOLUTION_REPORT.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/COMPREHENSIVE_AUDIT_AND_RESOLUTION_REPORT.md)** — Multi-pass vulnerability audit report.
 - **[`LOCAL_DEV_README.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/LOCAL_DEV_README.md)** — Local development environment setup guide.
 
@@ -28,7 +32,7 @@ Welcome to the ShanuTechX documentation hub. This directory contains comprehensi
 
 ```text
 shanutechx/
-├── apps/           # Core applications (api, dashboard, web, mobile-admin)
+├── apps/           # Core applications (api, dashboard, web, webmail, mobile-admin)
 ├── services/       # Autonomous daemons (node-agent, discord-bot, whatsapp-bot)
 ├── packages/       # Shared SDKs & modules (db, client, catalog, deployments, auth, types, tracing, supabase-js suite)
 ├── infra/          # Traefik, PostgreSQL, Redis control-plane & node configs

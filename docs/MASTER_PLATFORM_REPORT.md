@@ -31,14 +31,15 @@ The platform's database layer has been upgraded with 9 new Prisma migrations rep
                                 ┌────────────────────▼────────────────────┐
                                 │             Traefik Proxy               │
                                 │    (TLS / SSL Certificates, CORS)       │
-                                └─────────┬───────────────────┬───────────┘
-                                          │                   │
-                        ┌─────────────────▼───┐           ┌───▼──────────────────┐
-                        │   apps/dashboard    │           │       apps/web       │
-                        │   Next.js 14 Admin  │           │   Next.js Marketing  │
-                        └─────────────────┬───┘           └───┬──────────────────┘
-                                          │                   │
-                                          └─────────┬─────────┘
+                                └──────┬─────────────┬─────────────┬──────┘
+                                       │             │             │
+                    ┌──────────────────▼──┐   ┌──────▼──────┐   ┌──▼──────────────────┐
+                    │   apps/dashboard    │   │ apps/webmail│   │       apps/web       │
+                    │   Next.js 14 Admin  │   │ Next.js Mail│   │ Next.js Storefront  │
+                    │   (Protected Portal)│   │ (Enterprise)│   │ (SEO & AI Discovery)│
+                    └──────────────────┬──┘   └──────┬──────┘   └──┬──────────────────┘
+                                       │             │             │
+                                       └─────────────┼─────────────┘
                                                     │ REST API / JWT / Firebase
                                 ┌───────────────────▼────────────────────┐
                                 │               apps/api                 │
@@ -58,9 +59,10 @@ The platform's database layer has been upgraded with 9 new Prisma migrations rep
 
 | Component | Directory | Tech Stack | Purpose |
 | :--- | :--- | :--- | :--- |
-| **Control Plane API** | `apps/api` | Node.js, Express, TypeScript, Prisma, Zod | Core platform REST API, billing logic, deployment pipeline, node orchestration |
-| **Admin & Customer Portal**| `apps/dashboard` | Next.js 14, React, Tailwind CSS | Dashboard UI for managing deployments, VPS instances, domains, billing, settings |
-| **Marketing Site** | `apps/web` | Next.js 14, React, Tailwind CSS | Landing page, pricing tables, public catalog & status display |
+| **Control Plane API** | `apps/api` | Node.js, Express, TypeScript, Prisma, Zod | Core platform REST API, billing logic, deployment pipeline, node orchestration, robots shield |
+| **Admin & Customer Portal**| `apps/dashboard` | Next.js 14, React, Tailwind CSS | Dashboard UI for managing deployments, VPS instances, domains, billing, settings (protected from crawlers) |
+| **Storefront & SEO Hub** | `apps/web` | Next.js 14, React, Tailwind CSS | Public storefront, dynamic sitemap (20 routes), AI bot discovery (`llms.txt`), Schema.org JSON-LD graph, RFC 9116 / 8461 standards |
+| **Webmail Client** | `apps/webmail` | Next.js 14, React, Tailwind CSS | Enterprise webmail mailbox client with IMAP/SMTP integration and protected bot governance |
 | **Mobile Admin** | `apps/mobile-admin` | Expo, React Native | Cross-platform mobile admin app for key monitoring and node actions |
 | **Node Agent Service** | `services/node-agent` | Node.js, Express, Dockerode | VPS worker node agent managing Docker containers, compose stacks, and hardware stats |
 | **WhatsApp Bot** | `services/whatsapp-bot` | Node.js, Baileys / WhatsApp API | Inbound & outbound WhatsApp notifications and commands |

@@ -36,8 +36,9 @@ shanutechx/
 ### 1. [`apps/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps) — Platform Applications
 
 - **[`apps/api/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api)** — Core Express REST API backend (TypeScript) with Prisma 5.22 & PostgreSQL 16. Entrypoints: `src/index.ts` (Express server) and `src/worker.ts` (BullMQ repeatable queue worker).
-- **[`apps/dashboard/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard)** — Next.js 14 App Router customer & admin control panel dashboard studio.
-- **[`apps/web/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web)** — Next.js 14 App Router dark-theme public marketing storefront and documentation portal.
+- **[`apps/dashboard/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard)** — Next.js 14 App Router customer & admin control panel dashboard studio. Protected with `noindex` robots directive.
+- **[`apps/web/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web)** — Next.js 14 App Router dark-theme public marketing storefront, documentation portal, and AI discovery hub.
+- **[`apps/webmail/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/webmail)** — Next.js 14 App Router enterprise business email client with IMAP/SMTP synchronization, dark mode, and mailbox management. Protected with `noindex` robots directive.
 - **[`apps/mobile-admin/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/mobile-admin)** — Standalone Expo / React Native Android & iOS admin mobile app.
 
 ---
@@ -68,3 +69,15 @@ shanutechx/
 
 - **`infra/control-plane/`**: Compose configs for Traefik 3.x, PostgreSQL 16, Redis 7, MinIO, WildDuck Mail Server, Supabase.
 - **`templates/`**: Docker Compose YAML app templates (WordPress + MariaDB, Grafana, N8N, Hermes AI Agent, Redis, MinIO, PostgreSQL, etc.).
+
+---
+
+### 5. 🌐 SEO, AI Discovery & RFC Standards Directory
+
+- **`apps/web/app/sitemap.ts`**: Dynamic `sitemap.xml` mapping 20 public platform canonical URLs with priority and change frequencies.
+- **`apps/web/app/robots.ts`**: Granular crawler directives safely permitting AI web crawlers on business pages while shielding internal panels.
+- **`apps/web/public/llms.txt`**: Standard summary feed for LLM agents and AI search indexing.
+- **`apps/web/public/llms-full.txt`**: Full technical, architectural, and API specification document for machine ingestion.
+- **`apps/web/public/humans.txt`**: Standard team credits, open source acknowledgments, and architecture stack breakdown.
+- **`apps/web/public/.well-known/security.txt`**: RFC 9116 vulnerability disclosure policy with safe harbor rules.
+- **`apps/web/public/.well-known/mta-sts.txt`**: RFC 8461 SMTP MTA-STS policy for secure email transport encryption.

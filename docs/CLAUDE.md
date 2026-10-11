@@ -23,7 +23,8 @@
 - **Apps (`apps/`)**:
   - [`api/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api) (Port 4000) — Core Express REST API, Prisma 5.22, PostgreSQL 16, BullMQ worker.
   - [`dashboard/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard) (Port 3001) — Customer & Admin Control Panel Studio (Next.js 14).
-  - [`web/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web) (Port 3000) — Public Storefront & Marketing Portal (Next.js 14).
+  - [`web/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web) (Port 3000) — Public Storefront, SEO & AI Discovery Portal (Next.js 14).
+  - [`webmail/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/webmail) (Port 3002) — Enterprise Business Email Client (Next.js 14).
   - [`mobile-admin/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/mobile-admin) — Standalone Expo / React Native Android & iOS App.
 - **Services (`services/`)**:
   - [`node-agent/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent) (Port 5000) — Node compute container builder & telemetry daemon.
@@ -56,6 +57,7 @@
 5. **Interactive SSH Terminal:** Real-time WebSockets PTY gateway ([`sshTerminalGateway.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/sshTerminalGateway.ts)) with xterm.js support.
 6. **Encrypted Vault:** Secrets encrypted with AES-256-GCM.
 7. **Cloudflare R2 Backups:** Automated gzipped database snapshots to R2 bucket.
+8. **SEO, AI Bot Discovery & Security Standards:** Dynamic sitemap (20 canonical routes), dual-policy robots crawler governance, LLM ingestion standards (`llms.txt`, `llms-full.txt`), RFC 9116 `security.txt`, RFC 8461 `mta-sts.txt`, and Schema.org rich snippet graph.
 
 ---
 

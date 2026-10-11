@@ -14,10 +14,11 @@ ShanuTechX is a self-hosted, multi-tenant cloud platform. Think Coolify + Vercel
 
 | Service | URL |
 |---------|-----|
+| Web Storefront | `http://localhost:3000` |
 | Dashboard (Next.js) | `http://localhost:3001` |
+| Webmail Client | `http://localhost:3002` |
 | API Backend | `http://localhost:4000` |
-| Public Status Page | `http://localhost:3001/status` |
-| Webmail | `http://localhost:3001/webmail` |
+| Public Status Page | `http://localhost:3000/status` |
 
 ---
 
@@ -57,7 +58,9 @@ start-dev.cmd
 
 # or manually
 npm run dev --workspace=apps/api       # Port 4000
+npm run dev --workspace=apps/web       # Port 3000
 npm run dev --workspace=apps/dashboard # Port 3001
+npm run dev --workspace=apps/webmail   # Port 3002
 ```
 
 ---

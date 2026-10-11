@@ -7,6 +7,32 @@ Defect Audit & Vulnerability Ledger: see [`BUG_AUDIT.md`](file:///c:/Users/tiros
 
 ---
 
+## Phase 18 — SEO, Dynamic Sitemap, AI Bot Discovery & Enterprise Security Disclosure
+
+### 🗺️ Dynamic Sitemap Engine (`/sitemap.xml`)
+- **20 Platform Routes**: Automated indexing via [`apps/web/app/sitemap.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/app/sitemap.ts) with dynamic lastModified timestamps, change frequencies (daily/weekly/monthly), and priority hierarchies (1.0 for Home, 0.9 for VPS, App Hosting, Bot Hosting, Databases, Pricing, Docs, and Catalog).
+
+### 🤖 Granular Robots.txt & AI Web Crawler Permissions
+- **Dual Policy Governance**: Configured in [`apps/web/app/robots.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/app/robots.ts).
+- **Search Engines (`*`)**: Allowed on public pages, disallowed on `/dashboard`, `/api`, `/login`, `/cart`, `/admin`.
+- **AI Crawlers (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Google-Extended`, `Applebot-Extended`, `Amazonbot`, `cohere-ai`, `Meta-ExternalAgent`, `Bytespider`, `Diffbot`, `CCBot`)**: Explicitly permitted to learn about public business capabilities, catalog templates, pricing matrices, and technical documentation, while strictly blocking access to private user sessions and authenticated endpoints.
+- **Subsystem Isolation**: Added `User-agent: *\nDisallow: /` and `noindex` directives across [`apps/dashboard`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard), [`apps/webmail`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/webmail), and [`apps/api`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api) `/robots.txt`.
+
+### 🧠 LLM Standards (`/llms.txt` & `/llms-full.txt`)
+- **Concise Context Feed**: [`apps/web/public/llms.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/llms.txt) adhering to the llmstxt.org specification, delivering high-signal summaries of business offerings, developer capabilities, and usage policies.
+- **Exhaustive Technical Reference**: [`apps/web/public/llms-full.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/llms-full.txt) providing complete hardware tiers, REST API endpoint schemas, catalog template specifications, and deployment recipes for AI agent ingestion.
+
+### 🛡️ RFC 9116 Security Disclosure & RFC 8461 Email Security
+- **RFC 9116 Vulnerability Disclosure**: Policy at [`apps/web/public/.well-known/security.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/.well-known/security.txt) with security contact (`security@shanutechx.com`), safe harbor scope, 2027 expiration, and `/security.txt` redirect.
+- **RFC 8461 SMTP MTA-STS**: Policy at [`apps/web/public/.well-known/mta-sts.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/.well-known/mta-sts.txt) enforcing strict TLS encryption on incoming mail transport for `mail.shanutechx.com`.
+- **RFC Human Credit**: Standard [`apps/web/public/humans.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/humans.txt) celebrating the team, open source credits, and tech stack.
+
+### 📊 Schema.org Rich Data & Client Metadata Wrappers
+- **Connected `@graph`**: Injected into [`apps/web/app/layout.tsx`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/app/layout.tsx) linking `Organization`, `WebSite`, and `SoftwareApplication` with product pricing offers.
+- **Client Metadata Wrappers**: Added dedicated `layout.tsx` files for client-side pages (`/docs`, `/pricing`, `/faqs`, `/help`, `/status`, `/reviews`) enabling full title/OG tags and `FAQPage` rich snippets.
+
+---
+
 ## Phase 17 — Unified Dev Studio, OAuth SSO Standard & Node Port Exposure Engine
 
 ### 🔐 Multi-Provider OAuth SSO Standard

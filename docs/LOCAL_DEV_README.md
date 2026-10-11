@@ -36,7 +36,9 @@ start-dev.cmd
 Choose option **3** (API + Dashboard)
 
 **4. Open your browser:**
-- Dashboard: http://localhost:3000
+- Web Storefront: http://localhost:3000
+- Dashboard Portal: http://localhost:3001
+- Webmail Client: http://localhost:3002
 - API: http://localhost:4000
 
 **Done! ✅**
@@ -51,9 +53,10 @@ Choose option **3** (API + Dashboard)
 
 ### Applications (Node.js)
 - **API Server** - Express REST API (Port 4000)
-- **Dashboard** - Next.js admin interface (Port 3000)
-- **Web** - Marketing website (Port 3001)
-- **Worker** - Background job processor
+- **Web Storefront** - Marketing website, SEO & AI discovery hub (Port 3000)
+- **Dashboard** - Next.js customer & admin interface (Port 3001)
+- **Webmail** - Next.js enterprise business email client (Port 3002)
+- **Worker** - Background job processor (BullMQ)
 - **WhatsApp Bot** - Customer support (Port 4100)
 - **Discord Bot** - Team notifications (Port 4200)
 - **Node Agent** - Deployment handler (Port 5000)
@@ -210,10 +213,12 @@ Expected response:
 }
 ```
 
-### 3. Test Dashboard
-Open: http://localhost:3000
+### 3. Test Dashboard & Web Portals
+- Web Storefront: http://localhost:3000
+- Dashboard Portal: http://localhost:3001
+- Webmail Client: http://localhost:3002
 
-You should see the login page.
+You should see the respective portals and OAuth login options.
 
 ### 4. Create a Test User
 ```cmd
@@ -348,7 +353,9 @@ When you're ready to deploy:
 
 | Resource | URL |
 |----------|-----|
-| Dashboard | http://localhost:3000 |
+| Web Storefront | http://localhost:3000 |
+| Dashboard Portal | http://localhost:3001 |
+| Webmail Client | http://localhost:3002 |
 | API | http://localhost:4000 |
 | API Health | http://localhost:4000/api/health |
 | Prisma Studio | http://localhost:5555 |
@@ -371,7 +378,7 @@ When you're ready to deploy:
 
 1. **Check the logs** - most errors are visible there
 2. **Read error messages** - they usually tell you what's wrong
-3. **Check PORT availability** - make sure nothing else is using 4000, 3000, 5432, 6379
+3. **Check PORT availability** - make sure nothing else is using 4000, 3000, 3001, 3002, 5432, 6379
 4. **Restart Docker** - sometimes that's all you need
 5. **Clean reinstall** - when in doubt, `npm install` again
 

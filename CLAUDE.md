@@ -35,6 +35,13 @@ ShanuTechX integrates full-lifecycle cloud hosting, container builds, managed in
 - **Automated Billing Sweeps & Dunning:** Daily automated checks ([`billing.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/billing.ts)) for past-due subscriptions, graceful grace periods, and container suspension via BullMQ.
 - **Abuse & Fraud Detection:** Instant account suspension and deployment teardown pipeline ([`abuseDetector.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/api/src/lib/abuseDetector.ts)).
 
+### 4. SEO, AI Bot Discovery & Security Disclosure
+- **Dynamic XML Sitemap:** Automated `sitemap.xml` in [`apps/web/app/sitemap.ts`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/app/sitemap.ts) mapping 20 public platform routes with priorities and change frequencies.
+- **AI Crawler & Bot Governance:** Granular [`robots.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/app/robots.ts) explicitly granting permission for AI systems (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Google-Extended`, etc.) to index public business features, catalog templates, and documentation while disallowing private control panels and authenticated APIs.
+- **LLM Context Feeds:** [`llms.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/llms.txt) and [`llms-full.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/llms-full.txt) providing structured markdown context for LLM ingestion.
+- **RFC Standards:** RFC 9116 [`security.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/.well-known/security.txt) vulnerability disclosure policy, RFC 8461 [`mta-sts.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/.well-known/mta-sts.txt) SMTP transport security, and [`humans.txt`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/public/humans.txt) team and architecture credits.
+- **Schema.org Rich Data:** Connected `@graph` in [`apps/web/app/layout.tsx`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web/app/layout.tsx) for Organization, WebSite, SoftwareApplication offers, and FAQPage.
+
 ---
 
 ## 📁 Repository & Monorepo Structure
@@ -45,6 +52,7 @@ shanutechx/
 │   ├── api/             # Core REST API (Express + Prisma + PostgreSQL + BullMQ)
 │   ├── dashboard/       # Control Panel Studio (Next.js 14 App Router)
 │   ├── web/             # Public Dark-Theme Marketing & Landing Site (Next.js 14 App Router)
+│   ├── webmail/         # Enterprise Business Email Client (Next.js 14 App Router)
 │   └── mobile-admin/    # Standalone Mobile Admin App (Expo / React Native)
 ├── packages/
 │   ├── db/              # Prisma 5.22 Schema & Database Migrations Ledger

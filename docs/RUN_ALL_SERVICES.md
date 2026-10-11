@@ -14,9 +14,10 @@ run-full-stack.cmd
 Choose option **[1]** - Start ALL services
 
 ### 3. Access Your Platform
-- **Dashboard:** http://localhost:3000
-- **API:** http://localhost:4000
-- **Web:** http://localhost:3001
+- **Web Storefront:** http://localhost:3000
+- **Dashboard Portal:** http://localhost:3001
+- **Webmail Client:** http://localhost:3002
+- **API Server:** http://localhost:4000
 - **WhatsApp:** http://localhost:4100
 - **Discord:** http://localhost:4200
 - **Node Agent:** http://localhost:5000
@@ -28,15 +29,16 @@ Choose option **[1]** - Start ALL services
 ✅ **PostgreSQL** - Database (Port 5432)  
 ✅ **Redis** - Cache/Queue (Port 6379)  
 ✅ **API Server** - REST API (Port 4000)  
-✅ **Worker** - Background Jobs  
-✅ **Dashboard** - Admin UI (Port 3000)  
-✅ **Web** - Landing Page (Port 3001)  
+✅ **Worker** - Background Jobs (BullMQ)  
+✅ **Web Storefront** - Storefront, SEO & AI Discovery (Port 3000)  
+✅ **Dashboard** - Admin & Customer UI (Port 3001)  
+✅ **Webmail** - Business Email Client (Port 3002)  
 ✅ **WhatsApp Bot** - Support (Port 4100)  
 ✅ **Discord Bot** - Notifications (Port 4200)  
 ✅ **Node Agent** - Deployments (Port 5000)  
 ✅ **BuildKit** - Container Builds  
 
-**Total: 10 Services Running!**
+**Total: 11 Services Running!**
 
 ---
 
@@ -131,7 +133,7 @@ setup-full-stack.cmd
 
 ```
 ┌─────────────────────────────────────────────┐
-│  Dashboard (3000) + Web (3001)              │
+│  Web (3000) + Dashboard (3001) + Mail (3002)│
 └────────────────┬────────────────────────────┘
                  │ HTTP
 ┌────────────────▼────────────────────────────┐
@@ -205,7 +207,7 @@ run-full-stack.cmd
 
 **That's it! 🎉**
 
-Access the dashboard at: **http://localhost:3000**
+Access the platform at: **http://localhost:3001** (Dashboard Portal) or **http://localhost:3000** (Storefront)
 
 ---
 

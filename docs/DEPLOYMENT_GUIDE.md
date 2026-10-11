@@ -11,7 +11,7 @@ Defect Audit Report: see [`BUG_AUDIT.md`](file:///c:/Users/tiros/OneDrive/Deskto
 |---|---|---|
 | `docker compose -f docker/docker-compose.shanutechx.yml up -d` (repo root) | **Unified Local Dev**: Control plane + self-hosted Supabase + Infisical secrets manager. No TLS, HTTP on localhost. | Control Plane, Supabase Stack, Infisical |
 | `docker compose -f docker-compose.local.yml up -d` (repo root) | **Standalone Dev Stack**: Control plane + MinIO + Node Agent. | API, Dashboard, Web, Node Agent, MinIO |
-| `docker compose -f infra/control-plane/docker-compose.yml up -d` (`infra/control-plane/`) | **Production Deployment**: Real production stack with Traefik 3.x, Let's Encrypt TLS, and network isolation. | Traefik SSL, Core API, Worker, Dashboard, Web, Bots |
+| `docker compose -f infra/control-plane/docker-compose.yml up -d` (`infra/control-plane/`) | **Production Deployment**: Real production stack with Traefik 3.x, Let's Encrypt TLS, and network isolation. | Traefik SSL, Core API, Worker, Dashboard, Web, Webmail, Bots |
 
 ---
 
@@ -74,3 +74,4 @@ To add a worker VPS host node:
 2. **Cloudflare R2 Backups**: Configure R2 credentials (`R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) in `apps/api/.env`.
 3. **SSO OAuth Standard**: Ensure OAuth SSO client IDs and secrets for Google, GitHub, and Discord are set.
 4. **Audit Logging**: Confirm actor roles (`actorRole`) are captured in [`AuditLog`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/db/prisma/schema.prisma) records.
+5. **SEO & Bot Governance Verification**: Confirm `sitemap.xml` and `robots.txt` return correct HTTP 200 headers on `apps/web`, while `apps/dashboard`, `apps/webmail`, and `apps/api` strictly disallow crawling to protect internal systems (see [`SEO_AND_AI_DISCOVERY.md`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/docs/SEO_AND_AI_DISCOVERY.md)).
