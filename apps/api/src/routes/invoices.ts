@@ -9,7 +9,7 @@ import { generateInvoicePdf } from '../lib/invoicePdf';
 
 export const invoicesRouter = Router();
 
-invoicesRouter.use(requireAuth);
+invoicesRouter.use('/invoices', requireAuth);
 
 const INVOICES_DIR = process.env.INVOICES_DIR || '/var/lib/shanutechx/invoices';
 

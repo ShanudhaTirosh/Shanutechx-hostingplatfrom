@@ -18,7 +18,7 @@ import { validateCustomSubdomain } from '../lib/subdomain';
 import { createSubdomainRecord } from '../lib/cloudflare';
 
 export const catalogRouter = Router();
-catalogRouter.use(requireAuth);
+catalogRouter.use('/catalog', requireAuth);
 
 // ── Template catalogue ────────────────────────────────────────────────────────
 

@@ -6,7 +6,7 @@ import { requireRole } from '../middleware/rbac';
 import { logger } from '../lib/logger';
 
 export const vpsPlansRouter = Router();
-vpsPlansRouter.use(requireAuth);
+vpsPlansRouter.use('/vps-plans', requireAuth);
 
 /**
  * Validation schema for VPS plan creation and updates.

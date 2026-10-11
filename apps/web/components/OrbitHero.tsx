@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import GlobeOrb from './GlobeOrb';
 import { ArrowRight, Star, ShieldCheck, Zap, Server, Activity, Users, Globe, Database, Cpu, Terminal, Bot } from 'lucide-react';
+import CyberConstellationMotion from './motion/CyberConstellationMotion';
+import BorderBeam from './motion/BorderBeam';
 
 function useCounter(end: string | number, duration = 1800) {
   const [count, setCount] = useState<number | string>(0);
@@ -103,6 +105,9 @@ export default function OrbitHero() {
         background: 'transparent',
       }}
     >
+      {/* Interactive Cyber Constellation Motion Graphics Background */}
+      <CyberConstellationMotion nodeCount={32} maxDistance={125} speed={0.4} />
+
       {/* Apple-style Dot Grid Pattern Overlay */}
       <div
         aria-hidden="true"
@@ -252,21 +257,24 @@ export default function OrbitHero() {
             <StatPill value="1000" suffix="+" label="Deploys" />
           </div>
 
-          {/* Trustpilot Score */}
+          {/* Trustpilot Score with Motion BorderBeam */}
           <div
             style={{
+              position: 'relative',
               display: 'flex',
               alignItems: 'center',
               gap: '12px',
-              background: 'rgba(15,23,42,0.6)',
+              background: 'rgba(15,23,42,0.75)',
               padding: '10px 16px',
               borderRadius: '14px',
               width: 'fit-content',
               border: '1px solid rgba(255,255,255,0.08)',
               boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+              overflow: 'hidden',
             }}
           >
-            <div style={{ display: 'flex', gap: '3px' }}>
+            <BorderBeam size={160} duration={7} colorFrom="#10b981" colorTo="#38bdf8" />
+            <div style={{ display: 'flex', gap: '3px', position: 'relative', zIndex: 1 }}>
               {[1, 2, 3, 4, 5].map((i) => (
                 <div
                   key={i}

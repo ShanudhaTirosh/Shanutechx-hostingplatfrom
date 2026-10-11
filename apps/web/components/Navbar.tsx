@@ -88,15 +88,8 @@ const PRODUCTS = [
     color: 'text-amber-400',
   },
   {
-    name: 'V2Ray & STX Proxies',
-    desc: 'Ultra-fast VMess, VLess & Trojan nodes',
-    href: '/v2ray',
-    icon: ShieldCheck,
-    color: 'text-sky-400',
-  },
-  {
-    name: 'STX Digital Goods Store',
-    desc: 'Netflix 4K, Spotify, CapCut Pro & AI Accounts',
+    name: 'Digital Goods & V2Ray Store',
+    desc: 'V2Ray Proxies, Netflix 4K, Spotify, CapCut & AI Accounts',
     href: 'https://store.shanutechx.com',
     external: true,
     icon: ShoppingBag,
@@ -118,8 +111,7 @@ const ALL_SEARCHABLE_ITEMS = [
   { name: '24/7 Bot Hosting', desc: 'Discord, Telegram & WhatsApp bot daemons', href: '/bot-hosting', icon: Bot, color: 'text-pink-400', category: 'Services' },
   { name: 'Managed Databases', desc: 'PostgreSQL, MySQL, Redis & MongoDB clusters', href: '/databases', icon: Database, color: 'text-teal-400', category: 'Services' },
   { name: '1-Click Catalog', desc: 'WordPress, N8n, Plausible & 15+ templates', href: '/catalog', icon: LayoutGrid, color: 'text-amber-400', category: 'Services' },
-  { name: 'V2Ray & STX Proxies', desc: 'Ultra-fast VMess, VLess & Trojan nodes', href: '/v2ray', icon: ShieldCheck, color: 'text-sky-400', category: 'Services' },
-  { name: 'STX Digital Goods Store', desc: 'Netflix 4K, Spotify, CapCut Pro & AI Accounts', href: 'https://store.shanutechx.com', external: true, icon: ShoppingBag, color: 'text-purple-400', category: 'Digital Store' },
+  { name: 'Digital Goods & V2Ray Store', desc: 'V2Ray Proxies, Netflix 4K, Spotify, CapCut Pro & AI Accounts', href: 'https://store.shanutechx.com', external: true, icon: ShoppingBag, color: 'text-purple-400', category: 'External Store' },
   // Pages & Plans
   { name: 'Plans & Pricing', desc: 'Transparent pricing for VPS, Databases, and Apps', href: '/pricing', icon: Tag, color: 'text-emerald-400', category: 'Pages' },
   { name: 'System Status', desc: 'Live fleet uptime & real-time node metrics', href: '/status', icon: Activity, color: 'text-amber-400', category: 'Pages' },
@@ -149,6 +141,7 @@ export default function Navbar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [mounted, setMounted] = useState(false);
   const [userSession, setUserSession] = useState<{
     name: string;
     email: string;
@@ -220,6 +213,7 @@ export default function Navbar() {
 
   // Listen to Auth state & cached OAuth session
   useEffect(() => {
+    setMounted(true);
     const cached = localStorage.getItem('stx_auth_user');
     if (cached) {
       try {
@@ -230,7 +224,7 @@ export default function Navbar() {
     }
   }, []);
 
-  // Handle Click Outside to automatically close Notification & Profile dropdowns
+  // Handle Click Outside to automatically close Notification, Profile, Services & Legal dropdowns
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
@@ -238,6 +232,12 @@ export default function Navbar() {
       }
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setProfileOpen(false);
+      }
+      if (servicesRef.current && !servicesRef.current.contains(event.target as Node)) {
+        setServicesOpen(false);
+      }
+      if (legalRef.current && !legalRef.current.contains(event.target as Node)) {
+        setLegalOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -327,7 +327,11 @@ export default function Navbar() {
             onMouseEnter={() => setServicesOpen(true)}
             onMouseLeave={() => setServicesOpen(false)}
           >
-            <button className="hover:text-white transition-colors flex items-center gap-1.5 font-bold focus:outline-none group">
+            <button
+              type="button"
+              onClick={() => setServicesOpen((v) => !v)}
+              className="hover:text-white transition-colors flex items-center gap-1.5 font-bold focus:outline-none group cursor-pointer"
+            >
               <Layers className="h-3.5 w-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
               <span>Services</span>
               <ChevronDown
@@ -339,26 +343,68 @@ export default function Navbar() {
 
             <AnimatePresence>
               {servicesOpen && (
-                <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2.5 z-50">
+                <div className="absolute top-full left-0 mt-2 z-[100]">
                   <motion.div
-                    initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                    transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-                    className="w-80 bg-[#080922]/95 backdrop-blur-2xl border border-white/15 rounded-3xl p-3 shadow-[0_20px_50px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.12)]"
+                    exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                    transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                    className="w-[540px] max-w-[90vw] bg-[#090a21] border border-white/20 rounded-3xl p-4 shadow-[0_30px_90px_rgba(0,0,0,0.98),0_0_0_1px_rgba(255,255,255,0.08),0_0_40px_rgba(124,58,237,0.25)]"
                   >
-                    <div className="space-y-1">
+                    <div className="px-2 pb-2.5 mb-2.5 border-b border-white/10 flex items-center justify-between">
+                      <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-indigo-400">
+                        Platform Infrastructure &amp; Services
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        Instant 60s Provisioning
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
                       {PRODUCTS.map((prod) => {
                         const Icon = prod.icon;
+                        const isExt = Boolean((prod as any).external);
+                        if (isExt) {
+                          return (
+                            <a
+                              key={prod.href}
+                              href={prod.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => setServicesOpen(false)}
+                              className="col-span-2 flex items-center justify-between gap-3 p-3 rounded-2xl bg-gradient-to-r from-purple-500/15 via-indigo-500/10 to-purple-500/15 border border-purple-500/30 hover:border-purple-400/60 hover:bg-white/[0.08] transition-all group/item shadow-sm"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 group-hover/item:scale-110 transition-transform shrink-0">
+                                  <Icon className="h-4 w-4" />
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-white text-xs group-hover/item:text-purple-300 transition-colors">
+                                      {prod.name}
+                                    </span>
+                                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold uppercase">
+                                      store.shanutechx.com
+                                    </span>
+                                  </div>
+                                  <span className="block text-[11px] text-slate-300 leading-tight mt-0.5">
+                                    {prod.desc}
+                                  </span>
+                                </div>
+                              </div>
+                              <ExternalLink className="h-4 w-4 text-purple-300 group-hover/item:translate-x-0.5 group-hover/item:-translate-y-0.5 transition-transform shrink-0" />
+                            </a>
+                          );
+                        }
                         return (
                           <Link
                             key={prod.href}
                             href={prod.href}
                             onClick={() => setServicesOpen(false)}
-                            className="flex items-start gap-3 p-2.5 rounded-2xl hover:bg-white/10 transition-colors group/item"
+                            className="flex items-start gap-3 p-2.5 rounded-2xl hover:bg-white/10 border border-transparent hover:border-white/10 transition-all group/item"
                           >
                             <div
-                              className={`p-2 rounded-xl bg-white/5 border border-white/10 ${prod.color} group-hover/item:scale-110 transition-transform`}
+                              className={`p-2 rounded-xl bg-white/5 border border-white/10 ${prod.color} group-hover/item:scale-110 transition-transform shrink-0`}
                             >
                               <Icon className="h-4 w-4" />
                             </div>
@@ -403,7 +449,11 @@ export default function Navbar() {
             onMouseEnter={() => setLegalOpen(true)}
             onMouseLeave={() => setLegalOpen(false)}
           >
-            <button className="hover:text-white transition-colors flex items-center gap-1.5 font-bold focus:outline-none group">
+            <button
+              type="button"
+              onClick={() => setLegalOpen((v) => !v)}
+              className="hover:text-white transition-colors flex items-center gap-1.5 font-bold focus:outline-none group cursor-pointer"
+            >
               <Shield className="h-3.5 w-3.5 text-slate-400 group-hover:scale-110 transition-transform" />
               <span>Legal</span>
               <ChevronDown
@@ -415,13 +465,13 @@ export default function Navbar() {
 
             <AnimatePresence>
               {legalOpen && (
-                <div className="absolute top-full right-0 pt-2.5 z-50">
+                <div className="absolute top-full right-0 mt-2 z-[100]">
                   <motion.div
-                    initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.98 }}
                     transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-                    className="w-48 bg-[#080922]/95 backdrop-blur-2xl border border-white/15 rounded-2xl p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.12)] space-y-1"
+                    className="w-52 bg-[#090a21] border border-white/20 rounded-2xl p-2.5 shadow-[0_25px_70px_rgba(0,0,0,0.98),0_0_0_1px_rgba(255,255,255,0.08),0_0_25px_rgba(124,58,237,0.2)] space-y-1"
                   >
                     <Link
                       href="/terms"
@@ -476,7 +526,7 @@ export default function Navbar() {
             title="Shopping Cart"
           >
             <ShoppingCart className="h-4 w-4" />
-            {totalCount > 0 && (
+            {mounted && totalCount > 0 && (
               <span className="absolute top-1 right-1 bg-purple-500 text-white font-mono font-bold text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-[0_0_8px_rgba(168,85,247,0.8)]">
                 {totalCount}
               </span>
@@ -491,7 +541,7 @@ export default function Navbar() {
               title="Real Notifications"
             >
               <Bell className="h-4 w-4" />
-              {unreadCount > 0 && (
+              {mounted && unreadCount > 0 && (
                 <span className="absolute top-1 right-1 bg-emerald-400 text-slate-950 font-mono font-bold text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center shadow-[0_0_8px_#34d399]">
                   {unreadCount}
                 </span>
@@ -545,7 +595,7 @@ export default function Navbar() {
           </div>
 
           {/* 👤 CLIENT SPACE / User Profile Menu */}
-          {userSession ? (
+          {mounted && userSession ? (
             /* Logged-In User Pill with Avatar */
             <div ref={profileRef} className="relative">
               <button
@@ -875,6 +925,25 @@ export default function Navbar() {
           <div className="grid gap-2 border-b border-white/[0.08] pb-4">
             {PRODUCTS.map((prod) => {
               const Icon = prod.icon;
+              const isExt = Boolean((prod as any).external);
+              if (isExt) {
+                return (
+                  <a
+                    key={prod.href}
+                    href={prod.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-white/10 text-xs font-semibold text-white transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className={`h-4 w-4 ${prod.color}`} />
+                      <span>{prod.name}</span>
+                    </div>
+                    <ExternalLink className="h-3.5 w-3.5 text-purple-400" />
+                  </a>
+                );
+              }
               return (
                 <Link
                   key={prod.href}

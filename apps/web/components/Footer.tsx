@@ -168,12 +168,14 @@ export default function Footer() {
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/v2ray"
-                    className="hover:text-white transition-colors"
+                  <a
+                    href="https://store.shanutechx.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-white transition-colors flex items-center gap-1"
                   >
-                    V2Ray Proxies
-                  </Link>
+                    V2Ray Proxies <span className="text-[10px]">↗</span>
+                  </a>
                 </li>
                 <li>
                   <a
@@ -182,7 +184,7 @@ export default function Footer() {
                     rel="noopener noreferrer"
                     className="hover:text-white transition-colors text-purple-300 font-extrabold flex items-center gap-1"
                   >
-                    STX Digital Store <span className="text-[10px]">↗</span>
+                    STX Digital Goods <span className="text-[10px]">↗</span>
                   </a>
                 </li>
               </ul>

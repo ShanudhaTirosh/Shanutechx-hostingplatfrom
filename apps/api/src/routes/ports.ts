@@ -28,7 +28,8 @@ import {
  * so (`requiresRedeploy`). See docs/PORT_EXPOSURE.md.
  */
 export const portsRouter = Router();
-portsRouter.use(requireAuth);
+portsRouter.use('/ports', requireAuth);
+portsRouter.use('/deployments', requireAuth);
 
 const extraReserved = (process.env.EXPOSURE_RESERVED_PORTS ?? '')
   .split(',')

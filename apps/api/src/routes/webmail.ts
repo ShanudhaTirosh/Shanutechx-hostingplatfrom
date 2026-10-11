@@ -1744,6 +1744,7 @@ webmailRouter.get('/webmail/plan-usage', async (req: AuthedRequest, res: Respons
 
     const domains = new Set<string>();
     smtpAccounts.forEach(a => { if (a.customDomain) domains.add(a.customDomain); });
+    planQuotas.connectedDomains.forEach(d => domains.add(d));
     const usedDomains = domains.size;
     const usedAliases = smtpAccounts.reduce((acc, a) => acc + (a.aliases ? a.aliases.length : 0), 0);
 
@@ -1774,14 +1775,32 @@ webmailRouter.get('/webmail/plan-usage', async (req: AuthedRequest, res: Respons
 webmailRouter.get('/webmail/domains', async (req: AuthedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
+    const userRole = req.user!.role;
     const rootDomain = env.rootDomain || 'shanutechx.com';
 
-    const smtpAccounts = await prisma.smtpAccount.findMany({ where: { userId } });
-    const customDomains = Array.from(new Set(smtpAccounts.map(a => a.customDomain).filter(Boolean))) as string[];
+    // 1. Fetch domains from EmailDomain model
+    const emailDomainRecords = await prisma.emailDomain.findMany({
+      where: userRole === 'dev' ? {} : { userId },
+    });
 
-    const result = customDomains.map((domain) => ({
+    // 2. Fetch domains from SmtpAccount customDomain
+    const smtpAccounts = await prisma.smtpAccount.findMany({
+      where: userRole === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+    });
+
+    const domainStatusMap = new Map<string, string>();
+    for (const ed of emailDomainRecords) {
+      domainStatusMap.set(ed.domain, ed.status === 'verified' ? 'active' : 'pending');
+    }
+    for (const acc of smtpAccounts) {
+      if (acc.customDomain && !domainStatusMap.has(acc.customDomain)) {
+        domainStatusMap.set(acc.customDomain, 'active');
+      }
+    }
+
+    const result = Array.from(domainStatusMap.entries()).map(([domain, status]) => ({
       domain,
-      status: 'active',
+      status,
       records: {
         mx: `mail.${rootDomain}`,
         spf: `v=spf1 include:_spf.${rootDomain} ~all`,
@@ -1847,6 +1866,17 @@ webmailRouter.post('/webmail/domains', async (req: AuthedRequest, res: Response)
       dkimPublicKey = 'v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC3S2tK...';
     }
 
+    // Persist custom domain record in database
+    await prisma.emailDomain.upsert({
+      where: { domain: cleanDomain },
+      update: { userId },
+      create: {
+        userId,
+        domain: cleanDomain,
+        status: 'pending_dns',
+      },
+    });
+
     const dnsRecords = {
       mx: { type: 'MX', host: '@', value: `mail.${rootDomain}`, priority: 10 },
       spf: { type: 'TXT', host: '@', value: `v=spf1 include:_spf.${rootDomain} ~all` },
@@ -1881,13 +1911,16 @@ webmailRouter.post('/webmail/domains/:domain/verify', async (req: AuthedRequest,
     }
 
     if (userRole !== 'dev' && userRole !== 'admin') {
-      const owned = await prisma.smtpAccount.findFirst({
+      const ownedDomain = await prisma.emailDomain.findFirst({
+        where: { userId, domain: cleanDomain },
+      });
+      const ownedSmtp = await prisma.smtpAccount.findFirst({
         where: {
-          userId,
           customDomain: cleanDomain,
+          OR: [{ userId }, { allowedAdminIds: { has: userId } }],
         },
       });
-      if (!owned) {
+      if (!ownedDomain && !ownedSmtp) {
         return res.status(403).json({ error: 'You do not have permission to verify this domain' });
       }
     }
@@ -1936,9 +1969,17 @@ webmailRouter.post('/webmail/domains/:domain/verify', async (req: AuthedRequest,
 
     const overallVerified = mxVerified && (spfVerified || dkimVerified);
 
+    if (overallVerified) {
+      await prisma.emailDomain.updateMany({
+        where: { domain: cleanDomain },
+        data: { status: 'verified' },
+      });
+    }
+
     return res.json({
       domain: cleanDomain,
       verified: overallVerified,
+      status: overallVerified ? 'active' : 'pending',
       checks: {
         mx: mxVerified,
         spf: spfVerified,
@@ -1951,6 +1992,54 @@ webmailRouter.post('/webmail/domains/:domain/verify', async (req: AuthedRequest,
     });
   } catch (err: any) {
     return res.status(500).json({ error: 'DNS verification failed' });
+  }
+});
+
+/**
+ * DELETE /webmail/domains/:domain
+ * Disconnect custom domain if not used by active mailboxes
+ */
+webmailRouter.delete('/webmail/domains/:domain', async (req: AuthedRequest, res: Response) => {
+  try {
+    const { domain } = req.params;
+    const userRole = req.user!.role;
+    const userId = req.user!.id;
+    const cleanDomain = (domain || '').trim().toLowerCase();
+
+    if (!cleanDomain) {
+      return res.status(400).json({ error: 'Valid domain name required' });
+    }
+
+    if (userRole !== 'dev' && userRole !== 'admin') {
+      const ownedDomain = await prisma.emailDomain.findFirst({
+        where: { userId, domain: cleanDomain },
+      });
+      if (!ownedDomain) {
+        return res.status(403).json({ error: 'You do not have permission to delete this domain' });
+      }
+    }
+
+    const inUse = await prisma.smtpAccount.count({
+      where: { customDomain: cleanDomain },
+    });
+    if (inUse > 0) {
+      return res.status(409).json({
+        error: `Cannot disconnect domain ${cleanDomain}: ${inUse} active mailbox(es) are currently configured under it. Please remove or update those mailboxes first.`,
+      });
+    }
+
+    await prisma.emailDomain.deleteMany({
+      where: { domain: cleanDomain },
+    });
+
+    try {
+      await wildduckClient.deleteDomain(cleanDomain);
+    } catch (_) {}
+
+    return res.json({ ok: true, message: `Domain ${cleanDomain} disconnected successfully` });
+  } catch (err: any) {
+    logger.error({ err: err.message }, 'Failed to delete custom domain');
+    return res.status(500).json({ error: 'Failed to delete domain' });
   }
 });
 

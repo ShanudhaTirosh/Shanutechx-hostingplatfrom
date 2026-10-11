@@ -1391,9 +1391,11 @@ export default function BentoGrid() {
             gap: "18px",
           }}
         >
-          {/* CARD 6: V2Ray & High-Speed Proxies */}
+          {/* CARD 6: V2Ray & High-Speed Proxies (External Store) */}
           <motion.a
-            href="/v2ray"
+            href="https://store.shanutechx.com"
+            target="_blank"
+            rel="noopener noreferrer"
             whileHover="hover"
             initial="initial"
             variants={{
@@ -1541,7 +1543,7 @@ export default function BentoGrid() {
                 }}
               >
                 High-speed VMess, VLess &amp; Trojan obfuscated VPN nodes.
-                Bypasses throttling with zero latency &amp; instant config keys.
+                Available exclusively on our dedicated store at store.shanutechx.com.
               </p>
 
               {/* Protocol Badges */}
@@ -1557,7 +1559,7 @@ export default function BentoGrid() {
                   "VMess / VLess",
                   "Trojan Protocol",
                   "ShadowSocks",
-                  "Unlimited Bandwidth",
+                  "store.shanutechx.com",
                 ].map((tag, idx) => (
                   <span
                     key={idx}
@@ -1604,7 +1606,7 @@ export default function BentoGrid() {
                   transition: "all 0.3s ease",
                 }}
               >
-                Get V2Ray
+                Visit Store Portal ↗
                 <motion.span
                   variants={{ initial: { x: 0 }, hover: { x: 5 } }}
                   transition={{ duration: 0.3 }}

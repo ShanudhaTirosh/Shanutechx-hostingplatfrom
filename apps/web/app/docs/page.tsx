@@ -143,7 +143,7 @@ print("Response:", response.json())`,
     ),
     summary: 'Import high-speed VMess, VLESS, and Trojan proxy configs into Netch, V2RayN, or shadowrocket.',
     content: [
-      '1. Visit the V2Ray Store Portal (`https://v2ray.shanutechx.com`) or purchase a proxy plan from Client Space.',
+      '1. Visit the STX Store Portal (`https://store.shanutechx.com`) to get your proxy subscription.',
       '2. Copy your unique subscription URL from your order confirmation email or dashboard.',
       '3. In Netch (Windows): Open Subscription -> Add -> Paste URL -> Click "Import Configs".',
       '4. In V2RayN / v2rayNG (Android/iOS): Tap "+" -> Import Subscription URL -> Update Subscription.',

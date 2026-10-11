@@ -18,6 +18,8 @@ import {
   AlertTriangle,
   Lock,
   ChevronRight,
+  Trash2,
+  ExternalLink,
 } from 'lucide-react';
 
 interface QuotaMeters {
@@ -107,6 +109,8 @@ export default function CustomerMailManagementHub() {
     }
   };
 
+  const [deletingDomain, setDeletingDomain] = useState<string | null>(null);
+
   const handleVerifyDns = async (domain: string) => {
     setVerifyingDns(true);
     try {
@@ -122,6 +126,23 @@ export default function CustomerMailManagementHub() {
       toast('DNS verification failed', 'error');
     } finally {
       setVerifyingDns(false);
+    }
+  };
+
+  const handleDeleteDomain = async (domain: string) => {
+    if (!confirm(`Are you sure you want to disconnect custom domain "${domain}"?`)) return;
+    setDeletingDomain(domain);
+    try {
+      await api.delete(`/webmail/domains/${domain}`);
+      toast(`Domain ${domain} disconnected successfully`, 'success');
+      if (selectedDomainForWizard?.domain === domain) {
+        setSelectedDomainForWizard(null);
+      }
+      loadHubData();
+    } catch (err: any) {
+      toast(err.response?.data?.error || err.message || 'Failed to disconnect domain', 'error');
+    } finally {
+      setDeletingDomain(null);
     }
   };
 
@@ -153,7 +174,23 @@ export default function CustomerMailManagementHub() {
             Manage custom domains, setup DNS records, create mailboxes & email aliases under your plan limits.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href="/email"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+          >
+            <Mail className="h-3.5 w-3.5 text-indigo-500" />
+            Mailboxes &amp; SMTP
+          </a>
+          <a
+            href="/webmail"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            Launch Webmail UI
+          </a>
           <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300">
             {planUsage?.planName || 'Pro Mail Tier'}
           </span>
@@ -270,11 +307,19 @@ export default function CustomerMailManagementHub() {
                 className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/50"
               >
                 <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-                  <div>
+                  <div className="flex items-center gap-2">
                     <span className="font-semibold text-slate-900 dark:text-white">{d.domain}</span>
-                    <span className="ml-3 rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                      Active Mail Domain
-                    </span>
+                    {d.status === 'active' || d.status === 'verified' ? (
+                      <span className="flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Verified &amp; Active
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                        <Clock className="h-3 w-3" />
+                        DNS Pending
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -290,6 +335,15 @@ export default function CustomerMailManagementHub() {
                     >
                       {verifyingDns ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                       1-Click Verify DNS
+                    </button>
+                    <button
+                      onClick={() => handleDeleteDomain(d.domain)}
+                      disabled={deletingDomain === d.domain}
+                      title="Disconnect Custom Domain"
+                      className="flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400"
+                    >
+                      {deletingDomain === d.domain ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                      Disconnect
                     </button>
                   </div>
                 </div>

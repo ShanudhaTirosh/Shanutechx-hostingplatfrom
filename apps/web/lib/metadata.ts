@@ -10,7 +10,7 @@ export const siteMetadata: Metadata = {
     template: '%s | STX HOSTING',
   },
   description:
-    'Autonomous enterprise cloud platform. Deploy NVMe Cloud VPS, Node.js and Python container backends, 24/7 Discord bots, managed databases, V2Ray proxies, and one-click Docker templates in seconds with instant LKR & USD billing.',
+    'Autonomous enterprise cloud platform. Deploy NVMe Cloud VPS, static and dynamic web hosting, Node.js and Python container backends, 24/7 Discord bots, managed databases, and one-click Docker templates in seconds with instant LKR & USD billing.',
   keywords: [
     'STX HOSTING',
     'ShanuTechX',
@@ -26,8 +26,6 @@ export const siteMetadata: Metadata = {
     'Redis hosting',
     'Docker container hosting',
     'SMTP hosting Sri Lanka',
-    'V2Ray VPN',
-    'Shadowsocks proxy',
     'Supabase self-hosted',
     'Autonomous cloud platform',
   ],

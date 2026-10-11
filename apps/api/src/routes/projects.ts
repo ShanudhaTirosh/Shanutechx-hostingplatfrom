@@ -12,7 +12,7 @@ import { logger } from '../lib/logger';
 
 export const projectsRouter = Router();
 
-projectsRouter.use(requireAuth);
+projectsRouter.use('/projects', requireAuth);
 
 /**
  * Helper: Check if caller can access a project

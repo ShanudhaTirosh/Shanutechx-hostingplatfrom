@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Globe, Zap, Code, Bot, MessageSquare, Music, Monitor, Brain, Mail, Database, Package, ShoppingCart, ExternalLink } from 'lucide-react';
+import { Globe, Zap, Code, Bot, MessageSquare, Music, Monitor, Brain, Mail, Database, Package, ShoppingCart, ExternalLink, ShoppingBag } from 'lucide-react';
 
 import { useCart } from '../context/CartContext';
 import GradientMeshOrb from './GradientMeshOrb';
@@ -44,6 +44,71 @@ function formatPrice(cents: number) {
 interface Plan { id: string; name: string; price: number; billingType: string; }
 interface Product { id: string; name: string; category: string; description: string | null; plans: Plan[]; }
 
+const DEFAULT_PRODUCTS: Product[] = [
+  {
+    id: 'prod-vps',
+    name: 'High-Performance Cloud VPS',
+    category: 'vps',
+    description: 'Dedicated virtual private servers with NVMe SSDs, 1Gbps unmetered bandwidth, and root SSH control.',
+    plans: [
+      { id: 'plan-vps-1', name: 'VPS Micro (1 vCPU, 2GB RAM, 30GB NVMe)', price: 250000, billingType: 'monthly' },
+      { id: 'plan-vps-2', name: 'VPS Standard (2 vCPU, 4GB RAM, 80GB NVMe)', price: 500000, billingType: 'monthly' },
+      { id: 'plan-vps-3', name: 'VPS Pro (4 vCPU, 8GB RAM, 160GB NVMe)', price: 950000, billingType: 'monthly' },
+    ],
+  },
+  {
+    id: 'prod-web-hosting',
+    name: 'Static & Dynamic Web Hosting',
+    category: 'web_hosting',
+    description: 'High-speed cloud web hosting with GitHub auto-deployment, free SSL certificates, and custom domains.',
+    plans: [
+      { id: 'plan-web-1', name: 'Starter Web Hosting (1GB NVMe, 100GB BW)', price: 85000, billingType: 'monthly' },
+      { id: 'plan-web-2', name: 'Pro Web Hosting (5GB NVMe, 500GB BW)', price: 195000, billingType: 'monthly' },
+      { id: 'plan-web-3', name: 'Enterprise Web Hosting (20GB NVMe, 2TB BW)', price: 450000, billingType: 'monthly' },
+    ],
+  },
+  {
+    id: 'prod-app-hosting',
+    name: 'Node.js & Next.js App Hosting',
+    category: 'app_catalog',
+    description: 'Nixpacks-powered container hosting with automatic SSL, custom domain routing, and environment secrets.',
+    plans: [
+      { id: 'plan-app-1', name: 'Developer Node Plan (512MB RAM)', price: 120000, billingType: 'monthly' },
+      { id: 'plan-app-2', name: 'Business Node Plan (2GB RAM)', price: 280000, billingType: 'monthly' },
+    ],
+  },
+  {
+    id: 'prod-database',
+    name: 'Managed Databases & Cache',
+    category: 'database',
+    description: 'Automated daily Cloudflare R2 backups, SSL connection strings, and instant web database studio.',
+    plans: [
+      { id: 'plan-db-1', name: 'Managed Redis Cache Cluster', price: 120000, billingType: 'monthly' },
+      { id: 'plan-db-2', name: 'Managed PostgreSQL 16 Cluster', price: 280000, billingType: 'monthly' },
+    ],
+  },
+  {
+    id: 'prod-email',
+    name: 'Enterprise Outbound SMTP & Email',
+    category: 'smtp',
+    description: 'High-reputation SMTP mailer with webmail client, custom domain support, and DKIM/SPF signatures.',
+    plans: [
+      { id: 'plan-smtp-1', name: 'Starter Email 1GB (LKR 1,500/mo)', price: 450000, billingType: 'quarterly' },
+      { id: 'plan-smtp-2', name: 'Standard Email 5GB (LKR 3,500/mo)', price: 1050000, billingType: 'quarterly' },
+    ],
+  },
+  {
+    id: 'prod-bots',
+    name: '24/7 Discord & WhatsApp Bot Hosting',
+    category: 'bot_hosting',
+    description: 'Continuous bot process supervisor with auto-restart on disconnect and persistent session volumes.',
+    plans: [
+      { id: 'plan-bot-1', name: 'Discord Bot Starter (512MB RAM)', price: 80000, billingType: 'monthly' },
+      { id: 'plan-bot-2', name: 'Discord Bot Pro (2GB RAM)', price: 180000, billingType: 'monthly' },
+    ],
+  },
+];
+
 export default function Pricing() {
   const [products, setProducts] = useState<Product[] | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
@@ -53,11 +118,20 @@ export default function Pricing() {
   useEffect(() => {
     fetch(`${apiBase}/api/products`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => setProducts(Array.isArray(d.products) ? d.products : []))
-      .catch(() => setProducts([]));
+      .then((d) => {
+        if (Array.isArray(d.products) && d.products.length > 0) {
+          setProducts(d.products);
+        } else {
+          setProducts(DEFAULT_PRODUCTS);
+        }
+      })
+      .catch(() => setProducts(DEFAULT_PRODUCTS));
   }, [apiBase]);
 
-  const displayed = products?.filter((p) => p.plans && p.plans.length > 0).slice(0, 6) ?? [];
+  const displayed = (products && products.length > 0
+    ? products.filter((p) => p.plans && p.plans.length > 0)
+    : DEFAULT_PRODUCTS
+  ).slice(0, 6);
 
   return (
     <section id="pricing" className="px-4 py-28 max-w-6xl mx-auto relative">
@@ -210,28 +284,34 @@ export default function Pricing() {
         </div>
       )}
 
-      {/* AI Subscriptions External Storefront Card */}
-      <Reveal className="mt-10">
-        <div className="glass rounded-2xl p-6 border border-purple-500/30 bg-gradient-to-r from-purple-900/40 via-indigo-900/30 to-slate-900/60 flex flex-col md:flex-row items-center justify-between gap-6 shadow-glow-violet">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
-              <Brain className="h-6 w-6 text-purple-300" />
+      {/* Official Digital Goods & V2Ray Proxies External Store Notice */}
+      <Reveal className="mt-12">
+        <div className="glass rounded-3xl p-7 border border-purple-500/30 bg-gradient-to-r from-purple-950/60 via-[#0d0f2b] to-indigo-950/60 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_20px_50px_rgba(0,0,0,0.6),0_0_30px_rgba(168,85,247,0.15)] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-purple-600/10 to-transparent pointer-events-none" />
+          <div className="flex items-start sm:items-center gap-4 relative z-10">
+            <div className="h-14 w-14 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(168,85,247,0.3)]">
+              <ShoppingBag className="h-7 w-7 text-purple-300" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">Looking for AI Subscriptions &amp; ChatGPT Plus?</h3>
-              <p className="text-text-muted text-xs mt-1">
-                We offer specialized AI subscriptions, ChatGPT, Claude, and premium AI tools on our dedicated storefront.
+              <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 text-[10px] font-mono font-bold uppercase tracking-wider mb-1.5">
+                Official Digital Store
+              </div>
+              <h3 className="text-lg sm:text-xl font-extrabold text-white">
+                Looking for Digital Goods, AI Accounts &amp; V2Ray Proxies?
+              </h3>
+              <p className="text-slate-300 text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
+                Netflix 4K, Spotify, CapCut Pro, ChatGPT Plus, Claude, Google AI Pro, and high-speed V2Ray / VMess / Trojan proxy configurations are sold exclusively through our official store at <span className="text-purple-300 font-bold font-mono">store.shanutechx.com</span>.
               </p>
             </div>
           </div>
           <a
             href="https://store.shanutechx.com"
             target="_blank"
-            rel="noreferrer"
-            className="px-6 py-3 rounded-full text-xs font-bold bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/30 hover:opacity-90 transition-all shrink-0 flex items-center gap-2"
+            rel="noopener noreferrer"
+            className="px-6 py-3.5 rounded-2xl text-xs font-extrabold bg-gradient-to-r from-purple-600 via-indigo-600 to-sky-600 hover:from-purple-500 hover:to-sky-500 text-white shadow-[0_0_25px_rgba(168,85,247,0.4)] hover:shadow-[0_0_35px_rgba(168,85,247,0.6)] transition-all shrink-0 flex items-center gap-2 font-mono"
           >
-            <span>Visit AI Storefront</span>
-            <ExternalLink className="w-4 h-4" />
+            <span>Visit STX Store Portal</span>
+            <ExternalLink className="w-4 h-4 text-purple-200" />
           </a>
         </div>
       </Reveal>

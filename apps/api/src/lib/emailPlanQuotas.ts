@@ -27,12 +27,21 @@ export interface EmailPlanQuotas {
 export async function getUserEmailPlanQuotas(userId: string, role: string): Promise<EmailPlanQuotas> {
   // 1. Dev superuser bypass per AGENTS.md guardrails
   if (role === 'dev') {
-    const existingAccounts = await prisma.smtpAccount.findMany({
-      where: {},
-      select: { id: true, storageQuotaMb: true, customDomain: true },
-    });
+    const [existingAccounts, emailDomainRows] = await Promise.all([
+      prisma.smtpAccount.findMany({
+        where: {},
+        select: { id: true, storageQuotaMb: true, customDomain: true },
+      }),
+      prisma.emailDomain.findMany({
+        select: { domain: true },
+      }),
+    ]);
     const allocatedMb = existingAccounts.reduce((sum, a) => sum + (a.storageQuotaMb || 1024), 0);
-    const domains = Array.from(new Set(existingAccounts.map((a) => a.customDomain).filter(Boolean))) as string[];
+    const domainSet = new Set<string>([
+      ...(existingAccounts.map((a) => a.customDomain).filter(Boolean) as string[]),
+      ...(emailDomainRows.map((d) => d.domain).filter(Boolean) as string[]),
+    ]);
+    const domains = Array.from(domainSet);
 
     return {
       planName: 'Developer Superuser (Unrestricted)',
@@ -150,18 +159,27 @@ export async function getUserEmailPlanQuotas(userId: string, role: string): Prom
 
   const hasActivePlan = maxMailboxes > 0 || maxStorageMb > 0;
 
-  // Query existing user accounts to calculate allocated vs remaining
-  const existingAccounts = await prisma.smtpAccount.findMany({
-    where: { userId },
-    select: { id: true, storageQuotaMb: true, customDomain: true },
-  });
+  // Query existing user accounts and connected domains to calculate allocated vs remaining
+  const [existingAccounts, userEmailDomains] = await Promise.all([
+    prisma.smtpAccount.findMany({
+      where: { userId },
+      select: { id: true, storageQuotaMb: true, customDomain: true },
+    }),
+    prisma.emailDomain.findMany({
+      where: { userId },
+      select: { domain: true },
+    }),
+  ]);
 
   const usedMailboxes = existingAccounts.length;
   const allocatedStorageMb = existingAccounts.reduce((sum, a) => sum + (a.storageQuotaMb || 1024), 0);
   const remainingMailboxes = Math.max(0, maxMailboxes - usedMailboxes);
   const remainingStorageMb = Math.max(0, maxStorageMb - allocatedStorageMb);
 
-  const domainSet = new Set(existingAccounts.map((a) => a.customDomain).filter(Boolean) as string[]);
+  const domainSet = new Set<string>([
+    ...(existingAccounts.map((a) => a.customDomain).filter(Boolean) as string[]),
+    ...(userEmailDomains.map((d) => d.domain).filter(Boolean) as string[]),
+  ]);
   const connectedDomains = Array.from(domainSet);
   const usedDomains = connectedDomains.length;
 

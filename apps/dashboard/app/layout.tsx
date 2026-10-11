@@ -4,7 +4,7 @@ import { ThemeScript } from '@/components/ThemeProvider';
 
 export const metadata: Metadata = {
   title: 'STX HOSTING Control Panel',
-  description: 'Manage your VPS hosting, cloud deployments, V2Ray proxies, and invoices.',
+  description: 'Manage your VPS hosting, cloud deployments, databases, bots, and invoices.',
   icons: {
     icon: [
       { url: '/favicon.png', type: 'image/png' },

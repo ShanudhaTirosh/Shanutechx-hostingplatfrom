@@ -26,7 +26,7 @@ import { scanTextForAbuse, banUserAndTeardownResources } from '../lib/abuseDetec
 
 export const deploymentsRouter = Router();
 
-deploymentsRouter.use(requireAuth);
+deploymentsRouter.use('/deployments', requireAuth);
 
 function getDecryptedEnvVars(deployment: any): Record<string, string> | undefined {
   if (!deployment.envVarsEncrypted) return undefined;

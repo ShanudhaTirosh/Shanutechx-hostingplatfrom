@@ -1,6 +1,7 @@
 import Navbar from '@/components/Navbar';
 import OrbitHero from '@/components/OrbitHero';
 import MarqueeStrips from '@/components/MarqueeStrips';
+import TelemetryArchitectureFlow from '@/components/motion/TelemetryArchitectureFlow';
 import BentoGrid from '@/components/BentoGrid';
 import FeaturesGrid from '@/components/FeaturesGrid';
 import Pricing from '@/components/Pricing';
@@ -14,6 +15,7 @@ export default async function HomePage() {
       <Navbar />
       <OrbitHero />
       <MarqueeStrips />
+      <TelemetryArchitectureFlow />
       <BentoGrid />
       <FeaturesGrid />
       <Pricing />

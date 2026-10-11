@@ -16,7 +16,7 @@ import { logger } from '../lib/logger';
 
 export const ordersRouter = Router();
 
-ordersRouter.use(requireAuth);
+ordersRouter.use('/orders', requireAuth);
 
 /** Gets (or creates) the customer's single open draft order — their "cart". */
 async function getOrCreateDraftOrder(userId: string) {

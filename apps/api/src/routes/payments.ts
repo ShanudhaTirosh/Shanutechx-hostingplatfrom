@@ -22,7 +22,7 @@ import { formatCurrency } from '../lib/currency';
 
 export const paymentsRouter = Router();
 
-paymentsRouter.use(requireAuth);
+paymentsRouter.use('/payments', requireAuth);
 
 async function loadOwnedOrder(req: AuthedRequest, orderId: string) {
   const order = await prisma.order.findUnique({

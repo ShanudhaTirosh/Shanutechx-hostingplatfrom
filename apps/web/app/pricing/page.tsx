@@ -55,85 +55,81 @@ function formatPrice(cents: number) {
 }
 
 const CATEGORY_KEYS = [
-  { id: 'all', label: 'All Products', icon: Package },
+  { id: 'all', label: 'All Cloud Services', icon: Package },
   { id: 'vps', label: 'Cloud VPS', icon: Server },
-  { id: 'web', label: 'Web Apps', icon: Globe },
+  { id: 'web', label: 'Web & App Hosting', icon: Globe },
   { id: 'bot', label: '24/7 Bots', icon: Bot },
   { id: 'database', label: 'Databases', icon: Database },
-  { id: 'digital', label: 'Digital Goods & Store', icon: ShoppingBag },
-  { id: 'vpn', label: 'V2Ray Proxies', icon: ShieldCheck },
+  { id: 'smtp', label: 'Business Email / SMTP', icon: Zap },
 ];
 
-// Fallback catalog if DB has no products listed yet
+// Fallback catalog matching genuine platform plans from seedProducts.ts
 const STATIC_CATALOG: Product[] = [
   {
-    id: 'p-vps-starter',
-    name: 'Cloud VPS - Starter NVMe Node',
+    id: 'p-vps',
+    name: 'High-Performance Cloud VPS',
     category: 'vps',
-    description: '1 vCPU, 2GB RAM, 30GB NVMe SSD storage, 1TB Bandwidth, Root SSH & Dedicated IPv4',
+    description: 'Dedicated NVMe SSD compute nodes with unmetered 1Gbps bandwidth, root SSH control, and dedicated IPv4.',
+    isPopular: true,
+    badge: 'Flagship Compute',
     plans: [
-      { id: 'plan-vps-1', name: 'Starter 30-Day', price: 250000, billingType: 'monthly' },
-      { id: 'plan-vps-2', name: 'Starter Yearly (2 Months Free)', price: 2500000, billingType: 'yearly' },
+      { id: 'plan-vps-micro', name: 'VPS Micro (1 vCPU, 2GB RAM, 30GB NVMe)', price: 250000, billingType: 'monthly' },
+      { id: 'plan-vps-std', name: 'VPS Standard (2 vCPU, 4GB RAM, 80GB NVMe)', price: 500000, billingType: 'monthly', isPopular: true, badge: 'Best Seller' },
+      { id: 'plan-vps-pro', name: 'VPS Pro (4 vCPU, 8GB RAM, 160GB NVMe)', price: 950000, billingType: 'monthly' },
     ],
   },
   {
-    id: 'p-vps-pro',
-    name: 'Cloud VPS - Performance NVMe Node',
-    category: 'vps',
-    description: '4 vCPU, 8GB RAM, 100GB NVMe SSD storage, 4TB Bandwidth, Root SSH & Anycast IP',
+    id: 'p-web-hosting',
+    name: 'Static & Dynamic Web Hosting',
+    category: 'web',
+    description: 'Cloud web hosting with automated GitHub deployment (Public & Private repos), free SSL certificates, and custom domains.',
     plans: [
-      { id: 'plan-vps-p1', name: 'Pro 30-Day', price: 650000, billingType: 'monthly' },
-      { id: 'plan-vps-p2', name: 'Pro Yearly', price: 6500000, billingType: 'yearly' },
+      { id: 'plan-web-starter', name: 'Starter Web Hosting (1GB NVMe, 100GB Bandwidth)', price: 85000, billingType: 'monthly' },
+      { id: 'plan-web-pro', name: 'Pro Web Hosting (5GB NVMe, 500GB Bandwidth)', price: 195000, billingType: 'monthly', isPopular: true, badge: 'Popular' },
+      { id: 'plan-web-ent', name: 'Enterprise Web Hosting (20GB NVMe, 2TB Bandwidth)', price: 450000, billingType: 'monthly' },
     ],
   },
   {
     id: 'p-app-node',
-    name: 'Node.js & Python Web App Hosting',
+    name: 'Node.js & Next.js App Hosting',
     category: 'web',
-    description: 'Automated GitHub webhooks, isolated Docker container execution, custom SSL domain & environment vault',
+    description: 'Nixpacks-powered container hosting with automatic SSL, zero-config domain routing, and environment secrets.',
     plans: [
-      { id: 'plan-app-1', name: 'Developer Plan', price: 120000, billingType: 'monthly' },
-      { id: 'plan-app-2', name: 'Production Scale Plan', price: 350000, billingType: 'monthly' },
+      { id: 'plan-app-dev', name: 'Developer Node Plan (512MB RAM, 0.5 vCPU)', price: 120000, billingType: 'monthly' },
+      { id: 'plan-app-biz', name: 'Business Node Plan (2GB RAM, 1.5 vCPU)', price: 280000, billingType: 'monthly' },
     ],
   },
   {
-    id: 'p-bot-daemon',
-    name: '24/7 Discord & WhatsApp Bot Daemon',
+    id: 'p-bot-hosting',
+    name: '24/7 Discord & WhatsApp Bot Hosting',
     category: 'bot',
-    description: 'Continuous bot process supervisor (PM2), auto-restart on API disconnect, QR code session persistence',
+    description: 'Continuous process runner with auto-restart on disconnect, live real-time logs, and persistent volume storage.',
     plans: [
-      { id: 'plan-bot-1', name: 'Standard Bot Host', price: 99000, billingType: 'monthly' },
-      { id: 'plan-bot-2', name: 'High-Mem Multi-Bot Host', price: 220000, billingType: 'monthly' },
+      { id: 'plan-bot-discord-start', name: 'Discord Bot Starter (512MB RAM)', price: 80000, billingType: 'monthly' },
+      { id: 'plan-bot-discord-pro', name: 'Discord Bot Pro (2GB RAM)', price: 180000, billingType: 'monthly' },
+      { id: 'plan-bot-wa-starter', name: 'WhatsApp Bot Starter (1GB RAM, Persistent Session)', price: 150000, billingType: 'monthly' },
     ],
   },
   {
-    id: 'p-db-postgres',
-    name: 'Managed PostgreSQL & Redis Database Cluster',
-    category: 'db',
-    description: 'Managed PostgreSQL 16 with pgvector or Redis 7 cache. Automated daily R2 backups & snapshot restores',
+    id: 'p-db-cluster',
+    name: 'Managed Databases & Cache',
+    category: 'database',
+    description: 'Managed PostgreSQL 16, MySQL 8, Redis 7 & MongoDB clusters with automated daily Cloudflare R2 snapshots.',
     plans: [
-      { id: 'plan-db-1', name: 'Starter DB Cluster', price: 180000, billingType: 'monthly' },
-      { id: 'plan-db-2', name: 'High-Availability Cluster', price: 490000, billingType: 'monthly' },
+      { id: 'plan-db-redis', name: 'Managed Redis 7 Cache Cluster', price: 120000, billingType: 'monthly' },
+      { id: 'plan-db-postgres', name: 'Managed PostgreSQL 16 Cluster', price: 280000, billingType: 'monthly' },
+      { id: 'plan-db-ha', name: 'High-Availability Database Cluster', price: 650000, billingType: 'monthly' },
     ],
   },
   {
-    id: 'p-v2ray-proxy',
-    name: 'V2Ray & High-Speed Proxy Credentials',
-    category: 'vpn',
-    description: 'Ultra-low latency VMess, VLess & Trojan protocol proxy nodes with zero log privacy & obfs encryption',
+    id: 'p-smtp-email',
+    name: 'Enterprise Outbound SMTP & Business Email',
+    category: 'smtp',
+    description: 'High-reputation SMTP mailer with webmail client, custom domain support, DKIM/SPF auto-validation, and forwarding rules.',
     plans: [
-      { id: 'plan-vpn-1', name: 'VIP Proxy Pass (30 Days)', price: 85000, billingType: 'monthly' },
-      { id: 'plan-vpn-2', name: 'VIP Proxy Annual Pass', price: 850000, billingType: 'yearly' },
-    ],
-  },
-  {
-    id: 'p-digital-store',
-    name: 'STX Digital Goods & Premium Accounts',
-    category: 'digital',
-    description: 'Instant delivery for Netflix 4K, Spotify Premium, CapCut Pro, Google One AI Pro, Claude Pro & ChatGPT Plus',
-    plans: [
-      { id: 'plan-dig-1', name: 'Netflix 4K Ultra HD Pass', price: 150000, billingType: 'monthly' },
-      { id: 'plan-dig-2', name: 'Google AI Pro (Gemini 2TB)', price: 220000, billingType: 'monthly' },
+      { id: 'plan-smtp-1', name: 'Starter Email (1GB Storage, 1 Mailbox)', price: 450000, billingType: 'quarterly' },
+      { id: 'plan-smtp-2', name: 'Standard Email (5GB Storage, 5 Aliases)', price: 1050000, billingType: 'quarterly' },
+      { id: 'plan-smtp-3', name: 'Pro Email (20GB Storage, 10 Aliases)', price: 2250000, billingType: 'quarterly' },
     ],
   },
 ];
@@ -152,7 +148,16 @@ export default function PricingPage() {
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
       .then((data) => {
         if (Array.isArray(data.products) && data.products.length > 0) {
-          setProducts(data.products);
+          // Filter out any third-party or proxy products from hosting catalog
+          const valid = data.products.filter(
+            (p: Product) =>
+              p.category !== 'vpn' &&
+              p.category !== 'digital' &&
+              !p.name.toLowerCase().includes('v2ray')
+          );
+          if (valid.length > 0) {
+            setProducts(valid);
+          }
         }
       })
       .catch(() => {
@@ -186,8 +191,7 @@ export default function PricingPage() {
           (selectedCategory === 'web' && (cat.includes('web') || cat.includes('node') || cat.includes('python') || product.name.toLowerCase().includes('app'))) ||
           (selectedCategory === 'bot' && (cat.includes('bot') || product.name.toLowerCase().includes('bot'))) ||
           (selectedCategory === 'database' && (cat.includes('db') || cat.includes('database') || product.name.toLowerCase().includes('database'))) ||
-          (selectedCategory === 'digital' && (cat.includes('digital') || product.name.toLowerCase().includes('digital') || product.name.toLowerCase().includes('account'))) ||
-          (selectedCategory === 'vpn' && (cat.includes('vpn') || cat.includes('v2ray') || product.name.toLowerCase().includes('v2ray')));
+          (selectedCategory === 'smtp' && (cat.includes('smtp') || cat.includes('mail') || cat.includes('email') || product.name.toLowerCase().includes('email')));
 
         return matchesQuery && matchesCategory;
       })
@@ -228,6 +232,36 @@ export default function PricingPage() {
               Explore hardware specifications, container runtimes, and pricing plans. Filter by product type or search for specific parameters.
             </p>
           </div>
+        </div>
+
+        {/* Official Digital Goods & V2Ray Proxies Store Notice Banner */}
+        <div className="bg-gradient-to-r from-purple-950/70 via-[#0d0f2b] to-indigo-950/70 border border-purple-500/30 rounded-3xl p-6 sm:p-7 mb-10 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-purple-600/10 to-transparent pointer-events-none" />
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="h-12 w-12 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(168,85,247,0.3)]">
+              <ShoppingBag className="h-6 w-6 text-purple-300" />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-mono font-bold uppercase mb-1">
+                Notice to Customers
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-white">
+                Looking for Digital Goods, AI Accounts &amp; V2Ray Proxies?
+              </h3>
+              <p className="text-xs text-slate-300 mt-0.5 max-w-xl leading-relaxed">
+                Netflix 4K, Spotify, CapCut Pro, ChatGPT Plus, Claude, and high-speed V2Ray / VMess / Trojan proxies are sold exclusively on our dedicated store at <span className="text-purple-300 font-bold font-mono">store.shanutechx.com</span>.
+              </p>
+            </div>
+          </div>
+          <a
+            href="https://store.shanutechx.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-5 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs font-mono transition-all shrink-0 flex items-center gap-2 shadow-glow-violet cursor-pointer"
+          >
+            <span>Visit STX Store Portal</span>
+            <ArrowRight className="h-4 w-4" />
+          </a>
         </div>
 
         {/* Search, Filter & Sorting Bar Controls */}
