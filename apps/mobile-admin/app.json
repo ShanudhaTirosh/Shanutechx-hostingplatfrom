@@ -40,12 +40,12 @@
     "projectId": "c49bd60d-8872-42fa-8bda-af59a43d634a",
     "extra": {
       "apiBaseUrl": "https://api.shanutechx.com",
-      "firebaseApiKey": "REPLACE_WITH_REAL_FIREBASE_API_KEY",
-      "firebaseAuthDomain": "REPLACE_WITH_REAL_AUTH_DOMAIN",
-      "firebaseProjectId": "REPLACE_WITH_REAL_PROJECT_ID",
-      "firebaseStorageBucket": "",
-      "firebaseSenderId": "",
-      "firebaseAppId": "REPLACE_WITH_REAL_APP_ID",
+      "firebaseApiKey": "AIzaSyBayFkYpBnuVZ-Sr_ot_5Op2547EIHE_4w",
+      "firebaseAuthDomain": "shanutechx.firebaseapp.com",
+      "firebaseProjectId": "shanutechx",
+      "firebaseStorageBucket": "shanutechx.appspot.com",
+      "firebaseSenderId": "108392178392",
+      "firebaseAppId": "1:108392178392:web:7f84918a2bc419",
       "eas": {
         "projectId": "c49bd60d-8872-42fa-8bda-af59a43d634a"
       }

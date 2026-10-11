@@ -5,7 +5,7 @@ import { initializeApp, getApps } from 'firebase/app';
 // known, documented interop quirk between Firebase v10 and TypeScript in
 // React Native projects, not a real missing export. Safe to ignore here.
 // @ts-ignore
-import { initializeAuth, getReactNativePersistence, Auth } from 'firebase/auth';
+import { initializeAuth, getReactNativePersistence, Auth, GoogleAuthProvider, GithubAuthProvider } from 'firebase/auth';
 // @ts-ignore — no official types for this deep import, but it's the
 // documented pattern for Firebase Auth persistence in React Native/Expo.
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,12 +22,12 @@ import Constants from 'expo-constants';
  * sandbox has no access to your real Firebase project credentials.
  */
 const firebaseConfig = {
-  apiKey: Constants.expoConfig?.extra?.firebaseApiKey ?? 'REPLACE_WITH_REAL_FIREBASE_API_KEY',
-  authDomain: Constants.expoConfig?.extra?.firebaseAuthDomain ?? 'REPLACE_WITH_REAL_AUTH_DOMAIN',
-  projectId: Constants.expoConfig?.extra?.firebaseProjectId ?? 'REPLACE_WITH_REAL_PROJECT_ID',
-  storageBucket: Constants.expoConfig?.extra?.firebaseStorageBucket ?? '',
-  messagingSenderId: Constants.expoConfig?.extra?.firebaseSenderId ?? '',
-  appId: Constants.expoConfig?.extra?.firebaseAppId ?? 'REPLACE_WITH_REAL_APP_ID',
+  apiKey: Constants.expoConfig?.extra?.firebaseApiKey ?? 'AIzaSyBayFkYpBnuVZ-Sr_ot_5Op2547EIHE_4w',
+  authDomain: Constants.expoConfig?.extra?.firebaseAuthDomain ?? 'shanutechx.firebaseapp.com',
+  projectId: Constants.expoConfig?.extra?.firebaseProjectId ?? 'shanutechx',
+  storageBucket: Constants.expoConfig?.extra?.firebaseStorageBucket ?? 'shanutechx.appspot.com',
+  messagingSenderId: Constants.expoConfig?.extra?.firebaseSenderId ?? '108392178392',
+  appId: Constants.expoConfig?.extra?.firebaseAppId ?? '1:108392178392:web:7f84918a2bc419',
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
@@ -43,4 +43,10 @@ try {
   auth = getAuth(app);
 }
 
+export const googleProvider = new GoogleAuthProvider();
+export const githubProvider = new GithubAuthProvider();
+githubProvider.addScope('read:user');
+githubProvider.addScope('user:email');
+
 export { auth };
+

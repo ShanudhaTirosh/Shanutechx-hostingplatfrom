@@ -23,14 +23,14 @@ export function SplashScreen() {
   useEffect(() => {
     if (loading) return;
     const timer = setTimeout(() => {
-      if (firebaseUser && apiUser && ['admin', 'dev', 'support'].includes(apiUser.role)) {
+      if (apiUser && ['admin', 'dev', 'support'].includes(apiUser.role)) {
         navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
       } else {
         navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
       }
     }, 900);
     return () => clearTimeout(timer);
-  }, [loading, firebaseUser, apiUser]);
+  }, [loading, apiUser]);
 
   return (
     <LinearGradient colors={[colors.bgBase, '#14101f', colors.bgBase]} style={styles.container}>

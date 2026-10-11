@@ -1,7 +1,6 @@
 export type RootStackParamList = {
   Splash: undefined;
   Login: undefined;
-  ForgotPassword: undefined;
   Main: undefined;
   TicketChat: { ticketId: string; subject: string };
   Notifications: undefined;

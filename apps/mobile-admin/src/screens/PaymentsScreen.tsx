@@ -1,38 +1,64 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, Image, Pressable, Modal, TextInput, KeyboardAvoidingView, Platform, Linking, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  RefreshControl,
+  Image,
+  Pressable,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Linking,
+  ScrollView,
+} from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '@/components/GlassCard';
 import { Button } from '@/components/Button';
 import { Badge } from '@/components/Badge';
-import { api, Payment, ApiError, API_BASE } from '@/lib/api';
-import { colors, fontFamily, radius } from '@/theme/tokens';
+import { api, Payment, ApiError, getEffectiveApiBase } from '@/lib/api';
+import { colors, fontFamily, radius, spacing } from '@/theme/tokens';
 import type { RootStackParamList } from '@/navigation/types';
 
 function formatLkr(n: number | undefined): string {
-  if (n === undefined) return '';
+  if (n === undefined || isNaN(n)) return 'Rs 0';
   return `Rs ${n.toLocaleString('en-LK', { maximumFractionDigits: 0 })}`;
 }
 
 function resolveProofUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  const base = getEffectiveApiBase();
   const cleanPath = url.startsWith('/') ? url : `/${url}`;
-  return `${API_BASE}${cleanPath}`;
+  return `${base}${cleanPath}`;
 }
 
 type FilterTab = 'manual_review' | 'manually_approved' | 'rejected' | 'all';
 
+const DECLINE_PRESETS = [
+  'Bank slip reference number does not match record',
+  'Deposit slip image is blurred or truncated',
+  'Deposited amount does not match invoice total',
+  'Duplicate transaction — slip already processed',
+];
+
 export function PaymentsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
+
   const [payments, setPayments] = useState<Payment[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<FilterTab>('manual_review');
+  const [search, setSearch] = useState('');
 
+  // Modals
   const [declineTarget, setDeclineTarget] = useState<Payment | null>(null);
   const [declineReason, setDeclineReason] = useState('');
   const [previewProofUrl, setPreviewProofUrl] = useState<string | null>(null);
@@ -40,15 +66,19 @@ export function PaymentsScreen() {
 
   const load = useCallback(async (filter: FilterTab = statusFilter) => {
     try {
-      const { payments } = await api.payments.reviewQueue(filter);
-      setPayments(payments);
+      const { payments: list } = await api.payments.reviewQueue(filter);
+      setPayments(list || []);
       setError(null);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Failed to load payments queue');
     }
   }, [statusFilter]);
 
-  useFocusEffect(useCallback(() => { load(statusFilter); }, [load, statusFilter]));
+  useFocusEffect(
+    useCallback(() => {
+      load(statusFilter);
+    }, [load, statusFilter])
+  );
 
   async function onRefresh() {
     setRefreshing(true);
@@ -64,17 +94,17 @@ export function PaymentsScreen() {
 
   function showToast(text: string, kind: 'success' | 'error') {
     setToast({ text, kind });
-    setTimeout(() => setToast(null), 2500);
+    setTimeout(() => setToast(null), 3000);
   }
 
   async function handleApprove(payment: Payment) {
     setBusyId(payment.id);
     try {
       await api.payments.review(payment.id, true);
-      showToast('Payment approved.', 'success');
+      showToast(`Order #${payment.orderId.slice(0, 8).toUpperCase()} approved!`, 'success');
       load(statusFilter);
     } catch (err: any) {
-      showToast(err instanceof ApiError ? err.message : 'Failed to approve.', 'error');
+      showToast(err instanceof ApiError ? err.message : 'Failed to approve payment', 'error');
     } finally {
       setBusyId(null);
     }
@@ -90,25 +120,39 @@ export function PaymentsScreen() {
     setBusyId(declineTarget.id);
     try {
       await api.payments.review(declineTarget.id, false, declineReason.trim());
-      showToast('Payment declined.', 'error');
+      showToast(`Order #${declineTarget.orderId.slice(0, 8).toUpperCase()} declined.`, 'error');
       setDeclineTarget(null);
       load(statusFilter);
     } catch (err: any) {
-      showToast(err.message, 'error');
+      showToast(err.message || 'Failed to decline payment', 'error');
     } finally {
       setBusyId(null);
     }
   }
 
+  const visiblePayments = (payments ?? []).filter((p) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    const emailMatch = p.order?.user?.email?.toLowerCase().includes(q);
+    const orderMatch = p.orderId.toLowerCase().includes(q);
+    const refMatch =
+      p.extractedJson?.referenceNumber &&
+      String(p.extractedJson.referenceNumber).toLowerCase().includes(q);
+    return emailMatch || orderMatch || refMatch;
+  });
+
   return (
     <View style={styles.screen}>
+      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={{ color: colors.onSurface, fontSize: 20, lineHeight: 24 }}>‹</Text>
+          <Ionicons name="chevron-back" size={20} color={colors.onSurface} />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Payment Review</Text>
-          <Text style={styles.subtitle}>{payments?.length ?? 0} payments matching filter</Text>
+          <Text style={styles.title}>Payment Review Queue</Text>
+          <Text style={styles.subtitle}>
+            {payments ? `${visiblePayments.length} of ${payments.length} orders shown` : 'Loading…'}
+          </Text>
         </View>
       </View>
 
@@ -134,26 +178,67 @@ export function PaymentsScreen() {
         })}
       </View>
 
+      {/* Search Bar */}
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search customer email, order ID, or reference…"
+          placeholderTextColor={colors.muted}
+          value={search}
+          onChangeText={setSearch}
+        />
+        {search.length > 0 && (
+          <Pressable onPress={() => setSearch('')} style={styles.clearSearch}>
+            <Ionicons name="close-circle" size={16} color={colors.muted} />
+          </Pressable>
+        )}
+      </View>
+
       {toast && (
-        <View style={[styles.toast, { borderColor: toast.kind === 'success' ? 'rgba(74,222,128,0.4)' : 'rgba(239,68,68,0.4)' }]}>
-          <Text style={{ color: toast.kind === 'success' ? colors.success : colors.error, fontFamily: fontFamily.bodyMedium, fontSize: 13 }}>
+        <View
+          style={[
+            styles.toast,
+            {
+              backgroundColor: toast.kind === 'success' ? 'rgba(74,222,128,0.15)' : 'rgba(239,68,68,0.15)',
+              borderColor: toast.kind === 'success' ? 'rgba(74,222,128,0.4)' : 'rgba(239,68,68,0.4)',
+            },
+          ]}
+        >
+          <Text
+            style={{
+              color: toast.kind === 'success' ? colors.success : colors.error,
+              fontFamily: fontFamily.bodySemibold,
+              fontSize: 13,
+            }}
+          >
             {toast.text}
           </Text>
         </View>
       )}
 
+      {/* Payment List */}
       <FlatList
-        data={payments ?? []}
+        data={visiblePayments}
         keyExtractor={(p) => p.id}
-        contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: 20, paddingTop: 10, paddingBottom: 60 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         ListEmptyComponent={
           !payments ? (
-            <Text style={styles.muted}>Loading…</Text>
+            <Text style={styles.muted}>Loading payments from server…</Text>
           ) : error ? (
-            <Text style={{ color: colors.error, textAlign: 'center', marginTop: 40 }}>{error}</Text>
+            <GlassCard style={{ borderColor: 'rgba(239,68,68,0.4)' }}>
+              <Text style={{ color: colors.error, textAlign: 'center' }}>{error}</Text>
+            </GlassCard>
           ) : (
-            <GlassCard><Text style={styles.muted}>No payments found for this filter.</Text></GlassCard>
+            <GlassCard style={{ alignItems: 'center', paddingVertical: 24 }}>
+              <Ionicons name="card-outline" size={32} color={colors.muted} style={{ marginBottom: 6 }} />
+              <Text style={{ color: colors.onSurface, fontFamily: fontFamily.headSemibold, fontSize: 14 }}>
+                No payments found
+              </Text>
+              <Text style={[styles.muted, { marginTop: 4 }]}>
+                {search ? 'Try clearing your search query.' : 'No transactions matching this filter.'}
+              </Text>
+            </GlassCard>
           )
         }
         renderItem={({ item }) => {
@@ -161,76 +246,96 @@ export function PaymentsScreen() {
           const isPdf = fullProofUrl?.toLowerCase().includes('.pdf');
 
           return (
-            <GlassCard style={{ marginBottom: 16 }}>
+            <GlassCard style={styles.card}>
+              {/* Customer & Total */}
               <View style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.customer} numberOfLines={1}>{item.order?.user?.email ?? 'Unknown customer'}</Text>
-                  <Text style={styles.orderRef}>Order #{item.orderId.slice(0, 8).toUpperCase()}</Text>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={styles.customer} numberOfLines={1}>
+                    {item.order?.user?.email || 'Unknown customer'}
+                  </Text>
+                  <Text style={styles.orderRef}>
+                    Order #{item.orderId.slice(0, 8).toUpperCase()} · {item.method.replace(/_/g, ' ')}
+                  </Text>
                 </View>
                 <Text style={styles.amount}>{formatLkr(item.order?.totalLkr ?? item.order?.total)}</Text>
               </View>
 
-              {/* Order items summary */}
+              {/* Order Items */}
               {item.order?.items && item.order.items.length > 0 && (
                 <View style={styles.itemsBox}>
                   {item.order.items.map((it) => (
                     <Text key={it.id} style={styles.itemText} numberOfLines={1}>
-                      • {it.quantity}x {it.service?.name ?? it.plan?.name ?? 'Service'}
+                      • {it.quantity}x {it.service?.name || it.plan?.name || 'Cloud Service'}
                     </Text>
                   ))}
                 </View>
               )}
 
-              {/* Proof section */}
+              {/* Proof Slip Preview */}
               {fullProofUrl ? (
                 isPdf ? (
                   <Pressable onPress={() => Linking.openURL(fullProofUrl)} style={styles.pdfCard}>
-                    <Text style={{ fontSize: 24 }}>📄</Text>
+                    <Ionicons name="document-text-outline" size={26} color={colors.primary} />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.pdfTitle}>PDF Proof Document</Text>
-                      <Text style={styles.pdfSub}>Tap to view/download PDF slip</Text>
+                      <Text style={styles.pdfTitle}>PDF Payment Receipt</Text>
+                      <Text style={styles.pdfSub}>Tap to open in external viewer</Text>
                     </View>
-                    <Text style={{ color: colors.primary, fontSize: 13, fontFamily: fontFamily.bodySemibold }}>Open ↗</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={styles.pdfLink}>Open</Text>
+                      <Ionicons name="open-outline" size={13} color={colors.primary} />
+                    </View>
                   </Pressable>
                 ) : (
                   <Pressable onPress={() => setPreviewProofUrl(fullProofUrl)} style={styles.proofContainer}>
-                    <Image source={{ uri: fullProofUrl }} style={styles.proof} resizeMode="cover" />
+                    <Image source={{ uri: fullProofUrl }} style={styles.proofImage} resizeMode="cover" />
                     <View style={styles.zoomHint}>
-                      <Text style={styles.zoomHintText}>Tap to inspect slip</Text>
+                      <Ionicons name="scan-outline" size={12} color="#ffffff" />
+                      <Text style={styles.zoomHintText}>Tap to inspect receipt</Text>
                     </View>
                   </Pressable>
                 )
               ) : (
                 <View style={styles.noProofBox}>
-                  <Text style={styles.noProofText}>No payment proof uploaded</Text>
+                  <Text style={styles.noProofText}>No receipt slip uploaded</Text>
                 </View>
               )}
 
-              {/* OCR Extracted Metadata */}
+              {/* Extracted Transaction Data (AI / Groq OCR) */}
               {item.extractedJson && Object.keys(item.extractedJson).length > 0 && (
-                <View style={styles.metaBox}>
-                  <Text style={styles.metaBoxTitle}>Extracted Transaction Data</Text>
+                <View style={styles.ocrBox}>
+                  <Text style={styles.ocrTitle}>AI Transaction Extraction</Text>
                   {item.extractedJson.referenceNumber && (
-                    <Text style={styles.metaText}>Ref: <Text style={{ color: colors.onSurface }}>{item.extractedJson.referenceNumber}</Text></Text>
+                    <Text style={styles.ocrText}>
+                      Ref: <Text style={{ color: colors.onSurface }}>{item.extractedJson.referenceNumber}</Text>
+                    </Text>
                   )}
                   {item.extractedJson.bankName && (
-                    <Text style={styles.metaText}>Bank: <Text style={{ color: colors.onSurface }}>{item.extractedJson.bankName}</Text></Text>
+                    <Text style={styles.ocrText}>
+                      Bank: <Text style={{ color: colors.onSurface }}>{item.extractedJson.bankName}</Text>
+                    </Text>
                   )}
                   {item.extractedJson.depositDate && (
-                    <Text style={styles.metaText}>Date: <Text style={{ color: colors.onSurface }}>{item.extractedJson.depositDate}</Text></Text>
+                    <Text style={styles.ocrText}>
+                      Date: <Text style={{ color: colors.onSurface }}>{item.extractedJson.depositDate}</Text>
+                    </Text>
                   )}
                   {item.confidenceScore !== undefined && item.confidenceScore !== null && (
-                    <Text style={styles.metaText}>Match Confidence: <Text style={{ color: colors.primary }}>{Math.round(item.confidenceScore * 100)}%</Text></Text>
+                    <Text style={styles.ocrText}>
+                      Confidence: <Text style={{ color: colors.primary }}>{Math.round(item.confidenceScore * 100)}%</Text>
+                    </Text>
                   )}
                 </View>
               )}
 
+              {/* Meta Row */}
               <View style={styles.metaRow}>
                 <Badge status={item.status} />
-                <Text style={styles.method}>{item.method.replace('_', ' ')}</Text>
-                <Text style={styles.dateText}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+                <Text style={styles.dateText}>
+                  {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </Text>
               </View>
 
+              {/* Decline Reason if rejected */}
               {item.rejectionReason && (
                 <View style={styles.reasonBox}>
                   <Text style={styles.reasonTitle}>Decline Reason:</Text>
@@ -238,10 +343,27 @@ export function PaymentsScreen() {
                 </View>
               )}
 
+              {/* Action Buttons for Pending Items */}
               {item.status === 'manual_review' && (
                 <View style={styles.actions}>
-                  <Button label="Approve" variant="success" size="sm" onPress={() => handleApprove(item)} loading={busyId === item.id} style={{ flex: 1 }} />
-                  <Button label="Decline" variant="danger" size="sm" onPress={() => openDecline(item)} disabled={busyId === item.id} style={{ flex: 1 }} />
+                  <Button
+                    label="Approve"
+                    icon={<Ionicons name="checkmark-circle-outline" size={14} color="#ffffff" />}
+                    variant="success"
+                    size="sm"
+                    onPress={() => handleApprove(item)}
+                    loading={busyId === item.id}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    label="Decline"
+                    icon={<Ionicons name="close-circle-outline" size={14} color="#ffffff" />}
+                    variant="danger"
+                    size="sm"
+                    onPress={() => openDecline(item)}
+                    disabled={busyId === item.id}
+                    style={{ flex: 1 }}
+                  />
                 </View>
               )}
             </GlassCard>
@@ -249,29 +371,47 @@ export function PaymentsScreen() {
         }}
       />
 
-      {/* Decline Reason Input Modal */}
+      {/* Decline Reason Modal */}
       <Modal visible={!!declineTarget} transparent animationType="fade" onRequestClose={() => setDeclineTarget(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>
-              Decline payment for order #{declineTarget?.orderId.slice(0, 8).toUpperCase()}
+              Decline Order #{declineTarget?.orderId.slice(0, 8).toUpperCase()}
             </Text>
             <Text style={styles.modalSubtitle}>
-              This reason is sent directly to the customer. Required — declines without one are rejected by the server.
+              Select a predefined reason or enter a detailed notice sent directly to the customer:
             </Text>
+
+            {/* Presets */}
+            <View style={{ gap: 6, marginVertical: 10 }}>
+              {DECLINE_PRESETS.map((preset) => (
+                <Pressable
+                  key={preset}
+                  onPress={() => setDeclineReason(preset)}
+                  style={[styles.presetItem, declineReason === preset && styles.presetItemActive]}
+                >
+                  <Text style={[styles.presetText, declineReason === preset && { color: colors.primary }]}>
+                    • {preset}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
             <TextInput
               value={declineReason}
               onChangeText={setDeclineReason}
-              placeholder="e.g. Bank slip reference number does not match total amount"
+              placeholder="Or type custom decline explanation…"
               placeholderTextColor={colors.muted}
               multiline
-              numberOfLines={4}
+              numberOfLines={3}
               style={styles.textarea}
             />
+
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
               <Button label="Cancel" variant="glass" size="sm" onPress={() => setDeclineTarget(null)} style={{ flex: 1 }} />
               <Button
                 label="Confirm Decline"
+                icon={<Ionicons name="close-circle-outline" size={14} color="#ffffff" />}
                 variant="danger"
                 size="sm"
                 onPress={confirmDecline}
@@ -284,16 +424,16 @@ export function PaymentsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Full-screen Proof Slip Image Preview Modal */}
+      {/* Full-screen Receipt Image Viewer */}
       <Modal visible={!!previewProofUrl} transparent animationType="fade" onRequestClose={() => setPreviewProofUrl(null)}>
         <View style={styles.imageModalContainer}>
           <Pressable style={styles.imageModalOverlay} onPress={() => setPreviewProofUrl(null)} />
           {previewProofUrl && (
             <View style={styles.imageCard}>
               <View style={styles.imageHeader}>
-                <Text style={styles.imageModalTitle}>Payment Proof Slip</Text>
+                <Text style={styles.imageModalTitle}>Payment Receipt Slip</Text>
                 <Pressable onPress={() => setPreviewProofUrl(null)} style={styles.closeBtn}>
-                  <Text style={{ color: colors.onSurface, fontSize: 18, fontWeight: 'bold' }}>✕</Text>
+                  <Ionicons name="close" size={20} color={colors.onSurface} />
                 </Pressable>
               </View>
               <Image source={{ uri: previewProofUrl }} style={styles.fullProofImage} resizeMode="contain" />
@@ -307,48 +447,126 @@ export function PaymentsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bgBase },
-  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  header: { paddingHorizontal: 20, paddingBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.glass,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backArrow: { color: colors.onSurface, fontSize: 22, lineHeight: 26 },
   title: { fontFamily: fontFamily.head, fontSize: 20, color: colors.onSurface },
   subtitle: { fontFamily: fontFamily.body, fontSize: 12, color: colors.muted, marginTop: 2 },
-  tabBar: { flexDirection: 'row', paddingHorizontal: 20, marginVertical: 10, gap: 8 },
-  tab: { flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: radius.sm, backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center' },
-  activeTab: { backgroundColor: 'rgba(129,140,248,0.15)', borderColor: colors.primary },
+  tabBar: { flexDirection: 'row', paddingHorizontal: 20, marginVertical: 8, gap: 8 },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    alignItems: 'center',
+  },
+  activeTab: { backgroundColor: 'rgba(207,188,255,0.15)', borderColor: colors.primary },
   tabText: { fontFamily: fontFamily.bodyMedium, fontSize: 12, color: colors.muted },
   activeTabText: { color: colors.primary, fontFamily: fontFamily.bodySemibold },
-  muted: { fontFamily: fontFamily.body, color: colors.muted, fontSize: 13, textAlign: 'center', marginTop: 40 },
-  toast: { marginHorizontal: 20, marginTop: 10, padding: 10, borderRadius: radius.sm, borderWidth: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+  },
+  searchInput: { flex: 1, height: 38, fontFamily: fontFamily.body, fontSize: 13, color: colors.onSurface },
+  clearSearch: { padding: 6 },
+  muted: { fontFamily: fontFamily.body, color: colors.muted, fontSize: 13, textAlign: 'center', marginTop: 30 },
+  toast: { marginHorizontal: 20, marginBottom: 8, padding: 10, borderRadius: radius.sm, borderWidth: 1 },
+  card: { marginBottom: 14 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   customer: { fontFamily: fontFamily.bodySemibold, fontSize: 14, color: colors.onSurface },
   orderRef: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted, marginTop: 2 },
   amount: { fontFamily: fontFamily.headSemibold, fontSize: 15, color: colors.primary },
   itemsBox: { marginTop: 8, padding: 8, borderRadius: radius.xs, backgroundColor: 'rgba(255,255,255,0.03)' },
   itemText: { fontFamily: fontFamily.body, fontSize: 12, color: colors.muted },
-  proofContainer: { position: 'relative', marginTop: 12 },
-  proof: { width: '100%', height: 160, borderRadius: radius.sm, backgroundColor: colors.bgScreen2 },
-  zoomHint: { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  proofContainer: { position: 'relative', marginTop: 10 },
+  proofImage: { width: '100%', height: 160, borderRadius: radius.sm, backgroundColor: colors.bgScreen2 },
+  zoomHint: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   zoomHintText: { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.onSurface },
-  pdfCard: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: radius.sm, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: colors.glassBorder },
+  pdfCard: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: radius.sm,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+  },
   pdfTitle: { fontFamily: fontFamily.bodySemibold, fontSize: 13, color: colors.onSurface },
   pdfSub: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted },
-  noProofBox: { marginTop: 12, padding: 16, borderRadius: radius.sm, backgroundColor: 'rgba(255,255,255,0.02)', borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center' },
+  pdfLink: { color: colors.primary, fontSize: 12, fontFamily: fontFamily.bodySemibold },
+  noProofBox: {
+    marginTop: 10,
+    padding: 14,
+    borderRadius: radius.sm,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    alignItems: 'center',
+  },
   noProofText: { fontFamily: fontFamily.body, fontSize: 12, color: colors.muted, fontStyle: 'italic' },
-  metaBox: { marginTop: 10, padding: 10, borderRadius: radius.xs, backgroundColor: 'rgba(129,140,248,0.06)', borderWidth: 1, borderColor: 'rgba(129,140,248,0.2)' },
-  metaBoxTitle: { fontFamily: fontFamily.bodySemibold, fontSize: 11, color: colors.primary, marginBottom: 4 },
-  metaText: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted, marginTop: 2 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
-  method: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted, textTransform: 'capitalize' },
-  dateText: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted, marginLeft: 'auto' },
-  reasonBox: { marginTop: 10, padding: 8, borderRadius: radius.xs, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' },
+  ocrBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: radius.xs,
+    backgroundColor: 'rgba(207,188,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(207,188,255,0.2)',
+  },
+  ocrTitle: { fontFamily: fontFamily.bodySemibold, fontSize: 11, color: colors.primary, marginBottom: 4 },
+  ocrText: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted, marginTop: 2 },
+  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+  dateText: { fontFamily: fontFamily.body, fontSize: 11, color: colors.muted },
+  reasonBox: {
+    marginTop: 10,
+    padding: 8,
+    borderRadius: radius.xs,
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.25)',
+  },
   reasonTitle: { fontFamily: fontFamily.bodySemibold, fontSize: 11, color: colors.error },
   reasonText: { fontFamily: fontFamily.body, fontSize: 12, color: colors.onSurface, marginTop: 2 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', padding: 20 },
   modalCard: { backgroundColor: colors.bgScreen2, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.glassBorder, padding: 20 },
-  modalTitle: { fontFamily: fontFamily.headSemibold, fontSize: 15, color: colors.onSurface },
-  modalSubtitle: { fontFamily: fontFamily.body, fontSize: 12, color: colors.muted, marginTop: 6, lineHeight: 17 },
+  modalTitle: { fontFamily: fontFamily.headSemibold, fontSize: 16, color: colors.onSurface },
+  modalSubtitle: { fontFamily: fontFamily.body, fontSize: 12, color: colors.muted, marginTop: 4, lineHeight: 17 },
+  presetItem: { padding: 8, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: colors.glassBorder },
+  presetItemActive: { borderColor: colors.primary, backgroundColor: 'rgba(207,188,255,0.1)' },
+  presetText: { fontFamily: fontFamily.body, fontSize: 12, color: colors.muted },
   textarea: {
-    marginTop: 14,
+    marginTop: 10,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.glassBorder,
@@ -357,15 +575,14 @@ const styles = StyleSheet.create({
     color: colors.onSurface,
     fontFamily: fontFamily.body,
     fontSize: 13,
-    minHeight: 90,
+    minHeight: 70,
     textAlignVertical: 'top',
   },
-  imageModalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.85)', padding: 16 },
+  imageModalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.88)', padding: 16 },
   imageModalOverlay: { ...StyleSheet.absoluteFillObject },
-  imageCard: { width: '100%', maxHeight: '80%', backgroundColor: colors.bgScreen, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.glassBorder, overflow: 'hidden', padding: 16 },
+  imageCard: { width: '100%', maxHeight: '85%', backgroundColor: colors.bgScreen, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.glassBorder, padding: 16 },
   imageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   imageModalTitle: { fontFamily: fontFamily.headSemibold, fontSize: 15, color: colors.onSurface },
   closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center' },
-  fullProofImage: { width: '100%', height: 400, borderRadius: radius.sm },
+  fullProofImage: { width: '100%', height: 420, borderRadius: radius.sm },
 });
-

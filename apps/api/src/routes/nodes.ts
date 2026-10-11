@@ -275,7 +275,10 @@ nodesRouter.post('/nodes/:id/stats', async (req: Request, res: Response) => {
 nodesRouter.use('/nodes', requireAuth, requireAdminOrDev);
 
 nodesRouter.get('/nodes', async (_req: AuthedRequest, res: Response) => {
-  const nodes = await prisma.node.findMany({ orderBy: { createdAt: 'asc' } });
+  const nodes = await prisma.node.findMany({
+    include: { _count: { select: { deployments: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
   res.json({ nodes });
 });
 

@@ -1,9 +1,65 @@
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from './firebase';
 
-export const API_BASE: string = Constants.expoConfig?.extra?.apiBaseUrl ?? 'https://api.shanutechx.com';
+export const DEFAULT_API_BASE: string =
+  Constants.expoConfig?.extra?.apiBaseUrl ?? 'https://api.shanutechx.com';
 
-class ApiError extends Error {
+const STORAGE_KEY_API_BASE = '@shanutechx_api_base';
+const STORAGE_KEY_ADMIN_KEY = '@shanutechx_admin_key';
+
+let cachedApiBase = DEFAULT_API_BASE;
+let cachedApiKey: string | null = null;
+let storageInitialized = false;
+
+export async function initApiConfig(): Promise<string> {
+  try {
+    const [storedBase, storedKey] = await Promise.all([
+      AsyncStorage.getItem(STORAGE_KEY_API_BASE),
+      AsyncStorage.getItem(STORAGE_KEY_ADMIN_KEY),
+    ]);
+    if (storedBase && storedBase.trim()) {
+      cachedApiBase = storedBase.trim().replace(/\/+$/, '');
+    }
+    if (storedKey && storedKey.trim()) {
+      cachedApiKey = storedKey.trim();
+    }
+  } catch {
+    // fallback to defaults
+  }
+  storageInitialized = true;
+  return cachedApiBase;
+}
+
+export function getEffectiveApiBase(): string {
+  return cachedApiBase;
+}
+
+export const API_BASE = cachedApiBase;
+
+export async function setApiBaseUrl(url: string): Promise<void> {
+  const clean = url.trim().replace(/\/+$/, '');
+  cachedApiBase = clean || DEFAULT_API_BASE;
+  await AsyncStorage.setItem(STORAGE_KEY_API_BASE, cachedApiBase);
+}
+
+export async function getStoredApiKey(): Promise<string | null> {
+  if (!storageInitialized) {
+    await initApiConfig();
+  }
+  return cachedApiKey;
+}
+
+export async function setStoredApiKey(key: string | null): Promise<void> {
+  cachedApiKey = key ? key.trim() : null;
+  if (cachedApiKey) {
+    await AsyncStorage.setItem(STORAGE_KEY_ADMIN_KEY, cachedApiKey);
+  } else {
+    await AsyncStorage.removeItem(STORAGE_KEY_ADMIN_KEY);
+  }
+}
+
+export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
     super(message);
@@ -12,33 +68,50 @@ class ApiError extends Error {
 }
 
 /**
- * Same pattern as apps/dashboard/lib/useAuth.ts's apiFetch — attaches the
- * current Firebase ID token as a Bearer header. The API server (see
- * apps/api/src/middleware/auth.ts) doesn't care whether the token came from
- * the web app or this one; a valid Firebase ID token is a valid Firebase ID
- * token.
+ * Attaches either the active Firebase ID token OR a configured Admin/Dev API key.
+ * Dynamically resolves against the active API_BASE.
  */
-async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  const user = auth.currentUser;
-  const token = user ? await user.getIdToken() : null;
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  if (!storageInitialized) {
+    await initApiConfig();
+  }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
+  const user = auth.currentUser;
+  let token = user ? await user.getIdToken().catch(() => null) : null;
+  if (!token && cachedApiKey) {
+    token = cachedApiKey;
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(token && token.startsWith('shx_') ? { 'x-api-key': token } : {}),
+    ...((options.headers as Record<string, string>) || {}),
+  };
+
+  const url = `${cachedApiBase}${path.startsWith('/') ? path : `/${path}`}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (netErr: any) {
+    throw new ApiError(
+      `Cannot connect to API server at ${cachedApiBase}. Please check your internet or change server URL in settings. (${netErr.message || 'Network request failed'})`,
+      0
+    );
+  }
 
   if (!res.ok) {
     const body = await res.text();
     let message = body;
     try {
       const parsed = JSON.parse(body);
-      message = parsed.error ?? body;
+      message = parsed.error ?? parsed.message ?? body;
     } catch {
-      // body wasn't JSON — use as-is
+      // body wasn't JSON
     }
     throw new ApiError(typeof message === 'string' ? message : JSON.stringify(message), res.status);
   }
@@ -50,7 +123,7 @@ async function asJson<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// ── Types (mirrored from apps/dashboard/lib/types.ts for the fields this app uses) ──
+// ── Types ──────────────────────────────────────────────────────────────────
 
 export interface Payment {
   id: string;
@@ -78,17 +151,26 @@ export interface Payment {
 export interface Deployment {
   id: string;
   name: string;
-  status: 'building' | 'running' | 'failed' | 'stopped' | 'terminated';
+  subdomain?: string | null;
+  customSubdomain?: string | null;
+  customDomain?: string | null;
+  status: 'building' | 'running' | 'failed' | 'stopped' | 'terminated' | 'pending' | 'pending_configuration';
+  repoUrl?: string | null;
+  branch?: string | null;
   image: string;
   tag: string;
+  runtime?: string | null;
+  frameworkPreset?: string | null;
+  exposureMode?: string | null;
   nodeId: string | null;
-  customSubdomain: string | null;
   publicUrl: string | null;
+  port?: number | null;
   createdAt: string;
   updatedAt: string;
+  lastDeployAt?: string | null;
   userId: string;
   user?: { email: string; displayName?: string | null };
-  node?: { label: string; ip: string };
+  node?: { label: string; ip?: string };
   envVars?: Array<{ key: string }>;
 }
 
@@ -105,12 +187,21 @@ export interface Node {
   ip: string;
   region: string | null;
   status: 'online' | 'offline' | 'degraded';
+  isActive: boolean;
+  isGlobal?: boolean;
+  cpuCores?: number;
+  ramMb?: number;
+  diskGb?: number;
   cpuUsedPct: number | null;
+  ramUsedMb?: number | null;
   ramUsedPct: number | null;
+  diskUsedGb?: number | null;
   diskUsedPct: number | null;
   totalRamGb: number | null;
   totalDiskGb: number | null;
+  lastSeenAt?: string | null;
   deploymentCount: number;
+  _count?: { deployments: number };
   createdAt: string;
 }
 
@@ -151,12 +242,44 @@ export interface TicketMessage {
 
 export interface AnalyticsSummary {
   revenueLast30dLkr: number;
+  revenueInWindowLkr?: number;
+  revenueAllTimeLkr?: number;
+  revenueGrowthPct?: number;
+  mrrLkr?: number;
+  mrrUsd?: number;
+  arrLkr?: number;
+  averageOrderValueLkr?: number;
   revenueByMonth: Record<string, number>;
   activeSubscriptions: number;
   cancelledSubscriptionsLast30d: number;
+  cancelledSubscriptions?: number;
   totalCustomers: number;
-  nodeUtilization: Array<{ label: string; cpuUsedPct: number | null; ramUsedPct: number | null; diskUsedPct: number | null }>;
-  topServicesByOrderCount: Array<{ serviceId: string; name: string; type: string; count: number }>;
+  nodeUtilization: Array<{
+    id?: string;
+    label: string;
+    status?: string;
+    cpuUsedPct: number | null;
+    ramUsedPct: number | null;
+    diskUsedPct: number | null;
+  }>;
+  topServices?: Array<{ title?: string; name?: string; category?: string; type?: string; count: number; revenue?: number }>;
+  topServicesByOrderCount: Array<{ serviceId: string; name: string; type: string; count: number; revenue?: number }>;
+  fleetSummary?: {
+    totalNodes: number;
+    activeNodes: number;
+    healthyNodes: number;
+    warningNodes?: number;
+    criticalNodes?: number;
+    totalCpuCores: number;
+    totalRamGb: number;
+    totalDiskGb: number;
+  };
+  deploymentsSummary?: {
+    running: number;
+    building: number;
+    failed: number;
+  };
+  uptimePct?: number;
 }
 
 export interface ApiUser {
@@ -166,11 +289,148 @@ export interface ApiUser {
   role: 'customer' | 'admin' | 'support' | 'dev';
 }
 
-// ── API surface actually used by this app ───────────────────────────────────
+// ── Normalizers ────────────────────────────────────────────────────────────
+
+function normalizeDeployment(d: any): Deployment {
+  const repoName = d.repoUrl ? d.repoUrl.split('/').pop()?.replace('.git', '') : undefined;
+  const name =
+    d.name ||
+    d.preferredName ||
+    d.subdomain ||
+    repoName ||
+    `Deployment #${String(d.id || '').slice(0, 8)}`;
+
+  const cleanSubdomain = d.subdomain || d.customSubdomain || null;
+  const publicUrl =
+    d.publicUrl ||
+    (d.customDomain
+      ? `https://${d.customDomain}`
+      : cleanSubdomain
+      ? `https://${cleanSubdomain}.shanutechx.com`
+      : null);
+
+  return {
+    ...d,
+    id: d.id,
+    name,
+    subdomain: cleanSubdomain,
+    customSubdomain: cleanSubdomain,
+    publicUrl,
+    image: d.image || d.runtime || d.frameworkPreset || 'docker',
+    tag: d.tag || d.branch || 'latest',
+    status: d.status || 'running',
+    createdAt: d.createdAt || new Date().toISOString(),
+    updatedAt: d.updatedAt || d.lastDeployAt || d.createdAt || new Date().toISOString(),
+    userId: d.userId || '',
+  };
+}
+
+function normalizeNode(n: any): Node {
+  const ramMb = n.ramMb || 1024;
+  const diskGb = n.diskGb || 20;
+
+  const ramUsedPct =
+    n.ramUsedPct ?? (n.ramUsedMb ? Math.round(((n.ramUsedMb || 0) / ramMb) * 100) : null);
+  const diskUsedPct =
+    n.diskUsedPct ?? (n.diskUsedGb ? Math.round(((n.diskUsedGb || 0) / diskGb) * 100) : null);
+  const totalRamGb = n.totalRamGb ?? (n.ramMb ? Math.round(n.ramMb / 1024) : null);
+  const totalDiskGb = n.totalDiskGb ?? n.diskGb ?? null;
+  const deploymentCount = n._count?.deployments ?? n.deploymentCount ?? 0;
+
+  let status: 'online' | 'offline' | 'degraded' = n.status;
+  if (!status) {
+    if (n.isActive === false) {
+      status = 'offline';
+    } else if (n.lastSeenAt && Date.now() - new Date(n.lastSeenAt).getTime() > 5 * 60 * 1000) {
+      status = 'offline';
+    } else if ((n.cpuUsedPct ?? 0) > 85 || (ramUsedPct ?? 0) > 85 || (diskUsedPct ?? 0) > 85) {
+      status = 'degraded';
+    } else {
+      status = 'online';
+    }
+  }
+
+  return {
+    ...n,
+    id: n.id,
+    label: n.label || 'Compute Node',
+    ip: n.ip || '0.0.0.0',
+    region: n.region || null,
+    status,
+    isActive: n.isActive ?? true,
+    cpuUsedPct: n.cpuUsedPct ?? null,
+    ramUsedPct,
+    diskUsedPct,
+    totalRamGb,
+    totalDiskGb,
+    deploymentCount,
+    createdAt: n.createdAt || new Date().toISOString(),
+  };
+}
+
+function normalizeAnalytics(data: any): AnalyticsSummary {
+  const revLkr =
+    data.revenueInWindowLkr ??
+    data.revenueLast30dLkr ??
+    data.revenueAllTimeLkr ??
+    0;
+
+  const cancelled =
+    data.cancelledSubscriptions ??
+    data.cancelledSubscriptionsLast30d ??
+    0;
+
+  const topServices = Array.isArray(data.topServices) ? data.topServices : [];
+  const topServicesByOrderCount =
+    topServices.length > 0
+      ? topServices.map((s: any, idx: number) => ({
+          serviceId: s.serviceId || s.id || `srv-${idx}`,
+          name: s.title || s.name || 'Hosting Service',
+          type: s.category || s.type || 'hosting',
+          count: s.count || 0,
+          revenue: s.revenue || 0,
+        }))
+      : Array.isArray(data.topServicesByOrderCount)
+      ? data.topServicesByOrderCount
+      : [];
+
+  return {
+    ...data,
+    revenueLast30dLkr: revLkr,
+    revenueInWindowLkr: revLkr,
+    revenueAllTimeLkr: data.revenueAllTimeLkr,
+    revenueGrowthPct: data.revenueGrowthPct ?? 0,
+    mrrLkr: data.mrrLkr ?? 0,
+    mrrUsd: data.mrrUsd ?? 0,
+    arrLkr: data.arrLkr ?? 0,
+    averageOrderValueLkr: data.averageOrderValueLkr ?? 0,
+    revenueByMonth: data.revenueByMonth || {},
+    activeSubscriptions: data.activeSubscriptions ?? 0,
+    cancelledSubscriptionsLast30d: cancelled,
+    cancelledSubscriptions: cancelled,
+    totalCustomers: data.totalCustomers ?? 0,
+    topServices,
+    topServicesByOrderCount,
+    nodeUtilization: Array.isArray(data.nodeUtilization) ? data.nodeUtilization : [],
+    fleetSummary: data.fleetSummary,
+    deploymentsSummary: data.deploymentsSummary,
+    uptimePct: data.uptimePct ?? 99.9,
+  };
+}
+
+// ── API Surface ────────────────────────────────────────────────────────────
 
 export const api = {
+  health: () =>
+    apiFetch('/api/health').then((r) => asJson<{ ok: boolean; status?: string }>(r)),
+
   auth: {
     me: () => apiFetch('/api/me').then((r) => asJson<{ user: ApiUser }>(r)),
+    login: (idToken: string, provider?: string) =>
+      apiFetch('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ idToken, provider }),
+      }).then((r) => asJson<{ user: ApiUser; token?: string }>(r)),
   },
 
   payments: {
@@ -187,7 +447,9 @@ export const api = {
 
   tickets: {
     list: (status?: string) =>
-      apiFetch(`/api/tickets${status ? `?status=${status}` : ''}`).then((r) => asJson<{ tickets: Ticket[] }>(r)),
+      apiFetch(`/api/tickets${status ? `?status=${encodeURIComponent(status)}` : ''}`).then((r) =>
+        asJson<{ tickets: Ticket[]; total?: number }>(r)
+      ),
     get: (id: string) => apiFetch(`/api/tickets/${id}`).then((r) => asJson<{ ticket: Ticket }>(r)),
     reply: (id: string, body: string) =>
       apiFetch(`/api/tickets/${id}/messages`, { method: 'POST', body: JSON.stringify({ body }) }).then((r) =>
@@ -214,31 +476,22 @@ export const api = {
   },
 
   analytics: {
-    summary: () => apiFetch('/api/admin/analytics').then((r) => asJson<AnalyticsSummary>(r)),
+    summary: (range: string = '30d') =>
+      apiFetch(`/api/admin/analytics?range=${encodeURIComponent(range)}`)
+        .then((r) => asJson<any>(r))
+        .then(normalizeAnalytics),
   },
 
   discordWebhooks: {
-    // Reused here for the "test notification" flow on the Notifications
-    // screen — dev-only on the backend, same as the web Dev Dashboard.
     list: () =>
       apiFetch('/api/discord-webhooks').then((r) =>
         asJson<{ configs: Array<{ id: string; event: string; isActive: boolean }> }>(r)
       ),
   },
 
-  /**
-   * There is no separate "notifications feed" endpoint on the backend —
-   * real-time alerts go out via push/email/Discord at the moment something
-   * happens (see apps/api/src/lib/notifications.ts and discordWebhooks.ts),
-   * not into a queryable inbox. Rather than invent a fake feed with made-up
-   * data, the Notifications screen in this app is wired to the real,
-   * already-populated admin audit log instead — genuine recent activity
-   * (payment approvals/declines, staff changes, node changes, secret
-   * reveals), not a mockup.
-   */
   auditLog: {
-    recent: () =>
-      apiFetch('/api/admin/audit-log?take=30').then((r) =>
+    recent: (take: number = 40) =>
+      apiFetch(`/api/admin/audit-log?take=${take}`).then((r) =>
         asJson<{
           entries: Array<{ id: string; action: string; target: string | null; createdAt: string; admin: { email: string } }>;
           total: number;
@@ -257,36 +510,43 @@ export const api = {
   },
 
   deployments: {
-    /** Admin: list all deployments across all users */
     list: (params?: { status?: string; userId?: string; take?: number; skip?: number }) => {
       const qs = params
-        ? '?' + new URLSearchParams(
+        ? '?' +
+          new URLSearchParams(
             Object.fromEntries(
-              Object.entries({ ...params, take: params.take ?? 20, skip: params.skip ?? 0 })
+              Object.entries({ ...params, take: params.take ?? 50, skip: params.skip ?? 0 })
                 .filter(([, v]) => v !== undefined)
                 .map(([k, v]) => [k, String(v)])
             )
           ).toString()
         : '';
-      return apiFetch(`/api/deployments${qs}`).then((r) =>
-        asJson<{ deployments: Deployment[]; total: number }>(r)
-      );
+      return apiFetch(`/api/deployments${qs}`)
+        .then((r) => asJson<{ deployments: any[]; total: number }>(r))
+        .then(({ deployments, total }) => ({
+          deployments: deployments.map(normalizeDeployment),
+          total,
+        }));
     },
     get: (id: string) =>
-      apiFetch(`/api/deployments/${id}`).then((r) => asJson<{ deployment: Deployment }>(r)),
+      apiFetch(`/api/deployments/${id}`)
+        .then((r) => asJson<{ deployment: any }>(r))
+        .then(({ deployment }) => ({ deployment: normalizeDeployment(deployment) })),
     restart: (id: string) =>
-      apiFetch(`/api/deployments/${id}/restart`, { method: 'POST' }).then((r) =>
-        asJson<{ deployment: Deployment }>(r)
-      ),
+      apiFetch(`/api/deployments/${id}/restart`, { method: 'POST' })
+        .then((r) => asJson<{ deployment: any }>(r))
+        .then(({ deployment }) => ({ deployment: normalizeDeployment(deployment) })),
     stop: (id: string) =>
-      apiFetch(`/api/deployments/${id}/stop`, { method: 'POST' }).then((r) =>
-        asJson<{ deployment: Deployment }>(r)
-      ),
+      apiFetch(`/api/deployments/${id}/stop`, { method: 'POST' })
+        .then((r) => asJson<{ deployment: any }>(r))
+        .then(({ deployment }) => ({ deployment: normalizeDeployment(deployment) })),
     updateSubdomain: (id: string, subdomain: string) =>
       apiFetch(`/api/deployments/${id}/subdomain`, {
         method: 'PATCH',
         body: JSON.stringify({ subdomain }),
-      }).then((r) => asJson<{ deployment: Deployment }>(r)),
+      })
+        .then((r) => asJson<{ deployment: any }>(r))
+        .then(({ deployment }) => ({ deployment: normalizeDeployment(deployment) })),
     logs: (id: string, tail?: number) =>
       apiFetch(`/api/deployments/${id}/logs${tail ? `?tail=${tail}` : ''}`).then((r) =>
         asJson<{ logs: string | DeploymentLog[] }>(r)
@@ -295,11 +555,17 @@ export const api = {
 
   nodes: {
     list: () =>
-      apiFetch('/api/nodes').then((r) => asJson<{ nodes: Node[] }>(r)),
+      apiFetch('/api/nodes')
+        .then((r) => asJson<{ nodes: any[] }>(r))
+        .then(({ nodes }) => ({ nodes: nodes.map(normalizeNode) })),
     get: (id: string) =>
-      apiFetch(`/api/nodes/${id}`).then((r) => asJson<{ node: Node }>(r)),
+      apiFetch(`/api/nodes/${id}`)
+        .then((r) => asJson<{ node: any }>(r))
+        .then(({ node }) => ({ node: normalizeNode(node) })),
     toggleActive: (id: string, isActive: boolean) =>
-      apiFetch(`/api/nodes/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }).then((r) => asJson<{ node: Node }>(r)),
+      apiFetch(`/api/nodes/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive }) })
+        .then((r) => asJson<{ node: any }>(r))
+        .then(({ node }) => ({ node: normalizeNode(node) })),
     engineMonitoring: (nodeId: string) =>
       apiFetch(`/api/nodes/${nodeId}/engine/monitoring`).then((r) => asJson<any>(r)),
   },
@@ -307,7 +573,8 @@ export const api = {
   databases: {
     list: (params?: { userId?: string; take?: number; skip?: number }) => {
       const qs = params
-        ? '?' + new URLSearchParams(
+        ? '?' +
+          new URLSearchParams(
             Object.fromEntries(
               Object.entries({ take: 20, skip: 0, ...params })
                 .filter(([, v]) => v !== undefined)
@@ -323,5 +590,3 @@ export const api = {
       apiFetch(`/api/managed-databases/${id}`).then((r) => asJson<{ database: ManagedDatabase }>(r)),
   },
 };
-
-export { ApiError };

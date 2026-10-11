@@ -409,7 +409,10 @@ deploymentsRouter.get('/deployments', async (req: AuthedRequest, res) => {
   const [deployments, total] = await Promise.all([
     prisma.deployment.findMany({
       where,
-      include: { node: { select: { label: true } } },
+      include: {
+        node: { select: { label: true } },
+        user: { select: { email: true, displayName: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take,
       skip,
@@ -428,7 +431,10 @@ deploymentsRouter.get('/deployments', async (req: AuthedRequest, res) => {
 async function loadOwnedDeployment(req: AuthedRequest, id: string) {
   const deployment = await prisma.deployment.findUnique({
     where: { id },
-    include: { node: true },
+    include: {
+      node: true,
+      user: { select: { email: true, displayName: true } },
+    },
   });
 
   if (!deployment) return null;
