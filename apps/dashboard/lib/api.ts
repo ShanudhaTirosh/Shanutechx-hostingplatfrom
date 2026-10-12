@@ -1776,9 +1776,20 @@ export const api = {
       apiFetch(`/api/catalog/${slug}`, { method: 'DELETE' }).then((r) =>
         asJson<{ success: boolean; slug: string }>(r)
       ),
-    deploy: (body: { slug: string; nodeId: string; envVars?: Record<string, string>; projectName?: string; teamId?: string | null }) =>
+    deploy: (body: {
+      slug: string;
+      nodeId: string;
+      envVars?: Record<string, string>;
+      projectName?: string;
+      teamId?: string | null;
+      orderItemId?: string;
+      exposureMode?: string;
+      configFiles?: Record<string, string>;
+      configFileContent?: string;
+      configFileName?: string;
+    }) =>
       apiFetch('/api/catalog/deploy', { method: 'POST', body: JSON.stringify(body) }).then((r) =>
-        asJson<{ deployment: Deployment; agent: Record<string, unknown> }>(r)
+        asJson<{ deployment: Deployment; agent: Record<string, unknown>; generatedSecrets?: Record<string, string>; configFiles?: string[] }>(r)
       ),
     nodes: () =>
       apiFetch('/api/catalog/nodes').then((r) =>

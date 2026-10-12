@@ -1531,7 +1531,7 @@ function resolveEnvVars(yamlContent, userEnvVars = {}) {
  * Writes the YAML to disk, then runs `docker compose up -d`.
  */
 app.post('/agent/compose/up', async (req, res) => {
-  const { composeYaml, projectName, envVars } = req.body || {};
+  const { composeYaml, projectName, envVars, configFiles, configFileContent, configFileName } = req.body || {};
   const effectiveProject = projectName || (req.body?.deploymentId ? `proj-${req.body.deploymentId}` : '');
   if (!composeYaml || !effectiveProject) {
     return res.status(400).json({ error: 'composeYaml and projectName are required' });
@@ -1548,6 +1548,26 @@ app.post('/agent/compose/up', async (req, res) => {
   try {
     // Create project directory
     fs.mkdirSync(projectDir, { recursive: true });
+
+    // Write any provided config files (e.g. livekit.yaml, custom configs) into project directory
+    const filesToWrite = { ...(configFiles || {}) };
+    if (configFileContent) {
+      const targetFileName = configFileName ? path.basename(configFileName) : 'config.yaml';
+      filesToWrite[targetFileName] = configFileContent;
+    }
+
+    for (const [rawFileName, content] of Object.entries(filesToWrite)) {
+      if (typeof content !== 'string') continue;
+      const safeName = path.basename(rawFileName).replace(/[^a-zA-Z0-9_.-]/g, '_');
+      if (safeName && safeName !== 'docker-compose.yml' && safeName !== '.env') {
+        fs.writeFileSync(path.join(projectDir, safeName), content, 'utf8');
+      }
+    }
+
+    // Ensure external networks declared in compose exist on the Docker host (e.g. shanutechx-public)
+    if (/shanutechx-public/i.test(composeYaml)) {
+      await execFileAsync('docker', ['network', 'create', 'shanutechx-public']).catch(() => {});
+    }
 
     // Write env vars with auto-generated secrets
     const resolvedEnv = resolveEnvVars(composeYaml, envVars || {});

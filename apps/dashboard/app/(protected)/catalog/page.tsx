@@ -293,6 +293,27 @@ function DeployModal({
   const [customValue, setCustomValue] = useState('');
   const [fetchingYaml, setFetchingYaml] = useState(true);
 
+  // Configuration file state (manual editing or file upload)
+  const defaultLiveKitYaml = `# LiveKit WebRTC Server Configuration
+port: 7880
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true
+redis:
+  address: redis:6379
+keys:
+  # API Key and Secret are auto-generated and wired automatically
+logging:
+  level: info
+`;
+
+  const [configFileName, setConfigFileName] = useState(tpl.slug === 'livekit' ? 'livekit.yaml' : '');
+  const [configFileContent, setConfigFileContent] = useState(tpl.slug === 'livekit' ? defaultLiveKitYaml : '');
+  const [showConfigEditor, setShowConfigEditor] = useState(tpl.slug === 'livekit');
+  const configFileRef = useRef<HTMLInputElement>(null);
+
   const [selectedScope, setSelectedScope] = useState<string>('personal');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -344,6 +365,21 @@ function DeployModal({
     reader.readAsText(file);
   }
 
+  function handleConfigFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setConfigFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (typeof content === 'string') {
+        setConfigFileContent(content);
+        setShowConfigEditor(true);
+      }
+    };
+    reader.readAsText(file);
+  }
+
   async function handleDeploy() {
     if (!nodeId && isAdminOrDev) { setError('Select a target node'); return; }
     setLoading(true);
@@ -355,6 +391,9 @@ function DeployModal({
         projectName,
         envVars,
         teamId: selectedScope === 'personal' ? null : selectedScope,
+        exposureMode: 'auto',
+        configFileContent: configFileContent.trim() ? configFileContent : undefined,
+        configFileName: configFileName.trim() ? configFileName : undefined,
       });
       setSuccess({
         deploymentId: res.deployment.id,
@@ -649,7 +688,96 @@ function DeployModal({
                 </div>
               )}
 
-              {/* Add Custom Env Var */}
+              {/* Application Config File (Upload or Edit Manually) */}
+              <div className="space-y-2 border-t border-white/[0.06] pt-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-xs font-medium text-text-muted">Configuration File</label>
+                    {showConfigEditor && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                        {configFileName || 'custom.yaml'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      ref={configFileRef}
+                      type="file"
+                      accept=".yaml,.yml,.json,.conf,.toml,.ini,.txt"
+                      className="hidden"
+                      onChange={handleConfigFileUpload}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => configFileRef.current?.click()}
+                      className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30 transition-all flex items-center gap-1"
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+                      </svg>
+                      Upload Config File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowConfigEditor(!showConfigEditor);
+                        if (!showConfigEditor && !configFileName) {
+                          setConfigFileName(tpl.slug === 'livekit' ? 'livekit.yaml' : `${tpl.slug}.yaml`);
+                        }
+                      }}
+                      className={`px-2 py-1 rounded text-[11px] font-semibold border transition-all flex items-center gap-1 ${
+                        showConfigEditor
+                          ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
+                          : 'bg-white/5 border-white/10 text-text-muted hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                      {showConfigEditor ? 'Editor Open' : 'Edit Manually'}
+                    </button>
+                  </div>
+                </div>
+
+                {showConfigEditor && (
+                  <div className="space-y-2 p-3 rounded-xl bg-black/40 border border-white/10">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className="text-[11px] text-text-faint font-mono">Filename:</span>
+                        <input
+                          type="text"
+                          value={configFileName}
+                          onChange={(e) => setConfigFileName(e.target.value)}
+                          placeholder="e.g. livekit.yaml"
+                          className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs font-mono text-white focus:outline-none focus:border-cyan-500 flex-1 max-w-xs"
+                        />
+                      </div>
+                      {tpl.slug === 'livekit' && (
+                        <button
+                          type="button"
+                          onClick={() => setConfigFileContent(defaultLiveKitYaml)}
+                          className="text-[10px] text-text-faint hover:text-cyan-400 underline"
+                        >
+                          Reset defaults
+                        </button>
+                      )}
+                    </div>
+
+                    <textarea
+                      value={configFileContent}
+                      onChange={(e) => setConfigFileContent(e.target.value)}
+                      rows={6}
+                      placeholder="# Type or paste configuration YAML/JSON here..."
+                      className="w-full px-3 py-2 rounded-lg bg-black/60 border border-white/10 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 leading-relaxed scrollbar-thin"
+                      spellCheck={false}
+                    />
+                    <p className="text-[10px] text-text-faint">
+                      Saved directly into the application project container and mounted during startup.
+                    </p>
+                  </div>
+                )}
+              </div>
               {!fetchingYaml && (
                 <div className="space-y-2 border-t border-white/[0.06] pt-3">
                   <label className="text-xs font-medium text-text-muted block">Add Environment Variable</label>

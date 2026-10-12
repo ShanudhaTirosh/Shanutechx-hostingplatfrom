@@ -17,6 +17,7 @@ import { syncCatalogToFirebase } from '../lib/firebaseSync';
 import { validateCustomSubdomain } from '../lib/subdomain';
 import { createSubdomainRecord } from '../lib/cloudflare';
 import { claimDeploymentSlot } from '../lib/deploymentSlots';
+import { autoDetectExposureMode } from '../lib/exposureDefaults';
 
 export const catalogRouter = Router();
 catalogRouter.use('/catalog', requireAuth);
@@ -224,6 +225,11 @@ const deploySchema = z
     envVars: z.record(z.string()).optional(),
     projectName: z.string().min(1).optional(),
     teamId: z.string().nullable().optional(),
+    orderItemId: z.string().optional(),
+    exposureMode: z.enum(['ssl_with_proxy', 'ssl_direct', 'no_ssl', 'raw_tcp', 'internal_only', 'auto']).optional(),
+    configFiles: z.record(z.string()).optional(),
+    configFileContent: z.string().optional(),
+    configFileName: z.string().optional(),
   })
   .refine((data) => data.slug || data.templateSlug, {
     message: 'slug or templateSlug is required',
@@ -239,7 +245,16 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const slug = parsed.data.slug || parsed.data.templateSlug!;
-  const { nodeId: inputNodeId, envVars: customerEnvVars = {}, projectName, teamId } = parsed.data;
+  const {
+    nodeId: inputNodeId,
+    envVars: customerEnvVars = {},
+    projectName,
+    teamId,
+    exposureMode: requestedExposureMode,
+    configFiles: customerConfigFiles = {},
+    configFileContent,
+    configFileName,
+  } = parsed.data;
   const userId = req.user!.id;
   const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
 
@@ -354,6 +369,49 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
     return res.status(slotErr.statusCode || 403).json({ error: slotErr.message });
   }
 
+  const effectiveExposureMode = autoDetectExposureMode({
+    explicitMode: requestedExposureMode || meta.recommendedExposureMode,
+    port: meta.port,
+    composeYaml: yamlContent,
+  });
+
+  const configFiles: Record<string, string> = { ...customerConfigFiles };
+  if (configFileContent) {
+    const targetName = configFileName || (slug === 'livekit' ? 'livekit.yaml' : 'config.yaml');
+    configFiles[targetName] = configFileContent;
+  }
+
+  // Inject COMPOSE_PROJECT_NAME and ROOT_DOMAIN for dynamic Traefik template routing
+  envVars['COMPOSE_PROJECT_NAME'] = composeName;
+  envVars['ROOT_DOMAIN'] = env.rootDomain;
+  envVars['DEPLOYMENTS_ROOT_DOMAIN'] = env.deploymentsRootDomain || env.rootDomain;
+
+  // Automated LiveKit Server Configuration & Key Management
+  if (slug === 'livekit') {
+    const lkKey = envVars['LIVEKIT_API_KEY'] || generatedSecrets['LIVEKIT_API_KEY'] || generateStrongSecret();
+    const lkSecret = envVars['LIVEKIT_API_SECRET'] || generatedSecrets['LIVEKIT_API_SECRET'] || generateStrongSecret();
+    envVars['LIVEKIT_API_KEY'] = lkKey;
+    envVars['LIVEKIT_API_SECRET'] = lkSecret;
+    generatedSecrets['LIVEKIT_API_KEY'] = lkKey;
+    generatedSecrets['LIVEKIT_API_SECRET'] = lkSecret;
+
+    if (!configFiles['livekit.yaml']) {
+      configFiles['livekit.yaml'] = `port: 7880
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true
+redis:
+  address: redis:6379
+keys:
+  ${lkKey}: ${lkSecret}
+logging:
+  level: info
+`;
+    }
+  }
+
   let deployment;
   try {
     deployment = await prisma.deployment.create({
@@ -367,7 +425,7 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
         subdomain: targetSubdomain,
         repoUrl: `template:${slug}`,
         internalPort: meta.port ?? 80,
-        exposureMode: meta.recommendedExposureMode || 'ssl_with_proxy',
+        exposureMode: effectiveExposureMode,
       },
     });
   } catch (createErr: any) {
@@ -384,7 +442,14 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
         'Content-Type': 'application/json',
         'x-agent-secret': env.nodeAgentSecret,
       },
-      body: JSON.stringify({ composeYaml: yamlContent, projectName: composeName, envVars }),
+      body: JSON.stringify({
+        composeYaml: yamlContent,
+        projectName: composeName,
+        envVars,
+        configFiles,
+        configFileContent,
+        configFileName,
+      }),
       signal: AbortSignal.timeout(120_000),
     });
 
@@ -460,6 +525,7 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
       agent: agentData,
       ...(managedDatabasesCreated.length > 0 ? { managedDatabases: managedDatabasesCreated } : {}),
       ...(Object.keys(generatedSecrets).length > 0 ? { generatedSecrets } : {}),
+      ...(Object.keys(configFiles).length > 0 ? { configFiles: Object.keys(configFiles) } : {}),
     });
   } catch (err: any) {
     logger.error({ err, slug, nodeId: node?.id }, 'Failed to deploy template');

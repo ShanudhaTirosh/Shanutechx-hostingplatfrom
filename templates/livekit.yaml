@@ -26,16 +26,30 @@ services:
         limits:
           cpus: '0.5'
           memory: 256M
+    networks:
+      - default
 
   livekit:
     image: livekit/livekit-server:v1.7
     command: --config /etc/livekit.yaml
-    ports:
-      - "7880:7880"
-      - "7881:7881"
-      - "7882:7882/udp"
+    restart: always
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+      - livekit_data:/data
     environment:
       - LIVEKIT_KEYS=${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}:${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - default
+      - shanutechx-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=shanutechx-public"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=le"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=7880"
     healthcheck:
       test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:7880/ || exit 1"]
       interval: 15s
@@ -44,7 +58,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    restart: always
     deploy:
       resources:
         limits:
@@ -54,3 +67,6 @@ services:
 volumes:
   livekit_data:
 
+networks:
+  shanutechx-public:
+    external: true

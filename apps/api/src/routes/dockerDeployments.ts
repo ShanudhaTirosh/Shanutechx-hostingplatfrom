@@ -10,6 +10,8 @@ import { encryptSecret } from '../lib/secretsVault';
 import { env } from '../env';
 import { callNodeAgent, buildAndRun } from '../lib/nodeAgentClient';
 import { claimDeploymentSlot } from '../lib/deploymentSlots';
+import { autoDetectExposureMode } from '../lib/exposureDefaults';
+import { createSubdomainRecord } from '../lib/cloudflare';
 
 export const dockerDeploymentsRouter = Router();
 
@@ -21,7 +23,7 @@ const deployImageSchema = z.object({
   internalPort: z.number().default(80),
   envVars: z.record(z.string()).optional(),
   nodeId: z.string().optional(),
-  exposureMode: z.enum(['ssl_with_proxy', 'ssl_direct', 'no_ssl']).default('ssl_with_proxy'),
+  exposureMode: z.enum(['ssl_with_proxy', 'ssl_direct', 'no_ssl', 'raw_tcp', 'internal_only', 'auto']).optional(),
   cpuLimit: z.number().optional(),
   memoryLimit: z.number().optional(),
   orderItemId: z.string().optional(),
@@ -33,6 +35,10 @@ const deployComposeSchema = z.object({
   envVars: z.record(z.string()).optional(),
   nodeId: z.string().optional(),
   orderItemId: z.string().optional(),
+  exposureMode: z.enum(['ssl_with_proxy', 'ssl_direct', 'no_ssl', 'raw_tcp', 'internal_only', 'auto']).optional(),
+  configFiles: z.record(z.string()).optional(),
+  configFileContent: z.string().optional(),
+  configFileName: z.string().optional(),
 });
 
 /**
@@ -85,6 +91,12 @@ dockerDeploymentsRouter.post('/deployments/docker-image', async (req: AuthedRequ
       return res.status(slotErr.statusCode || 403).json({ error: slotErr.message });
     }
 
+    const effectiveExposureMode = autoDetectExposureMode({
+      explicitMode: exposureMode,
+      port: internalPort,
+      image,
+    });
+
     const deployment = await prisma.deployment.create({
       data: {
         userId,
@@ -96,7 +108,7 @@ dockerDeploymentsRouter.post('/deployments/docker-image', async (req: AuthedRequ
         runtime: 'docker',
         sourceType: 'image',
         repoUrl: `image://${image}`,
-        exposureMode,
+        exposureMode: effectiveExposureMode,
         cpuLimit: cpuLimit ?? null,
         memoryLimit: memoryLimit ?? null,
         envVarsEncrypted,
@@ -111,7 +123,7 @@ dockerDeploymentsRouter.post('/deployments/docker-image', async (req: AuthedRequ
       subdomain,
       internalPort,
       envVars: envVars || {},
-      exposureMode,
+      exposureMode: effectiveExposureMode,
       cpuLimit,
       memLimitMb: memoryLimit,
     }).catch(async (err) => {
@@ -122,9 +134,18 @@ dockerDeploymentsRouter.post('/deployments/docker-image', async (req: AuthedRequ
         subdomain,
         internalPort,
         envVars,
-        exposureMode,
+        exposureMode: effectiveExposureMode,
       }, () => {});
     });
+
+    if (effectiveExposureMode !== 'internal_only' && subdomain && selectedNode.ip) {
+      try {
+        await createSubdomainRecord(subdomain, selectedNode.ip, true);
+        logger.info({ subdomain, ip: selectedNode.ip }, 'Auto-registered Cloudflare SSL proxy DNS record for docker image deployment');
+      } catch (dnsErr) {
+        logger.warn({ dnsErr, subdomain }, 'Cloudflare DNS auto-record registration skipped or failed');
+      }
+    }
 
     const updated = await prisma.deployment.update({
       where: { id: deployment.id },
@@ -154,7 +175,7 @@ dockerDeploymentsRouter.post('/deployments/docker-compose', async (req: AuthedRe
       return res.status(400).json({ error: 'Invalid payload', details: parseResult.error.flatten() });
     }
 
-    const { composeYaml, preferredName, envVars, nodeId: requestedNodeId } = parseResult.data;
+    const { composeYaml, preferredName, envVars, nodeId: requestedNodeId, exposureMode, configFiles, configFileContent, configFileName } = parseResult.data;
     const userId = req.user!.id;
 
     if (req.user!.role !== 'admin' && req.user!.role !== 'dev') {
@@ -197,6 +218,11 @@ dockerDeploymentsRouter.post('/deployments/docker-compose', async (req: AuthedRe
       return res.status(slotErr.statusCode || 403).json({ error: slotErr.message });
     }
 
+    const effectiveExposureMode = autoDetectExposureMode({
+      explicitMode: exposureMode,
+      composeYaml,
+    });
+
     const deployment = await prisma.deployment.create({
       data: {
         userId,
@@ -208,18 +234,35 @@ dockerDeploymentsRouter.post('/deployments/docker-compose', async (req: AuthedRe
         runtime: 'compose',
         sourceType: 'template',
         repoUrl: `compose://${preferredName}`,
-        exposureMode: 'ssl_with_proxy',
+        exposureMode: effectiveExposureMode,
         envVarsEncrypted,
       } as any,
       include: { node: true },
     });
+
+    const filesPayload = { ...(configFiles || {}) };
+    if (configFileContent) {
+      filesPayload[configFileName || 'config.yaml'] = configFileContent;
+    }
 
     const composeResult = await callNodeAgent(selectedNode, '/agent/compose/up', 'POST', {
       projectName: `proj-${deployment.id}`,
       deploymentId: deployment.id,
       composeYaml,
       envVars: envVars || {},
+      configFiles: filesPayload,
+      configFileContent,
+      configFileName,
     });
+
+    if (effectiveExposureMode !== 'internal_only' && subdomain && selectedNode.ip) {
+      try {
+        await createSubdomainRecord(subdomain, selectedNode.ip, true);
+        logger.info({ subdomain, ip: selectedNode.ip }, 'Auto-registered Cloudflare SSL proxy DNS record for docker compose deployment');
+      } catch (dnsErr) {
+        logger.warn({ dnsErr, subdomain }, 'Cloudflare DNS auto-record registration skipped or failed');
+      }
+    }
 
     const updated = await prisma.deployment.update({
       where: { id: deployment.id },

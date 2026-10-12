@@ -16,7 +16,6 @@ volumes:
   traefik-certs:
   traefik-dynamic:
   shanutechx-workspaces:
-  livekit-config:
   postgres-data:
 
 services:
@@ -83,7 +82,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - shanutechx-workspaces:/var/lib/shanutechx/workspaces
-      - livekit-config:/etc/livekit
       - traefik-dynamic:/etc/traefik/dynamic
     networks: [shanutechx-public, shanutechx-internal]
     depends_on: [buildkit]
@@ -118,18 +116,3 @@ services:
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
     networks: [shanutechx-internal]
-
-  livekit-server:
-    image: livekit/livekit-server:latest
-    container_name: livekit-server
-    restart: unless-stopped
-    command: ["--config", "/etc/livekit/livekit.yaml"]
-    volumes:
-      - livekit-config:/etc/livekit
-    networks: [shanutechx-public]
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.livekit.rule=Host(`livekit.${ROOT_DOMAIN}`)
-      - traefik.http.routers.livekit.entrypoints=websecure
-      - traefik.http.routers.livekit.tls.certresolver=le
-      - traefik.http.services.livekit.loadbalancer.server.port=7880
