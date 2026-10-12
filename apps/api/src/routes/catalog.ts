@@ -18,6 +18,7 @@ import { validateCustomSubdomain } from '../lib/subdomain';
 import { createSubdomainRecord } from '../lib/cloudflare';
 import { claimDeploymentSlot } from '../lib/deploymentSlots';
 import { autoDetectExposureMode } from '../lib/exposureDefaults';
+import { validateComposeSecurity } from '../lib/composeIsolation';
 
 export const catalogRouter = Router();
 catalogRouter.use('/catalog', requireAuth);
@@ -682,6 +683,12 @@ catalogRouter.post('/catalog/:slug', requireRole('admin', 'dev'), async (req: Au
       });
     }
 
+    // Enforce multi-tenant compose isolation security
+    const isolationCheck = validateComposeSecurity(yaml);
+    if (!isolationCheck.valid) {
+      return res.status(400).json({ error: isolationCheck.error || 'Template security validation failed' });
+    }
+
     // Build comment header from provided metadata
     const commentLines: string[] = [];
     if (name) commentLines.push(`# name: ${name}`);
@@ -806,6 +813,11 @@ catalogRouter.patch('/catalog/:slug', requireRole('admin', 'dev'), async (req: A
             error: 'Template validation failed', 
             details: validation.errors 
           });
+        }
+
+        const isolationCheck = validateComposeSecurity(updates.yaml);
+        if (!isolationCheck.valid) {
+          return res.status(400).json({ error: isolationCheck.error || 'Template security validation failed' });
         }
         
         finalYaml = updates.yaml;

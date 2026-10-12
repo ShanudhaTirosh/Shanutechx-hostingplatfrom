@@ -26,6 +26,7 @@ const { listDir, readFile, writeFile, writeBinaryFile, extractArchive, makeDir, 
 const { provisionProject, deprovisionProject, execSql, listTables, validateIdentifier, insertRow, updateRow, deleteRow } = require('./projects');
 
 const nodeEngine = require('./nodeEngine');
+const { validateAndHardenCompose, seedSharedPlugins, getCacheStatus, initializeSharedCache } = require('./isolationEngine');
 
 const PORT = process.env.AGENT_PORT || 5000;
 const AGENT_SECRET = process.env.NODE_AGENT_SECRET;
@@ -1537,17 +1538,23 @@ app.post('/agent/compose/up', async (req, res) => {
     return res.status(400).json({ error: 'composeYaml and projectName are required' });
   }
 
-  // Security check: block privileged mode, host network, and root host filesystem mounts
-  if (/privileged\s*:\s*true/i.test(composeYaml) || /volumes\s*:\s*.*\/:(?!\/)/i.test(composeYaml) || /network_mode\s*:\s*["']?host["']?/i.test(composeYaml)) {
-    return res.status(400).json({ error: 'Privileged containers, host networking, and root host mounts are forbidden.' });
-  }
-
   const safeProject = effectiveProject.replace(/[^a-z0-9-]/gi, '-').toLowerCase().slice(0, 60);
   const projectDir = `${COMPOSE_DIR}/${safeProject}`;
+
+  // Multi-tenant isolation & security validation
+  const validation = validateAndHardenCompose(composeYaml, safeProject, projectDir);
+  if (!validation.valid) {
+    logger.warn({ safeProject, error: validation.error }, 'Compose stack rejected by isolation engine');
+    return res.status(400).json({ error: validation.error });
+  }
+  const effectiveComposeYaml = validation.hardenedYaml || composeYaml;
 
   try {
     // Create project directory
     fs.mkdirSync(projectDir, { recursive: true });
+
+    // Pre-seed verified shared plugins into project directory (Lavalink, WordPress, etc.)
+    seedSharedPlugins(safeProject, projectDir, effectiveComposeYaml);
 
     // Write any provided config files (e.g. livekit.yaml, custom configs) into project directory
     const filesToWrite = { ...(configFiles || {}) };
@@ -1565,24 +1572,24 @@ app.post('/agent/compose/up', async (req, res) => {
     }
 
     // Ensure external networks declared in compose exist on the Docker host (e.g. shanutechx-public)
-    if (/shanutechx-public/i.test(composeYaml)) {
+    if (/shanutechx-public/i.test(effectiveComposeYaml)) {
       await execFileAsync('docker', ['network', 'create', 'shanutechx-public']).catch(() => {});
     }
 
     // Write env vars with auto-generated secrets
-    const resolvedEnv = resolveEnvVars(composeYaml, envVars || {});
+    const resolvedEnv = resolveEnvVars(effectiveComposeYaml, envVars || {});
     const envFileContent = Object.entries(resolvedEnv)
       .map(([k, v]) => `${k}="${String(v ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`)
       .join('\n');
 
-    fs.writeFileSync(`${projectDir}/docker-compose.yml`, composeYaml, 'utf8');
+    fs.writeFileSync(`${projectDir}/docker-compose.yml`, effectiveComposeYaml, 'utf8');
     if (envFileContent) fs.writeFileSync(`${projectDir}/.env`, envFileContent, 'utf8');
 
-    // Pull images first (so we can give a better error), then bring up
+    // Pull images first (Docker automatically shares & reuses immutable cached layers across tenants)
     await execFileAsync('docker', ['compose', '-p', safeProject, '-f', `${projectDir}/docker-compose.yml`, '--env-file', `${projectDir}/.env`, 'pull', '--quiet'], { cwd: projectDir });
     const { stdout, stderr } = await execFileAsync('docker', ['compose', '-p', safeProject, '-f', `${projectDir}/docker-compose.yml`, '--env-file', `${projectDir}/.env`, 'up', '-d', '--remove-orphans'], { cwd: projectDir });
 
-    logger.info({ safeProject }, 'Compose stack started');
+    logger.info({ safeProject }, 'Compose stack started with verified tenant isolation');
     res.status(201).json({
       ok: true,
       project: safeProject,
@@ -1593,6 +1600,37 @@ app.post('/agent/compose/up', async (req, res) => {
   } catch (err) {
     logger.error({ safeProject, err }, 'Failed to start compose stack');
     res.status(500).json({ error: err.stderr || err.message });
+  }
+});
+
+/**
+ * GET /agent/cache/status
+ * Returns shared image and plugin cache telemetry.
+ */
+app.get('/agent/cache/status', (_req, res) => {
+  try {
+    const status = getCacheStatus();
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /agent/cache/prewarm
+ * Pre-warms common template Docker images so all tenants share local layers.
+ */
+app.post('/agent/cache/prewarm', async (_req, res) => {
+  try {
+    const status = getCacheStatus();
+    const images = status.prewarmedImages || [];
+    const pulled = [];
+    for (const img of images) {
+      await execFileAsync('docker', ['pull', '--quiet', img]).then(() => pulled.push(img)).catch(() => {});
+    }
+    res.json({ ok: true, pulled });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

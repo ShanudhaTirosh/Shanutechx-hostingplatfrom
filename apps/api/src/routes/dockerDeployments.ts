@@ -12,6 +12,7 @@ import { callNodeAgent, buildAndRun } from '../lib/nodeAgentClient';
 import { claimDeploymentSlot } from '../lib/deploymentSlots';
 import { autoDetectExposureMode } from '../lib/exposureDefaults';
 import { createSubdomainRecord } from '../lib/cloudflare';
+import { validateComposeSecurity } from '../lib/composeIsolation';
 
 export const dockerDeploymentsRouter = Router();
 
@@ -187,9 +188,10 @@ dockerDeploymentsRouter.post('/deployments/docker-compose', async (req: AuthedRe
       }
     }
 
-    // Validate composeYaml to prevent host root mounts and privileged mode
-    if (/privileged\s*:\s*true/i.test(composeYaml) || /volumes\s*:\s*.*\/:(?!\/)/i.test(composeYaml) || /network_mode\s*:\s*["']?host["']?/i.test(composeYaml)) {
-      return res.status(400).json({ error: 'Privileged containers, host networking, and root host mounts are forbidden.' });
+    // Validate composeYaml for multi-tenant security and host isolation
+    const isolationCheck = validateComposeSecurity(composeYaml);
+    if (!isolationCheck.valid) {
+      return res.status(400).json({ error: isolationCheck.error || 'Invalid or insecure compose YAML' });
     }
 
     let selectedNode;
