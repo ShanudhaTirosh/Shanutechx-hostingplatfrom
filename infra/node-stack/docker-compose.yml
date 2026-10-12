@@ -14,16 +14,37 @@ networks:
 
 volumes:
   traefik-certs:
+  traefik-dynamic:
   shanutechx-workspaces:
   livekit-config:
+  postgres-data:
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: shanutechx-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shanutechx
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: shanutechx
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [shanutechx-internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shanutechx"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   traefik:
     image: traefik:v3.1
     restart: unless-stopped
     command:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
       - --certificatesresolvers.le.acme.httpchallenge=true
@@ -36,7 +57,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik-certs:/certs
-    networks: [shanutechx-public]
+      - traefik-dynamic:/etc/traefik/dynamic:ro
+    networks: [shanutechx-public, shanutechx-internal]
 
   buildkit:
     image: moby/buildkit:latest
@@ -48,17 +70,21 @@ services:
     build:
       context: ../..
       dockerfile: services/node-agent/Dockerfile
+    container_name: node-agent
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5000:5000"
+      - "5000:5000"
     env_file: .env
     environment:
       - AGENT_PUBLIC_NETWORK=shanutechx-public
       - BUILDKIT_HOST=docker-container://buildkit
+      - AGENT_RUNNING_IN_DOCKER=true
+      - AGENT_FORWARD_AUTH_HOST=node-agent
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - shanutechx-workspaces:/var/lib/shanutechx/workspaces
       - livekit-config:/etc/livekit
+      - traefik-dynamic:/etc/traefik/dynamic
     networks: [shanutechx-public, shanutechx-internal]
     depends_on: [buildkit]
 

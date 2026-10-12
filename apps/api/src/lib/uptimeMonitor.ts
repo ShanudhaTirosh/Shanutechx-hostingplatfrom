@@ -203,14 +203,22 @@ export async function runUptimeChecks(): Promise<{ checked: number; up: number; 
     const nodeCheck = await checkTcpPort(node.ip, nodePort, 3000);
     recordProbeTelemetry(`node-${node.id}`, nodeCheck.isUp, nodeCheck.responseTimeMs);
 
-    // Update node health timestamp
-    await prisma.node.update({
-      where: { id: node.id },
-      data: {
-        lastSeenAt: new Date(),
-        isActive: nodeCheck.isUp,
-      },
-    }).catch(() => {});
+    // BUG-086 FIX: Only refresh lastSeenAt when probe succeeds.
+    // Do not set isActive: false here, as doing so blinds nodeMonitor.ts
+    // from detecting heartbeats exceeding NODE_OFFLINE_THRESHOLD_MS and evacuating workloads.
+    if (nodeCheck.isUp) {
+      await prisma.node.update({
+        where: { id: node.id },
+        data: {
+          lastSeenAt: new Date(),
+        },
+      }).catch(() => {});
+    } else {
+      logger.warn(
+        { nodeId: node.id, ip: node.ip, error: nodeCheck.errorMessage },
+        'Node agent TCP probe failed during uptime check; awaiting watchdog failover evaluation'
+      );
+    }
   }
 
   // 3. Probe customer deployments

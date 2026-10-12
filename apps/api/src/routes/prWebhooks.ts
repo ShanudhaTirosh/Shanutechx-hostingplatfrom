@@ -81,7 +81,21 @@ prWebhooksRouter.post('/webhooks/pr-deploy', async (req: Request, res: Response)
       }
 
       if (['opened', 'synchronize', 'reopened'].includes(action)) {
-        logger.info({ repoFullName, prNumber, headBranch }, 'Triggering automated PR preview deployment');
+        // BUG-020 FIX: Restrict automated PR preview deployments to repository collaborators & owners
+        const authorAssociation = payload.pull_request?.author_association;
+        const trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+        if (authorAssociation && !trustedAssociations.includes(authorAssociation)) {
+          logger.warn(
+            { repoFullName, prNumber, authorAssociation },
+            'PR preview deployment skipped: untrusted PR author association'
+          );
+          return res.status(200).json({
+            ok: false,
+            message: `Preview deployment skipped: author association "${authorAssociation}" is not a repository collaborator`,
+          });
+        }
+
+        logger.info({ repoFullName, prNumber, headBranch, authorAssociation }, 'Triggering automated PR preview deployment');
 
         const candidates = getCanonicalRepoUrls('github', repoFullName);
         const parent = await prisma.deployment.findFirst({

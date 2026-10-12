@@ -16,6 +16,7 @@ import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector
 import { syncCatalogToFirebase } from '../lib/firebaseSync';
 import { validateCustomSubdomain } from '../lib/subdomain';
 import { createSubdomainRecord } from '../lib/cloudflare';
+import { claimDeploymentSlot } from '../lib/deploymentSlots';
 
 export const catalogRouter = Router();
 catalogRouter.use('/catalog', requireAuth);
@@ -239,6 +240,24 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
 
   const slug = parsed.data.slug || parsed.data.templateSlug!;
   const { nodeId: inputNodeId, envVars: customerEnvVars = {}, projectName, teamId } = parsed.data;
+  const userId = req.user!.id;
+  const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
+
+  // BUG-038 & BUG-004 FIX: Enforce active hosting subscription for non-staff customers
+  if (!isStaff) {
+    const activeSub = await prisma.subscription.findFirst({
+      where: {
+        userId,
+        status: 'active',
+        currentPeriodEnd: { gte: new Date() },
+      },
+    });
+    if (!activeSub) {
+      return res.status(403).json({
+        error: 'An active hosting subscription is required to deploy application catalog templates.',
+      });
+    }
+  }
 
   // Abuse protection scan on environment variables & project name
   const abuseScanText = JSON.stringify(customerEnvVars) + (projectName || '') + slug;
@@ -324,11 +343,23 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
   }
 
   // Pre-reserve deployment record in pending status
+  let claimedOrderItemId: string | null = null;
+  try {
+    const slot = await claimDeploymentSlot(req.user!.id, {
+      preferredOrderItemId: req.body.orderItemId,
+      isAdminOrDev: isAdmin,
+    });
+    claimedOrderItemId = slot.orderItemId;
+  } catch (slotErr: any) {
+    return res.status(slotErr.statusCode || 403).json({ error: slotErr.message });
+  }
+
   let deployment;
   try {
     deployment = await prisma.deployment.create({
       data: {
         userId: req.user!.id,
+        orderItemId: claimedOrderItemId,
         teamId: teamId ?? null,
         nodeId: node.id,
         status: 'pending',

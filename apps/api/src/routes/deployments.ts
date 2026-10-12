@@ -23,6 +23,7 @@ import { redactRepoUrl } from '../lib/redact';
 import { deploymentCreateLimiter } from '../middleware/rateLimit';
 
 import { scanTextForAbuse, banUserAndTeardownResources } from '../lib/abuseDetector';
+import { claimDeploymentSlot, getAvailableDeploymentSlots } from '../lib/deploymentSlots';
 
 export const deploymentsRouter = Router();
 
@@ -54,6 +55,7 @@ const createDeploymentSchema = z.object({
     'supabase_stack',
     'custom_docker',
   ]),
+  orderItemId: z.string().optional(),
   templateId: z.string().optional(),
   repoUrl: z.string().url().optional(),
   branch: z.string().regex(/^[a-zA-Z0-9_\-\/\.]+$/, 'Invalid branch name').max(100).optional(),
@@ -179,6 +181,18 @@ deploymentsRouter.post('/deployments', deploymentCreateLimiter, async (req: Auth
     data.exposureMode = 'ssl_with_proxy';
   }
 
+  // Enforce 1-to-1 purchase record slot binding (server-side)
+  let claimedOrderItemId: string | null = null;
+  try {
+    const slot = await claimDeploymentSlot(req.user!.id, {
+      preferredOrderItemId: data.orderItemId,
+      isAdminOrDev: callerIsAdminOrDev || Boolean(data.isAdminDeployment),
+    });
+    claimedOrderItemId = slot.orderItemId;
+  } catch (slotErr: any) {
+    return res.status(slotErr.statusCode || 403).json({ error: slotErr.message });
+  }
+
   // If creating a deployment in pending configuration state (e.g. Vercel-style draft creation)
   if (data.isPendingConfig || data.status === 'pending_configuration') {
     let node;
@@ -222,6 +236,7 @@ deploymentsRouter.post('/deployments', deploymentCreateLimiter, async (req: Auth
     const dep = await prisma.deployment.create({
       data: {
         userId: req.user!.id,
+        orderItemId: claimedOrderItemId,
         nodeId: node.id,
         repoUrl: data.repoUrl || null,
         gitAccountId: gitAccountId ?? null,
@@ -260,6 +275,7 @@ deploymentsRouter.post('/deployments', deploymentCreateLimiter, async (req: Auth
   try {
     const { deployment, subdomain } = await deployService({
       userId: req.user!.id,
+      orderItemId: claimedOrderItemId,
       serviceType: data.serviceType,
       repoUrl: data.repoUrl!,
       branch: data.branch,
@@ -400,6 +416,11 @@ deploymentsRouter.post('/deployments/:id/launch', async (req: AuthedRequest, res
   }
 });
 
+
+deploymentsRouter.get('/deployments/slots', async (req: AuthedRequest, res) => {
+  const result = await getAvailableDeploymentSlots(req.user!.id);
+  res.json(result);
+});
 
 deploymentsRouter.get('/deployments', async (req: AuthedRequest, res) => {
   // Admin scoped to assigned customers' deployments.
@@ -1558,6 +1579,7 @@ deploymentsRouter.patch('/deployments/:id/git-settings', async (req: AuthedReque
 const botHostingSchema = z.object({
   language: z.enum(['python', 'nodejs']),
   preferredName: z.string().min(1),
+  orderItemId: z.string().optional(),
   repoUrl: z.string().url().optional(),
   branch: z.string().optional().default('main'),
   entryFile: z.string().optional(),
@@ -1574,7 +1596,19 @@ deploymentsRouter.post('/deployments/bot-hosting', async (req: AuthedRequest, re
   const parsed = botHostingSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const { language, preferredName, repoUrl, branch, entryFile, startCommand, envVars, isPendingConfig } = parsed.data;
+  const { language, preferredName, repoUrl, branch, entryFile, startCommand, envVars, isPendingConfig, orderItemId } = parsed.data;
+
+  const callerIsAdminOrDev = req.user!.role === 'admin' || req.user!.role === 'dev';
+  let claimedOrderItemId: string | null = null;
+  try {
+    const slot = await claimDeploymentSlot(req.user!.id, {
+      preferredOrderItemId: orderItemId,
+      isAdminOrDev: callerIsAdminOrDev,
+    });
+    claimedOrderItemId = slot.orderItemId;
+  } catch (slotErr: any) {
+    return res.status(slotErr.statusCode || 403).json({ error: slotErr.message });
+  }
 
   const serviceType = language === 'python' ? 'discordbot_python' : 'discordbot_node';
   const frameworkPreset = language === 'python' ? 'python_bot' : 'nodejs_bot';
@@ -1599,6 +1633,7 @@ deploymentsRouter.post('/deployments/bot-hosting', async (req: AuthedRequest, re
   const dep = await prisma.deployment.create({
     data: {
       userId: req.user!.id,
+      orderItemId: claimedOrderItemId,
       nodeId: node.id,
       repoUrl: repoUrl ? sanitizeRepoUrlForStorage(repoUrl, (t) => encryptSecret(t, env.secretsEncryptionKey)).repoUrl : null,
       githubTokenEncrypted: repoUrl ? sanitizeRepoUrlForStorage(repoUrl, (t) => encryptSecret(t, env.secretsEncryptionKey)).githubTokenEncrypted ?? null : null,

@@ -9,6 +9,7 @@ import { logger } from '../lib/logger';
 import { encryptSecret } from '../lib/secretsVault';
 import { env } from '../env';
 import { callNodeAgent, buildAndRun } from '../lib/nodeAgentClient';
+import { claimDeploymentSlot } from '../lib/deploymentSlots';
 
 export const dockerDeploymentsRouter = Router();
 
@@ -23,6 +24,7 @@ const deployImageSchema = z.object({
   exposureMode: z.enum(['ssl_with_proxy', 'ssl_direct', 'no_ssl']).default('ssl_with_proxy'),
   cpuLimit: z.number().optional(),
   memoryLimit: z.number().optional(),
+  orderItemId: z.string().optional(),
 });
 
 const deployComposeSchema = z.object({
@@ -30,6 +32,7 @@ const deployComposeSchema = z.object({
   preferredName: z.string().min(1, 'Name is required'),
   envVars: z.record(z.string()).optional(),
   nodeId: z.string().optional(),
+  orderItemId: z.string().optional(),
 });
 
 /**
@@ -70,9 +73,22 @@ dockerDeploymentsRouter.post('/deployments/docker-image', async (req: AuthedRequ
     const subdomain = await generateSubdomain(preferredName);
     const envVarsEncrypted = envVars ? encryptSecret(JSON.stringify(envVars), env.secretsEncryptionKey) : null;
 
+    const callerIsAdminOrDev = req.user!.role === 'admin' || req.user!.role === 'dev';
+    let claimedOrderItemId: string | null = null;
+    try {
+      const slot = await claimDeploymentSlot(userId, {
+        preferredOrderItemId: req.body.orderItemId,
+        isAdminOrDev: callerIsAdminOrDev,
+      });
+      claimedOrderItemId = slot.orderItemId;
+    } catch (slotErr: any) {
+      return res.status(slotErr.statusCode || 403).json({ error: slotErr.message });
+    }
+
     const deployment = await prisma.deployment.create({
       data: {
         userId,
+        orderItemId: claimedOrderItemId,
         nodeId: selectedNode.id,
         subdomain,
         internalPort,
@@ -169,9 +185,22 @@ dockerDeploymentsRouter.post('/deployments/docker-compose', async (req: AuthedRe
     const subdomain = await generateSubdomain(preferredName);
     const envVarsEncrypted = envVars ? encryptSecret(JSON.stringify(envVars), env.secretsEncryptionKey) : null;
 
+    const callerIsAdminOrDev = req.user!.role === 'admin' || req.user!.role === 'dev';
+    let claimedOrderItemId: string | null = null;
+    try {
+      const slot = await claimDeploymentSlot(userId, {
+        preferredOrderItemId: req.body.orderItemId,
+        isAdminOrDev: callerIsAdminOrDev,
+      });
+      claimedOrderItemId = slot.orderItemId;
+    } catch (slotErr: any) {
+      return res.status(slotErr.statusCode || 403).json({ error: slotErr.message });
+    }
+
     const deployment = await prisma.deployment.create({
       data: {
         userId,
+        orderItemId: claimedOrderItemId,
         nodeId: selectedNode.id,
         subdomain,
         internalPort: 80,

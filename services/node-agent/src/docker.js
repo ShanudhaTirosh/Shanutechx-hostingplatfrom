@@ -83,6 +83,7 @@ async function runContainer({
       Memory: memLimitMb * 1024 * 1024,
       RestartPolicy: { Name: 'unless-stopped' },
       NetworkMode: networks[0] || 'bridge',
+      SecurityOpt: ['no-new-privileges:true'],
     },
     User: '1000:1000', // never run customer code as root
   };

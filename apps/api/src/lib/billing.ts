@@ -75,7 +75,18 @@ export async function runBillingChecks(): Promise<{ markedPastDue: number; cance
   while (true) {
     const subscriptions = await prisma.subscription.findMany({
       where: { status: { in: ['active', 'past_due'] } },
-      include: { user: true, orderItem: { include: { deployment: true } } },
+      include: {
+        user: true,
+        orderItem: {
+          include: {
+            deployment: true,
+            managedDatabase: true,
+            smtpAccount: true,
+            vpsProvision: true,
+            liveKitProject: true,
+          },
+        },
+      },
       take: 100,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       orderBy: { id: 'asc' },
@@ -120,6 +131,54 @@ export async function runBillingChecks(): Promise<{ markedPastDue: number; cance
               } catch (err) {
                 logger.error({ deploymentId: deployment.id, err }, 'Failed to suspend deployment for cancelled subscription');
               }
+            }
+
+            const managedDb = sub.orderItem?.managedDatabase;
+            if (managedDb && managedDb.status === 'running') {
+              try {
+                if (managedDb.containerId && managedDb.nodeId) {
+                  const node = await prisma.node.findUnique({ where: { id: managedDb.nodeId } });
+                  if (node) {
+                    await stopDeployment(node, managedDb.containerId).catch(() => {});
+                  }
+                }
+                await prisma.managedDatabase.update({
+                  where: { id: managedDb.id },
+                  data: { status: 'failed' },
+                });
+              } catch (err) {
+                logger.error({ managedDbId: managedDb.id, err }, 'Failed to suspend managed database for cancelled subscription');
+              }
+            }
+
+            const smtp = sub.orderItem?.smtpAccount;
+            if (smtp && !smtp.isSuspended) {
+              await prisma.smtpAccount.update({
+                where: { id: smtp.id },
+                data: { isSuspended: true },
+              }).catch((err) => {
+                logger.error({ smtpAccountId: smtp.id, err }, 'Failed to suspend SMTP account for cancelled subscription');
+              });
+            }
+
+            const vps = sub.orderItem?.vpsProvision;
+            if (vps && vps.status === 'provisioned') {
+              await prisma.vpsProvision.update({
+                where: { id: vps.id },
+                data: { status: 'terminated' },
+              }).catch((err) => {
+                logger.error({ vpsProvisionId: vps.id, err }, 'Failed to terminate VPS provision for cancelled subscription');
+              });
+            }
+
+            const lk = sub.orderItem?.liveKitProject;
+            if (lk && lk.isActive) {
+              await prisma.liveKitProject.update({
+                where: { id: lk.id },
+                data: { isActive: false },
+              }).catch((err) => {
+                logger.error({ liveKitProjectId: lk.id, err }, 'Failed to deactivate LiveKit project for cancelled subscription');
+              });
             }
 
             void notifyCustomer(sub.user, `Your subscription has been cancelled due to non-payment.`);

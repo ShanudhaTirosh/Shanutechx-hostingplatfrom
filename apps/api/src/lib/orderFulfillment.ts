@@ -10,6 +10,7 @@ import { selectNodeForDeployment } from './nodeSelector';
 import { registerLiveKitKey, provisionDatabaseContainer } from './nodeAgentClient';
 import { formatCurrency } from './currency';
 import { wildduckClient } from './wildduckClient';
+import { splitOrderItemsIntoUnits } from './deploymentSlots';
 import crypto from 'crypto';
 
 /**
@@ -22,6 +23,9 @@ import crypto from 'crypto';
  *    instead, a dedicated Discord Webhook alert is sent to team channels for manual setup.
  */
 export async function fulfillOrder(orderId: string): Promise<{ success: boolean; fulfilledItems: string[]; manualVpsItems: string[] }> {
+  // Ensure every purchased unit across all line items has its own dedicated OrderItem record
+  await splitOrderItemsIntoUnits(orderId);
+
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {

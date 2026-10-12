@@ -12,6 +12,7 @@ import { notifyDiscordChannel } from '../lib/discordWebhooks';
 import { fulfillOrder } from '../lib/orderFulfillment';
 import { sendInvoiceDeliveryNotification } from '../lib/notifications';
 import { logger } from '../lib/logger';
+import { splitOrderItemsIntoUnits } from '../lib/deploymentSlots';
 
 
 export const ordersRouter = Router();
@@ -221,6 +222,9 @@ ordersRouter.post('/cart/checkout', idempotent, async (req: AuthedRequest, res) 
   if (itemCount === 0) {
     return res.status(400).json({ error: 'Cart is empty' });
   }
+
+  // Split any multi-quantity items into distinct 1-unit records so each unit gets its own deployment slot
+  await splitOrderItemsIntoUnits(order.id);
 
   const { total, totalLkr, currency } = await recalculateTotal(order.id);
 

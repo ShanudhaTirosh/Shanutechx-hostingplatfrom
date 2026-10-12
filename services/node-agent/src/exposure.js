@@ -88,7 +88,8 @@ function resolveExposure({
     // first rule was added. WAF only applies here: direct_port/internal_only bypass Traefik entirely, so there is no
     // HTTP request for a forwardAuth check to intercept.
     if (agentPort && agentSecret) {
-      labels[`traefik.http.middlewares.${routerName}-waf.forwardauth.address`] = `http://127.0.0.1:${agentPort}/agent/waf-check/${deploymentId}?secret=${encodeURIComponent(agentSecret)}`;
+      const authHost = process.env.AGENT_FORWARD_AUTH_HOST || (process.env.AGENT_RUNNING_IN_DOCKER ? 'node-agent' : '127.0.0.1');
+      labels[`traefik.http.middlewares.${routerName}-waf.forwardauth.address`] = `http://${authHost}:${agentPort}/agent/waf-check/${deploymentId}?secret=${encodeURIComponent(agentSecret)}`;
       labels[`traefik.http.middlewares.${routerName}-waf.forwardauth.trustForwardHeader`] = 'true';
       const existing = labels[`traefik.http.routers.${routerName}.middlewares`];
       labels[`traefik.http.routers.${routerName}.middlewares`] = existing ? `${routerName}-waf@docker,${existing}` : `${routerName}-waf@docker`;

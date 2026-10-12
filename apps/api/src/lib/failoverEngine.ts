@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { prisma } from './prisma';
 import { selectNodeForDeployment } from './nodeSelector';
 import { buildAndRun, provisionDatabaseContainer, registerLiveKitKey } from './nodeAgentClient';
@@ -104,6 +106,51 @@ export async function evacuateNodeWorkloads(failedNodeId: string): Promise<Failo
         await createSubdomainRecord(dep.subdomain, targetNode.ip, isProxied).catch((dnsErr) => {
           logger.warn({ dnsErr, subdomain: dep.subdomain }, 'Cloudflare DNS record update warning during failover');
         });
+      }
+
+      // BUG-084 FIX: Handle Docker Compose app catalog templates without routing to git clone
+      if (dep.repoUrl && dep.repoUrl.startsWith('template:')) {
+        const slug = dep.repoUrl.replace(/^template:/, '');
+        const templatesDir = path.resolve(__dirname, '../../../../templates');
+        const filePath = path.join(templatesDir, `${slug}.yaml`);
+        const altPath = path.join(templatesDir, `${slug}.yml`);
+        const templatePath = fs.existsSync(filePath) ? filePath : fs.existsSync(altPath) ? altPath : null;
+
+        if (templatePath) {
+          const composeYaml = fs.readFileSync(templatePath, 'utf8');
+          const projectName = dep.containerId || dep.subdomain || `template-${dep.id}`;
+          const agentRes = await fetch(`http://${targetNode.ip}:${env.nodeAgentPort}/agent/compose/up`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-agent-secret': env.nodeAgentSecret,
+            },
+            body: JSON.stringify({ composeYaml, projectName, envVars: envVars || {} }),
+            signal: AbortSignal.timeout(120_000),
+          });
+
+          if (!agentRes.ok) {
+            const errText = await agentRes.text().catch(() => '');
+            throw new Error(`Failed to failover template compose stack: ${errText || agentRes.statusText}`);
+          }
+
+          await prisma.deployment.update({
+            where: { id: dep.id },
+            data: {
+              status: 'running',
+              lastDeployAt: new Date(),
+            },
+          });
+
+          void fireWebhook(dep.userId, 'deployment_status_changed', {
+            deploymentId: dep.id,
+            status: 'running',
+            migratedToNodeId: targetNode.id,
+          });
+
+          result.deploymentsMigrated++;
+          continue;
+        }
       }
 
       // Source URL: credential-free stored URL → fresh token resolved at build time (S06 fix).
@@ -216,11 +263,16 @@ export async function evacuateNodeWorkloads(failedNodeId: string): Promise<Failo
         password,
       });
 
+      const poolerPort = containerInfo.internalPort ? containerInfo.internalPort + 1000 : db.poolerPort;
+
       await prisma.managedDatabase.update({
         where: { id: db.id },
         data: {
           nodeId: targetDbNode.id,
           containerId: containerInfo.containerId,
+          internalHost: containerInfo.containerName || db.internalHost,
+          internalPort: containerInfo.internalPort || db.internalPort,
+          poolerPort,
           status: 'running',
         },
       });

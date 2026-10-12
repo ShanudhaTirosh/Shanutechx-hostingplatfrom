@@ -7,6 +7,7 @@ import { notifyCustomer } from './notifications';
 import { fireWebhook } from './webhooks';
 import { encryptSecret } from './secretsVault';
 import { extractEmbeddedToken, stripRepoCredentials } from './gitAuth';
+import { claimDeploymentSlot } from './deploymentSlots';
 import { env } from '../env';
 
 const SERVICE_TYPE_TO_TAG: Record<string, string> = {
@@ -23,6 +24,7 @@ const PUBLIC_SERVICE_TYPES = new Set(['web_hosting', 'node_hosting', 'python_hos
 
 interface DeployParams {
   userId: string;
+  orderItemId?: string | null;
   serviceType: string;
   repoUrl: string;
   branch?: string;
@@ -129,9 +131,16 @@ export async function deployService(params: DeployParams) {
     }
   }
 
+  let finalOrderItemId: string | null = params.orderItemId ?? null;
+  if (finalOrderItemId === null && !isPreview && !isAdminDeployment) {
+    const slot = await claimDeploymentSlot(userId, { isAdminOrDev: false });
+    finalOrderItemId = slot.orderItemId;
+  }
+
   const deployment = await prisma.deployment.create({
     data: {
       userId,
+      orderItemId: finalOrderItemId,
       nodeId: node.id,
       isAdminDeployment: Boolean(isAdminDeployment),
       repoUrl: stripRepoCredentials(repoUrl),

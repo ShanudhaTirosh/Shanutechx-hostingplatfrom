@@ -718,7 +718,41 @@ app.delete('/agent/livekit/keys/:apiKey', async (req, res) => {
 // ─────────────────────────────────────────────────
 const waf = require('./waf');
 const bcrypt = require('bcryptjs');
-const wafStateByDeployment = new Map(); // deploymentId -> { rules: WafRule[], protectionPasswordHash: string|null }
+
+const WAF_STATE_FILE = process.env.AGENT_WAF_STATE_FILE || path.join(process.env.AGENT_WORKSPACES_DIR || '/var/lib/shanutechx/workspaces', 'waf-rules.json');
+
+function loadPersistedWafState() {
+  const map = new Map();
+  try {
+    if (fs.existsSync(WAF_STATE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(WAF_STATE_FILE, 'utf8'));
+      if (typeof data === 'object' && data !== null) {
+        for (const [k, v] of Object.entries(data)) {
+          map.set(k, v);
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn({ err }, 'Failed to read persisted WAF state on node agent');
+  }
+  return map;
+}
+
+function persistWafState(map) {
+  try {
+    const obj = {};
+    for (const [k, v] of map.entries()) {
+      obj[k] = v;
+    }
+    const dir = path.dirname(WAF_STATE_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(WAF_STATE_FILE, JSON.stringify(obj, null, 2), 'utf8');
+  } catch (err) {
+    logger.warn({ err }, 'Failed to persist WAF state to disk on node agent');
+  }
+}
+
+const wafStateByDeployment = loadPersistedWafState(); // deploymentId -> { rules: WafRule[], protectionPasswordHash: string|null }
 const wafLimiter = new waf.RateLimiter();
 const passwordGate = new waf.PasswordGate((password, hash) => bcrypt.compare(password, hash));
 setInterval(() => wafLimiter.sweep(), 5 * 60 * 1000).unref();
@@ -728,10 +762,11 @@ app.post('/agent/deployments/:deploymentId/waf/sync', async (req, res) => {
   const rules = Array.isArray(req.body && req.body.rules) ? req.body.rules : [];
   const protectionPasswordHash = typeof (req.body && req.body.protectionPasswordHash) === 'string' ? req.body.protectionPasswordHash : null;
   wafStateByDeployment.set(deploymentId, { rules, protectionPasswordHash });
+  persistWafState(wafStateByDeployment);
   // A password that changed or was removed must stop matching a cached (now stale, or now nonexistent) credential
   // immediately -- without this the OLD password would keep working until the cache entry happened to fall out.
   passwordGate.invalidate(deploymentId);
-  logger.info({ deploymentId, rules: rules.length, passwordProtected: Boolean(protectionPasswordHash) }, 'WAF rules synced on node agent');
+  logger.info({ deploymentId, rules: rules.length, passwordProtected: Boolean(protectionPasswordHash) }, 'WAF rules synced and persisted on node agent');
   res.json({ ok: true, syncedAt: new Date().toISOString() });
 });
 

@@ -454,8 +454,25 @@ async function createDockerContainer({ name, image, env = [], ports = [], volume
     }
   }
 
+  const RESTRICTED_HOST_PATHS = [
+    '/var/run/docker.sock',
+    '/proc',
+    '/sys',
+    '/etc',
+    '/dev',
+    '/root',
+    '/',
+  ];
+
   const binds = Array.isArray(volumes)
-    ? volumes.filter((v) => v.hostPath && v.containerPath).map((v) => `${v.hostPath}:${v.containerPath}`)
+    ? volumes
+        .filter((v) => {
+          if (!v.hostPath || !v.containerPath) return false;
+          const normalized = path.normalize(v.hostPath).replace(/\\/g, '/').toLowerCase();
+          const isRestricted = RESTRICTED_HOST_PATHS.some((p) => normalized === p || normalized.startsWith(p + '/'));
+          return !isRestricted;
+        })
+        .map((v) => `${v.hostPath}:${v.containerPath}`)
     : [];
 
   const container = await docker.createContainer({
@@ -468,6 +485,7 @@ async function createDockerContainer({ name, image, env = [], ports = [], volume
       Binds: binds,
       RestartPolicy: { Name: 'unless-stopped' },
       NetworkMode: network || 'bridge',
+      SecurityOpt: ['no-new-privileges:true'],
     },
   });
 

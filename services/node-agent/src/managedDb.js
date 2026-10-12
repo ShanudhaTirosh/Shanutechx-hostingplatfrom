@@ -52,6 +52,7 @@ async function provisionDatabase({ databaseId, type, password }) {
     HostConfig: {
       NetworkMode: 'shanutechx-internal',
       RestartPolicy: { Name: 'unless-stopped' },
+      SecurityOpt: ['no-new-privileges:true'],
     },
   });
 
@@ -372,7 +373,8 @@ async function listDatabaseBackups({ databaseId }) {
  */
 async function restoreDatabase({ containerId, type, databaseId, backupId, masterPassword }) {
   ensureBackupDir();
-  const filename = backupId.endsWith('.dump') ? backupId : `${backupId}.dump`;
+  const safeBackupId = path.basename(backupId);
+  const filename = safeBackupId.endsWith('.dump') ? safeBackupId : `${safeBackupId}.dump`;
   const filePath = path.join(BACKUP_DIR, filename);
 
   if (!fs.existsSync(filePath)) {
@@ -397,10 +399,14 @@ async function restoreDatabase({ containerId, type, databaseId, backupId, master
       stream.on('error', reject);
       fileStream.on('error', reject);
     });
+    const inspectWrite = await writeExec.inspect();
+    if (inspectWrite.ExitCode !== 0) {
+      throw new Error(`Redis snapshot restore failed (exit ${inspectWrite.ExitCode})`);
+    }
     await container.restart().catch((err) => {
       console.warn('[node-agent:managedDb] Redis container restart error after restore:', err.message || err);
     });
-    return { ok: true, containerId, backupId, message: 'Redis snapshot restored and container restarted.' };
+    return { ok: true, containerId, backupId: safeBackupId, message: 'Redis snapshot restored and container restarted.' };
   }
 
   let cmd = [];
@@ -435,7 +441,12 @@ async function restoreDatabase({ containerId, type, databaseId, backupId, master
     fileStream.on('error', reject);
   });
 
-  return { ok: true, containerId, backupId, message: 'Database snapshot successfully restored.' };
+  const inspect = await exec.inspect();
+  if (inspect.ExitCode !== 0) {
+    throw new Error(`Database restore failed (exit ${inspect.ExitCode}): ${output.slice(-500)}`);
+  }
+
+  return { ok: true, containerId, backupId: safeBackupId, message: 'Database snapshot successfully restored.' };
 }
 
 module.exports = {
