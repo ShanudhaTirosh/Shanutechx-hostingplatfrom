@@ -377,7 +377,7 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
 
   const configFiles: Record<string, string> = { ...customerConfigFiles };
   if (configFileContent) {
-    const targetName = configFileName || (slug === 'livekit' ? 'livekit.yaml' : 'config.yaml');
+    const targetName = configFileName || (slug === 'livekit' ? 'livekit.yaml' : slug === 'lavalink' ? 'application.yml' : 'config.yaml');
     configFiles[targetName] = configFileContent;
   }
 
@@ -408,6 +408,92 @@ keys:
   ${lkKey}: ${lkSecret}
 logging:
   level: info
+`;
+    }
+  }
+
+  // Automated Lavalink v4 Audio Server Configuration & Password Management
+  if (slug === 'lavalink') {
+    const llPass = envVars['LAVALINK_PASSWORD'] || generatedSecrets['LAVALINK_PASSWORD'] || generateStrongSecret();
+    envVars['LAVALINK_PASSWORD'] = llPass;
+    generatedSecrets['LAVALINK_PASSWORD'] = llPass;
+
+    if (!configFiles['application.yml']) {
+      configFiles['application.yml'] = `server:
+  port: 2333
+  address: 0.0.0.0
+  http2:
+    enabled: false
+lavalink:
+  plugins:
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.5.2"
+      snapshot: false
+  server:
+    password: "${llPass}"
+    sources:
+      youtube: true
+      bandcamp: true
+      soundcloud: true
+      twitch: true
+      vimeo: true
+      http: true
+      local: false
+    filters:
+      volume: true
+      equalizer: true
+      karaoke: true
+      timescale: true
+      tremolo: true
+      vibrato: true
+      distortion: true
+      rotation: true
+      channelMix: true
+      lowPass: true
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    opusEncodingQuality: 10
+    resamplingQuality: LOW
+    trackStuckThresholdMs: 10000
+    useSeekGhosting: true
+    playerUpdateInterval: 5
+    youtubePlaylistLoadLimit: 6
+    youtubeSearchEnabled: true
+    soundcloudSearchEnabled: true
+    gc-warnings: true
+plugins:
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+    clients:
+      - MUSIC
+      - ANDROID
+      - WEB
+metrics:
+  prometheus:
+    enabled: false
+    endpoint: /metrics
+sentry:
+  dsn: ""
+  environment: ""
+logging:
+  file:
+    path: ./logs/
+  level:
+    root: INFO
+    lavalink: INFO
+  request:
+    enabled: true
+    includeClientInfo: true
+    includeHeaders: false
+    includeQueryString: true
+    includePayload: false
+    maxPayloadLength: 10000
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
 `;
     }
   }

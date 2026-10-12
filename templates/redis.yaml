@@ -16,7 +16,7 @@ services:
     image: redis:7-alpine
     command: redis-server --save 60 1 --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
     ports:
-      - "6379:6379"
+      - "${PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     environment:
@@ -28,11 +28,10 @@ services:
           cpus: '0.5'
           memory: 256M
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$REDIS_PASSWORD\" ping || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
   redis_data:
-

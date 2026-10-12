@@ -4,8 +4,8 @@
 # category: cms
 # tags: wordpress, cms, blog, website, mysql, mariadb
 # logo: https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg/wordpress.svg
-# port: 8080
-# defaultInternalPort: 8080
+# port: 80
+# defaultInternalPort: 80
 # requiresExposedPort: true
 # recommendedExposureMode: ssl_with_proxy
 
@@ -21,6 +21,8 @@ services:
       MYSQL_PASSWORD: ${WORDPRESS_DB_PASSWORD:?WORDPRESS_DB_PASSWORD must be set}
     volumes:
       - wordpress_db_data:/var/lib/mysql
+    networks:
+      - default
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
@@ -35,18 +37,27 @@ services:
 
   wordpress:
     image: wordpress:latest
-    ports:
-      - "8080:80"
     environment:
       - WORDPRESS_DB_HOST=db:3306
       - WORDPRESS_DB_NAME=${WORDPRESS_DB_NAME:-wordpress_db}
       - WORDPRESS_DB_USER=${WORDPRESS_DB_USER:-wp_user}
       - WORDPRESS_DB_PASSWORD=${WORDPRESS_DB_PASSWORD:?WORDPRESS_DB_PASSWORD must be set}
+      - WORDPRESS_CONFIG_EXTRA=define('WP_HOME','https://${COMPOSE_PROJECT_NAME}.${ROOT_DOMAIN}'); define('WP_SITEURL','https://${COMPOSE_PROJECT_NAME}.${ROOT_DOMAIN}'); if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && $$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') { $$_SERVER['HTTPS'] = 'on'; }
     volumes:
       - wordpress_html:/var/www/html
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - default
+      - shanutechx-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=shanutechx-public"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=le"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
       interval: 15s
@@ -63,3 +74,6 @@ volumes:
   wordpress_db_data:
   wordpress_html:
 
+networks:
+  shanutechx-public:
+    external: true

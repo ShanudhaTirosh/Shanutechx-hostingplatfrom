@@ -20,6 +20,8 @@ services:
       POSTGRES_DB: ${DB_POSTGRESDB_DATABASE:-n8n_db}
     volumes:
       - n8n_postgres_storage:/var/lib/postgresql/data
+    networks:
+      - default
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -U ${DB_POSTGRESDB_USER:-n8n}"]
       interval: 10s
@@ -34,14 +36,13 @@ services:
 
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
-    ports:
-      - "5678:5678"
     environment:
-      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_HOST=${COMPOSE_PROJECT_NAME}.${ROOT_DOMAIN}
       - N8N_PORT=5678
       - N8N_PROTOCOL=https
       - NODE_ENV=production
-      - WEBHOOK_URL=https://${N8N_HOST:-localhost}/
+      - WEBHOOK_URL=https://${COMPOSE_PROJECT_NAME}.${ROOT_DOMAIN}/
+      - N8N_EDITOR_BASE_URL=https://${COMPOSE_PROJECT_NAME}.${ROOT_DOMAIN}/
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
@@ -50,6 +51,16 @@ services:
       - DB_POSTGRESDB_PASSWORD=${DB_POSTGRESDB_PASSWORD:?DB_POSTGRESDB_PASSWORD must be set}
     volumes:
       - n8n_data:/home/node/.n8n
+    networks:
+      - default
+      - shanutechx-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=shanutechx-public"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=le"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=5678"
     healthcheck:
       test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:5678/healthz || exit 1"]
       interval: 15s
@@ -69,3 +80,6 @@ volumes:
   n8n_postgres_storage:
   n8n_data:
 
+networks:
+  shanutechx-public:
+    external: true

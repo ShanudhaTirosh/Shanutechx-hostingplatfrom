@@ -84,6 +84,61 @@ services:
     });
   });
 
+  describe('Full Catalog Templates Suite (templates/*)', () => {
+    const templatesDir = path.resolve(__dirname, '../../templates');
+    const webTemplates = [
+      { file: 'lavalink.yaml', port: 2333, configFile: './application.yml:/opt/Lavalink/application.yml:ro' },
+      { file: 'grafana.yaml', port: 3000 },
+      { file: 'uptime-kuma.yaml', port: 3001 },
+      { file: 'wordpress.yaml', port: 80 },
+      { file: 'n8n.yaml', port: 5678 },
+      { file: 'hermes-agent.yaml', port: 8080 },
+      { file: 'supabase-lite.yaml', port: 3000 },
+    ];
+
+    it('all 10 templates exist in the templates directory', () => {
+      const files = fs.readdirSync(templatesDir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
+      assert.equal(files.length, 10);
+    });
+
+    for (const t of webTemplates) {
+      it(`${t.file} adheres to zero-collision Traefik proxy and non-conflicting container/port rules`, () => {
+        const filePath = path.join(templatesDir, t.file);
+        const content = fs.readFileSync(filePath, 'utf8');
+
+        // Must recommend ssl_with_proxy
+        assert.match(content, /# recommendedExposureMode: ssl_with_proxy/);
+        // Must declare external shanutechx-public network
+        assert.match(content, /shanutechx-public:\s*\n\s*external:\s*true/);
+        // Must have Traefik labels
+        assert.match(content, /traefik\.enable=true/);
+        assert.match(content, /traefik\.docker\.network=shanutechx-public/);
+        assert.match(content, new RegExp(`loadbalancer\\.server\\.port=${t.port}`));
+        // Must not have fixed host port collision (e.g. "port:port")
+        assert.doesNotMatch(content, new RegExp(`"${t.port}:${t.port}"`));
+        // Must not have static container_name
+        assert.doesNotMatch(content, /container_name:\s*\$\{?[A-Z0-9_]+:-[a-z0-9_-]+\}?/);
+
+        if (t.configFile) {
+          assert.match(content, new RegExp(t.configFile.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+        }
+      });
+    }
+
+    it('redis.yaml has authenticated healthcheck and configurable port', () => {
+      const content = fs.readFileSync(path.join(templatesDir, 'redis.yaml'), 'utf8');
+      assert.match(content, /# recommendedExposureMode: raw_tcp/);
+      assert.match(content, /redis-cli -a \\"\$REDIS_PASSWORD\\" ping/);
+      assert.match(content, /volumes:\s*\n\s*redis_data:/);
+    });
+
+    it('mongodb.yaml has persistent volume and configurable port', () => {
+      const content = fs.readFileSync(path.join(templatesDir, 'mongodb.yaml'), 'utf8');
+      assert.match(content, /# recommendedExposureMode: raw_tcp/);
+      assert.match(content, /volumes:\s*\n\s*mongodb_data:/);
+    });
+  });
+
   describe('Node Stack Docker Compose Hygiene (infra/node-stack/docker-compose.yml)', () => {
     const nodeStackPath = path.resolve(__dirname, '../../infra/node-stack/docker-compose.yml');
 

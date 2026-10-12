@@ -309,9 +309,75 @@ logging:
   level: info
 `;
 
-  const [configFileName, setConfigFileName] = useState(tpl.slug === 'livekit' ? 'livekit.yaml' : '');
-  const [configFileContent, setConfigFileContent] = useState(tpl.slug === 'livekit' ? defaultLiveKitYaml : '');
-  const [showConfigEditor, setShowConfigEditor] = useState(tpl.slug === 'livekit');
+  const defaultLavalinkYaml = `# Lavalink v4 Audio Server Configuration
+server:
+  port: 2333
+  address: 0.0.0.0
+  http2:
+    enabled: false
+lavalink:
+  plugins:
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.5.2"
+      snapshot: false
+  server:
+    password: "\${LAVALINK_PASSWORD}"
+    sources:
+      youtube: true
+      bandcamp: true
+      soundcloud: true
+      twitch: true
+      vimeo: true
+      http: true
+      local: false
+    filters:
+      volume: true
+      equalizer: true
+      karaoke: true
+      timescale: true
+      tremolo: true
+      vibrato: true
+      distortion: true
+      rotation: true
+      channelMix: true
+      lowPass: true
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    opusEncodingQuality: 10
+    resamplingQuality: LOW
+    trackStuckThresholdMs: 10000
+    useSeekGhosting: true
+    playerUpdateInterval: 5
+    youtubePlaylistLoadLimit: 6
+    youtubeSearchEnabled: true
+    soundcloudSearchEnabled: true
+    gc-warnings: true
+plugins:
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+    clients:
+      - MUSIC
+      - ANDROID
+      - WEB
+metrics:
+  prometheus:
+    enabled: false
+    endpoint: /metrics
+logging:
+  level:
+    root: INFO
+    lavalink: INFO
+`;
+
+  const initialConfigName = tpl.slug === 'livekit' ? 'livekit.yaml' : tpl.slug === 'lavalink' ? 'application.yml' : '';
+  const initialConfigContent = tpl.slug === 'livekit' ? defaultLiveKitYaml : tpl.slug === 'lavalink' ? defaultLavalinkYaml : '';
+  const initialShowEditor = tpl.slug === 'livekit' || tpl.slug === 'lavalink';
+
+  const [configFileName, setConfigFileName] = useState(initialConfigName);
+  const [configFileContent, setConfigFileContent] = useState(initialConfigContent);
+  const [showConfigEditor, setShowConfigEditor] = useState(initialShowEditor);
   const configFileRef = useRef<HTMLInputElement>(null);
 
   const [selectedScope, setSelectedScope] = useState<string>('personal');
@@ -753,10 +819,13 @@ logging:
                           className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs font-mono text-white focus:outline-none focus:border-cyan-500 flex-1 max-w-xs"
                         />
                       </div>
-                      {tpl.slug === 'livekit' && (
+                      {(tpl.slug === 'livekit' || tpl.slug === 'lavalink') && (
                         <button
                           type="button"
-                          onClick={() => setConfigFileContent(defaultLiveKitYaml)}
+                          onClick={() => {
+                            if (tpl.slug === 'livekit') setConfigFileContent(defaultLiveKitYaml);
+                            else if (tpl.slug === 'lavalink') setConfigFileContent(defaultLavalinkYaml);
+                          }}
                           className="text-[10px] text-text-faint hover:text-cyan-400 underline"
                         >
                           Reset defaults

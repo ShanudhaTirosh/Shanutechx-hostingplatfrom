@@ -14,10 +14,7 @@ version: '3.8'
 services:
   hermes-agent:
     image: hermesagent/hermes-agent:latest
-    container_name: ${HERMES_CONTAINER_NAME:-hermes-agent}
     restart: unless-stopped
-    ports:
-      - "${PORT:-8080}:8080"
     environment:
       - PORT=8080
       - NODE_ENV=production
@@ -25,6 +22,16 @@ services:
       - HERMES_SECRET_KEY=${HERMES_SECRET_KEY:?HERMES_SECRET_KEY is required}
       - REDIS_URL=redis://hermes-redis:6379
       - VECTOR_STORE_URL=http://hermes-vector:6333
+    networks:
+      - default
+      - shanutechx-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=shanutechx-public"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=le"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
     healthcheck:
       test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1"]
       interval: 15s
@@ -43,9 +50,12 @@ services:
 
   hermes-redis:
     image: redis:7-alpine
-    container_name: ${HERMES_CONTAINER_NAME:-hermes}-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - default
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -59,10 +69,11 @@ services:
 
   hermes-vector:
     image: qdrant/qdrant:latest
-    container_name: ${HERMES_CONTAINER_NAME:-hermes}-vector
     restart: unless-stopped
-    ports:
-      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - default
     healthcheck:
       test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:6333/readyz || exit 1"]
       interval: 10s
@@ -74,3 +85,10 @@ services:
           cpus: '1.0'
           memory: 512M
 
+volumes:
+  redis_data:
+  qdrant_data:
+
+networks:
+  shanutechx-public:
+    external: true

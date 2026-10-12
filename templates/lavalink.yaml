@@ -7,22 +7,31 @@
 # port: 2333
 # defaultInternalPort: 2333
 # requiresExposedPort: true
-# recommendedExposureMode: raw_tcp
+# recommendedExposureMode: ssl_with_proxy
 
 version: '3.8'
 
 services:
   lavalink:
     image: ghcr.io/lavalink-devs/lavalink:4-alpine
-    ports:
-      - "2333:2333"
+    restart: always
+    volumes:
+      - ./application.yml:/opt/Lavalink/application.yml:ro
+      - lavalink_plugins:/opt/Lavalink/plugins
     environment:
       - LAVALINK_SERVER_PASSWORD=${LAVALINK_PASSWORD:?LAVALINK_PASSWORD must be set}
       - SERVER_PORT=2333
       - OPUS_ENCODING=true
-    volumes:
-      - lavalink_config:/opt/Lavalink/application.yml
-    restart: always
+    networks:
+      - default
+      - shanutechx-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=shanutechx-public"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=le"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=2333"
     deploy:
       resources:
         limits:
@@ -35,5 +44,8 @@ services:
       retries: 3
 
 volumes:
-  lavalink_config:
+  lavalink_plugins:
 
+networks:
+  shanutechx-public:
+    external: true
