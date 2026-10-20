@@ -224,7 +224,11 @@ export async function sendSmtpEmail(
             if (hasAttachments && mail.attachments) {
               for (const att of mail.attachments) {
                 const mimeType = att.contentType || 'application/octet-stream';
-                const base64Data = att.content ? att.content.replace(/^data:[^;]+;base64,/, '') : '';
+                // Wrap at 76 chars (RFC 2045). An unwrapped attachment is ONE line of tens of thousands of
+                // characters, beyond the 998-char SMTP line limit: strict servers reject or mangle it.
+                const base64Data = att.content
+                  ? (att.content.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '').match(/.{1,76}/g) ?? []).join('\r\n')
+                  : '';
                 rawLines.push(
                   ``,
                   `--${mixedBoundary}`,

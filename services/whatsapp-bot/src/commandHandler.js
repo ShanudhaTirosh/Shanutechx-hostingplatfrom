@@ -8,6 +8,7 @@ const rateLimiter = new RateLimiter(6, 60000); // 6 commands per minute per phon
 async function apiFetch(path, options = {}) {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
+      signal: AbortSignal.timeout(10000), // never let a hung API stall the bot
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -25,8 +26,27 @@ async function apiFetch(path, options = {}) {
   }
 }
 
-// In-memory state machine for interactive ticket creation menus per phone number
+// In-memory state machine for interactive ticket creation menus per phone number.
+// Entries expire so a forgotten menu can't capture a user's messages days later.
 const userPendingMenu = new Map();
+const PENDING_TTL_MS = 10 * 60 * 1000;
+
+function setPending(phone, state) {
+  if (userPendingMenu.size > 1000) {
+    const now = Date.now();
+    for (const [k, v] of userPendingMenu) if (now - v.at > PENDING_TTL_MS) userPendingMenu.delete(k);
+  }
+  userPendingMenu.set(phone, { ...state, at: Date.now() });
+}
+
+// Send the anti-spam notice at most once per window, otherwise a flooder
+// makes the bot reply to every message and clogs the outbound queue.
+const spamWarnedAt = new Map();
+
+async function isStaffUser(phone) {
+  const data = await apiFetch(`/api/internal/customer-summary?phone=${encodeURIComponent(phone)}`);
+  return Boolean(data && data.user && ['admin', 'dev', 'support'].includes(data.user.role));
+}
 
 const FAQ_RESPONSES = {
   deploy: `*Deploying Apps on ShanuTechX*\n\n1. Log into https://${process.env.ROOT_DOMAIN || 'shanutechx.com'}/dashboard\n2. Click *New Deployment* and select your Git repository or Docker image.\n3. Configure your environment variables and port exposure.\n4. Click *Deploy*! Autonomous container provisioning takes under 30 seconds.`,
@@ -37,11 +57,33 @@ const FAQ_RESPONSES = {
 };
 
 async function handleCommand(senderPhone, messageText) {
-  const text = messageText.trim();
-  const cleanPhone = senderPhone.replace(/[^0-9]/g, '');
+  const trimmed = String(messageText || '').trim();
+  // Phone keyboards auto-capitalise ("!Status", "Hi"): make only the command word
+  // case-insensitive and leave the arguments untouched.
+  const cmd = trimmed.match(/^([!/]\S+)([\s\S]*)$/);
+  const text = cmd ? cmd[1].toLowerCase() + cmd[2] : trimmed;
+  // "9477...:12@s.whatsapp.net" -> strip the companion-device suffix before taking digits.
+  const cleanPhone = String(senderPhone).split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+  if (!cleanPhone) return null;
 
   if (rateLimiter.isRateLimited(cleanPhone)) {
+    const now = Date.now();
+    if (spamWarnedAt.size > 1000) {
+      for (const [k, t] of spamWarnedAt) if (now - t > 60000) spamWarnedAt.delete(k);
+    }
+    if (now - (spamWarnedAt.get(cleanPhone) || 0) < 60000) return null;
+    spamWarnedAt.set(cleanPhone, now);
     return `[ANTI-SPAM] You are sending commands too fast. Please wait a minute.`;
+  }
+
+  // A real command always wins over (and cancels) a half-finished ticket menu,
+  // instead of being swallowed as an "invalid category".
+  if (userPendingMenu.has(cleanPhone) && /^[!/]/.test(text)) {
+    userPendingMenu.delete(cleanPhone);
+  }
+  const pendingEntry = userPendingMenu.get(cleanPhone);
+  if (pendingEntry && Date.now() - pendingEntry.at > PENDING_TTL_MS) {
+    userPendingMenu.delete(cleanPhone);
   }
 
   // Handle pending interactive menu choice for tickets
@@ -53,7 +95,7 @@ async function handleCommand(senderPhone, messageText) {
       const categories = { '1': 'support', '2': 'billing', '3': 'purchase', '4': 'other' };
       if (categories[choice]) {
         const category = categories[choice];
-        userPendingMenu.set(cleanPhone, { step: 'ENTER_DETAILS', category });
+        setPending(cleanPhone, { step: 'ENTER_DETAILS', category });
         return `Selected category: *${category.toUpperCase()}*\n\nPlease reply with your ticket subject and details in this format:\n\`Subject | Detailed message\``;
       } else {
         userPendingMenu.delete(cleanPhone);
@@ -81,6 +123,7 @@ async function handleCommand(senderPhone, messageText) {
       if (res._error) {
         return `Failed to create ticket: ${res.error}`;
       }
+      if (!res.ticket) return `Failed to create ticket: unexpected response from the platform.`;
 
       return `*Support Ticket Created Successfully!*\n\n• *Ticket ID*: \`#${res.ticket.id.slice(0, 8).toUpperCase()}\`\n• *Category*: ${res.ticket.category.toUpperCase()}\n• *Subject*: ${res.ticket.subject}\n• *Status*: OPEN\n\nA support agent will reply shortly. You can send replies to this ticket using:\n\`!reply ${res.ticket.id.slice(0, 8)} your message\``;
     }
@@ -100,14 +143,14 @@ async function handleCommand(senderPhone, messageText) {
       return `*ShanuTechX Deployments*\n\nNo active deployments found linked to (+${cleanPhone}).`;
     }
     const list = data.deployments
-      .map((d) => `• *${d.name}*: ${d.status.toUpperCase()} (${d.publicUrl || 'internal'})`)
+      .map((d) => `• *${d.name || d.subdomain || d.id}*: ${String(d.status).toUpperCase()} (${d.publicUrl || d.customDomain || 'internal'})`)
       .join('\n');
     return `*Your Active Deployments*\n\n${list}`;
   }
 
   // 3. Ticket Interactive Menu & Commands
-  if (text === '!ticket' || text === '/ticket' || text === '!ticket open') {
-    userPendingMenu.set(cleanPhone, { step: 'SELECT_CATEGORY' });
+  if (text === '!ticket' || text === '/ticket' || text.toLowerCase() === '!ticket open') {
+    setPending(cleanPhone, { step: 'SELECT_CATEGORY' });
     return `*ShanuTechX Support Ticket System*\n\nPlease select a ticket category by replying with a number:\n\n1. *Support* - Technical issues & container errors\n2. *Billing* - Invoices, payments & subscriptions\n3. *Purchase* - Plan upgrades & new orders\n4. *Other* - General inquiries\n\nOr open directly using:\n\`!ticket open [category] [subject] | [message]\``;
   }
 
@@ -142,6 +185,7 @@ async function handleCommand(senderPhone, messageText) {
     if (res._error) {
       return `Failed to create ticket: ${res.error}`;
     }
+    if (!res.ticket) return `Failed to create ticket: unexpected response from the platform.`;
 
     return `*Support Ticket Created Successfully!*\n\n• *Ticket ID*: \`#${res.ticket.id.slice(0, 8).toUpperCase()}\`\n• *Category*: ${res.ticket.category.toUpperCase()}\n• *Subject*: ${res.ticket.subject}\n• *Status*: OPEN\n\nA support agent will reply shortly. You can send replies using:\n\`!reply ${res.ticket.id.slice(0, 8)} your message\``;
   }
@@ -205,6 +249,7 @@ async function handleCommand(senderPhone, messageText) {
         ticketId,
         rating,
         feedback,
+        senderPhone: cleanPhone,
       }),
     });
 
@@ -214,11 +259,6 @@ async function handleCommand(senderPhone, messageText) {
 
     return `Thank you! Your ${rating}-star rating has been recorded for ticket #${ticketId.slice(0, 8).toUpperCase()}.`;
   }
-
-async function isStaffUser(phone) {
-  const data = await apiFetch(`/api/internal/customer-summary?phone=${encodeURIComponent(phone)}`);
-  return Boolean(data && data.user && ['admin', 'dev', 'support'].includes(data.user.role));
-}
 
   // 7. Staff Commands (Claim, Unclaim, Close, Broadcast, Invoice)
   const isStaffCommand =
@@ -236,10 +276,10 @@ async function isStaffUser(phone) {
   }
 
   if (text.startsWith('!claim ')) {
-    const ticketId = text.slice('!claim '.length).trim();
+    const [ticketId, ...claimFlags] = text.slice('!claim '.length).trim().split(/\s+/);
     const res = await apiFetch('/api/internal/claim-ticket', {
       method: 'POST',
-      body: JSON.stringify({ ticketId, staffPhone: cleanPhone, force: text.includes('--force') }),
+      body: JSON.stringify({ ticketId, staffPhone: cleanPhone, force: claimFlags.includes('--force') }),
     });
     if (res._error) return `Failed to claim ticket: ${res.error}`;
     return `*Ticket #${ticketId.slice(0, 8).toUpperCase()} Claimed Successfully*`;
@@ -274,14 +314,19 @@ async function isStaffUser(phone) {
     const res = await apiFetch('/api/internal/announcements/send', {
       method: 'POST',
       body: JSON.stringify({
-        platforms: ['whatsapp'],
+        targetPlatform: 'whatsapp',
         title: 'Platform Announcement',
         message,
         authorName: `Staff (+${cleanPhone})`,
       }),
     });
     if (res._error) return `Broadcast failed: ${res.error}`;
-    return `*WhatsApp Broadcast Queued Successfully* (${res.deliveredCount || 0} recipients)`;
+    const queued = res.deliveredCount || 0;
+    if (res.truncated) {
+      // Broadcasts are capped (WhatsApp throttles bulk senders): never let staff think everyone got it.
+      return `*WhatsApp Broadcast Queued* - only ${queued} of ${res.totalRecipients} customers (per-broadcast limit reached). The rest did NOT receive it.`;
+    }
+    return `*WhatsApp Broadcast Queued Successfully* (${queued} recipients)`;
   }
 
   if (text.startsWith('!invoice ')) {
@@ -291,7 +336,7 @@ async function isStaffUser(phone) {
     const amount = parseFloat(parts[1]);
     const description = parts.slice(2).join(' ') || 'Platform Hosting Service';
 
-    if (!userEmail || isNaN(amount)) {
+    if (!userEmail || !Number.isFinite(amount) || amount <= 0) {
       return `Usage: \`!invoice [userEmail] [amount] [description]\``;
     }
 
@@ -317,7 +362,7 @@ async function isStaffUser(phone) {
   }
 
   // 9. Help Command
-  if (text.startsWith('!help') || text.startsWith('/help') || text === 'help' || text === 'hi' || text === 'hello') {
+  if (text.startsWith('!help') || text.startsWith('/help') || lowerText === 'help' || lowerText === 'hi' || lowerText === 'hello') {
     return `*ShanuTechX WhatsApp Virtual Assistant*\n\n` +
       `*Customer Commands:*\n` +
       `• *!status* - Check cloud cluster system health\n` +

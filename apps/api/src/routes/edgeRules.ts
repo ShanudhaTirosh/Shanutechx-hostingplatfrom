@@ -2,11 +2,12 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
-import { canAccessResource } from '../middleware/rbac';
+import { canAccessResource, accessActionForRequest } from '../middleware/rbac';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const edgeRulesRouter = Router();
 
-edgeRulesRouter.use(requireAuth);
+useForOwnRoutes(edgeRulesRouter, requireAuth);
 
 async function loadOwnedDeployment(req: AuthedRequest, id: string) {
   const deployment = await prisma.deployment.findUnique({
@@ -14,7 +15,7 @@ async function loadOwnedDeployment(req: AuthedRequest, id: string) {
     include: { node: true },
   });
   if (!deployment) return null;
-  if (!(await canAccessResource(deployment.userId, req))) return null;
+  if (!(await canAccessResource(deployment.userId, req, undefined, undefined, accessActionForRequest(req)))) return null;
   return deployment;
 }
 

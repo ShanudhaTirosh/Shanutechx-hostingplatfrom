@@ -67,7 +67,12 @@ export function ProfileScreen() {
       Alert.alert('Invalid URL', 'Please enter a valid API URL');
       return;
     }
-    await setServerUrl(clean);
+    try {
+      await setServerUrl(clean);
+    } catch (e: any) {
+      Alert.alert('Invalid server URL', e?.message ?? 'Could not save the server URL.');
+      return;
+    }
     setModalVisible(false);
     Alert.alert('Server Updated', `Active API endpoint set to:\n${clean}`);
   }

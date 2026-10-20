@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 /**
  * The category-aware product catalog (Product + Plan).
  * Legacy `/services` routes keep working untouched; checkout flows use this.
@@ -46,7 +47,7 @@ productsRouter.get('/products/:id', async (req, res) => {
 });
 
 // ── Admin/dev-managed CRUD ──────────────────────────────────────────────────
-productsRouter.use(requireAuth);
+useForOwnRoutes(productsRouter, requireAuth);
 
 function slugify(name: string): string {
   return name

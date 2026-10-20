@@ -1,11 +1,12 @@
 import { Router, Response } from 'express';
 import { env } from '../env';
-import { requireStaff, AuthedRequest } from '../middleware/auth';
+import { requireAuth, requireStaff, AuthedRequest } from '../middleware/auth';
 import { logger } from '../lib/logger';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const botAdminRouter = Router();
 
-botAdminRouter.use(requireStaff);
+useForOwnRoutes(botAdminRouter, requireAuth, requireStaff);
 
 async function postInternalBot(url: string, secret: string, body?: object): Promise<{ ok: boolean; status: number; data: any }> {
   try {

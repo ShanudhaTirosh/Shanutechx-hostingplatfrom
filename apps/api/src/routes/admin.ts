@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdmin, requireDev, AuthedRequest } from '../middleware/auth';
 import { parsePagination } from '../lib/pagination';
+import { canImpersonate } from '../lib/impersonation';
 
 import { banUserAndTeardownResources, unbanUser } from '../lib/abuseDetector';
 import { fullFirebaseDataMigration, syncProductsToFirebase, syncPanelSettingsToFirebase } from '../lib/firebaseSync';
@@ -229,6 +230,14 @@ adminRouter.patch('/admin/staff/:userId/role', async (req: AuthedRequest, res) =
     });
   }
 
+  // Changing an ADMIN account's role (e.g. demoting another admin) is an administrative-role change
+  // too: only dev may do it, matching the rule for assigning admin/dev below.
+  if (target.role === 'admin' && req.user!.role !== 'dev') {
+    return res.status(403).json({
+      error: 'Only the platform dev account can change the role of an admin account.',
+    });
+  }
+
   if (['dev', 'admin'].includes(parsed.data.role) && req.user!.role !== 'dev') {
     return res.status(403).json({
       error: 'Only the platform dev account can assign administrative roles (admin or dev).',
@@ -339,7 +348,7 @@ adminRouter.post('/admin/users/:userId/ban', async (req: AuthedRequest, res) => 
   }
 
   const { canAccessResource } = await import('../middleware/rbac');
-  if (!(await canAccessResource(targetUser.id, req))) {
+  if (!(await canAccessResource(targetUser.id, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'User not found' });
   }
 
@@ -370,7 +379,7 @@ adminRouter.post('/admin/users/:userId/unban', async (req: AuthedRequest, res) =
   if (!targetUser) return res.status(404).json({ error: 'User not found' });
 
   const { canAccessResource } = await import('../middleware/rbac');
-  if (!(await canAccessResource(targetUser.id, req))) {
+  if (!(await canAccessResource(targetUser.id, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'User not found' });
   }
 
@@ -417,6 +426,12 @@ adminRouter.post('/admin/impersonate/:userId', async (req: AuthedRequest, res) =
 
   if (target.isBanned) {
     return res.status(400).json({ error: 'Cannot impersonate a banned user' });
+  }
+
+  // Customers only, and admins only for customers assigned to them (dev is unrestricted). This also
+  // stops the endpoint from returning the profile of staff accounts.
+  if (!canImpersonate({ id: req.user!.id, role: req.user!.role }, target)) {
+    return res.status(403).json({ error: 'You can only impersonate active customer accounts assigned to you' });
   }
 
   await prisma.auditLog.create({

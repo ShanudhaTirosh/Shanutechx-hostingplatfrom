@@ -20,11 +20,22 @@ let connectionState = 'disconnected';
 
 const baileysLogger = pino({ level: 'warn' });
 
+// pino-pretty is not a declared dependency of this service (it only exists in the repo-root
+// node_modules by hoisting). In the Docker image it is missing and pino() throws at startup,
+// so only use it when it can actually be resolved.
+function prettyTransport() {
+  if (process.env.NODE_ENV === 'production') return {};
+  try {
+    require.resolve('pino-pretty');
+  } catch (_) {
+    return {};
+  }
+  return { transport: { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:standard', ignore: 'pid,hostname' } } };
+}
+
 const appLogger = pino({
   level: process.env.LOG_LEVEL || 'info',
-  ...(process.env.NODE_ENV !== 'production'
-    ? { transport: { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:standard', ignore: 'pid,hostname' } } }
-    : {}),
+  ...prettyTransport(),
 });
 
 async function connect() {
@@ -71,7 +82,10 @@ async function connect() {
     if (connection === 'close') {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
-      connectionState = loggedOut ? 'logged_out' : 'reconnecting';
+      // Another device/instance took over this session: reconnecting would just make the two
+      // fight forever (endless 5s flap loop), so stop and wait for an explicit /internal/reconnect.
+      const replaced = statusCode === DisconnectReason.connectionReplaced;
+      connectionState = loggedOut ? 'logged_out' : replaced ? 'replaced' : 'reconnecting';
       currentQr = null;
       currentQrDataUrl = null;
 
@@ -79,6 +93,8 @@ async function connect() {
         if (loggedOut) {
           appLogger.error('WhatsApp session logged out. Resetting auth folder.');
           await resetSession();
+        } else if (replaced) {
+          appLogger.error('WhatsApp session was replaced by another connection. Not reconnecting automatically.');
         } else {
           appLogger.warn({ statusCode }, 'WhatsApp connection closed, reconnecting in 5s...');
           setTimeout(() => {

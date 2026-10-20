@@ -30,11 +30,12 @@ import {
   saveMailboxAvatar,
   deleteLocalAvatarIfExists,
 } from '../lib/avatarUpload';
+import { useForOwnRoutes } from '../lib/routerGuard';
 
 export const emailRouter = Router();
 
 // All endpoints require authentication
-emailRouter.use(requireAuth);
+useForOwnRoutes(emailRouter, requireAuth);
 
 /**
  * GET /api/email/mailboxes
@@ -2031,7 +2032,11 @@ emailRouter.post('/admin/email/send-renewal-reminders', requireAdminOrDev, async
 emailRouter.get('/email/domains/:id/dns', async (req: AuthedRequest, res) => {
   try {
     const domainRecord = await prisma.emailDomain.findUnique({ where: { id: req.params.id } });
-    if (!domainRecord) {
+    // Owner or admin/dev only (same rule as POST /email/domains/:id/verify). Other customers get a
+    // 404 so a record id doesn't reveal another tenant's domain name or verification status.
+    const isOwner = domainRecord?.userId === req.user!.id;
+    const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
+    if (!domainRecord || (!isOwner && !isStaff)) {
       return res.status(404).json({ error: 'Domain record not found' });
     }
 

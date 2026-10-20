@@ -4,8 +4,9 @@ import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const notificationsRouter = Router();
-notificationsRouter.use(requireAuth);
+useForOwnRoutes(notificationsRouter, requireAuth);
 
 const createChannelSchema = z.object({
   name: z.string().min(1).max(100),

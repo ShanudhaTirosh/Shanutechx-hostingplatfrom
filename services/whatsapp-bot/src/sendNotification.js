@@ -9,7 +9,7 @@ let processing = false;
 
 function toJid(phoneNumber) {
   if (typeof phoneNumber !== 'string') return '';
-  if (phoneNumber.endsWith('@s.whatsapp.net') || phoneNumber.endsWith('@g.us')) {
+  if (phoneNumber.endsWith('@s.whatsapp.net') || phoneNumber.endsWith('@g.us') || phoneNumber.endsWith('@lid')) {
     return phoneNumber;
   }
   const digitsOnly = phoneNumber.replace(/[^0-9]/g, '');

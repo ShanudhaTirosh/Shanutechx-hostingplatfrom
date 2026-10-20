@@ -5,6 +5,7 @@ import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/aut
 import { listNodeContainers, containerAction, getContainerLogs, removeNodeContainer, streamNodeAgentSSE } from '../lib/nodeAgentClient';
 import { logger } from '../lib/logger';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 /**
  * Dev/admin-only: see and manage every container on every registered node —
  * not scoped to a single deployment, unlike routes/deployments.ts. Reuses
@@ -18,7 +19,7 @@ import { logger } from '../lib/logger';
  */
 export const containersRouter = Router();
 
-containersRouter.use(requireAuth, requireAdminOrDev);
+useForOwnRoutes(containersRouter, requireAuth, requireAdminOrDev);
 
 containersRouter.get('/nodes/:nodeId/containers', async (req: AuthedRequest, res) => {
   const node = await prisma.node.findUnique({ where: { id: req.params.nodeId } });

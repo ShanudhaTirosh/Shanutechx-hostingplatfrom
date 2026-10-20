@@ -14,7 +14,11 @@ import {
   nodeFailoverQueue,
   BackupSweepJob,
   backupSweepQueue,
+  webmailSweepQueue,
+  announcementSweepQueue,
   PushReceiptJob,
+  WebmailSweepJob,
+  AnnouncementSweepJob,
 } from './lib/queue';
 import { executeSSLRenewalJob } from './jobs/ssl-renewal';
 import { runBillingChecks } from './lib/billing';
@@ -23,6 +27,8 @@ import { executeWorkspaceCleanupJob } from './jobs/workspace-cleanup';
 import { checkMetricAlerts } from './lib/alerts';
 import { checkNodeHealthAndFailover } from './lib/nodeMonitor';
 import { executePushReceiptJob } from './jobs/push-receipt';
+import { executeWebmailSweepJob } from './jobs/webmail-sweep';
+import { executeAnnouncementSweepJob } from './jobs/announcement-sweep';
 import { executeBackupSweepJob } from './jobs/backup-sweep';
 import { logger } from './lib/logger';
 
@@ -196,7 +202,56 @@ pushReceiptWorker.on('failed', (job, err) => {
   logger.error({ jobId: job?.id, err }, 'Push receipt check job failed');
 });
 
-[sslRenewalWorker, workspaceCleanupWorker, billingSweepWorker, uptimeSweepWorker, nodeFailoverWorker, backupSweepWorker, pushReceiptWorker].forEach((w) => {
+// Scheduled announcements (POST /internal/announcements/send with scheduledFor) were stored and never sent.
+const announcementSweepWorker = new Worker<AnnouncementSweepJob>(
+  'announcement-sweep',
+  async () => executeAnnouncementSweepJob(),
+  { connection: redisConnectionOptions, concurrency: 1 }
+);
+
+announcementSweepWorker.on('failed', (job, err) => {
+  logger.error({ jobId: job?.id, err }, 'Announcement sweep job failed');
+});
+
+(async () => {
+  try {
+    await announcementSweepQueue.upsertJobScheduler(
+      'announcement-sweep-recurring',
+      { every: 60 * 1000 },
+      { name: 'announcement-sweep-recurring', data: {} }
+    );
+    logger.info({ msg: 'Announcement sweep scheduled successfully', interval: '1 minute' });
+  } catch (error) {
+    logger.error({ msg: 'Failed to schedule announcement sweep job', error: error instanceof Error ? error.message : String(error) });
+  }
+})();
+
+// Webmail: returns snoozed mail to the inbox and sends scheduled mail (see lib/webmailSweep.ts).
+// concurrency 1 + at-most-once claiming: a message can be sent late, never twice.
+const webmailSweepWorker = new Worker<WebmailSweepJob>(
+  'webmail-sweep',
+  async () => executeWebmailSweepJob(),
+  { connection: redisConnectionOptions, concurrency: 1 }
+);
+
+webmailSweepWorker.on('failed', (job, err) => {
+  logger.error({ jobId: job?.id, err }, 'Webmail sweep job failed');
+});
+
+(async () => {
+  try {
+    await webmailSweepQueue.upsertJobScheduler(
+      'webmail-sweep-recurring',
+      { every: 60 * 1000 }, // every minute: snooze and scheduled send have minute granularity
+      { name: 'webmail-sweep-recurring', data: {} }
+    );
+    logger.info({ msg: 'Webmail sweep scheduled successfully', interval: '1 minute' });
+  } catch (error) {
+    logger.error({ msg: 'Failed to schedule webmail sweep job', error: error instanceof Error ? error.message : String(error) });
+  }
+})();
+
+[sslRenewalWorker, workspaceCleanupWorker, billingSweepWorker, uptimeSweepWorker, nodeFailoverWorker, backupSweepWorker, pushReceiptWorker, webmailSweepWorker, announcementSweepWorker].forEach((w) => {
   w.on('error', (err) => {
     logger.warn({ err: err.message, worker: w.name }, 'Worker Redis connection error caught');
   });

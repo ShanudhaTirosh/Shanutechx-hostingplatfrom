@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 /**
  * Real push-token storage — registered by the mobile admin app
  * (apps/mobile-admin/src/lib/pushRegistration.ts) after a user signs in
@@ -12,7 +13,7 @@ import { requireAuth, AuthedRequest } from '../middleware/auth';
  */
 export const pushTokensRouter = Router();
 
-pushTokensRouter.use(requireAuth);
+useForOwnRoutes(pushTokensRouter, requireAuth);
 
 const registerSchema = z.object({
   expoToken: z.string().min(1),

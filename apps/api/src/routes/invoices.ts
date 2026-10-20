@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { useForOwnRoutes } from '../lib/routerGuard';
 import { existsSync } from 'fs';
 import { mkdir, writeFile, readFile } from 'fs/promises';
 import path from 'path';
@@ -9,7 +10,9 @@ import { generateInvoicePdf } from '../lib/invoicePdf';
 
 export const invoicesRouter = Router();
 
-invoicesRouter.use('/invoices', requireAuth);
+// Covers every route in this file. The old path-scoped gate only matched /invoices, so routes under
+// other prefixes in this router were only authenticated by accident (via another router's global requireAuth).
+useForOwnRoutes(invoicesRouter, requireAuth);
 
 const INVOICES_DIR = process.env.INVOICES_DIR || '/var/lib/shanutechx/invoices';
 
@@ -66,7 +69,7 @@ async function loadOwnedOrderWithItems(req: AuthedRequest, orderId: string) {
   });
   if (!order) return null;
   // Dev always passes, admin only passes for an assigned customer's order.
-  if (!(await canAccessResource(order.userId, req))) return null;
+  if (!(await canAccessResource(order.userId, req, undefined, undefined, 'read'))) return null;
   return order;
 }
 

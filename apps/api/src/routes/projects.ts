@@ -3,7 +3,7 @@ import { z } from 'zod';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
-import { canAccessResource } from '../middleware/rbac';
+import { canAccessResource, accessActionForRequest } from '../middleware/rbac';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
 import { env } from '../env';
@@ -52,7 +52,7 @@ async function canAccessProject(req: AuthedRequest, projectId: string): Promise<
   }
 
   // Assigned Admin check
-  if (req.user!.role === 'admin' && (await canAccessResource(project.userId, req))) {
+  if (req.user!.role === 'admin' && (await canAccessResource(project.userId, req, undefined, undefined, accessActionForRequest(req)))) {
     return { project, role: 'admin' };
   }
 
@@ -145,7 +145,7 @@ projectsRouter.post('/projects', async (req: AuthedRequest, res) => {
   // Determine owner user
   let ownerUserId = req.user!.id;
   if (targetUserId && (req.user!.role === 'admin' || req.user!.role === 'dev')) {
-    if (req.user!.role === 'admin' && !(await canAccessResource(targetUserId, req))) {
+    if (req.user!.role === 'admin' && !(await canAccessResource(targetUserId, req, undefined, undefined, 'write'))) {
       return res.status(403).json({ error: 'Unauthorized to create project for target user' });
     }
     ownerUserId = targetUserId;

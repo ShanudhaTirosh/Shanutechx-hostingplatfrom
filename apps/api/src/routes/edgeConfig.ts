@@ -4,9 +4,10 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { logger } from '../lib/logger';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const edgeConfigRouter = Router();
 
-edgeConfigRouter.use(requireAuth);
+useForOwnRoutes(edgeConfigRouter, requireAuth);
 
 // GET /api/edge-config — List Edge Config stores owned by user
 edgeConfigRouter.get('/edge-config', async (req: AuthedRequest, res) => {

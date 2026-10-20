@@ -8,9 +8,11 @@
 FROM node:20-alpine AS deps
 RUN apk add --no-cache git
 WORKDIR /repo
-COPY package.json ./
+# The lockfile is copied and installed with `npm ci` so the image gets exactly the dependency versions CI tested
+# (`npm install` without it re-resolved the latest in-range versions on every build).
+COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/package.json
-RUN npm install --workspace=apps/web --include-workspace-root
+RUN npm ci --workspace=apps/web --include-workspace-root
 
 FROM deps AS builder
 ARG API_BASE_URL

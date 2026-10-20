@@ -74,6 +74,8 @@ export interface UptimeSweepJob {}
 export interface WorkspaceCleanupJob {}
 export interface NodeFailoverSweepJob {}
 export interface BackupSweepJob {}
+export interface WebmailSweepJob {}
+export interface AnnouncementSweepJob {}
 
 export const billingSweepQueue = new Queue<BillingSweepJob>('billing-sweep', {
   connection: redisConnectionOptions,
@@ -82,6 +84,27 @@ export const billingSweepQueue = new Queue<BillingSweepJob>('billing-sweep', {
     backoff: { type: 'exponential', delay: 60000 },
     removeOnComplete: { age: 60 * 60 * 24 * 7 },
     removeOnFail: { age: 60 * 60 * 24 * 30 },
+  },
+});
+
+// Sends scheduled announcements. attempts: 1 on purpose, like the webmail sweep: never retry a send.
+export const announcementSweepQueue = new Queue<AnnouncementSweepJob>('announcement-sweep', {
+  connection: redisConnectionOptions,
+  defaultJobOptions: {
+    attempts: 1,
+    removeOnComplete: { age: 60 * 60 * 24 },
+    removeOnFail: { age: 60 * 60 * 24 * 7 },
+  },
+});
+
+// Returns snoozed mail and sends scheduled mail. attempts: 1 on purpose - sending e-mail must never be
+// retried by the queue (the next minute's run is the retry for anything not yet due or skipped).
+export const webmailSweepQueue = new Queue<WebmailSweepJob>('webmail-sweep', {
+  connection: redisConnectionOptions,
+  defaultJobOptions: {
+    attempts: 1,
+    removeOnComplete: { age: 60 * 60 * 24 },
+    removeOnFail: { age: 60 * 60 * 24 * 7 },
   },
 });
 
@@ -150,6 +173,12 @@ billingSweepQueue.on('error', () => {
   isRedisConnected = false;
 });
 uptimeSweepQueue.on('error', () => {
+  isRedisConnected = false;
+});
+webmailSweepQueue.on('error', () => {
+  isRedisConnected = false;
+});
+announcementSweepQueue.on('error', () => {
   isRedisConnected = false;
 });
 workspaceCleanupQueue.on('error', () => {

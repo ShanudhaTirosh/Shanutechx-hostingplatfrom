@@ -5,13 +5,14 @@ import { canAccessResource } from '../middleware/rbac';
 import { logger } from '../lib/logger';
 import { env } from '../env';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 /**
  * Downloading a deployment's source as a ZIP. Deploying FROM an uploaded archive was removed (git and Docker-image
  * deploys remain); this only reads from the platform's private shadow-backup repo on GitHub.
  */
 export const downloadZipRouter = Router();
 
-downloadZipRouter.use(requireAuth);
+useForOwnRoutes(downloadZipRouter, requireAuth);
 
 const downloadZipHandler = async (req: AuthedRequest, res: any) => {
   const deploymentId = req.params.id || req.params.deploymentId;
@@ -24,7 +25,7 @@ const downloadZipHandler = async (req: AuthedRequest, res: any) => {
     return res.status(404).json({ error: 'Deployment instance not found' });
   }
 
-  if (!(await canAccessResource(deployment.userId, req))) {
+  if (!(await canAccessResource(deployment.userId, req, undefined, undefined, 'read'))) {
     return res.status(403).json({ error: 'Access denied' });
   }
 

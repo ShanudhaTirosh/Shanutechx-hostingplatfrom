@@ -1,26 +1,56 @@
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { auth } from './firebase';
+import { normalizeServerUrl } from './serverUrl';
 
 export const DEFAULT_API_BASE: string =
   Constants.expoConfig?.extra?.apiBaseUrl ?? 'https://api.shanutechx.com';
 
 const STORAGE_KEY_API_BASE = '@shanutechx_api_base';
-const STORAGE_KEY_ADMIN_KEY = '@shanutechx_admin_key';
+// The admin/dev API key used to be kept in plaintext AsyncStorage under this key. It now lives in the
+// platform keychain/keystore (expo-secure-store); the legacy entry is migrated once and then deleted.
+const LEGACY_STORAGE_KEY_ADMIN_KEY = '@shanutechx_admin_key';
+const SECURE_KEY_ADMIN_KEY = 'shanutechx_admin_key'; // SecureStore keys: alphanumerics, ".", "-", "_" only
+
+// Plain http:// is only acceptable for a local dev server (see serverUrl.ts).
+const ALLOW_INSECURE_LOOPBACK = typeof __DEV__ !== 'undefined' && __DEV__;
 
 let cachedApiBase = DEFAULT_API_BASE;
 let cachedApiKey: string | null = null;
 let storageInitialized = false;
 
+async function readSecureApiKey(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(SECURE_KEY_ADMIN_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export async function initApiConfig(): Promise<string> {
   try {
-    const [storedBase, storedKey] = await Promise.all([
+    const [storedBase, legacyKey] = await Promise.all([
       AsyncStorage.getItem(STORAGE_KEY_API_BASE),
-      AsyncStorage.getItem(STORAGE_KEY_ADMIN_KEY),
+      AsyncStorage.getItem(LEGACY_STORAGE_KEY_ADMIN_KEY),
     ]);
+
+    // Ignore (and forget) a stored server URL that would not pass today's validation, e.g. plain http://.
     if (storedBase && storedBase.trim()) {
-      cachedApiBase = storedBase.trim().replace(/\/+$/, '');
+      const checked = normalizeServerUrl(storedBase, { allowInsecureLoopback: ALLOW_INSECURE_LOOPBACK });
+      if (checked.ok) cachedApiBase = checked.url;
+      else await AsyncStorage.removeItem(STORAGE_KEY_API_BASE).catch(() => {});
     }
+
+    let storedKey = await readSecureApiKey();
+    if (!storedKey && legacyKey && legacyKey.trim()) {
+      // One-time migration out of plaintext storage. If SecureStore is unavailable the key is kept in
+      // memory for this session only; it is never written back to AsyncStorage.
+      storedKey = legacyKey.trim();
+      await SecureStore.setItemAsync(SECURE_KEY_ADMIN_KEY, storedKey).catch(() => {});
+    }
+    if (legacyKey !== null) await AsyncStorage.removeItem(LEGACY_STORAGE_KEY_ADMIN_KEY).catch(() => {});
+
     if (storedKey && storedKey.trim()) {
       cachedApiKey = storedKey.trim();
     }
@@ -37,9 +67,15 @@ export function getEffectiveApiBase(): string {
 
 export const API_BASE = cachedApiBase;
 
+/** Throws an Error with a user-facing message when the URL is not acceptable (credentials are sent to it). */
 export async function setApiBaseUrl(url: string): Promise<void> {
-  const clean = url.trim().replace(/\/+$/, '');
-  cachedApiBase = clean || DEFAULT_API_BASE;
+  if (!url.trim()) {
+    cachedApiBase = DEFAULT_API_BASE;
+  } else {
+    const checked = normalizeServerUrl(url, { allowInsecureLoopback: ALLOW_INSECURE_LOOPBACK });
+    if (!checked.ok) throw new Error(checked.error);
+    cachedApiBase = checked.url;
+  }
   await AsyncStorage.setItem(STORAGE_KEY_API_BASE, cachedApiBase);
 }
 
@@ -52,11 +88,14 @@ export async function getStoredApiKey(): Promise<string | null> {
 
 export async function setStoredApiKey(key: string | null): Promise<void> {
   cachedApiKey = key ? key.trim() : null;
+  // Never persist the key in AsyncStorage (unencrypted). If the keychain is unavailable it stays in
+  // memory for this session only.
   if (cachedApiKey) {
-    await AsyncStorage.setItem(STORAGE_KEY_ADMIN_KEY, cachedApiKey);
+    await SecureStore.setItemAsync(SECURE_KEY_ADMIN_KEY, cachedApiKey).catch(() => {});
   } else {
-    await AsyncStorage.removeItem(STORAGE_KEY_ADMIN_KEY);
+    await SecureStore.deleteItemAsync(SECURE_KEY_ADMIN_KEY).catch(() => {});
   }
+  await AsyncStorage.removeItem(LEGACY_STORAGE_KEY_ADMIN_KEY).catch(() => {});
 }
 
 export class ApiError extends Error {

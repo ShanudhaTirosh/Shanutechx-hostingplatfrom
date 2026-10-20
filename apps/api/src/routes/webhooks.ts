@@ -7,9 +7,10 @@ import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { encryptSecret } from '../lib/secretsVault';
 import { isSafeWebhookUrl } from '../lib/webhooks';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const webhooksRouter = Router();
 
-webhooksRouter.use(requireAuth);
+useForOwnRoutes(webhooksRouter, requireAuth);
 
 const createWebhookSchema = z.object({
   url: z.string().url(),

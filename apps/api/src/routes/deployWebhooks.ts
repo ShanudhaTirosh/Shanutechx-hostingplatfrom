@@ -61,7 +61,7 @@ deployWebhooksRouter.post('/deployments/:id/webhook-secret', requireAuth, async 
   const deployment = await prisma.deployment.findUnique({ where: { id: req.params.id } });
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
 
-  if (!(await canAccessResource(deployment.userId, req))) {
+  if (!(await canAccessResource(deployment.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Deployment not found' });
   }
   if (!deployment.repoUrl) {
@@ -91,7 +91,7 @@ deployWebhooksRouter.post('/deployments/:id/webhook-secret', requireAuth, async 
 deployWebhooksRouter.post('/deployments/:id/webhook-auto-register', requireAuth, async (req: AuthedRequest, res) => {
   const deployment = await prisma.deployment.findUnique({ where: { id: req.params.id } });
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
-  if (!(await canAccessResource(deployment.userId, req))) return res.status(404).json({ error: 'Deployment not found' });
+  if (!(await canAccessResource(deployment.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Deployment not found' });
   if (!deployment.repoUrl) return res.status(409).json({ error: 'Deployment has no git repository' });
 
   // Parse GitHub owner/repo from repoUrl (e.g., https://github.com/owner/repo)
@@ -170,7 +170,7 @@ deployWebhooksRouter.post('/deployments/:id/webhook-auto-register', requireAuth,
 deployWebhooksRouter.delete('/deployments/:id/webhook-secret', requireAuth, async (req: AuthedRequest, res) => {
   const deployment = await prisma.deployment.findUnique({ where: { id: req.params.id } });
   if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
-  if (!(await canAccessResource(deployment.userId, req))) return res.status(404).json({ error: 'Deployment not found' });
+  if (!(await canAccessResource(deployment.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Deployment not found' });
 
   await prisma.deployment.update({ where: { id: deployment.id }, data: { deployWebhookSecret: null } });
   res.json({ ok: true });

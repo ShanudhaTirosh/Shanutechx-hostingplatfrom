@@ -1,14 +1,16 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
-import { canAccessResource } from '../middleware/rbac';
+import { canAccessResource, accessActionForRequest } from '../middleware/rbac';
 import { env } from '../env';
 import { logger } from '../lib/logger';
 import { issueSshTicket } from '../lib/sshTerminalGateway';
+import { vpsAgentSecretFor } from '../lib/agentSecret';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const nodeEngineRouter = Router();
 
-nodeEngineRouter.use(requireAuth);
+useForOwnRoutes(nodeEngineRouter, requireAuth);
 
 /**
  * Helper to resolve node or VPS provision IP and check access permissions.
@@ -35,7 +37,10 @@ async function resolveNodeAccess(req: AuthedRequest, nodeId: string) {
   // 2. Try finding a customer VPS provision
   const provision = await prisma.vpsProvision.findUnique({ where: { id: nodeId } });
   if (provision) {
-    const allowed = await canAccessResource(provision.userId, req);
+    // Reads (GET) are visible to read-only staff; anything that changes the host (create/delete users,
+    // passwords, firewall, docker, packages, SSH tickets) needs WRITE access. canAccessResource defaults
+    // to 'read', which used to let support staff and view-only team members run every operation here.
+    const allowed = await canAccessResource(provision.userId, req, undefined, undefined, accessActionForRequest(req));
     if (!allowed) return null;
 
     let ip: string | null = provision.ip || null;
@@ -57,6 +62,7 @@ async function resolveNodeAccess(req: AuthedRequest, nodeId: string) {
       label: `vps-${provision.externalId || provision.id.slice(0, 8)}`,
       ip,
       monthlyBandwidthGb: 30000,
+      vpsProvisionId: provision.id, // marks a customer-controlled machine: see agentHeaders(node)
     };
   }
 
@@ -67,8 +73,17 @@ function agentUrl(nodeIp: string, path: string) {
   return `http://${nodeIp}:${env.nodeAgentPort}${path}`;
 }
 
-function agentHeaders() {
-  return { 'x-agent-secret': env.nodeAgentSecret, 'Content-Type': 'application/json' };
+/**
+ * Cluster nodes are platform-owned and use the platform secret. A customer VPS is controlled by the
+ * customer, so with VPS_AGENT_SECRET_MODE=derived it gets its own per-VPS secret instead (see
+ * lib/agentSecret.ts) and can never learn the platform-wide one.
+ */
+function agentHeaders(node?: object) {
+  const vpsId = (node as { vpsProvisionId?: string } | undefined)?.vpsProvisionId;
+  const secret = vpsId
+    ? vpsAgentSecretFor(vpsId, env.nodeAgentSecret, process.env.VPS_AGENT_SECRET_MODE)
+    : env.nodeAgentSecret;
+  return { 'x-agent-secret': secret, 'Content-Type': 'application/json' };
 }
 
 // ── 1. SYSTEM MONITORING & TELEMETRY ──────────────────────────────────────
@@ -80,7 +95,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/monitoring', async (req: AuthedReque
   const limitGb = (node as any).monthlyBandwidthGb || 30000;
 
   try {
-    const r = await fetch(agentUrl(node.ip, `/agent/engine/monitoring?monthlyLimitGb=${limitGb}`), { headers: agentHeaders() });
+    const r = await fetch(agentUrl(node.ip, `/agent/engine/monitoring?monthlyLimitGb=${limitGb}`), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -112,7 +127,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/packages/install', async (req: Auth
   try {
     const r = await fetch(agentUrl(node.ip, '/agent/engine/packages/install'), {
       method: 'POST',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
       body: JSON.stringify({ packageName: cleanPackage }),
     });
     const data = await r.json();
@@ -136,7 +151,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/packages/upgrade', async (req: Auth
   try {
     const r = await fetch(agentUrl(node.ip, '/agent/engine/packages/upgrade'), {
       method: 'POST',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
     });
     const data = await r.json();
 
@@ -159,7 +174,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/ports', async (req: AuthedRequest, r
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/ports'), { headers: agentHeaders() });
+    const r = await fetch(agentUrl(node.ip, '/agent/engine/ports'), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -174,7 +189,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/services', async (req: AuthedRequest
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/services'), { headers: agentHeaders() });
+    const r = await fetch(agentUrl(node.ip, '/agent/engine/services'), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -208,7 +223,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/services/action', async (req: Authe
   try {
     const r = await fetch(agentUrl(node.ip, '/agent/engine/services/action'), {
       method: 'POST',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
       body: JSON.stringify({ action: cleanAction, serviceName: cleanService }),
     });
     const data = await r.json();
@@ -237,7 +252,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/services/logs', async (req: AuthedRe
   const path = `/agent/engine/services/logs?serviceName=${encodeURIComponent(String(serviceName ?? ''))}&lines=${encodeURIComponent(String(lines ?? 100))}`;
 
   try {
-    const r = await fetch(agentUrl(node.ip, path), { headers: agentHeaders() });
+    const r = await fetch(agentUrl(node.ip, path), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -252,7 +267,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/users', async (req: AuthedRequest, r
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/users'), { headers: agentHeaders() });
+    const r = await fetch(agentUrl(node.ip, '/agent/engine/users'), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -269,7 +284,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/users', async (req: AuthedRequest, 
   try {
     const r = await fetch(agentUrl(node.ip, '/agent/engine/users'), {
       method: 'POST',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
       body: JSON.stringify({ username, password }),
     });
     const data = await r.json();
@@ -295,7 +310,7 @@ nodeEngineRouter.delete('/nodes/:nodeId/engine/users/:username', async (req: Aut
   try {
     const r = await fetch(agentUrl(node.ip, `/agent/engine/users/${encodeURIComponent(req.params.username)}?removeHome=${removeHome}`), {
       method: 'DELETE',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
     });
     const data = await r.json();
 
@@ -320,7 +335,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/users/:username/password', async (r
   try {
     const r = await fetch(agentUrl(node.ip, `/agent/engine/users/${encodeURIComponent(req.params.username)}/password`), {
       method: 'POST',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
       body: JSON.stringify({ password }),
     });
     const data = await r.json();
@@ -346,7 +361,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/users/:username/groups', async (req
   try {
     const r = await fetch(agentUrl(node.ip, `/agent/engine/users/${encodeURIComponent(req.params.username)}/groups`), {
       method: 'POST',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
       body: JSON.stringify({ group, action }),
     });
     const data = await r.json();
@@ -370,7 +385,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/docker/containers', async (req: Auth
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/containers'), { headers: agentHeaders() });
+    const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/containers'), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -405,7 +420,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/docker/containers', async (req: Aut
   try {
     const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/containers'), {
       method: 'POST',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
       body: JSON.stringify(req.body || {}),
     });
     const data = await r.json();
@@ -431,7 +446,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/docker/containers/:containerId/acti
   try {
     const r = await fetch(agentUrl(node.ip, `/agent/engine/docker/containers/${encodeURIComponent(req.params.containerId)}/action`), {
       method: 'POST',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
       body: JSON.stringify({ action }),
     });
     const data = await r.json();
@@ -456,7 +471,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/docker/containers/:containerId/logs'
 
   try {
     const r = await fetch(agentUrl(node.ip, `/agent/engine/docker/containers/${encodeURIComponent(req.params.containerId)}/logs?tail=${tail}`), {
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
     });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
@@ -470,7 +485,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/docker/networks', async (req: Authed
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/networks'), { headers: agentHeaders() });
+    const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/networks'), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -487,7 +502,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/docker/networks', async (req: Authe
   try {
     const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/networks'), {
       method: 'POST',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
       body: JSON.stringify({ name, driver }),
     });
     const data = await r.json();
@@ -537,7 +552,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/docker/compose', async (req: Authed
   try {
     const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/compose'), {
       method: 'POST',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
       body: JSON.stringify({ yamlContent, projectName }),
     });
     const data = await r.json();
@@ -561,7 +576,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/docker/prune', async (req: AuthedRe
   try {
     const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/prune'), {
       method: 'POST',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
     });
     const data = await r.json();
 
@@ -584,7 +599,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/firewall', async (req: AuthedRequest
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/firewall'), { headers: agentHeaders() });
+    const r = await fetch(agentUrl(node.ip, '/agent/engine/firewall'), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -601,7 +616,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/firewall/rules', async (req: Authed
   try {
     const r = await fetch(agentUrl(node.ip, '/agent/engine/firewall/rules'), {
       method: 'POST',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
       body: JSON.stringify({ port, protocol, action }),
     });
     const data = await r.json();
@@ -627,7 +642,7 @@ nodeEngineRouter.delete('/nodes/:nodeId/engine/firewall/rules', async (req: Auth
   try {
     const r = await fetch(agentUrl(node.ip, `/agent/engine/firewall/rules?port=${encodeURIComponent(String(port ?? ''))}&protocol=${encodeURIComponent(String(protocol ?? 'tcp'))}`), {
       method: 'DELETE',
-      headers: agentHeaders(),
+      headers: agentHeaders(node),
     });
     const data = await r.json();
 

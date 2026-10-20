@@ -1,3 +1,6 @@
+// Load .env before anything reads process.env (the logger reads LOG_LEVEL on require).
+require('dotenv').config();
+
 const express = require('express');
 const { connect, requestPairingCode, resetSession, getSocket, getTelemetryState, onMessageUpsert, logger } = require('./connection');
 const { sendNotification } = require('./sendNotification');
@@ -93,15 +96,29 @@ onMessageUpsert(async ({ messages, type }) => {
 
   for (const msg of messages) {
     if (!msg.message || msg.key.fromMe) continue;
-    const sender = msg.key.remoteJid;
-    const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
+    const chatJid = msg.key.remoteJid || '';
+    // This is a 1:1 customer-support bot: ignore groups, broadcast lists, status and channels.
+    // (Previously a group message made the bot treat the *group id* as a phone number and
+    // reply to a non-existent "<groupid>@s.whatsapp.net".)
+    if (chatJid.endsWith('@g.us') || chatJid.endsWith('@broadcast') || chatJid.endsWith('@newsletter')) continue;
+
+    // Newer WhatsApp addressing can deliver a "@lid" chat id; prefer the real phone JID when given
+    // so customer/staff lookups by phone work.
+    const senderPn = typeof msg.key.senderPn === 'string' && msg.key.senderPn.endsWith('@s.whatsapp.net')
+      ? msg.key.senderPn
+      : null;
+    const sender = senderPn || chatJid;
+
+    // Unwrap disappearing-message / view-once wrappers so those messages aren't silently dropped.
+    const inner = msg.message.ephemeralMessage?.message || msg.message.viewOnceMessage?.message || msg.message;
+    const text = inner.conversation || inner.extendedTextMessage?.text;
 
     if (sender && text) {
       try {
         const reply = await handleCommand(sender, text);
         if (reply) {
-          const cleanPhone = sender.split('@')[0];
-          await sendNotification(cleanPhone, reply);
+          // Reply on the exact chat the message arrived on.
+          await sendNotification(chatJid, reply);
         }
       } catch (err) {
         logger.error({ sender, err }, 'Error handling WhatsApp incoming command');

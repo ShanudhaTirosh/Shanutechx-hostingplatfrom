@@ -3,10 +3,11 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
-import { canAccessResource } from '../middleware/rbac';
+import { canAccessResource, accessActionForRequest } from '../middleware/rbac';
 import { logger } from '../lib/logger';
 import { notifyAgentWafSync, type WafSyncRule } from '../lib/nodeAgentClient';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 /**
  * Per-deployment firewall: IP/CIDR/header/path/user-agent allow+block rules, per-IP rate limiting, and HTTP Basic
  * Auth password protection for the whole deployment -- all actually enforced at the edge by the node agent (see
@@ -33,7 +34,7 @@ import { notifyAgentWafSync, type WafSyncRule } from '../lib/nodeAgentClient';
 
 export const wafRouter = Router();
 
-wafRouter.use(requireAuth);
+useForOwnRoutes(wafRouter, requireAuth);
 
 async function loadOwnedDeployment(req: AuthedRequest, id: string) {
   const deployment = await prisma.deployment.findUnique({
@@ -41,7 +42,7 @@ async function loadOwnedDeployment(req: AuthedRequest, id: string) {
     include: { node: true },
   });
   if (!deployment) return null;
-  if (!(await canAccessResource(deployment.userId, req))) return null;
+  if (!(await canAccessResource(deployment.userId, req, undefined, undefined, accessActionForRequest(req)))) return null;
   return deployment;
 }
 

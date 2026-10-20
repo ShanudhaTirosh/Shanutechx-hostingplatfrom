@@ -14,9 +14,10 @@ import { autoDetectExposureMode } from '../lib/exposureDefaults';
 import { createSubdomainRecord } from '../lib/cloudflare';
 import { validateComposeSecurity } from '../lib/composeIsolation';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const dockerDeploymentsRouter = Router();
 
-dockerDeploymentsRouter.use(requireAuth);
+useForOwnRoutes(dockerDeploymentsRouter, requireAuth);
 
 const deployImageSchema = z.object({
   image: z.string().min(1, 'Docker image name is required'),

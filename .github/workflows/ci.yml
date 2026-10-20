@@ -6,10 +6,18 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-and-build:
     name: Build & Test Workspace
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       DATABASE_URL: "postgresql://shanutechx:SecurePass@localhost:5432/shanutechx?schema=public"
       FIREBASE_PROJECT_ID: "shanutechx-demo-project"
@@ -61,6 +69,11 @@ jobs:
         run: npm run build --workspace=apps/dashboard
         env:
           NEXT_PUBLIC_API_BASE_URL: https://api.shanutechx.com
+
+      - name: Build Webmail Client (apps/webmail)
+        run: npm run build --workspace=apps/webmail
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
 
       - name: Typecheck Expo Mobile Admin App (apps/mobile-admin)
         run: |

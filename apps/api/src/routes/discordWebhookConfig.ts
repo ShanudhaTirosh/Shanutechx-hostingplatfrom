@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireDev, AuthedRequest } from '../middleware/auth';
 import { encryptWebhookUrl, sendTestDiscordWebhook } from '../lib/discordWebhooks';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 /**
  * Dev-only management of the platform's Discord channel alerts
  * (Dev Dashboard -> Webhooks). This is distinct from routes/webhooks.ts,
@@ -16,7 +17,7 @@ import { encryptWebhookUrl, sendTestDiscordWebhook } from '../lib/discordWebhook
  */
 export const discordWebhookConfigRouter = Router();
 
-discordWebhookConfigRouter.use(requireAuth, requireDev);
+useForOwnRoutes(discordWebhookConfigRouter, requireAuth, requireDev);
 
 const NOTIFICATION_EVENTS = [
   'new_payment_submitted',

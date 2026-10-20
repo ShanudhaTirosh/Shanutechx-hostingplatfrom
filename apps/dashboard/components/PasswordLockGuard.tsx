@@ -3,6 +3,7 @@
 import { useState, useEffect, ReactNode } from 'react';
 import { Card, Input, Button, ErrorBanner } from './ui';
 import { api } from '@/lib/api';
+import { getSettingsUnlockToken, setSettingsUnlockToken } from '@/lib/settingsUnlockToken';
 
 import { Lock, KeyRound } from 'lucide-react';
 
@@ -40,10 +41,13 @@ export default function PasswordLockGuard({
     const storedUnlockTime = sessionStorage.getItem(UNLOCK_STORAGE_KEY);
     if (storedUnlockTime) {
       const until = parseInt(storedUnlockTime, 10);
-      if (until > Date.now()) {
+      // The server now requires its unlock token too: a timestamp without one (e.g. unlocked before
+      // this change) would show an unlocked page whose saves are rejected, so ask for the PIN again.
+      if (until > Date.now() && getSettingsUnlockToken()) {
         setUnlocked(true);
       } else {
         sessionStorage.removeItem(UNLOCK_STORAGE_KEY);
+        setSettingsUnlockToken(undefined);
       }
     }
   }, []);
@@ -65,6 +69,7 @@ export default function PasswordLockGuard({
         // Keep unlocked for 30 minutes in current browser session
         const expireAt = Date.now() + 30 * 60 * 1000;
         sessionStorage.setItem(UNLOCK_STORAGE_KEY, expireAt.toString());
+        setSettingsUnlockToken(res.unlockToken);
         setPassword('');
       } else {
         setError(res.message || 'Incorrect password or PIN.');
@@ -79,6 +84,7 @@ export default function PasswordLockGuard({
   function handleLock() {
     setUnlocked(false);
     sessionStorage.removeItem(UNLOCK_STORAGE_KEY);
+    setSettingsUnlockToken(undefined);
   }
 
   if (unlocked) {

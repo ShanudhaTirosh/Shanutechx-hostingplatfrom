@@ -5,16 +5,17 @@ import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { canAccessResource } from '../middleware/rbac';
 import { logger } from '../lib/logger';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const previewToolbarRouter = Router();
 
-previewToolbarRouter.use(requireAuth);
+useForOwnRoutes(previewToolbarRouter, requireAuth);
 
 async function loadOwnedDeployment(req: AuthedRequest, id: string) {
   const deployment = await prisma.deployment.findUnique({
     where: { id },
   });
   if (!deployment) return null;
-  if (!(await canAccessResource(deployment.userId, req))) return null;
+  if (!(await canAccessResource(deployment.userId, req, undefined, undefined, 'read'))) return null;
   return deployment;
 }
 

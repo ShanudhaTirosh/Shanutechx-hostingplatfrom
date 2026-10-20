@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { useForOwnRoutes } from '../lib/routerGuard';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdmin, AuthedRequest } from '../middleware/auth';
@@ -22,7 +23,9 @@ import { formatCurrency } from '../lib/currency';
 
 export const paymentsRouter = Router();
 
-paymentsRouter.use('/payments', requireAuth);
+// Covers every route in this file. The old path-scoped gate only matched /payments, so routes under
+// other prefixes in this router were only authenticated by accident (via another router's global requireAuth).
+useForOwnRoutes(paymentsRouter, requireAuth);
 
 async function loadOwnedOrder(req: AuthedRequest, orderId: string) {
   const order = await prisma.order.findUnique({

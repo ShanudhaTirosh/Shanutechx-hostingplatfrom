@@ -21,9 +21,10 @@ import {
   MailboxPermission,
 } from '../lib/mailboxAcl';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const webmailRouter = Router();
 
-webmailRouter.use(requireAuth);
+useForOwnRoutes(webmailRouter, requireAuth);
 
 const FOLDERS = ['inbox', 'starred', 'drafts', 'sent', 'spam', 'trash', 'archive', 'snoozed'] as const;
 
@@ -1436,12 +1437,25 @@ webmailRouter.post('/webmail/messages/:id/snooze', async (req: AuthedRequest, re
     }
 
     const snoozeDate = new Date(snoozedUntil);
+    if (Number.isNaN(snoozeDate.getTime())) {
+      return res.status(400).json({ error: 'snoozedUntil must be a valid date' });
+    }
+    const folder = typeof returnFolder === 'string' && returnFolder ? returnFolder : 'inbox';
+    if (!(FOLDERS as readonly string[]).includes(folder)) {
+      return res.status(400).json({ error: 'Invalid returnFolder' });
+    }
+    // Only snooze messages that belong to this user (no snooze rows pointing at other people's mail).
+    const ownedMessage = await prisma.webmailMessage.findFirst({ where: { id, userId }, select: { id: true } });
+    if (!ownedMessage) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
     const snooze = await prisma.webmailSnooze.create({
       data: {
         userId,
         messageId: id,
         snoozedUntil: snoozeDate,
-        returnFolder: returnFolder || 'inbox',
+        returnFolder: folder,
       },
     });
 
@@ -1492,13 +1506,24 @@ webmailRouter.post('/webmail/messages/schedule', async (req: AuthedRequest, res:
       return res.status(400).json({ error: 'recipientTo, subject, and scheduledFor required' });
     }
 
+    if (typeof recipientTo !== 'string' || typeof subject !== 'string') {
+      return res.status(400).json({ error: 'recipientTo and subject must be strings' });
+    }
+    const sendAt = new Date(scheduledFor);
+    if (Number.isNaN(sendAt.getTime())) {
+      return res.status(400).json({ error: 'scheduledFor must be a valid date' });
+    }
+    if (sendAt.getTime() < Date.now() - 60_000) {
+      return res.status(400).json({ error: 'scheduledFor must be in the future' });
+    }
+
     const item = await prisma.webmailScheduledSend.create({
       data: {
         userId,
         recipientTo,
         subject,
-        body: body || '',
-        scheduledFor: new Date(scheduledFor),
+        body: typeof body === 'string' ? body : '',
+        scheduledFor: sendAt,
         attachmentsJson: attachments || null,
       },
     });

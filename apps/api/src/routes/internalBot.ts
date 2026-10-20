@@ -6,14 +6,47 @@ import { fulfillOrder } from '../lib/orderFulfillment';
 import { notifyCustomer, notifyTicketEmbed } from '../lib/notifications';
 import { renderPaymentReviewEmail, renderTicketReplyEmail } from '../lib/emailTemplates';
 import { generateInvoicePdf } from '../lib/invoicePdf';
+import { cleanTicketRef, phoneOwnsTicket } from '../lib/ticketRef';
+import { convertToLkr } from '../lib/currency';
+import { dispatchAnnouncement } from '../lib/announcements';
+import { announcementOptions, announcementSenders } from '../lib/announcementSenders';
 
 export const internalBotRouter = Router();
+
+type TicketRefResult = { id: string } | { status: number; error: string };
+
+/**
+ * Resolve a full ticket id OR the short 8-char form the bots display
+ * (e.g. "#ABC12345", case-insensitive) to the real ticket id.
+ */
+async function resolveTicketId(raw: unknown): Promise<TicketRefResult> {
+  if (!raw) return { status: 400, error: 'ticketId is required' };
+  const ref = cleanTicketRef(raw);
+  if (!ref) return { status: 400, error: 'Invalid ticket ID' };
+
+  const exact = await prisma.ticket.findFirst({
+    where: { id: { in: [ref.exact, ref.lower] } },
+    select: { id: true },
+  });
+  if (exact) return { id: exact.id };
+
+  const matches = await prisma.ticket.findMany({
+    where: { id: { startsWith: ref.lower } },
+    select: { id: true },
+    take: 2,
+  });
+  if (matches.length === 1) return { id: matches[0].id };
+  if (matches.length > 1) return { status: 409, error: 'Ticket ID is ambiguous - please use more characters' };
+  return { status: 404, error: 'Ticket not found' };
+}
 
 let isSweepingTickets = false;
 let lastSweepTimestamp = 0;
 
-// Middleware: Verify internal secret from either Discord or WhatsApp bot
-internalBotRouter.use((req: Request, res: Response, next) => {
+// Middleware: Verify internal secret from either Discord or WhatsApp bot.
+// Scoped to /internal on purpose: a path-less use() in a router mounted at /api rejected every
+// later router's request (botAdmin, reviews, waf, volumes, ...) with 401 "Unauthorized".
+internalBotRouter.use('/internal', (req: Request, res: Response, next) => {
   const secret = req.headers['x-internal-secret'];
   if (typeof secret !== 'string' || !secret) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -335,9 +368,11 @@ internalBotRouter.post('/internal/open-ticket', async (req: Request, res: Respon
  * Claim ticket. Enforces anti-double-claim unless force=true.
  */
 internalBotRouter.post('/internal/claim-ticket', async (req: Request, res: Response) => {
-  const { ticketId, staffUserLabel, staffUserId, staffPhone, force, discordUserId } = req.body || {};
+  const { ticketId: rawTicketId, staffUserLabel, staffUserId, staffPhone, force, discordUserId } = req.body || {};
 
-  if (!ticketId) return res.status(400).json({ error: 'ticketId is required' });
+  const resolved = await resolveTicketId(rawTicketId);
+  if ('error' in resolved) return res.status(resolved.status).json({ error: resolved.error });
+  const ticketId = resolved.id;
 
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
@@ -397,8 +432,10 @@ internalBotRouter.post('/internal/claim-ticket', async (req: Request, res: Respo
  * POST /api/internal/unclaim-ticket
  */
 internalBotRouter.post('/internal/unclaim-ticket', async (req: Request, res: Response) => {
-  const { ticketId, staffUserLabel } = req.body || {};
-  if (!ticketId) return res.status(400).json({ error: 'ticketId is required' });
+  const { ticketId: rawTicketId, staffUserLabel } = req.body || {};
+  const resolved = await resolveTicketId(rawTicketId);
+  if ('error' in resolved) return res.status(resolved.status).json({ error: resolved.error });
+  const ticketId = resolved.id;
 
   const updated = await prisma.ticket.update({
     where: { id: ticketId },
@@ -425,11 +462,14 @@ internalBotRouter.post('/internal/unclaim-ticket', async (req: Request, res: Res
  * POST /api/internal/reply-ticket
  */
 internalBotRouter.post('/internal/reply-ticket', async (req: Request, res: Response) => {
-  const { ticketId, body, staffUserLabel, senderRole } = req.body || {};
+  const { ticketId: rawTicketId, body, staffUserLabel, senderRole, senderPhone } = req.body || {};
 
-  if (!ticketId || !body) {
+  if (!rawTicketId || !body) {
     return res.status(400).json({ error: 'ticketId and body are required' });
   }
+  const resolved = await resolveTicketId(rawTicketId);
+  if ('error' in resolved) return res.status(resolved.status).json({ error: resolved.error });
+  const ticketId = resolved.id;
 
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
@@ -441,6 +481,11 @@ internalBotRouter.post('/internal/reply-ticket', async (req: Request, res: Respo
   }
 
   const role = senderRole === 'customer' ? 'customer' : 'admin';
+
+  // A customer replying from WhatsApp must own the ticket (bots pass their sender's phone).
+  if (role === 'customer' && senderPhone !== undefined && !phoneOwnsTicket(senderPhone, ticket.user?.phoneNumber)) {
+    return res.status(403).json({ error: 'You can only reply to your own tickets' });
+  }
   const staffUser =
     (await prisma.user.findFirst({ where: { role: { in: ['admin', 'dev', 'support'] } } })) || ticket.user;
 
@@ -480,9 +525,11 @@ internalBotRouter.post('/internal/reply-ticket', async (req: Request, res: Respo
  * Close ticket with reason, generate full transcript, and save to DB
  */
 internalBotRouter.post('/internal/close-ticket', async (req: Request, res: Response) => {
-  const { ticketId, reason, staffUserLabel } = req.body || {};
+  const { ticketId: rawTicketId, reason, staffUserLabel } = req.body || {};
 
-  if (!ticketId) return res.status(400).json({ error: 'ticketId is required' });
+  const resolved = await resolveTicketId(rawTicketId);
+  if ('error' in resolved) return res.status(resolved.status).json({ error: resolved.error });
+  const ticketId = resolved.id;
 
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
@@ -544,18 +591,31 @@ internalBotRouter.post('/internal/close-ticket', async (req: Request, res: Respo
  * POST /api/internal/rate-ticket
  */
 internalBotRouter.post('/internal/rate-ticket', async (req: Request, res: Response) => {
-  const { ticketId, rating, feedback } = req.body || {};
-  if (!ticketId || typeof rating !== 'number') {
+  const { ticketId: rawTicketId, rating, feedback, senderPhone } = req.body || {};
+  if (!rawTicketId || typeof rating !== 'number' || !Number.isFinite(rating)) {
     return res.status(400).json({ error: 'ticketId and rating (1-5) are required' });
+  }
+  const resolved = await resolveTicketId(rawTicketId);
+  if ('error' in resolved) return res.status(resolved.status).json({ error: resolved.error });
+
+  const existing = await prisma.ticket.findUnique({
+    where: { id: resolved.id },
+    include: { user: true },
+  });
+  if (!existing) return res.status(404).json({ error: 'Ticket not found' });
+
+  // Only the ticket owner may rate it (bots pass their sender's phone).
+  if (senderPhone !== undefined && !phoneOwnsTicket(senderPhone, existing.user?.phoneNumber)) {
+    return res.status(403).json({ error: 'You can only rate your own tickets' });
   }
 
   const validRating = Math.max(1, Math.min(5, Math.round(rating)));
 
   const ticket = await prisma.ticket.update({
-    where: { id: ticketId },
+    where: { id: existing.id },
     data: {
       rating: validRating,
-      feedback: feedback || null,
+      feedback: typeof feedback === 'string' && feedback ? feedback.slice(0, 1000) : null,
     },
   });
 
@@ -566,17 +626,28 @@ internalBotRouter.post('/internal/rate-ticket', async (req: Request, res: Respon
  * POST /api/internal/announcements/send
  */
 internalBotRouter.post('/internal/announcements/send', async (req: Request, res: Response) => {
-  const { title, message, targetPlatform, channelId, color, imageUrl, rolePing, scheduledFor, createdById } = req.body || {};
+  const { title, message, targetPlatform, platforms, channelId, color, imageUrl, rolePing, scheduledFor, createdById } = req.body || {};
 
   if (!title || !message) {
     return res.status(400).json({ error: 'title and message are required' });
   }
 
+  // Normalise the target once and use it for BOTH storage and dispatch. Previously a missing
+  // `targetPlatform` (the WhatsApp bot sent `platforms: ['whatsapp']`) was stored as 'both' but
+  // matched neither dispatch branch, so the announcement was marked "sent" and nothing was sent.
+  let platform: string | undefined = targetPlatform;
+  if (!platform && Array.isArray(platforms) && platforms.length > 0) {
+    platform = platforms.includes('discord') && platforms.includes('whatsapp') ? 'both' : String(platforms[0]);
+  }
+  platform = platform || 'both';
+  if (!['discord', 'whatsapp', 'both'].includes(platform)) {
+    return res.status(400).json({ error: "targetPlatform must be 'discord', 'whatsapp' or 'both'" });
+  }
   const announcement = await prisma.announcement.create({
     data: {
       title,
       message,
-      targetPlatform: targetPlatform || 'both',
+      targetPlatform: platform,
       channelId: channelId || null,
       color: color || 8140525,
       imageUrl: imageUrl || null,
@@ -588,42 +659,21 @@ internalBotRouter.post('/internal/announcements/send', async (req: Request, res:
     },
   });
 
-  // If not scheduled, dispatch immediately
+  // Scheduled announcements are stored and sent later by the announcement sweep (worker); only
+  // immediate ones are dispatched here.
+  let dispatch = { deliveredCount: 0, totalRecipients: 0, truncated: false };
   if (!scheduledFor) {
-    if (targetPlatform === 'discord' || targetPlatform === 'both') {
-      await fetch(`${env.discordBotUrl}/internal/send-channel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-internal-secret': env.discordInternalSecret },
-        body: JSON.stringify({
-          channelId: channelId || process.env.DISCORD_ANNOUNCEMENT_CHANNEL_ID || process.env.ADMIN_ALERT_CHANNEL_ID,
-          message: `${rolePing ? `${rolePing}\n` : ''}📢 **${title}**\n${message}${imageUrl ? `\n${imageUrl}` : ''}`,
-        }),
-      }).catch(() => {});
-    }
-
-    if (targetPlatform === 'whatsapp' || targetPlatform === 'both') {
-      const customers = await prisma.user.findMany({
-        where: { phoneNumber: { not: null } },
-        select: { phoneNumber: true },
-        take: 100,
-      });
-
-      for (const c of customers) {
-        if (c.phoneNumber) {
-          void fetch(`${env.whatsappBotUrl}/internal/send`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-internal-secret': env.whatsappInternalSecret },
-            body: JSON.stringify({
-              phoneNumber: c.phoneNumber,
-              message: `📢 *${title}*\n\n${message}`,
-            }),
-          }).catch(() => {});
-        }
-      }
-    }
+    dispatch = await dispatchAnnouncement(prisma, announcement, announcementSenders, announcementOptions());
   }
 
-  res.json({ ok: true, announcement });
+  res.json({
+    ok: true,
+    announcement,
+    deliveredCount: dispatch.deliveredCount,
+    // WhatsApp broadcasts are capped (WHATSAPP_BROADCAST_LIMIT, default 100): say so instead of hiding it.
+    totalRecipients: dispatch.totalRecipients,
+    truncated: dispatch.truncated,
+  });
 });
 
 /**
@@ -651,13 +701,24 @@ internalBotRouter.post('/internal/invoices/generate-and-send', async (req: Reque
       ? reqItems
       : [{ name: 'Platform Hosting Service', amount: 0, quantity: 1 }];
 
+    const badItem = rawItems.some((i) => {
+      const unit = i.amount ?? i.unitPrice ?? 0;
+      const qty = i.quantity ?? 1;
+      return !Number.isFinite(unit) || unit < 0 || !Number.isFinite(qty) || qty <= 0;
+    });
+    if (badItem) {
+      return res.status(400).json({ error: 'Invoice items need a non-negative numeric amount and a positive quantity' });
+    }
+
     const calcTotal = rawItems.reduce((acc, i) => acc + Math.round((i.amount ?? i.unitPrice ?? 0) * (i.quantity ?? 1) * 100), 0);
 
     order = await prisma.order.create({
       data: {
         userId: user.id,
         total: calcTotal,
-        totalLkr: calcTotal,
+        // totalLkr must be the LKR equivalent of `total` (payment verification compares against it);
+        // it was previously set to the raw USD cents, ~300x too small.
+        totalLkr: convertToLkr(calcTotal, 'USD'),
         status: 'awaiting_payment',
         currency: 'USD',
       },
@@ -678,8 +739,9 @@ internalBotRouter.post('/internal/invoices/generate-and-send', async (req: Reque
       }))
     : (Array.isArray(reqItems) ? reqItems.map((i: any) => ({ name: i.name || 'Cloud Hosting Service', quantity: i.quantity || 1, unitPrice: i.amount ?? i.unitPrice ?? 0 })) : [{ name: 'Cloud Hosting Service', quantity: 1, unitPrice: order.total / 100 }]);
 
+  const invoiceNumber = `INV-${new Date(order.createdAt).getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`;
   const pdfBytes = await generateInvoicePdf({
-    invoiceId: `INV-${new Date(order.createdAt).getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`,
+    invoiceId: invoiceNumber,
     issuedAt: order.createdAt,
     customerEmail: order.user.email,
     items,
@@ -693,13 +755,16 @@ internalBotRouter.post('/internal/invoices/generate-and-send', async (req: Reque
     update: {},
   });
 
-  const messageText = `📄 *Invoice INV-${new Date(order.createdAt).getFullYear()}-${order.id
-    .slice(0, 8)
-    .toUpperCase()}*\n\nOrder Total: ${order.currency} ${(order.total / 100).toFixed(2)}\nStatus: ${order.status.toUpperCase()}\nDate: ${new Date(
+  const messageText = `📄 *Invoice ${invoiceNumber}*\n\nOrder Total: ${order.currency} ${(order.total / 100).toFixed(2)}\nStatus: ${order.status.toUpperCase()}\nDate: ${new Date(
     order.createdAt
   ).toLocaleDateString()}`;
 
-  void notifyCustomer(order.user, messageText);
+  // The PDF used to be generated and then discarded: customers only got this text. Deliver the file too.
+  void notifyCustomer(order.user, messageText, undefined, undefined, {
+    fileName: `${invoiceNumber}.pdf`,
+    mimetype: 'application/pdf',
+    base64: Buffer.from(pdfBytes).toString('base64'),
+  });
 
   res.json({
     ok: true,

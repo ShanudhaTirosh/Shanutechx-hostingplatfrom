@@ -21,6 +21,7 @@ import {
   toFlowError,
 } from '../lib/deploymentBackup';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 /**
  * Per-deployment backups to GitHub, plus restore and schedule.
  *
@@ -36,7 +37,7 @@ import {
  * the dashboard polls. See docs/GITHUB_BACKUPS.md.
  */
 export const deploymentBackupsRouter = Router();
-deploymentBackupsRouter.use(requireAuth);
+useForOwnRoutes(deploymentBackupsRouter, requireAuth);
 
 const MANUAL_COOLDOWN_MS = 60_000;
 

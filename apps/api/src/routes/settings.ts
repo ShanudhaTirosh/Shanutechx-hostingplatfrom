@@ -1,10 +1,11 @@
-import { Router } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { env } from '../env';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
+import { issueSettingsUnlockToken, verifySettingsUnlockToken, SETTINGS_UNLOCK_TTL_MS } from '../lib/settingsUnlock';
 
 import { authRateLimiter } from '../middleware/rateLimit';
 
@@ -12,6 +13,21 @@ export const settingsRouter = Router();
 
 // All settings routes require authentication
 settingsRouter.use(requireAuth);
+
+// GitHub organisation / user names: letters, digits and hyphens, max 39 chars. It is interpolated into
+// GitHub API URLs and stored as the backup target, so anything else (e.g. "../user/repos") is rejected.
+const GITHUB_ORG_RE = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/;
+
+/**
+ * The settings PIN used to be a UI-only gate. Sensitive routes now require the unlock token that
+ * POST /verify-password issues after a correct PIN. `dev` is exempt because the dashboard
+ * auto-unlocks dev accounts without prompting for a PIN.
+ */
+function requireSettingsUnlock(req: AuthedRequest, res: Response, next: NextFunction) {
+  if (req.user!.role === 'dev') return next();
+  if (verifySettingsUnlockToken(req.body?.unlockToken, req.user!.id, env.secretsEncryptionKey)) return next();
+  return res.status(403).json({ error: 'Settings are locked. Verify your settings PIN first.', code: 'SETTINGS_LOCKED' });
+}
 
 const verifyPasswordSchema = z.object({
   password: z.string().min(1, 'Password or PIN is required'),
@@ -49,10 +65,12 @@ settingsRouter.post('/verify-password', requireAdminOrDev, authRateLimiter, asyn
     return res.status(401).json({ error: 'Invalid password or PIN. Please try again.' });
   }
 
+  const { token: unlockToken } = issueSettingsUnlockToken(req.user!.id, env.secretsEncryptionKey);
   return res.json({
     ok: true,
     unlocked: true,
-    expiresInSeconds: 1800, // 30 minutes unlock session
+    unlockToken, // send back as `unlockToken` in the body of sensitive settings requests
+    expiresInSeconds: SETTINGS_UNLOCK_TTL_MS / 1000,
     message: 'Settings unlocked successfully.',
   });
 });
@@ -68,7 +86,7 @@ const changePinSchema = z.object({
 /**
  * Set / change the settings security PIN.
  */
-settingsRouter.post('/change-pin', requireAdminOrDev, async (req: AuthedRequest, res) => {
+settingsRouter.post('/change-pin', requireAdminOrDev, authRateLimiter, async (req: AuthedRequest, res) => {
   const parsed = changePinSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -153,7 +171,12 @@ settingsRouter.get('/configs', requireAdminOrDev, async (req: AuthedRequest, res
 
 const githubBackupSchema = z.object({
   token: z.string().trim().min(1, 'GitHub Token is required'),
-  org: z.string().trim().optional(),
+  org: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || GITHUB_ORG_RE.test(v), 'Invalid GitHub organisation or user name')
+    .optional(),
+  unlockToken: z.string().optional(),
 });
 
 /**
@@ -187,7 +210,7 @@ settingsRouter.get('/github-backup', requireAdminOrDev, async (req: AuthedReques
 /**
  * Update GitHub System API Token and Backup Organization.
  */
-settingsRouter.post('/github-backup', requireAdminOrDev, async (req: AuthedRequest, res) => {
+settingsRouter.post('/github-backup', requireAdminOrDev, requireSettingsUnlock, async (req: AuthedRequest, res) => {
   const parsed = githubBackupSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -252,9 +275,13 @@ settingsRouter.post('/github-backup', requireAdminOrDev, async (req: AuthedReque
 /**
  * Test GitHub API Token connection and verify user/org access & scopes.
  */
-settingsRouter.post('/github-backup/test', requireAdminOrDev, async (req: AuthedRequest, res) => {
+settingsRouter.post('/github-backup/test', requireAdminOrDev, requireSettingsUnlock, async (req: AuthedRequest, res) => {
   const testToken = req.body?.token?.trim() || env.backupGithubToken || process.env.BACKUP_GITHUB_TOKEN || '';
-  const testOrg = req.body?.org?.trim() ?? (env.backupGithubOrg || process.env.BACKUP_GITHUB_ORG || '');
+  const testOrg =
+    typeof req.body?.org === 'string' ? req.body.org.trim() : (env.backupGithubOrg || process.env.BACKUP_GITHUB_ORG || '');
+  if (testOrg && !GITHUB_ORG_RE.test(testOrg)) {
+    return res.status(400).json({ error: 'Invalid GitHub organisation or user name' });
+  }
 
   if (!testToken) {
     return res.status(400).json({ error: 'No GitHub API token provided or configured.' });

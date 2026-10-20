@@ -5,10 +5,15 @@ on:
     branches:
       - main
 
+concurrency:
+  group: publish-sdk
+  cancel-in-progress: false
+
 jobs:
   publish:
     name: Build & Publish @shanutechx/* SDK
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
       packages: write

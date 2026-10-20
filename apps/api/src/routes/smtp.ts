@@ -17,9 +17,10 @@ import { logger } from '../lib/logger';
 import dns from 'dns';
 import { getServerIp, buildSpfRecord } from '../lib/mailAuth';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const smtpRouter = Router();
 
-smtpRouter.use(requireAuth);
+useForOwnRoutes(smtpRouter, requireAuth);
 
 const createSmtpAccountSchema = z.object({
   userId: z.string(),

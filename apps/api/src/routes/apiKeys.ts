@@ -5,9 +5,10 @@ import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { canAccessResource } from '../middleware/rbac';
 import { generateApiKey } from '../lib/apiKeys';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const apiKeysRouter = Router();
 
-apiKeysRouter.use(requireAuth);
+useForOwnRoutes(apiKeysRouter, requireAuth);
 
 apiKeysRouter.get('/api-keys', async (req: AuthedRequest, res) => {
   const keys = await prisma.apiKey.findMany({
@@ -40,7 +41,7 @@ apiKeysRouter.post('/api-keys', async (req: AuthedRequest, res) => {
 apiKeysRouter.delete('/api-keys/:id', async (req: AuthedRequest, res) => {
   const key = await prisma.apiKey.findUnique({ where: { id: req.params.id } });
   if (!key) return res.status(404).json({ error: 'Key not found' });
-  if (!(await canAccessResource(key.userId, req))) {
+  if (!(await canAccessResource(key.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Key not found' });
   }
 

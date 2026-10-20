@@ -7,5 +7,21 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["shanutechx", "api", "dashboard", "@shanutechx/db"]
+  "ignore": [
+    "@shanutechx/api",
+    "@shanutechx/dashboard",
+    "@shanutechx/web",
+    "@shanutechx/webmail",
+    "@shanutechx/db",
+    "@shanutechx/discord-bot",
+    "@shanutechx/node-agent",
+    "@shanutechx/whatsapp-bot",
+    "@shanutechx/tracing",
+    "@shanutechx/auth-js",
+    "@shanutechx/functions-js",
+    "@shanutechx/postgrest-js",
+    "@shanutechx/realtime-js",
+    "@shanutechx/storage-js",
+    "@shanutechx/supabase-js"
+  ]
 }

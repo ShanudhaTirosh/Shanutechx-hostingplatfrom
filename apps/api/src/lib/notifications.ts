@@ -35,21 +35,30 @@ async function postInternal(url: string, secret: string, body: object): Promise<
  * failure never blocks the actual business action (payment approval,
  * deployment, etc.) that triggered it.
  */
+/** A file to deliver with a notification (e.g. an invoice PDF), base64-encoded. */
+export interface NotificationAttachment {
+  fileName: string;
+  mimetype: string;
+  base64: string;
+}
+
 export async function notifyCustomer(
   user: NotifiableUser,
   message: string,
   customHtml?: string,
-  customSubject?: string
+  customSubject?: string,
+  attachment?: NotificationAttachment
 ): Promise<void> {
   const sends: Promise<unknown>[] = [];
 
-  sends.push(sendEmailFallback(user.email, message, customHtml, customSubject));
+  sends.push(sendEmailFallback(user.email, message, customHtml, customSubject, attachment));
 
   if (user.phoneNumber) {
     sends.push(
       postInternal(`${env.whatsappBotUrl}/internal/send`, env.whatsappInternalSecret, {
         phoneNumber: user.phoneNumber,
         message,
+        ...(attachment ? { document: attachment } : {}),
       })
     );
   }
@@ -59,6 +68,7 @@ export async function notifyCustomer(
       postInternal(`${env.discordBotUrl}/internal/send-dm`, env.discordInternalSecret, {
         discordUserId: user.discordUserId,
         message,
+        ...(attachment ? { document: attachment } : {}),
       })
     );
   }
@@ -78,7 +88,13 @@ import {
 import { sendSmtpEmail } from './smtpDispatcher';
 
 
-async function sendEmailFallback(email: string, message: string, customHtml?: string, customSubject?: string): Promise<void> {
+async function sendEmailFallback(
+  email: string,
+  message: string,
+  customHtml?: string,
+  customSubject?: string,
+  attachment?: NotificationAttachment
+): Promise<void> {
   const rendered = customHtml
     ? { subject: customSubject || 'ShanuTechX Notification', html: customHtml, text: message }
     : renderNotificationEmail({ title: 'ShanuTechX Alert', message });
@@ -103,6 +119,9 @@ async function sendEmailFallback(email: string, message: string, customHtml?: st
           subject: rendered.subject,
           html: rendered.html,
           text: rendered.text,
+          attachments: attachment
+            ? [{ filename: attachment.fileName, contentType: attachment.mimetype, content: attachment.base64 }]
+            : undefined,
         }
       );
       return;

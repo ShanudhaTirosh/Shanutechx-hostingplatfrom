@@ -53,6 +53,15 @@ export function verifyResourceOwnership(
  * Pure boolean version of the ownership & team permission check.
  * Differentiates read vs write actions for team member permissions.
  */
+/**
+ * The access level a request needs: GET/HEAD only read, everything else changes something.
+ * canAccessResource() defaults to 'read' (read-only support staff and view-only team members pass it),
+ * so shared "load the owner's resource" helpers must pass this instead of relying on the default.
+ */
+export function accessActionForRequest(req: { method: string }): 'read' | 'write' {
+  return req.method === 'GET' || req.method === 'HEAD' ? 'read' : 'write';
+}
+
 export async function canAccessResource(
   resourceOwnerId: string,
   req: AuthedRequest,

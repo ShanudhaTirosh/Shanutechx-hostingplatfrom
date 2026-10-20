@@ -10,9 +10,10 @@ import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector
 import { registerLiveKitKey, revokeLiveKitKey } from '../lib/nodeAgentClient';
 import { logger } from '../lib/logger';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const livekitRouter = Router();
 
-livekitRouter.use(requireAuth);
+useForOwnRoutes(livekitRouter, requireAuth);
 
 const createProjectSchema = z.object({
   userId: z.string(),
@@ -94,7 +95,7 @@ livekitRouter.post('/livekit/projects/:id/token', async (req: AuthedRequest, res
   if (!project || !project.isActive) {
     return res.status(404).json({ error: 'Project not found or deactivated' });
   }
-  if (!(await canAccessResource(project.userId, req))) {
+  if (!(await canAccessResource(project.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Project not found' });
   }
 
@@ -125,7 +126,7 @@ livekitRouter.delete('/livekit/projects/:id', async (req: AuthedRequest, res) =>
     where: { id: req.params.id },
   });
   if (!project) return res.status(404).json({ error: 'Project not found' });
-  if (!(await canAccessResource(project.userId, req))) {
+  if (!(await canAccessResource(project.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Project not found' });
   }
 

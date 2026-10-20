@@ -29,9 +29,11 @@ RUN apt-get update \
 ENV PATH="/root/.local/share/mise/shims:/root/.local/bin:${PATH}"
 
 WORKDIR /repo
-COPY package.json ./
+# The lockfile is copied and installed with `npm ci` so the image gets exactly the dependency versions CI tested
+# (`npm install` without it re-resolved the latest in-range versions on every build).
+COPY package.json package-lock.json ./
 COPY services/node-agent/package.json services/node-agent/package.json
-RUN npm install --workspace=services/node-agent --include-workspace-root
+RUN npm ci --workspace=services/node-agent --include-workspace-root
 
 COPY services/node-agent services/node-agent
 

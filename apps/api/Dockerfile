@@ -6,10 +6,12 @@
 FROM node:20-alpine AS deps
 RUN apk add --no-cache git
 WORKDIR /repo
-COPY package.json ./
+# The lockfile is copied and installed with `npm ci` so the image gets exactly the dependency versions CI tested
+# (`npm install` without it re-resolved the latest in-range versions on every build).
+COPY package.json package-lock.json ./
 COPY packages/db/package.json packages/db/package.json
 COPY apps/api/package.json apps/api/package.json
-RUN npm install --workspace=apps/api --workspace=packages/db --include-workspace-root
+RUN npm ci --workspace=apps/api --workspace=packages/db --include-workspace-root
 
 FROM deps AS builder
 COPY packages/db packages/db

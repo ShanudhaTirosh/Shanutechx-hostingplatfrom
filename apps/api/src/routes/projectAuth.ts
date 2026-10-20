@@ -3,7 +3,7 @@ import { z } from 'zod';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
-import { canAccessResource } from '../middleware/rbac';
+import { canAccessResource, accessActionForRequest } from '../middleware/rbac';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { env } from '../env';
 import { sendSmtpEmail } from '../lib/smtpDispatcher';
@@ -368,7 +368,7 @@ const oauthConfigSchema = z.object({
 async function resolveProjectAuthAccess(projectId: string, req: AuthedRequest) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) return null;
-  if (req.user?.role !== 'dev' && !(await canAccessResource(project.userId, req))) {
+  if (req.user?.role !== 'dev' && !(await canAccessResource(project.userId, req, undefined, undefined, accessActionForRequest(req)))) {
     return null;
   }
   return project;

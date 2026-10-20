@@ -2,9 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
-import { canAccessResource } from '../middleware/rbac';
+import { canAccessResource, accessActionForRequest } from '../middleware/rbac';
 import { logger } from '../lib/logger';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const speedInsightsRouter = Router();
 
 const recordVitalSchema = z.object({
@@ -39,14 +40,14 @@ speedInsightsRouter.post('/speed-insights/vitals', async (req, res) => {
   return res.status(201).json({ ok: true, metricId: metric.id });
 });
 
-speedInsightsRouter.use(requireAuth);
+useForOwnRoutes(speedInsightsRouter, requireAuth);
 
 async function loadOwnedDeployment(req: AuthedRequest, id: string) {
   const deployment = await prisma.deployment.findUnique({
     where: { id },
   });
   if (!deployment) return null;
-  if (!(await canAccessResource(deployment.userId, req))) return null;
+  if (!(await canAccessResource(deployment.userId, req, undefined, undefined, accessActionForRequest(req)))) return null;
   return deployment;
 }
 

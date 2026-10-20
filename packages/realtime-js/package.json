@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@shanutechx/realtime-js",
   "version": "0.0.0-automated",
   "description": "Listen to realtime updates to your PostgreSQL database",

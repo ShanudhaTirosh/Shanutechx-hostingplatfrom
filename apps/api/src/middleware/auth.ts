@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { canImpersonate } from '../lib/impersonation';
 import { firebaseAuth } from '../lib/firebaseAdmin';
 import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
@@ -169,7 +170,8 @@ export async function requireAuth(
     const impersonateUserId = req.headers['x-impersonate-user-id'] as string | undefined;
     if (impersonateUserId && (user.role === 'admin' || user.role === 'dev')) {
       const targetUser = await prisma.user.findUnique({ where: { id: impersonateUserId } });
-      if (targetUser && !targetUser.isBanned && targetUser.role === 'customer') {
+      // Same rule as POST /admin/impersonate: customers only, and an admin only for customers assigned to them.
+      if (targetUser && canImpersonate({ id: req.user!.id, role: req.user!.role }, targetUser)) {
         (req as any).adminUser = req.user;
         await prisma.auditLog.create({
           data: {

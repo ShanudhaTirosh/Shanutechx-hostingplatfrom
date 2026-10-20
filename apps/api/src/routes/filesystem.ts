@@ -1,13 +1,14 @@
 import { Router } from 'express';
+import { useForOwnRoutes } from '../lib/routerGuard';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
-import { canAccessResource } from '../middleware/rbac';
+import { canAccessResource, accessActionForRequest } from '../middleware/rbac';
 import { pushWorkspaceToShadowRepo } from '../lib/shadowBackup';
 import { env } from '../env';
 
 export const filesystemRouter = Router();
 
-filesystemRouter.use(requireAuth);
+useForOwnRoutes(filesystemRouter, requireAuth);
 
 async function getNodeForDeployment(deploymentId: string) {
   const deployment = await prisma.deployment.findUnique({
@@ -21,7 +22,7 @@ async function getNodeForDeployment(deploymentId: string) {
 async function canAccessFs(req: AuthedRequest, deploymentId: string): Promise<boolean> {
   const deployment = await prisma.deployment.findUnique({ where: { id: deploymentId } });
   if (!deployment) return false;
-  return canAccessResource(deployment.userId, req);
+  return canAccessResource(deployment.userId, req, undefined, undefined, accessActionForRequest(req));
 }
 
 function agentUrl(nodeIp: string, path: string) {

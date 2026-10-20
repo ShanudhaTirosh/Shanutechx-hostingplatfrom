@@ -33,6 +33,7 @@ import {
   SupabaseClientProject,
 } from './types';
 
+import { getSettingsUnlockToken } from './settingsUnlockToken';
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -1936,7 +1937,7 @@ export const api = {
   settings: {
     verifyPassword: (password: string) =>
       apiFetch('/api/settings/verify-password', { method: 'POST', body: JSON.stringify({ password }) }).then((r) =>
-        asJson<{ ok: boolean; unlocked: boolean; message: string }>(r)
+        asJson<{ ok: boolean; unlocked: boolean; unlockToken?: string; message: string }>(r)
       ),
     changePin: (currentPin: string, newPin: string) =>
       apiFetch('/api/settings/change-pin', { method: 'POST', body: JSON.stringify({ currentPin, newPin }) }).then((r) =>
@@ -1959,11 +1960,11 @@ export const api = {
         asJson<{ configured: boolean; org: string; maskedToken: string }>(r)
       ),
     saveGithubBackup: (token: string, org?: string) =>
-      apiFetch('/api/settings/github-backup', { method: 'POST', body: JSON.stringify({ token, org }) }).then((r) =>
+      apiFetch('/api/settings/github-backup', { method: 'POST', body: JSON.stringify({ token, org, unlockToken: getSettingsUnlockToken() }) }).then((r) =>
         asJson<{ ok: boolean; message: string; configured: boolean; org: string }>(r)
       ),
     testGithubBackup: (token?: string, org?: string) =>
-      apiFetch('/api/settings/github-backup/test', { method: 'POST', body: JSON.stringify({ token, org }) }).then((r) =>
+      apiFetch('/api/settings/github-backup/test', { method: 'POST', body: JSON.stringify({ token, org, unlockToken: getSettingsUnlockToken() }) }).then((r) =>
         asJson<{
           ok: boolean;
           user: { login: string; name: string | null; publicRepos: number; totalPrivateRepos: number; avatarUrl?: string };

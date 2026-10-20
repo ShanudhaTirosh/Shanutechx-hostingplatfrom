@@ -10,6 +10,7 @@ import {
   Pressable,
   Modal,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -130,7 +131,13 @@ export function LoginScreen() {
   async function handleSaveServerUrl(url: string) {
     const clean = url.trim().replace(/\/+$/, '');
     if (!clean) return;
-    await setServerUrl(clean);
+    try {
+      await setServerUrl(clean);
+    } catch (e: any) {
+      // e.g. plain http:// or a URL with embedded credentials: the credentials would be sent there.
+      Alert.alert('Invalid server URL', e?.message ?? 'Could not save the server URL.');
+      return;
+    }
     setCustomServerUrl(clean);
     setServerModalVisible(false);
     setError(null);

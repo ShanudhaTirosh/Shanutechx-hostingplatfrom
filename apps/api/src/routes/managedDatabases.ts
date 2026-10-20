@@ -18,9 +18,10 @@ import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { env } from '../env';
 import { logger } from '../lib/logger';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const managedDatabasesRouter = Router();
 
-managedDatabasesRouter.use(requireAuth);
+useForOwnRoutes(managedDatabasesRouter, requireAuth);
 
 const createDbSchema = z.object({
   userId: z.string().optional(),
@@ -63,7 +64,7 @@ managedDatabasesRouter.post('/managed-databases', async (req: AuthedRequest, res
   }
 
   // Admin can only provision for a customer assigned to them.
-  if (req.user!.role === 'admin' && !(await canAccessResource(targetUserId, req))) {
+  if (req.user!.role === 'admin' && !(await canAccessResource(targetUserId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Customer not found' });
   }
 
@@ -297,7 +298,7 @@ managedDatabasesRouter.post('/managed-databases/:id/action', async (req: AuthedR
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
 
   const newStatus = parsed.data.action === 'stop' ? 'stopped' : 'running';
 
@@ -331,7 +332,7 @@ managedDatabasesRouter.delete('/managed-databases/:id', async (req: AuthedReques
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
 
   try {
     if (db.containerId && db.node) {
@@ -424,7 +425,7 @@ managedDatabasesRouter.post('/managed-databases/:id/backups', async (req: Authed
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
   if (!db.containerId || !db.node) {
     return res.status(400).json({ error: 'Database container node unavailable' });
   }
@@ -495,7 +496,7 @@ managedDatabasesRouter.post('/managed-databases/:id/restore', async (req: Authed
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
   if (db.status !== 'running' || !db.containerId || !db.node) {
     return res.status(400).json({ error: 'Database container must be running to restore a snapshot' });
   }
@@ -572,7 +573,7 @@ managedDatabasesRouter.post('/managed-databases/:id/users', async (req: AuthedRe
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
 
   const rawPassword = parsed.data.password || crypto.randomBytes(16).toString('hex');
   const passwordEnc = encryptSecret(rawPassword, env.secretsEncryptionKey);
@@ -636,7 +637,7 @@ managedDatabasesRouter.delete('/managed-databases/:id/users/:username', async (r
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
 
   // Delete live user from container database engine if running
   if (db.containerId && db.node && db.status === 'running') {
@@ -680,7 +681,7 @@ managedDatabasesRouter.patch('/managed-databases/:id/users/:username', async (re
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
 
   const existingUser = await prisma.managedDatabaseUser.findUnique({
     where: { databaseId_username: { databaseId: db.id, username: req.params.username } },
@@ -750,7 +751,7 @@ managedDatabasesRouter.patch('/managed-databases/:id/config', async (req: Authed
 
   const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
 
   const updated = await prisma.managedDatabase.update({
     where: { id: db.id },
@@ -774,7 +775,7 @@ managedDatabasesRouter.post('/managed-databases/:id/master-password', async (req
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
 
   // Decrypt old password for authentication against live database engine
   let oldPassword: string | undefined;
@@ -841,7 +842,7 @@ managedDatabasesRouter.post('/managed-databases/:id/migrate', async (req: Authed
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
 
   // RESTRICTION: Only dev superusers can migrate database containers to another compute node
   if (req.user!.role !== 'dev') {
@@ -928,7 +929,7 @@ managedDatabasesRouter.post('/managed-databases/:id/migrate', async (req: Authed
 managedDatabasesRouter.post('/managed-databases/:id/renew', async (req: AuthedRequest, res) => {
   const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
 
   const schema = z.object({ months: z.number().int().min(1).max(18).default(1) });
   const parsed = schema.safeParse(req.body ?? {});
@@ -1006,7 +1007,7 @@ managedDatabasesRouter.post('/managed-databases/:id/scale', async (req: AuthedRe
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
 
   try {
     if (db.containerId && db.node) {
@@ -1096,7 +1097,7 @@ managedDatabasesRouter.post('/managed-databases/:id/s3-backups', async (req: Aut
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
   if (!db.containerId || !db.node) {
     return res.status(400).json({ error: 'Database container node unavailable' });
   }
@@ -1198,7 +1199,7 @@ managedDatabasesRouter.post('/managed-databases/:id/s3-restore', async (req: Aut
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
   if (db.status !== 'running' || !db.containerId || !db.node) {
     return res.status(400).json({ error: 'Database container must be running to restore a backup' });
   }
@@ -1412,7 +1413,7 @@ managedDatabasesRouter.post('/managed-databases/:id/extensions/toggle', async (r
     include: { node: true },
   });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
   if (db.type !== 'postgres') return res.status(400).json({ error: 'Extensions are supported on PostgreSQL only' });
 
   const { extensionName, enable } = parsed.data;
@@ -1481,7 +1482,7 @@ const snippetSchema = z.object({
 managedDatabasesRouter.post('/managed-databases/:id/snippets', async (req: AuthedRequest, res) => {
   const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
 
   const parsed = snippetSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
@@ -1500,7 +1501,7 @@ managedDatabasesRouter.post('/managed-databases/:id/snippets', async (req: Authe
 managedDatabasesRouter.delete('/managed-databases/:id/snippets/:snippetId', async (req: AuthedRequest, res) => {
   const db = await prisma.managedDatabase.findUnique({ where: { id: req.params.id } });
   if (!db) return res.status(404).json({ error: 'Database not found' });
-  if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await canAccessResource(db.userId, req, undefined, undefined, 'write'))) return res.status(404).json({ error: 'Not found' });
 
   await prisma.databaseSavedQuery.deleteMany({
     where: { id: req.params.snippetId, databaseId: db.id },

@@ -17,6 +17,7 @@ const rateLimiter = new RateLimiter(6, 60000); // Max 6 commands per minute per 
 async function apiFetch(path, options = {}) {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
+      signal: AbortSignal.timeout(10000), // never leave an interaction hanging on a stuck API call
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -33,6 +34,22 @@ async function apiFetch(path, options = {}) {
     return { ok: false, error: err.message || 'Network request failed' };
   }
 }
+
+const STAFF_ROLES = ['Staff', 'Admin', 'Support', 'Developer'];
+
+/**
+ * Staff = a role named Staff/Admin/Support/Developer, the DISCORD_STAFF_ROLE_ID role (the same
+ * role that is granted access to ticket channels), or the Administrator permission.
+ */
+function isStaffMember(interaction) {
+  const staffRoleId = process.env.DISCORD_STAFF_ROLE_ID;
+  return Boolean(
+    interaction.member?.roles?.cache?.some((r) => STAFF_ROLES.includes(r.name) || (staffRoleId && r.id === staffRoleId)) ||
+      interaction.member?.permissions?.has('Administrator')
+  );
+}
+
+const NO_PERMISSION = '❌ You do not have permission to execute staff commands.';
 
 const commands = [
   new SlashCommandBuilder()
@@ -239,6 +256,12 @@ async function handleInteraction(interaction) {
   if (interaction.isButton()) {
     const [action, ticketId] = interaction.customId.split(':');
 
+    // These buttons sit on ticket embeds in channels the *customer* can also see. They were
+    // previously unchecked, so a customer could reply "as staff" or close their ticket.
+    if (['claim_ticket', 'reply_ticket', 'close_ticket'].includes(action) && !isStaffMember(interaction)) {
+      return interaction.reply({ content: NO_PERMISSION, ephemeral: true });
+    }
+
     if (action === 'claim_ticket') {
       await interaction.deferReply({ ephemeral: true });
       const res = await apiFetch('/api/internal/claim-ticket', {
@@ -285,6 +308,13 @@ async function handleInteraction(interaction) {
 
   // 3. Handle Modal Submits
   if (interaction.isModalSubmit()) {
+    if (
+      (interaction.customId.startsWith('modal_reply_ticket:') || interaction.customId.startsWith('modal_close_ticket:')) &&
+      !isStaffMember(interaction)
+    ) {
+      return interaction.reply({ content: NO_PERMISSION, ephemeral: true });
+    }
+
     if (interaction.customId.startsWith('modal_open_ticket:')) {
       const category = interaction.customId.split(':')[1];
       const subject = interaction.fields.getTextInputValue('ticket_subject');
@@ -344,15 +374,13 @@ async function handleInteraction(interaction) {
   // 4. Handle Slash Commands
   if (!interaction.isChatInputCommand()) return;
 
-  const STAFF_ROLES = ['Staff', 'Admin', 'Support', 'Developer'];
-  const isStaff =
-    interaction.member?.roles?.cache?.some((r) => STAFF_ROLES.includes(r.name)) ||
-    interaction.member?.permissions?.has('Administrator');
+  const isStaff = isStaffMember(interaction);
   const STAFF_COMMANDS = [
     'claim-ticket',
     'unclaim-ticket',
     'close-ticket',
     'reply-ticket',
+    'tickets-list', // exposes the whole queue incl. customer emails
     'ticket-panel',
     'announce',
     'send-invoice',
@@ -360,7 +388,7 @@ async function handleInteraction(interaction) {
   ];
   if (STAFF_COMMANDS.includes(interaction.commandName) && !isStaff) {
     return interaction.reply({
-      content: '❌ You do not have permission to execute staff commands.',
+      content: NO_PERMISSION,
       ephemeral: true,
     });
   }
@@ -609,9 +637,19 @@ async function handleInteraction(interaction) {
         );
 
       await interaction.editReply({ embeds: [embed] });
+    } else {
+      // e.g. /deployments and /invoices-list are registered but have no handler yet; without a
+      // reply Discord shows "The application did not respond".
+      await interaction.reply({ content: `\`/${commandName}\` is not available yet.`, ephemeral: true });
     }
   } catch (err) {
     console.error('Failed handling Discord command:', err);
+    // After deferReply() a silent failure leaves the user staring at "thinking..." - always answer.
+    const failure = '[ERROR] Something went wrong while running that command. Please try again.';
+    try {
+      if (interaction.deferred || interaction.replied) await interaction.editReply(failure);
+      else await interaction.reply({ content: failure, ephemeral: true });
+    } catch (_) {}
   }
 }
 

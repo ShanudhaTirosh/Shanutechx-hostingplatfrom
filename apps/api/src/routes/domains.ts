@@ -20,10 +20,11 @@ import { domainManager, DomainManagerError } from '../lib/domain/manager';
 import { createCnameViaCloudflare } from '../lib/cloudflareDns';
 import { logger } from '../lib/logger';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const domainsRouter = Router();
 
 // All domain endpoints require authentication
-domainsRouter.use(requireAuth);
+useForOwnRoutes(domainsRouter, requireAuth);
 
 /**
  * Request body schema for attaching a custom domain

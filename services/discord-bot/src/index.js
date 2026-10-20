@@ -1,5 +1,9 @@
+// Load .env before anything reads process.env (the logger reads LOG_LEVEL on require).
+require('dotenv').config();
+
 const crypto = require('crypto');
 const express = require('express');
+const { buildDmPayload } = require('./dmPayload');
 const { connect, getClient, logger } = require('./client');
 
 const PORT = process.env.DISCORD_PORT || 4200;
@@ -12,7 +16,8 @@ if (!INTERNAL_SECRET) {
 }
 
 const app = express();
-app.use(express.json());
+// Documents (e.g. invoice PDFs) arrive base64-encoded: the 100 KB default would reject them.
+app.use(express.json({ limit: '12mb' }));
 
 // Liveness — Docker HEALTHCHECK target. Registered before the auth
 // middleware below so Docker's healthcheck doesn't need the shared secret.
@@ -45,15 +50,19 @@ app.use((req, res, next) => {
  * channel alerts (below) have no such restriction.
  */
 app.post('/internal/send-dm', async (req, res) => {
-  const { discordUserId, message } = req.body || {};
-  if (!discordUserId || !message) {
-    return res.status(400).json({ error: 'discordUserId and message are required' });
+  const { discordUserId, message, document } = req.body || {};
+  if (!discordUserId) {
+    return res.status(400).json({ error: 'discordUserId and a message or document are required' });
+  }
+  const built = buildDmPayload(message, document);
+  if (!built.ok) {
+    return res.status(400).json({ error: built.error });
   }
 
   try {
     const client = getClient();
     const user = await client.users.fetch(discordUserId);
-    await user.send(message);
+    await user.send(built.payload);
     res.json({ ok: true });
   } catch (err) {
     logger.error({ discordUserId, err }, 'Failed to send Discord DM');
@@ -156,10 +165,22 @@ app.post('/internal/create-ticket-channel', async (req, res) => {
     const shortId = ticketId.slice(0, 8).toUpperCase();
     const channelName = `ticket-${shortId.toLowerCase()}`;
 
+    // Idempotency: don't create a second channel if this ticket already has one.
+    const existingChannel = guild.channels.cache.find((c) => c.name === channelName && c.type === 0);
+    if (existingChannel) {
+      return res.json({ ok: true, channelId: existingChannel.id, channelName: existingChannel.name, existing: true });
+    }
+
     const overwrites = [
       {
         id: guild.roles.everyone.id,
         deny: ['ViewChannel'],
+      },
+      // Channel-level @everyone deny overrides the bot's guild-level role permissions, so without
+      // this the bot (unless Administrator) could not post its embed or read replies here.
+      {
+        id: client.user.id,
+        allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'EmbedLinks', 'AttachFiles'],
       },
     ];
 

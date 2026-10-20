@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
-import { ownedResourceWhere, canAccessResource } from '../middleware/rbac';
+import { ownedResourceWhere, canAccessResource, accessActionForRequest } from '../middleware/rbac';
 import { deployService } from '../lib/deployPipeline';
 import { selectNodeForDeployment, NodeSelectionError } from '../lib/nodeSelector';
 import { fetchLogs, stopDeployment, cancelBuild, stopComposeProject, startDeployment, restartDeployment, buildAndRun, addCustomDomainRoute, removeCustomDomainRoute, getResourceUsage, ResourceMetrics } from '../lib/nodeAgentClient';
@@ -460,7 +460,7 @@ async function loadOwnedDeployment(req: AuthedRequest, id: string) {
 
   if (!deployment) return null;
   // Dev unrestricted; admin only for an assigned customer's deployment.
-  if (!(await canAccessResource(deployment.userId, req))) return null;
+  if (!(await canAccessResource(deployment.userId, req, undefined, undefined, accessActionForRequest(req)))) return null;
   return deployment;
 }
 

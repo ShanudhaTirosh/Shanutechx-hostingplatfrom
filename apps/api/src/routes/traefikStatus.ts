@@ -4,9 +4,10 @@ import { env } from '../env';
 import { logger } from '../lib/logger';
 import { prisma } from '../lib/prisma';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const traefikStatusRouter = Router();
 
-traefikStatusRouter.use(requireAuth, requireAdminOrDev);
+useForOwnRoutes(traefikStatusRouter, requireAuth, requireAdminOrDev);
 
 async function fetchTraefikApi(path: string) {
   const controller = new AbortController();

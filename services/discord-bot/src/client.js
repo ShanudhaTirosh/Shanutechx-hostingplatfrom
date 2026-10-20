@@ -2,11 +2,22 @@ const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
 const pino = require('pino');
 const { commands, handleInteraction } = require('./slashCommands');
 
+// pino-pretty is not a declared dependency of this service (it only exists in the repo-root
+// node_modules by hoisting). In the Docker image it is missing and pino() throws at startup,
+// so only use it when it can actually be resolved.
+function prettyTransport() {
+  if (process.env.NODE_ENV === 'production') return {};
+  try {
+    require.resolve('pino-pretty');
+  } catch (_) {
+    return {};
+  }
+  return { transport: { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:standard', ignore: 'pid,hostname' } } };
+}
+
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
-  ...(process.env.NODE_ENV !== 'production'
-    ? { transport: { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:standard', ignore: 'pid,hostname' } } }
-    : {}),
+  ...prettyTransport(),
 });
 
 let client = null;
@@ -73,7 +84,8 @@ function connect() {
 
     let ticketId = null;
     if (topic.includes('Ticket ID:')) {
-      const match = topic.match(/Ticket ID:\s*([a-f0-9\-]+)/i);
+      // Ticket ids are cuids (a-z0-9), not hex: the old [a-f0-9-]+ stopped at the first non-hex letter.
+      const match = topic.match(/Ticket ID:\s*([A-Za-z0-9_-]+)/i);
       if (match) ticketId = match[1];
     }
 
@@ -86,8 +98,17 @@ function connect() {
         const apiBase = process.env.API_INTERNAL_URL || 'http://localhost:4000';
         const secret = process.env.DISCORD_INTERNAL_SECRET;
 
+        // Only staff are relayed as staff. The ticket's customer is also allowed to type in the
+        // channel; their messages used to be stored as staff replies and emailed back to them.
+        const staffRoleId = process.env.DISCORD_STAFF_ROLE_ID;
+        const isStaffMember = Boolean(staffRoleId && message.member?.roles?.cache?.has(staffRoleId));
+        const isCustomer =
+          !isStaffMember &&
+          Boolean(message.channel.permissionOverwrites?.cache?.some((o) => o.id === message.author.id));
+
         const res = await fetch(`${apiBase}/api/internal/reply-ticket`, {
           method: 'POST',
+          signal: AbortSignal.timeout(10000),
           headers: {
             'Content-Type': 'application/json',
             'x-internal-secret': secret,
@@ -95,6 +116,7 @@ function connect() {
           body: JSON.stringify({
             ticketId,
             body: message.content,
+            senderRole: isCustomer ? 'customer' : 'admin',
             staffUserLabel: `${message.author.username} (via Discord Channel)`,
           }),
         });

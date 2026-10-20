@@ -13,11 +13,12 @@ import { env } from '../env';
 import { buildAndRun } from '../lib/nodeAgentClient';
 import { decryptSecret } from '../lib/secretsVault';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 const execFileAsync = promisify(execFile);
 
 export const uploadDeploymentsRouter = Router();
 
-uploadDeploymentsRouter.use(requireAuth);
+useForOwnRoutes(uploadDeploymentsRouter, requireAuth);
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -52,7 +53,7 @@ const handleArchiveUpload = async (req: AuthedRequest, res: any) => {
     return res.status(404).json({ error: 'Deployment instance not found' });
   }
 
-  if (!(await canAccessResource(deployment.userId, req))) {
+  if (!(await canAccessResource(deployment.userId, req, undefined, undefined, 'write'))) {
     return res.status(403).json({ error: 'Access denied to this deployment instance' });
   }
 
@@ -311,7 +312,7 @@ const downloadZipHandler = async (req: AuthedRequest, res: any) => {
     return res.status(404).json({ error: 'Deployment instance not found' });
   }
 
-  if (!(await canAccessResource(deployment.userId, req))) {
+  if (!(await canAccessResource(deployment.userId, req, undefined, undefined, 'write'))) {
     return res.status(403).json({ error: 'Access denied' });
   }
 

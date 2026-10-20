@@ -29,10 +29,11 @@ import {
   testVpsConnectionRaw,
 } from '../lib/vpsSshClient';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const vpsRouter = Router();
 const upload = multer({ limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB max SFTP upload
 
-vpsRouter.use(requireAuth);
+useForOwnRoutes(vpsRouter, requireAuth);
 
 const CREDENTIAL_SYNC_NOTICE =
   'IMPORTANT NOTE: If you change your root password directly inside the SSH terminal or external provider console, you MUST update your stored credentials in the control panel using "Update Credentials". Otherwise, automated reboot, SFTP file management, and browser SSH terminal will fail to authenticate.';
@@ -113,7 +114,7 @@ vpsRouter.post('/vps-provisions', requireAdminOrDev, async (req: AuthedRequest, 
   const parsed = provisionSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  if (req.user!.role === 'admin' && !(await canAccessResource(parsed.data.userId, req))) {
+  if (req.user!.role === 'admin' && !(await canAccessResource(parsed.data.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Customer not found' });
   }
 
@@ -314,7 +315,7 @@ vpsRouter.get('/vps-provisions/:id/reveal-password', async (req: AuthedRequest, 
 vpsRouter.post('/vps-provisions/:id/ssh-ticket', async (req: AuthedRequest, res: Response) => {
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -350,7 +351,7 @@ vpsRouter.post('/vps-provisions/:id/renew', async (req: AuthedRequest, res: Resp
   });
 
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -476,7 +477,7 @@ vpsRouter.post('/vps-provisions/:id/power', async (req: AuthedRequest, res: Resp
 
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -542,7 +543,7 @@ vpsRouter.get('/vps-provisions/:id/upgrade-packages/status', async (req: AuthedR
 vpsRouter.post('/vps-provisions/:id/upgrade-packages', async (req: AuthedRequest, res: Response) => {
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -644,7 +645,7 @@ vpsRouter.post('/vps-provisions/:id/change-password', async (req: AuthedRequest,
 
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -700,7 +701,7 @@ vpsRouter.patch('/vps-provisions/:id/update-credentials', async (req: AuthedRequ
 
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -804,7 +805,7 @@ vpsRouter.post(
   async (req: AuthedRequest, res: Response) => {
     const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
     if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-    if (!(await canAccessResource(provision.userId, req))) {
+    if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
       return res.status(404).json({ error: 'Not found' });
     }
 
@@ -836,7 +837,7 @@ vpsRouter.post(
 vpsRouter.delete('/vps-provisions/:id/sftp/delete', async (req: AuthedRequest, res: Response) => {
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -867,7 +868,7 @@ vpsRouter.post('/vps-provisions/:id/sftp/extract', async (req: AuthedRequest, re
 
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -894,7 +895,7 @@ vpsRouter.post('/vps-provisions/:id/sftp/rename', async (req: AuthedRequest, res
 
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -918,7 +919,7 @@ vpsRouter.post('/vps-provisions/:id/sftp/mkdir', async (req: AuthedRequest, res:
 
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -942,7 +943,7 @@ vpsRouter.post('/vps-provisions/:id/sftp/touch', async (req: AuthedRequest, res:
 
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -993,7 +994,7 @@ vpsRouter.post('/vps-provisions/:id/sftp/save-file', async (req: AuthedRequest, 
 
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -1013,7 +1014,7 @@ vpsRouter.post('/vps-provisions/:id/sftp/save-file', async (req: AuthedRequest, 
 vpsRouter.delete('/vps-provisions/:id', async (req: AuthedRequest, res: Response) => {
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -1063,7 +1064,7 @@ vpsRouter.post('/vps-provisions/:id/firewall/toggle', async (req: AuthedRequest,
 
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -1096,7 +1097,7 @@ vpsRouter.post('/vps-provisions/:id/firewall/rules', async (req: AuthedRequest, 
 
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -1123,7 +1124,7 @@ vpsRouter.delete('/vps-provisions/:id/firewall/rules/:ruleIndex', async (req: Au
 
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
-  if (!(await canAccessResource(provision.userId, req))) {
+  if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
 
@@ -1138,7 +1139,13 @@ vpsRouter.delete('/vps-provisions/:id/firewall/rules/:ruleIndex', async (req: Au
   }
 });
 
-function omitCredentialRef<T extends { credentialRef: string | null }>(provision: T) {
-  const { credentialRef, ...rest } = provision;
-  return rest;
+/**
+ * Strips stored secret material before a provision is returned to a client: `credentialRef` is the
+ * encrypted password and `sshPrivateKey` the encrypted SSH key. Both used to be handled differently
+ * (only credentialRef was removed), so the key ciphertext was sent in every response - including to
+ * support staff, who can read any customer's VPS. Clients get `hasSshKey` instead.
+ */
+function omitCredentialRef<T extends { credentialRef: string | null; sshPrivateKey?: string | null }>(provision: T) {
+  const { credentialRef, sshPrivateKey, ...rest } = provision;
+  return { ...rest, hasSshKey: Boolean(sshPrivateKey) };
 }

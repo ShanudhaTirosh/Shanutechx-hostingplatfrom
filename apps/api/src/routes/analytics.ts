@@ -3,9 +3,10 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { logger } from '../lib/logger';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const analyticsRouter = Router();
 
-analyticsRouter.use(requireAuth, requireAdmin);
+useForOwnRoutes(analyticsRouter, requireAuth, requireAdmin);
 
 /**
  * Enhanced Enterprise Telemetry & Platform Analytics Engine

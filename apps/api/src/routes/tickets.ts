@@ -7,9 +7,10 @@ import { notifyCustomer, notifyAdmins, notifyTicketEmbed } from '../lib/notifica
 import { parsePagination } from '../lib/pagination';
 import { fireWebhook } from '../lib/webhooks';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const ticketsRouter = Router();
 
-ticketsRouter.use(requireAuth);
+useForOwnRoutes(ticketsRouter, requireAuth);
 
 const createTicketSchema = z.object({
   subject: z.string().min(1).max(200),

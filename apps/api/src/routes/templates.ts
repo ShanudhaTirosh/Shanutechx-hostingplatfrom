@@ -3,9 +3,10 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const templatesRouter = Router();
 
-templatesRouter.use(requireAuth);
+useForOwnRoutes(templatesRouter, requireAuth);
 
 /** Customers browse public templates to pre-fill a deployment instead of bringing their own repo. */
 templatesRouter.get('/templates', async (_req, res) => {

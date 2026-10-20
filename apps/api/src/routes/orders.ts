@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { useForOwnRoutes } from '../lib/routerGuard';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
@@ -17,7 +18,9 @@ import { splitOrderItemsIntoUnits } from '../lib/deploymentSlots';
 
 export const ordersRouter = Router();
 
-ordersRouter.use('/orders', requireAuth);
+// Covers every route in this file. The old path-scoped gate only matched /orders, so routes under
+// other prefixes in this router were only authenticated by accident (via another router's global requireAuth).
+useForOwnRoutes(ordersRouter, requireAuth);
 
 /** Gets (or creates) the customer's single open draft order — their "cart". */
 async function getOrCreateDraftOrder(userId: string) {
@@ -202,6 +205,13 @@ ordersRouter.delete('/cart/items/:itemId', async (req: AuthedRequest, res) => {
 
   if (!item || item.order.userId !== req.user!.id) {
     return res.status(404).json({ error: 'Item not found' });
+  }
+
+  // Only the cart (a draft order) is editable. recalculateTotal() re-prices every line from the
+  // CURRENT catalog and overwrites total/totalLkr, so allowing this on a placed or paid order
+  // silently rewrote its recorded amounts (and the exchange-rate snapshot payments rely on).
+  if (item.order.status !== 'draft') {
+    return res.status(409).json({ error: 'Only items in your cart can be removed. This order has already been placed.' });
   }
 
   await prisma.orderItem.delete({ where: { id: item.id } });

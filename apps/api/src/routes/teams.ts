@@ -3,9 +3,11 @@ import { z } from 'zod';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
+import { canAccessResource } from '../middleware/rbac';
 import { sendTeamInviteNotification } from '../lib/notifications';
 import { logger } from '../lib/logger';
 
+import { useForOwnRoutes } from '../lib/routerGuard';
 export const teamsRouter = Router();
 
 /**
@@ -45,7 +47,7 @@ teamsRouter.get('/teams/public/invites/:token', async (req: Request, res: Respon
   });
 });
 
-teamsRouter.use(requireAuth);
+useForOwnRoutes(teamsRouter, requireAuth);
 
 /**
  * GET /api/teams
@@ -149,7 +151,8 @@ teamsRouter.get('/teams/:id', async (req: AuthedRequest, res) => {
   const isOwner = team.ownerId === userId;
   const myMembership = team.members.find((m: any) => m.userId === userId);
 
-  if (!isOwner && !myMembership && req.user!.role !== 'admin' && req.user!.role !== 'dev') {
+  const isStaff = await isPlatformStaffForTeam(req, team.ownerId);
+  if (!isOwner && !myMembership && !isStaff) {
     return res.status(403).json({ error: 'Access denied' });
   }
 
@@ -162,7 +165,6 @@ teamsRouter.get('/teams/:id', async (req: AuthedRequest, res) => {
   ]);
 
   // Filter resources based on granular resource permissions for non-owner members
-  const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
   if (!isOwner && !isStaff && myMembership?.permissions && myMembership.permissions.length > 0) {
     const perms = myMembership.permissions;
     const allowed = (type: string, id: string) => perms.some((p: any) => p.resourceType === type && p.resourceId === id && p.permission !== 'none');
@@ -172,8 +174,15 @@ teamsRouter.get('/teams/:id', async (req: AuthedRequest, res) => {
     smtpAccounts = smtpAccounts.filter((s: any) => allowed('smtp', s.id));
   }
 
+  // Invite tokens are bearer secrets for joining the team: only people who can manage invitations
+  // may see them (a viewer used to receive every pending token in this response).
+  const canSeeInviteTokens = isOwner || isStaff || myMembership?.role === 'admin';
+  const safeTeam = canSeeInviteTokens
+    ? team
+    : { ...team, invites: team.invites.map(({ token: _token, ...rest }: any) => rest) };
+
   res.json({
-    team,
+    team: safeTeam,
     myRole: isOwner ? 'owner' : myMembership?.role ?? 'viewer',
     resources: {
       deployments,
@@ -347,6 +356,7 @@ teamsRouter.delete('/teams/:id/invites/:inviteId', async (req: AuthedRequest, re
   const isOwner = team.ownerId === userId;
   const myMembership = team.members.find((m: any) => m.userId === userId);
   const canRevoke = isOwner || myMembership?.role === 'admin' || req.user!.role === 'dev';
+  if (!canRevoke) return res.status(403).json({ error: 'Only team owners or admins can revoke invitations' });
 
   const invite = await prisma.teamInvite.findUnique({
     where: { id: inviteId },
@@ -497,7 +507,7 @@ teamsRouter.patch('/teams/:id/members/:memberId', async (req: AuthedRequest, res
     return res.status(404).json({ error: 'Member not found in this team' });
   }
 
-  if (team.ownerId !== userId && req.user!.role !== 'admin' && req.user!.role !== 'dev') {
+  if (team.ownerId !== userId && !(await isPlatformStaffForTeam(req, team.ownerId))) {
     return res.status(403).json({ error: 'Only the team owner can edit member roles' });
   }
 
@@ -535,6 +545,17 @@ teamsRouter.patch('/teams/:id/members/:memberId', async (req: AuthedRequest, res
 
   res.json({ member: updatedMember });
 });
+
+/**
+ * Platform staff access to a team: `dev` is unrestricted, `admin` only for teams owned by one of
+ * their ASSIGNED customers (same scoping as every other resource - see canAccessResource).
+ * It used to be `role === 'admin' || role === 'dev'`, which let any admin edit any team.
+ */
+async function isPlatformStaffForTeam(req: AuthedRequest, ownerId: string): Promise<boolean> {
+  if (req.user!.role === 'dev') return true;
+  if (req.user!.role === 'admin') return canAccessResource(ownerId, req, undefined, undefined, 'write');
+  return false;
+}
 
 async function validateTeamResourcePermissions(
   ownerId: string,
@@ -599,7 +620,7 @@ teamsRouter.delete('/teams/:id/members/:memberId', async (req: AuthedRequest, re
   const isOwner = team.ownerId === userId;
   const isSelf = member.userId === userId;
 
-  if (!isOwner && !isSelf && req.user!.role !== 'admin' && req.user!.role !== 'dev') {
+  if (!isOwner && !isSelf && !(await isPlatformStaffForTeam(req, team.ownerId))) {
     return res.status(403).json({ error: 'Permission denied' });
   }
 

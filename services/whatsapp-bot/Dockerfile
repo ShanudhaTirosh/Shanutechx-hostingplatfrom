@@ -4,9 +4,11 @@
 FROM node:20-alpine
 RUN apk add --no-cache git
 WORKDIR /repo
-COPY package.json ./
+# The lockfile is copied and installed with `npm ci` so the image gets exactly the dependency versions CI tested
+# (`npm install` without it re-resolved the latest in-range versions on every build).
+COPY package.json package-lock.json ./
 COPY services/whatsapp-bot/package.json services/whatsapp-bot/package.json
-RUN npm install --workspace=services/whatsapp-bot --include-workspace-root
+RUN npm ci --workspace=services/whatsapp-bot --include-workspace-root
 
 COPY services/whatsapp-bot services/whatsapp-bot
 
