@@ -66,7 +66,7 @@ sudo usermod -aG docker ubuntu
 sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
 
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # Build and deploy
@@ -93,7 +93,7 @@ sudo docker-compose ps
 2. **Upload .env Files** - Transfers updated configs to server
 3. **Install System Dependencies**
    - Docker & Docker Compose
-   - Node.js 20
+   - Node.js 22
 4. **Install Project Dependencies** - npm packages
 5. **Generate Prisma Client** - Database ORM
 6. **Build Docker Containers**

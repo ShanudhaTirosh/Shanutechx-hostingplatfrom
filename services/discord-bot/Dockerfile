@@ -1,6 +1,6 @@
 # Build context is the repo root (see docker-compose).
 
-FROM node:20-alpine
+FROM node:22-alpine
 RUN apk add --no-cache git
 WORKDIR /repo
 # The lockfile is copied and installed with `npm ci` so the image gets exactly the dependency versions CI tested

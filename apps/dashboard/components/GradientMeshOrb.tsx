@@ -11,7 +11,7 @@ interface GradientMeshOrbProps {
 
 export default function GradientMeshOrb({
   size = 480,
-  glowColor = 'rgba(124,58,237,0.45)',
+  glowColor = 'rgba(255,255,255,0.03)',
   className = '',
   opacity = 0.8,
 }: GradientMeshOrbProps) {
@@ -25,7 +25,7 @@ export default function GradientMeshOrb({
       <div
         className="absolute inset-0 rounded-full blur-3xl animate-pulse"
         style={{
-          background: `radial-gradient(circle, ${glowColor} 0%, rgba(99,102,241,0.2) 50%, transparent 75%)`,
+          background: `radial-gradient(circle, ${glowColor} 0%, rgba(255,255,255,0.015) 50%, transparent 75%)`,
           animationDuration: '6s',
         }}
       />

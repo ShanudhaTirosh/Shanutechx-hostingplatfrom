@@ -463,7 +463,7 @@ export function DashboardSidebarView({
         {/* User Info */}
         {apiUser && (
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-full bg-[var(--color-accent)] flex items-center justify-center text-white text-[11px] font-semibold shrink-0">
+            <div className="h-8 w-8 rounded-full bg-[var(--color-accent)] flex items-center justify-center text-[var(--color-accent-contrast,#0a0a0a)] text-[11px] font-bold shrink-0">
               {initials}
             </div>
             <div className="min-w-0 flex-1">
@@ -472,7 +472,7 @@ export function DashboardSidebarView({
               </p>
               <div className="flex items-center gap-1 mt-0.5">
                 {apiUser.role === "dev" ? (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-accent)] bg-[var(--color-accent-subtle)] border border-[var(--color-accent-border)] rounded px-1.5 py-0.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-white bg-white/10 border border-white/20 rounded px-1.5 py-0.5">
                     Dev · Superuser
                   </span>
                 ) : userRole === "admin" ? (
@@ -481,7 +481,7 @@ export function DashboardSidebarView({
                     onChange={async (e) => {
                       try { await switchRole(e.target.value as any); } catch {}
                     }}
-                    className="text-[10px] capitalize font-semibold bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--color-text-muted)] rounded px-1.5 py-0.5 cursor-pointer focus:outline-none focus:border-[var(--color-accent)]"
+                    className="text-[10px] capitalize font-semibold bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--color-text-muted)] rounded px-1.5 py-0.5 cursor-pointer focus:outline-none focus:border-white"
                   >
                     <option value="admin">Admin Account</option>
                     <option value="support">Support Account</option>

@@ -16,7 +16,7 @@
 # docker-compose.yml / .env.example, both required for `railpack build` to
 # work at all, unlike Nixpacks which bundled its own build mechanism.
 
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends git curl ca-certificates unzip p7zip-full tar bzip2 xz-utils iproute2 docker.io docker-compose-plugin \

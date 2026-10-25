@@ -174,14 +174,14 @@ function GatedLayoutContent({
             style={{ background: 'var(--color-accent)' }}
           >
             <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-              <path d="M7 1L13 4.5V9.5L7 13L1 9.5V4.5L7 1Z" stroke="white" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M7 1L13 4.5V9.5L7 13L1 9.5V4.5L7 1Z" stroke="var(--color-accent-contrast, #0a0a0a)" strokeWidth="1.5" strokeLinejoin="round" />
             </svg>
           </div>
           <span
             className="font-semibold text-sm tracking-tight"
             style={{ color: 'var(--color-text-primary)' }}
           >
-            STX <span style={{ color: 'var(--color-accent)' }}>HOSTING</span>
+            STX <span style={{ color: 'var(--color-text-primary)' }}>HOSTING</span>
           </span>
         </div>
 

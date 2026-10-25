@@ -8,13 +8,18 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        bg: '#0a0a0a',
+        surface: '#141414',
+        'surface-2': '#1e1e1e',
+        'surface-3': '#262626',
+        border: 'rgba(255,255,255,0.08)',
         brand: {
-          50: '#f0f3ff',
-          100: '#e0e7ff',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          900: '#312e81',
+          50: '#f4f4f5',
+          100: '#e4e4e7',
+          500: '#ffffff',
+          600: '#e5e5e5',
+          700: '#d4d4d8',
+          900: '#0a0a0a',
         },
       },
     },

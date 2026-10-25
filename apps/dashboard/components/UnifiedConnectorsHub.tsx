@@ -232,7 +232,7 @@ function UnifiedConnectorsHubContent({ defaultTab = 'containers' }: UnifiedConne
               onClick={() => setActiveTab(t.id as ConnectorTab)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                 isActive
-                  ? 'bg-brand-gradient text-white shadow-glow-violet scale-[1.02]'
+                  ? 'bg-white text-black font-semibold shadow-sm scale-[1.02]'
                   : 'text-text-muted hover:text-text-primary hover:bg-white/[0.06]'
               }`}
             >
@@ -257,7 +257,7 @@ function UnifiedConnectorsHubContent({ defaultTab = 'containers' }: UnifiedConne
                 onClick={() => setSelectedNodeId(n.id)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
                   isSel
-                    ? 'bg-accent-violet text-white shadow-glow-violet'
+                    ? 'bg-white text-black font-semibold shadow-sm'
                     : 'glass text-text-muted hover:text-text-primary hover:bg-white/[0.08]'
                 }`}
               >
@@ -415,7 +415,7 @@ function Stat({ label, value, unit, max }: { label: string; value: number | null
   const pct = value !== null && max > 0 ? Math.min(100, (value / max) * 100) : 0;
   const isHigh = pct > 85;
   const isMedium = pct > 60;
-  const colorClass = isHigh ? 'bg-red-500' : isMedium ? 'bg-orange-400' : 'bg-brand-gradient';
+  const colorClass = isHigh ? 'bg-red-500' : isMedium ? 'bg-orange-400' : 'bg-white';
   const textColorClass = isHigh ? 'text-red-300 font-semibold' : isMedium ? 'text-orange-300' : 'text-emerald-400';
 
   return (
@@ -593,7 +593,7 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
             type="button"
             onClick={() => setTab('combined')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              tab === 'combined' ? 'bg-accent-violet text-white shadow-glow-violet' : 'text-text-muted hover:text-text-primary'
+              tab === 'combined' ? 'bg-white text-black font-semibold shadow-sm' : 'text-text-muted hover:text-text-primary'
             }`}
           >
             <KeyIcon /> Automated SSH &amp; 1-Line Script
@@ -602,7 +602,7 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
             type="button"
             onClick={() => setTab('manual')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              tab === 'manual' ? 'bg-accent-violet text-white shadow-glow-violet' : 'text-text-muted hover:text-text-primary'
+              tab === 'manual' ? 'bg-white text-black font-semibold shadow-sm' : 'text-text-muted hover:text-text-primary'
             }`}
           >
             <ServerIcon /> Manual Form
@@ -632,7 +632,7 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
                 onClick={() => toggleTag(tag)}
                 className={`text-xs rounded-full px-3 py-1 font-medium transition-all capitalize border ${
                   active
-                    ? 'bg-accent-violet/20 border-accent-violet/40 text-accent-violet-light'
+                    ? 'bg-white/20 border-white/40 text-white'
                     : 'bg-white/5 border-white/10 text-text-muted hover:text-text-primary'
                 }`}
               >
@@ -1094,7 +1094,7 @@ function ContainersTabView({ nodeId }: { nodeId: string | null }) {
                 key={st}
                 onClick={() => setStatusFilter(st)}
                 className={`px-3 py-1 rounded-lg text-xs font-semibold capitalize transition-all ${
-                  statusFilter === st ? 'bg-accent-violet text-white' : 'text-text-muted hover:text-text-primary'
+                  statusFilter === st ? 'bg-white text-black font-semibold shadow-sm' : 'text-text-muted hover:text-text-primary'
                 }`}
               >
                 {st}

@@ -1,0 +1,309 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 5e83deb..9c839bb 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -38,10 +38,10 @@ jobs:
+       - name: Checkout Source Code
+         uses: actions/checkout@v4
+ 
+-      - name: Setup Node.js 20.x Environment
++      - name: Setup Node.js 22.x Environment
+         uses: actions/setup-node@v4
+         with:
+-          node-version: 20
++          node-version: 22
+           cache: 'npm'
+ 
+       - name: Install Monorepo Dependencies
+diff --git a/.github/workflows/publish-sdk.yml b/.github/workflows/publish-sdk.yml
+index 95bed62..75a0c8d 100644
+--- a/.github/workflows/publish-sdk.yml
++++ b/.github/workflows/publish-sdk.yml
+@@ -28,7 +28,7 @@ jobs:
+       - name: Setup Node.js
+         uses: actions/setup-node@v4
+         with:
+-          node-version: 20
++          node-version: 22
+           registry-url: 'https://npm.pkg.github.com'
+           scope: '@shanutechx'
+ 
+diff --git a/AGENTS.md b/AGENTS.md
+index 1601ba1..c5f6626 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -31,7 +31,7 @@ ShanuTechX is an autonomous enterprise cloud-hosting platform and container orch
+ 
+ ## 🛠️ Environment & Commands Quick-Start
+ 
+-- **Node Version:** Node 20 required (CI enforces `node-version: 20`).
++- **Node Version:** Node 22 required (CI enforces `node-version: 22`; Node 20 reached end-of-life on 2026-04-30).
+ - **Dev Servers:** `npm run dev:api` (port 4000), `npm run dev:dashboard` (3001), `npm run dev:web` (3000), `npm run dev:webmail` (3002), `npm run dev:whatsapp`, `npm run dev:discord`, `npm run dev:node-agent`.
+ - **Database & Prisma:** `npm run db:generate`, `npm run db:migrate`, `npm run db:migrate:deploy`.
+ - **Tests & Typechecks:**
+diff --git a/apps/api/Dockerfile b/apps/api/Dockerfile
+index b782f1f..ba78307 100644
+--- a/apps/api/Dockerfile
++++ b/apps/api/Dockerfile
+@@ -3,7 +3,7 @@
+ # required so npm workspaces can resolve the @shanutechx/db dependency,
+ # which is a symlink into packages/db, not a published package.
+ 
+-FROM node:20-alpine AS deps
++FROM node:22-alpine AS deps
+ RUN apk add --no-cache git
+ WORKDIR /repo
+ # The lockfile is copied and installed with `npm ci` so the image gets exactly the dependency versions CI tested
+@@ -20,7 +20,9 @@ COPY templates templates
+ RUN npx prisma generate --schema packages/db/prisma/schema.prisma
+ RUN npm run build --workspace=apps/api
+ 
+-FROM node:20-slim AS runner
++# Pinned to bookworm (Debian 12 / OpenSSL 3.0) like node:20-slim was: Prisma's schema lists the
++# debian-openssl-3.0.x binary target, and a floating node:22-slim tag can move to a newer Debian.
++FROM node:22-bookworm-slim AS runner
+ RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+ WORKDIR /repo
+ ENV NODE_ENV=production
+diff --git a/apps/dashboard/Dockerfile b/apps/dashboard/Dockerfile
+index 4807f5f..c034c5b 100644
+--- a/apps/dashboard/Dockerfile
++++ b/apps/dashboard/Dockerfile
+@@ -9,7 +9,7 @@
+ # passed as Docker build args (see docker-compose.yml's `build.args`),
+ # sourced from infra/control-plane/.env.
+ 
+-FROM node:20-alpine AS deps
++FROM node:22-alpine AS deps
+ RUN apk add --no-cache git
+ WORKDIR /repo
+ # The lockfile is copied and installed with `npm ci` so the image gets exactly the dependency versions CI tested
+@@ -31,7 +31,7 @@ ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ COPY apps/dashboard apps/dashboard
+ RUN npm run build --workspace=apps/dashboard
+ 
+-FROM node:20-alpine AS runner
++FROM node:22-alpine AS runner
+ WORKDIR /app
+ ENV NODE_ENV=production
+ ENV HOSTNAME=0.0.0.0
+diff --git a/apps/web/Dockerfile b/apps/web/Dockerfile
+index 8a9b6ad..c508d7e 100644
+--- a/apps/web/Dockerfile
++++ b/apps/web/Dockerfile
+@@ -5,7 +5,7 @@
+ # the paths wrong here, since Next traces standalone output relative to the
+ # workspace root, not apps/web itself.
+ 
+-FROM node:20-alpine AS deps
++FROM node:22-alpine AS deps
+ RUN apk add --no-cache git
+ WORKDIR /repo
+ # The lockfile is copied and installed with `npm ci` so the image gets exactly the dependency versions CI tested
+@@ -22,7 +22,7 @@ ENV NEXT_PUBLIC_DASHBOARD_URL=${NEXT_PUBLIC_DASHBOARD_URL}
+ COPY apps/web apps/web
+ RUN npm run build --workspace=apps/web
+ 
+-FROM node:20-alpine AS runner
++FROM node:22-alpine AS runner
+ WORKDIR /app
+ ENV NODE_ENV=production
+ ENV HOSTNAME=0.0.0.0
+diff --git a/docs/CLAUDE.md b/docs/CLAUDE.md
+index 140ddbf..76b3279 100644
+--- a/docs/CLAUDE.md
++++ b/docs/CLAUDE.md
+@@ -38,7 +38,7 @@
+ ## 3. Technology Stack
+ 
+ ### Backend & Infrastructure
+-- **Runtime & Language:** Node.js 20, TypeScript & ES6+ JavaScript
++- **Runtime & Language:** Node.js 22, TypeScript & ES6+ JavaScript
+ - **Database & ORM:** PostgreSQL 16 with Prisma 5.22
+ - **Caching & Queue:** Redis 7 & BullMQ background workers
+ - **Authentication:** Firebase OAuth SSO (Google, GitHub, Discord)
+diff --git a/docs/LOCAL_TESTING_GUIDE.md b/docs/LOCAL_TESTING_GUIDE.md
+index 3b8cf76..a546a78 100644
+--- a/docs/LOCAL_TESTING_GUIDE.md
++++ b/docs/LOCAL_TESTING_GUIDE.md
+@@ -12,7 +12,7 @@ if you also want the mobile app, node agent, or observability stack running.
+ 
+ ## 0. Prerequisites
+ 
+-- **Node.js 20+** and npm (you said you have this)
++- **Node.js 22+** and npm (you said you have this)
+ - **Docker** (you said you have this) — used here just for Postgres + Redis, not the full
+   production compose stack, to keep local testing simple
+ - **A free Firebase project** — the platform's entire auth system (web dashboard, API, and
+diff --git a/docs/PRODUCTION_READY.md b/docs/PRODUCTION_READY.md
+index 09f774d..33c4e68 100644
+--- a/docs/PRODUCTION_READY.md
++++ b/docs/PRODUCTION_READY.md
+@@ -66,7 +66,7 @@ sudo usermod -aG docker ubuntu
+ sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+ sudo chmod +x /usr/local/bin/docker-compose
+ 
+-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
++curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+ sudo apt-get install -y nodejs
+ 
+ # Build and deploy
+@@ -93,7 +93,7 @@ sudo docker-compose ps
+ 2. **Upload .env Files** - Transfers updated configs to server
+ 3. **Install System Dependencies**
+    - Docker & Docker Compose
+-   - Node.js 20
++   - Node.js 22
+ 4. **Install Project Dependencies** - npm packages
+ 5. **Generate Prisma Client** - Database ORM
+ 6. **Build Docker Containers**
+diff --git a/docs/TECH_STACK_AND_ARCHITECTURE.md b/docs/TECH_STACK_AND_ARCHITECTURE.md
+index 7e142fc..684295c 100644
+--- a/docs/TECH_STACK_AND_ARCHITECTURE.md
++++ b/docs/TECH_STACK_AND_ARCHITECTURE.md
+@@ -56,7 +56,7 @@ ShanuTechX is an enterprise-grade cloud-hosting platform and container orchestra
+ 
+ | Technology | Role / Version | Architectural Rationale (WHY Chosen) |
+ | :--- | :--- | :--- |
+-| **Node.js 20 LTS** | Runtime Environment | High-throughput asynchronous I/O, native EventLoop for non-blocking Server-Sent Events (SSE) build streaming, and unified JavaScript ecosystem across API, node agents, and workers. |
++| **Node.js 22 LTS** | Runtime Environment | High-throughput asynchronous I/O, native EventLoop for non-blocking Server-Sent Events (SSE) build streaming, and unified JavaScript ecosystem across API, node agents, and workers. |
+ | **TypeScript 5.x** | Language | Compile-time type safety across shared monorepo packages (`@shanutechx/types`, `@shanutechx/client`), eliminating runtime type errors and object dereferencing bugs. |
+ | **Express.js** | Web Framework | Lightweight, modular HTTP router framework with minimal overhead, compatible with standard middleware chains (CORS, Rate Limit, Helmet, Pino HTTP). |
+ | **Prisma 5.22** | ORM & Migration Ledger | Strict relational data modeling with automatic SQL migration generation, typed queries, foreign key integrity protection, and client generation. |
+diff --git a/docs/complete-deployment.md b/docs/complete-deployment.md
+index c851a3d..1fcc9f9 100644
+--- a/docs/complete-deployment.md
++++ b/docs/complete-deployment.md
+@@ -35,8 +35,8 @@ echo "Installing Docker Compose..."
+ sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+ sudo chmod +x /usr/local/bin/docker-compose
+ 
+-echo "Installing Node.js 20..."
+-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
++echo "Installing Node.js 22..."
++curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+ sudo apt-get install -y nodejs
+ 
+ # Install project dependencies
+@@ -267,7 +267,7 @@ UPDATE "User" SET role = 'dev' WHERE "firebaseUid" = 'your-firebase-uid';
+ 
+ - [ ] All files uploaded to server
+ - [ ] Docker and Docker Compose installed
+-- [ ] Node.js 20 installed
++- [ ] Node.js 22 installed
+ - [ ] npm dependencies installed
+ - [ ] Prisma client generated
+ - [ ] Environment files created
+diff --git a/docs/development/TROUBLESHOOTING_DOCKER.md b/docs/development/TROUBLESHOOTING_DOCKER.md
+index 83f7e05..f7b239d 100644
+--- a/docs/development/TROUBLESHOOTING_DOCKER.md
++++ b/docs/development/TROUBLESHOOTING_DOCKER.md
+@@ -89,8 +89,8 @@ Try switching to a different network (WiFi/Ethernet/mobile hotspot) to see if it
+ Try pulling the required base images one by one:
+ 
+ ```cmd
+-docker pull node:20-alpine
+-docker pull node:20-bookworm-slim
++docker pull node:22-alpine
++docker pull node:22-bookworm-slim
+ docker pull postgres:16-alpine
+ docker pull redis:7-alpine
+ docker pull traefik:v3.1
+diff --git a/services/discord-bot/Dockerfile b/services/discord-bot/Dockerfile
+index e67aef5..2acae45 100644
+--- a/services/discord-bot/Dockerfile
++++ b/services/discord-bot/Dockerfile
+@@ -1,6 +1,6 @@
+ # Build context is the repo root (see docker-compose).
+ 
+-FROM node:20-alpine
++FROM node:22-alpine
+ RUN apk add --no-cache git
+ WORKDIR /repo
+ # The lockfile is copied and installed with `npm ci` so the image gets exactly the dependency versions CI tested
+diff --git a/services/node-agent/Dockerfile b/services/node-agent/Dockerfile
+index 528f576..9917968 100644
+--- a/services/node-agent/Dockerfile
++++ b/services/node-agent/Dockerfile
+@@ -16,7 +16,7 @@
+ # docker-compose.yml / .env.example, both required for `railpack build` to
+ # work at all, unlike Nixpacks which bundled its own build mechanism.
+ 
+-FROM node:20-bookworm-slim
++FROM node:22-bookworm-slim
+ 
+ RUN apt-get update \
+   && apt-get install -y --no-install-recommends git curl ca-certificates unzip p7zip-full tar bzip2 xz-utils iproute2 docker.io docker-compose-plugin \
+diff --git a/services/whatsapp-bot/Dockerfile b/services/whatsapp-bot/Dockerfile
+index e48fab0..cbdfabb 100644
+--- a/services/whatsapp-bot/Dockerfile
++++ b/services/whatsapp-bot/Dockerfile
+@@ -1,7 +1,7 @@
+ # Build context is the repo root (see docker-compose), for consistency with
+ # the other services even though this one has no workspace dependency.
+ 
+-FROM node:20-alpine
++FROM node:22-alpine
+ RUN apk add --no-cache git
+ WORKDIR /repo
+ # The lockfile is copied and installed with `npm ci` so the image gets exactly the dependency versions CI tested
+diff --git a/tests/unit/nodeVersion.test.ts b/tests/unit/nodeVersion.test.ts
+new file mode 100644
+index 0000000..a858dbb
+--- /dev/null
++++ b/tests/unit/nodeVersion.test.ts
+@@ -0,0 +1,54 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import fs from 'node:fs';
++import path from 'node:path';
++
++/**
++ * Node 20 reached end-of-life on 2026-04-30 (the repo's own vendored Supabase SDKs already require
++ * Node 22+). Images, CI and the install docs must agree on one supported major.
++ */
++const ROOT = path.join(__dirname, '../..');
++const MIN_MAJOR = 22;
++const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
++
++const dockerfiles = ['apps', 'services']
++  .flatMap((dir) => fs.readdirSync(path.join(ROOT, dir)).map((name) => path.join(dir, name, 'Dockerfile')))
++  .filter((f) => fs.existsSync(path.join(ROOT, f)));
++
++const imageMajors = dockerfiles.flatMap((f) =>
++  [...read(f).matchAll(/^FROM node:(\d+)[\w.-]*/gm)].map((m) => ({ file: f, major: Number(m[1]), tag: m[0] }))
++);
++const ciMajors = ['.github/workflows/ci.yml', '.github/workflows/publish-sdk.yml'].flatMap((f) =>
++  [...read(f).matchAll(/node-version:\s*(\d+)/g)].map((m) => ({ file: f, major: Number(m[1]) }))
++);
++
++test('found the Docker base images and CI node versions (sanity)', () => {
++  assert.ok(imageMajors.length >= 9, `expected >= 9 FROM node: lines, found ${imageMajors.length}`);
++  assert.ok(ciMajors.length >= 2, 'expected node-version in both workflows');
++});
++
++test(`every Docker image uses Node >= ${MIN_MAJOR}`, () => {
++  assert.deepEqual(imageMajors.filter((i) => i.major < MIN_MAJOR).map((i) => `${i.file}: ${i.tag}`), []);
++});
++
++test(`CI runs on Node >= ${MIN_MAJOR} and on the same major as the images (tests must run on what ships)`, () => {
++  assert.deepEqual(ciMajors.filter((c) => c.major < MIN_MAJOR).map((c) => `${c.file}: ${c.major}`), []);
++  const shipped = new Set(imageMajors.map((i) => i.major));
++  assert.equal(shipped.size, 1, `images use different Node majors: ${[...shipped]}`);
++  for (const c of ciMajors) assert.equal(c.major, [...shipped][0], `${c.file} uses Node ${c.major}, images use ${[...shipped][0]}`);
++});
++
++test('the API runtime image stays on Debian bookworm so it matches Prisma\'s debian-openssl-3.0.x binary target', () => {
++  assert.match(read('apps/api/Dockerfile'), /^FROM node:\d+-bookworm-slim AS runner/m);
++  assert.match(read('packages/db/prisma/schema.prisma'), /binaryTargets\s*=\s*\[[^\]]*"debian-openssl-3\.0\.x"/);
++});
++
++test('install docs do not tell people to install a Node major below the minimum', () => {
++  for (const f of ['docs/complete-deployment.md', 'docs/PRODUCTION_READY.md']) {
++    for (const m of read(f).matchAll(/setup_(\d+)\.x/g)) assert.ok(Number(m[1]) >= MIN_MAJOR, `${f}: setup_${m[1]}.x`);
++  }
++});
++
++test('the Node version this test suite runs on is supported', () => {
++  assert.ok(Number(process.versions.node.split('.')[0]) >= MIN_MAJOR, `running on Node ${process.versions.node}`);
++});

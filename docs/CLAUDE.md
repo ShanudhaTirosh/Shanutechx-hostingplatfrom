@@ -38,7 +38,7 @@
 ## 3. Technology Stack
 
 ### Backend & Infrastructure
-- **Runtime & Language:** Node.js 20, TypeScript & ES6+ JavaScript
+- **Runtime & Language:** Node.js 22, TypeScript & ES6+ JavaScript
 - **Database & ORM:** PostgreSQL 16 with Prisma 5.22
 - **Caching & Queue:** Redis 7 & BullMQ background workers
 - **Authentication:** Firebase OAuth SSO (Google, GitHub, Discord)

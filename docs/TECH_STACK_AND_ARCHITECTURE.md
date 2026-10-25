@@ -56,7 +56,7 @@ ShanuTechX is an enterprise-grade cloud-hosting platform and container orchestra
 
 | Technology | Role / Version | Architectural Rationale (WHY Chosen) |
 | :--- | :--- | :--- |
-| **Node.js 20 LTS** | Runtime Environment | High-throughput asynchronous I/O, native EventLoop for non-blocking Server-Sent Events (SSE) build streaming, and unified JavaScript ecosystem across API, node agents, and workers. |
+| **Node.js 22 LTS** | Runtime Environment | High-throughput asynchronous I/O, native EventLoop for non-blocking Server-Sent Events (SSE) build streaming, and unified JavaScript ecosystem across API, node agents, and workers. |
 | **TypeScript 5.x** | Language | Compile-time type safety across shared monorepo packages (`@shanutechx/types`, `@shanutechx/client`), eliminating runtime type errors and object dereferencing bugs. |
 | **Express.js** | Web Framework | Lightweight, modular HTTP router framework with minimal overhead, compatible with standard middleware chains (CORS, Rate Limit, Helmet, Pino HTTP). |
 | **Prisma 5.22** | ORM & Migration Ledger | Strict relational data modeling with automatic SQL migration generation, typed queries, foreign key integrity protection, and client generation. |

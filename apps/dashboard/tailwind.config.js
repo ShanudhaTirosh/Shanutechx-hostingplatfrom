@@ -56,16 +56,16 @@ module.exports = {
         'input-border':   'var(--input-border)',
 
         // ── Legacy aliases (kept for existing components) ──
-        // These previously had hard-coded dark values; now they map to tokens
-        'accent-violet':        '#2563eb',
-        'accent-violet-light':  '#60a5fa',
-        'accent-violet-bright': '#93c5fd',
-        'accent-teal':          '#3b82f6',
-        'accent-teal-bright':   '#60a5fa',
+        // These map to clean monochrome tokens matching the #0A0A0A, #FFFFFF design
+        'accent-violet':        '#ffffff',
+        'accent-violet-light':  '#e5e5e5',
+        'accent-violet-bright': '#f4f4f5',
+        'accent-teal':          '#d4d4d8',
+        'accent-teal-bright':   '#ffffff',
       },
       backgroundImage: {
-        'brand-gradient':        'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
-        'brand-gradient-subtle': 'linear-gradient(135deg, rgba(37,99,235,0.12) 0%, rgba(59,130,246,0.12) 100%)',
+        'brand-gradient':        'linear-gradient(135deg, #ffffff 0%, #a3a3a3 100%)',
+        'brand-gradient-subtle': 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
       },
       borderRadius: {
         'sm':  '6px',

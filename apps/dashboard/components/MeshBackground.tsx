@@ -66,28 +66,28 @@ export default function MeshBackground() {
           transform: translate(var(--mx), var(--my));
         }
         .orb-1 {
-          width: 600px; height: 600px;
-          background: radial-gradient(circle, #7c3aed, transparent 70%);
-          top: -150px; left: -100px;
+          width: 700px; height: 700px;
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.025), transparent 70%);
+          top: -200px; left: -150px;
           animation-duration: 22s;
         }
         .orb-2 {
-          width: 500px; height: 500px;
-          background: radial-gradient(circle, #06b6d4, transparent 70%);
+          width: 600px; height: 600px;
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.015), transparent 70%);
           top: 30%; right: -150px;
           animation-duration: 18s;
           animation-delay: -8s;
         }
         .orb-3 {
-          width: 400px; height: 400px;
-          background: radial-gradient(circle, #f472b6, transparent 70%);
-          bottom: -100px; left: 30%;
+          width: 500px; height: 500px;
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.02), transparent 70%);
+          bottom: -150px; left: 30%;
           animation-duration: 25s;
           animation-delay: -14s;
         }
         .orb-4 {
-          width: 350px; height: 350px;
-          background: radial-gradient(circle, #34d399, transparent 70%);
+          width: 400px; height: 400px;
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.01), transparent 70%);
           top: 60%; left: -80px;
           opacity: 0.1;
           animation-duration: 28s;
@@ -111,7 +111,7 @@ export default function MeshBackground() {
         .dot-grid {
           position: absolute;
           inset: 0;
-          background-image: radial-gradient(circle, rgba(124,58,237,0.12) 1px, transparent 1px);
+          background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
           background-size: 28px 28px;
         }
       ` }} />

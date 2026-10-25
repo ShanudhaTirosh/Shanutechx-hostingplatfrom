@@ -12,7 +12,7 @@ if you also want the mobile app, node agent, or observability stack running.
 
 ## 0. Prerequisites
 
-- **Node.js 20+** and npm (you said you have this)
+- **Node.js 22+** and npm (you said you have this)
 - **Docker** (you said you have this) — used here just for Postgres + Redis, not the full
   production compose stack, to keep local testing simple
 - **A free Firebase project** — the platform's entire auth system (web dashboard, API, and

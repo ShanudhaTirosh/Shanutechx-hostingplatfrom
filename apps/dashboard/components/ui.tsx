@@ -96,14 +96,15 @@ export function Button({
   // Inline styles keyed by variant — uses CSS variables for theme awareness
   const variantStyles: Record<string, React.CSSProperties> = {
     primary: {
-      background: 'var(--color-accent)',
-      color: '#ffffff',
-      border: '1px solid var(--color-accent)',
+      background: 'var(--color-accent, #ffffff)',
+      color: 'var(--color-accent-contrast, #0a0a0a)',
+      border: '1px solid var(--color-accent, #ffffff)',
+      fontWeight: 600,
     },
     secondary: {
-      background: 'transparent',
-      color: 'var(--color-text-primary)',
-      border: '1px solid var(--color-border)',
+      background: 'var(--color-surface-2, rgba(255, 255, 255, 0.05))',
+      color: 'var(--color-text-primary, #ffffff)',
+      border: '1px solid var(--color-border, rgba(255, 255, 255, 0.12))',
     },
     danger: {
       background: 'var(--color-danger-bg)',
@@ -121,10 +122,11 @@ export function Button({
       border: '1px solid var(--color-success-border)',
     },
     glow: {
-      background: 'var(--color-accent)',
-      color: '#ffffff',
-      border: '1px solid var(--color-accent)',
-      boxShadow: '0 0 20px var(--color-accent-subtle)',
+      background: 'var(--color-accent, #ffffff)',
+      color: 'var(--color-accent-contrast, #0a0a0a)',
+      border: '1px solid var(--color-accent, #ffffff)',
+      boxShadow: '0 0 16px rgba(255, 255, 255, 0.25)',
+      fontWeight: 600,
     },
   };
 
@@ -132,13 +134,13 @@ export function Button({
     <button
       disabled={disabled || loading}
       style={variantStyles[variant]}
-      className={`stx-btn rounded-lg font-medium transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center ${sizes[size]} ${className}`}
+      className={`stx-btn rounded-xl font-medium transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center ${sizes[size]} ${className}`}
       {...props}
     >
       {loading && (
         <span
           className="h-3.5 w-3.5 rounded-full border-2 border-t-transparent animate-spin shrink-0"
-          style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'transparent' }}
+          style={{ borderColor: variant === 'primary' || variant === 'glow' ? 'var(--color-accent-contrast, #0a0a0a)' : 'currentColor', borderTopColor: 'transparent' }}
         />
       )}
       {!loading && icon && <span className="shrink-0">{icon}</span>}

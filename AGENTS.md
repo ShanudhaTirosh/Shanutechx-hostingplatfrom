@@ -31,7 +31,7 @@ ShanuTechX is an autonomous enterprise cloud-hosting platform and container orch
 
 ## 🛠️ Environment & Commands Quick-Start
 
-- **Node Version:** Node 20 required (CI enforces `node-version: 20`).
+- **Node Version:** Node 22 required (CI enforces `node-version: 22`; Node 20 reached end-of-life on 2026-04-30).
 - **Dev Servers:** `npm run dev:api` (port 4000), `npm run dev:dashboard` (3001), `npm run dev:web` (3000), `npm run dev:webmail` (3002), `npm run dev:whatsapp`, `npm run dev:discord`, `npm run dev:node-agent`.
 - **Database & Prisma:** `npm run db:generate`, `npm run db:migrate`, `npm run db:migrate:deploy`.
 - **Tests & Typechecks:**

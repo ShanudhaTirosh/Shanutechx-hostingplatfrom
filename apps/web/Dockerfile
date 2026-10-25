@@ -5,7 +5,7 @@
 # the paths wrong here, since Next traces standalone output relative to the
 # workspace root, not apps/web itself.
 
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 RUN apk add --no-cache git
 WORKDIR /repo
 # The lockfile is copied and installed with `npm ci` so the image gets exactly the dependency versions CI tested
@@ -22,7 +22,7 @@ ENV NEXT_PUBLIC_DASHBOARD_URL=${NEXT_PUBLIC_DASHBOARD_URL}
 COPY apps/web apps/web
 RUN npm run build --workspace=apps/web
 
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0

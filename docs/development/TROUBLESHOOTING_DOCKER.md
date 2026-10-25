@@ -89,8 +89,8 @@ Try switching to a different network (WiFi/Ethernet/mobile hotspot) to see if it
 Try pulling the required base images one by one:
 
 ```cmd
-docker pull node:20-alpine
-docker pull node:20-bookworm-slim
+docker pull node:22-alpine
+docker pull node:22-bookworm-slim
 docker pull postgres:16-alpine
 docker pull redis:7-alpine
 docker pull traefik:v3.1

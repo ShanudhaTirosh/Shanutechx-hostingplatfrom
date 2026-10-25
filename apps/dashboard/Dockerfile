@@ -9,7 +9,7 @@
 # passed as Docker build args (see docker-compose.yml's `build.args`),
 # sourced from infra/control-plane/.env.
 
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 RUN apk add --no-cache git
 WORKDIR /repo
 # The lockfile is copied and installed with `npm ci` so the image gets exactly the dependency versions CI tested
@@ -31,7 +31,7 @@ ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 COPY apps/dashboard apps/dashboard
 RUN npm run build --workspace=apps/dashboard
 
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0

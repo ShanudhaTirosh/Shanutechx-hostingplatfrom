@@ -35,8 +35,8 @@ echo "Installing Docker Compose..."
 sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
 
-echo "Installing Node.js 20..."
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+echo "Installing Node.js 22..."
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # Install project dependencies
@@ -267,7 +267,7 @@ UPDATE "User" SET role = 'dev' WHERE "firebaseUid" = 'your-firebase-uid';
 
 - [ ] All files uploaded to server
 - [ ] Docker and Docker Compose installed
-- [ ] Node.js 20 installed
+- [ ] Node.js 22 installed
 - [ ] npm dependencies installed
 - [ ] Prisma client generated
 - [ ] Environment files created
