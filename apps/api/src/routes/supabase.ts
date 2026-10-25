@@ -288,6 +288,28 @@ async function selectOptimalNode(preferredNodeId?: string): Promise<{ node: any 
     }
   }
 
+  // Priority 1: If no preferred node specified, target the designated Main VPS Node by default
+  if (!preferredNodeId) {
+    const mainNode = await prisma.node.findFirst({
+      where: {
+        isActive: true,
+        OR: [
+          { roleTags: { has: 'main-node' } },
+          { label: { contains: 'main', mode: 'insensitive' } },
+        ],
+      },
+    });
+    if (mainNode) {
+      const cpuPct = mainNode.cpuUsedPct ?? 0;
+      const totalRam = mainNode.ramMb || 4096;
+      const ramUsed = mainNode.ramUsedMb ?? 512;
+      const isOverloaded = cpuPct >= 90 || (ramUsed / totalRam) >= 0.95;
+      if (!isOverloaded) {
+        return { node: mainNode, isOptimalAuto: false };
+      }
+    }
+  }
+
   const activeNodes = await prisma.node.findMany({
     where: { isActive: true },
   });

@@ -30,6 +30,7 @@ import {
   Cpu,
   HardDrive,
   Layers,
+  Maximize2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { SupabaseClientProject, Node } from '@/lib/types';
@@ -54,8 +55,16 @@ export default function UnifiedDevProjectsPage() {
 
   // Supabase Studio Sub-Tab navigation state
   const [studioSubTab, setStudioSubTab] = useState<
-    'overview' | 'tables' | 'sql' | 'auth' | 'storage' | 'advisors' | 'observability' | 'settings'
+    'overview' | 'studio' | 'keys' | 'tables' | 'sql' | 'auth' | 'storage' | 'advisors' | 'observability' | 'settings'
   >('overview');
+
+  function getStudioUrl(proj: SupabaseClientProject | null | undefined): string {
+    if (!proj) return '#';
+    if (proj.studioUrl) return proj.studioUrl;
+    const host = proj.nodeIp || 'localhost';
+    const port = proj.studioPort || 8000;
+    return `http://${host}:${port}`;
+  }
 
   // Table browser state
   const [selectedSchema, setSelectedSchema] = useState<string>('public');
@@ -395,7 +404,11 @@ export default function UnifiedDevProjectsPage() {
       const fetchedNodes = nodeRes.nodes || [];
       setNodes(fetchedNodes);
       if (fetchedNodes.length > 0) {
-        setSupaNodeId(''); // Default to Auto-Select Optimal Node
+        // Automatically default to the primary Main VPS Node
+        const mainNode = fetchedNodes.find(
+          (n) => n.roleTags?.includes('main-node') || n.label.toLowerCase().includes('main')
+        ) || fetchedNodes[0];
+        setSupaNodeId(mainNode ? mainNode.id : '');
       }
     } catch (err: any) {
       console.error('Failed loading projects hub data', err);
@@ -631,7 +644,7 @@ export default function UnifiedDevProjectsPage() {
                   <div className="flex items-center gap-2">
                     {selectedSupabaseProject && (
                       <a
-                        href={selectedSupabaseProject.studioUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.studioPort || 8000}`}
+                        href={getStudioUrl(selectedSupabaseProject)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-500/20 flex items-center gap-1.5 transition-all"
@@ -737,19 +750,23 @@ export default function UnifiedDevProjectsPage() {
                               <h3 className="text-lg font-black text-white mt-1.5 flex items-center gap-2">
                                 <span>{proj.name}</span>
                               </h3>
-                              <p className="text-xs text-text-muted font-mono mt-0.5">
-                                Node: <strong className="text-white">{proj.nodeLabel || proj.nodeIp || 'localhost'}</strong> ({proj.nodeIp || '127.0.0.1'})
+                              <p className="text-xs text-text-muted font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                <span>Host Node:</span>
+                                <span className="text-emerald-300 font-bold">
+                                  {proj.nodeLabel || proj.nodeIp || 'Main VPS'}
+                                </span>
+                                <span>({proj.nodeIp || '127.0.0.1'}:{proj.studioPort || 8000})</span>
                               </p>
                             </div>
 
                             {/* Launch Studio Button */}
                             <a
-                              href={proj.studioUrl || `http://${proj.nodeIp || 'localhost'}:${proj.studioPort || 8000}`}
+                              href={getStudioUrl(proj)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 transition-all shrink-0"
                             >
-                              <span>Open Studio</span>
+                              <span>Launch Studio</span>
                               <ExternalLink className="w-3.5 h-3.5" />
                             </a>
                           </div>
@@ -1010,79 +1027,31 @@ export default function UnifiedDevProjectsPage() {
                       }`}
                     >
                       <Zap className="w-3.5 h-3.5" />
-                      <span>Overview & Launch</span>
+                      <span>Overview</span>
                     </button>
 
                     <button
-                      onClick={() => setStudioSubTab('tables')}
+                      onClick={() => setStudioSubTab('studio')}
                       className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                        studioSubTab === 'tables'
+                        studioSubTab === 'studio'
+                          ? 'bg-gradient-to-r from-emerald-500/25 to-teal-500/25 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                          : 'text-text-muted hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Native Supabase Studio (VPS)</span>
+                    </button>
+
+                    <button
+                      onClick={() => setStudioSubTab('keys')}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                        studioSubTab === 'keys'
                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                           : 'text-text-muted hover:text-white hover:bg-white/5'
                       }`}
                     >
-                      <Database className="w-3.5 h-3.5" />
-                      <span>Table Browser ({projectTables.length})</span>
-                    </button>
-
-                    <button
-                      onClick={() => setStudioSubTab('sql')}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                        studioSubTab === 'sql'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'text-text-muted hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      <Code className="w-3.5 h-3.5" />
-                      <span>SQL Console</span>
-                    </button>
-
-                    <button
-                      onClick={() => setStudioSubTab('auth')}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                        studioSubTab === 'auth'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'text-text-muted hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      <Users className="w-3.5 h-3.5" />
-                      <span>Auth Users ({authUsers.length})</span>
-                    </button>
-
-                    <button
-                      onClick={() => setStudioSubTab('storage')}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                        studioSubTab === 'storage'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'text-text-muted hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      <Folder className="w-3.5 h-3.5" />
-                      <span>Storage Buckets ({storageBuckets.length})</span>
-                    </button>
-
-                    <button
-                      onClick={() => setStudioSubTab('advisors')}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                        studioSubTab === 'advisors'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'text-text-muted hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      <ShieldAlert className="w-3.5 h-3.5" />
-                      <span>Advisors Linter</span>
-                    </button>
-
-                    <button
-                      onClick={() => setStudioSubTab('observability')}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                        studioSubTab === 'observability'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'text-text-muted hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      <Activity className="w-3.5 h-3.5" />
-                      <span>Observability & Logs</span>
+                      <Key className="w-3.5 h-3.5" />
+                      <span>API Keys & Connection</span>
                     </button>
 
                     <button
@@ -1094,34 +1063,126 @@ export default function UnifiedDevProjectsPage() {
                       }`}
                     >
                       <Settings className="w-3.5 h-3.5" />
-                      <span>Settings & Keys</span>
+                      <span>Config & Settings</span>
+                    </button>
+
+                    <button
+                      onClick={() => setStudioSubTab('tables')}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                        studioSubTab === 'tables'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'text-text-muted hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <Database className="w-3.5 h-3.5" />
+                      <span>Quick Table Browser ({projectTables.length})</span>
+                    </button>
+
+                    <button
+                      onClick={() => setStudioSubTab('sql')}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                        studioSubTab === 'sql'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'text-text-muted hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <Code className="w-3.5 h-3.5" />
+                      <span>Quick SQL</span>
                     </button>
                   </div>
 
                   {/* SUB-TAB 1: OVERVIEW */}
                   {studioSubTab === 'overview' && (
                     <div className="space-y-6">
-                      <div className="bg-[#05060b] border border-emerald-500/30 rounded-2xl p-6 relative overflow-hidden space-y-4 shadow-xl">
+                      <div className="bg-[#05060b] border border-emerald-500/30 rounded-2xl p-6 relative overflow-hidden space-y-5 shadow-xl">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
                           <div>
-                            <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-bold">
-                              Self-Hosted Supabase Stack
-                            </span>
-                            <h2 className="text-xl font-black text-white mt-0.5">{selectedSupabaseProject.name}</h2>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-bold">
+                                Self-Hosted Supabase Stack
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 flex items-center gap-1">
+                                ⭐ Main VPS Node: {selectedSupabaseProject.nodeLabel || selectedSupabaseProject.nodeIp || 'Main VPS'}
+                              </span>
+                            </div>
+                            <h2 className="text-xl font-black text-white mt-1 flex items-center gap-2">
+                              <span>{selectedSupabaseProject.name}</span>
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase border ${
+                                selectedSupabaseProject.status === 'ACTIVE'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                  : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                              }`}>
+                                {selectedSupabaseProject.status}
+                              </span>
+                            </h2>
                             <p className="text-xs text-text-muted font-mono mt-1">
-                              ID: {selectedSupabaseProject.id} | Host Node: {selectedSupabaseProject.nodeIp || '127.0.0.1'}
+                              ID: {selectedSupabaseProject.id} | Host IP: <strong className="text-white">{selectedSupabaseProject.nodeIp || '127.0.0.1'}</strong> | Studio Port: <strong className="text-emerald-400">{selectedSupabaseProject.studioPort || 8000}</strong>
                             </p>
                           </div>
 
-                          <a
-                            href={selectedSupabaseProject.studioUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.studioPort || 8000}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all"
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              onClick={() => setStudioSubTab('studio')}
+                              className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all"
+                            >
+                              <Maximize2 className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Embed Studio In-App</span>
+                            </button>
+                            <a
+                              href={getStudioUrl(selectedSupabaseProject)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all"
+                            >
+                              <span>Launch Studio UI</span>
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* Power Controls & Quick Actions */}
+                        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-white/10">
+                          {selectedSupabaseProject.status === 'ACTIVE' ? (
+                            <button
+                              onClick={() => handleStopProject(selectedSupabaseProject)}
+                              disabled={actionLoading[`stop-${selectedSupabaseProject.id}`]}
+                              className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5"
+                            >
+                              <Square className="w-3.5 h-3.5" />
+                              <span>{actionLoading[`stop-${selectedSupabaseProject.id}`] ? 'Stopping...' : 'Stop Stack'}</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleStartProject(selectedSupabaseProject)}
+                              disabled={actionLoading[`start-${selectedSupabaseProject.id}`]}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition-all flex items-center gap-1.5"
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                              <span>{actionLoading[`start-${selectedSupabaseProject.id}`] ? 'Starting...' : 'Start Stack'}</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRestartProject(selectedSupabaseProject)}
+                            disabled={actionLoading[`restart-${selectedSupabaseProject.id}`]}
+                            className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-text-muted hover:text-white text-xs font-bold transition-all flex items-center gap-1.5"
                           >
-                            <span>Launch Studio UI</span>
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
+                            <RotateCw className={`w-3.5 h-3.5 ${actionLoading[`restart-${selectedSupabaseProject.id}`] ? 'animate-spin' : ''}`} />
+                            <span>Restart</span>
+                          </button>
+                          <button
+                            onClick={() => setProjectMigrateModal(selectedSupabaseProject)}
+                            className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300 text-xs font-bold transition-all flex items-center gap-1.5"
+                          >
+                            <Cpu className="w-3.5 h-3.5" />
+                            <span>Migrate Node</span>
+                          </button>
+                          <button
+                            onClick={() => setProjectDeleteModal(selectedSupabaseProject)}
+                            className="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 text-xs font-bold transition-all flex items-center gap-1.5 ml-auto"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete Stack</span>
+                          </button>
                         </div>
 
                         {/* STATS SUMMARY GRID */}
@@ -1172,6 +1233,178 @@ export default function UnifiedDevProjectsPage() {
                             <div className="text-xs text-amber-300 font-bold truncate">
                               {selectedSupabaseProject.dbUrl || `postgresql://postgres:postgres@${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.dbPort || 5432}/${selectedSupabaseProject.dbName}`}
                             </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUB-TAB: NATIVE SUPABASE STUDIO (VPS EMBEDDED) */}
+                  {studioSubTab === 'studio' && (
+                    <div className="space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#05060b] border border-emerald-500/30 rounded-2xl p-4 shadow-xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                            <Zap className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-black text-white">Self-Hosted Supabase Studio Dashboard</h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                Port {selectedSupabaseProject.studioPort || 8000}
+                              </span>
+                            </div>
+                            <p className="text-xs text-text-muted font-mono mt-0.5">
+                              Running on Main VPS Node: <strong className="text-emerald-300">{selectedSupabaseProject.nodeLabel || selectedSupabaseProject.nodeIp || 'Main VPS'}</strong> ({selectedSupabaseProject.nodeIp || '127.0.0.1'})
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => {
+                              const iframe = document.getElementById('supabase-studio-frame') as HTMLIFrameElement;
+                              if (iframe) iframe.src = iframe.src;
+                            }}
+                            className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-text-muted hover:text-white text-xs font-bold transition-all flex items-center gap-1.5"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>Reload Frame</span>
+                          </button>
+                          <a
+                            href={getStudioUrl(selectedSupabaseProject)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-500/20 flex items-center gap-1.5 transition-all"
+                          >
+                            <span>Open Full Studio in New Window</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Embedded Native Studio Iframe */}
+                      <div className="w-full h-[780px] bg-[#05060b] border border-white/10 rounded-2xl overflow-hidden shadow-2xl relative">
+                        <iframe
+                          id="supabase-studio-frame"
+                          src={getStudioUrl(selectedSupabaseProject)}
+                          title={`Supabase Studio - ${selectedSupabaseProject.name}`}
+                          className="w-full h-full border-0"
+                          allow="clipboard-read; clipboard-write; fullscreen"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUB-TAB: API KEYS & CONNECTION URIs */}
+                  {studioSubTab === 'keys' && (
+                    <div className="bg-[#05060b] border border-white/10 rounded-2xl p-6 space-y-6">
+                      <div>
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                          <Key className="w-4 h-4 text-emerald-400" />
+                          <span>Project API Keys & Connection URIs</span>
+                        </h3>
+                        <p className="text-xs text-text-muted font-mono mt-1">
+                          Use these credentials to connect web applications, mobile clients, and backend services to this self-hosted Supabase stack on your VPS node.
+                        </p>
+                      </div>
+
+                      <div className="space-y-4 font-mono">
+                        {/* Project URL */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-text-muted font-bold uppercase">Project URL (Kong API Gateway)</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              readOnly
+                              value={selectedSupabaseProject.apiUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.apiPort || 8001}`}
+                              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-emerald-300 font-bold focus:outline-none"
+                            />
+                            <button
+                              onClick={() => handleCopy(selectedSupabaseProject.apiUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.apiPort || 8001}`, 'Project URL')}
+                              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition-all flex items-center gap-1.5 shrink-0"
+                            >
+                              {copiedKey === 'Project URL' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedKey === 'Project URL' ? 'Copied' : 'Copy'}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Anon Public Key */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs text-text-muted font-bold uppercase">Anon Public API Key (Client-side Safe)</label>
+                            <span className="text-[10px] text-emerald-400">role: 'anon' (enforces RLS)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type={revealedKeys[`anon-${selectedSupabaseProject.id}`] ? 'text' : 'password'}
+                              readOnly
+                              value={selectedSupabaseProject.anonKey}
+                              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                            />
+                            <button
+                              onClick={() => toggleKeyReveal(`anon-${selectedSupabaseProject.id}`)}
+                              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-text-muted hover:text-white transition-all shrink-0"
+                            >
+                              {revealedKeys[`anon-${selectedSupabaseProject.id}`] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                            <button
+                              onClick={() => handleCopy(selectedSupabaseProject.anonKey, 'Anon Key')}
+                              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition-all flex items-center gap-1.5 shrink-0"
+                            >
+                              {copiedKey === 'Anon Key' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedKey === 'Anon Key' ? 'Copied' : 'Copy'}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Service Role Secret */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs text-amber-400 font-bold uppercase">Service Role Secret (Private / Admin Only)</label>
+                            <span className="text-[10px] text-amber-400">role: 'service_role' (bypasses RLS)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type={revealedKeys[`service-${selectedSupabaseProject.id}`] ? 'text' : 'password'}
+                              readOnly
+                              value={selectedSupabaseProject.serviceKey}
+                              className="flex-1 bg-white/5 border border-amber-500/30 rounded-xl px-3.5 py-2 text-xs text-amber-200 focus:outline-none"
+                            />
+                            <button
+                              onClick={() => toggleKeyReveal(`service-${selectedSupabaseProject.id}`)}
+                              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-text-muted hover:text-white transition-all shrink-0"
+                            >
+                              {revealedKeys[`service-${selectedSupabaseProject.id}`] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                            <button
+                              onClick={() => handleCopy(selectedSupabaseProject.serviceKey, 'Service Key')}
+                              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition-all flex items-center gap-1.5 shrink-0"
+                            >
+                              {copiedKey === 'Service Key' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedKey === 'Service Key' ? 'Copied' : 'Copy'}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* PostgreSQL Direct Connection URI */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-text-muted font-bold uppercase">PostgreSQL Direct Connection URI</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              readOnly
+                              value={selectedSupabaseProject.dbUrl || `postgresql://postgres:postgres@${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.dbPort || 5432}/${selectedSupabaseProject.dbName}`}
+                              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-cyan-300 font-bold focus:outline-none"
+                            />
+                            <button
+                              onClick={() => handleCopy(selectedSupabaseProject.dbUrl || `postgresql://postgres:postgres@${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.dbPort || 5432}/${selectedSupabaseProject.dbName}`, 'DB URI')}
+                              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition-all flex items-center gap-1.5 shrink-0"
+                            >
+                              {copiedKey === 'DB URI' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedKey === 'DB URI' ? 'Copied' : 'Copy'}</span>
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1877,15 +2110,18 @@ export default function UnifiedDevProjectsPage() {
                       onChange={(e) => setSupaNodeId(e.target.value)}
                       className="w-full bg-[#121324] border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
                     >
+                      {nodes.map((n) => {
+                        const isMain = n.roleTags?.includes('main-node') || n.label.toLowerCase().includes('main');
+                        return (
+                          <option key={n.id} value={n.id}>
+                            {isMain ? '⭐ [MAIN VPS NODE] ' : ''}{n.label} ({n.ip}) - {n.cpuCores || 4} Cores / {n.ramMb || 8192} MB RAM
+                          </option>
+                        );
+                      })}
                       <option value="">⚡ Auto-Select Optimal Node (Lowest CPU/RAM Load)</option>
-                      {nodes.map((n) => (
-                        <option key={n.id} value={n.id}>
-                          {n.label} ({n.ip}) - {n.cpuCores || 4} Cores / {n.ramMb || 8192} MB RAM
-                        </option>
-                      ))}
                     </select>
                     <p className="text-[10px] text-emerald-400 font-mono mt-1">
-                      ⚡ Automatically provisions isolated DB & keys, and points Cloudflare A-record: supabase-&lt;name&gt;.shanutechx.com
+                      ⭐ Deploys on your Main VPS node with full self-hosted Supabase Studio dashboard, Kong API gateway, PostgreSQL & Auth.
                     </p>
                   </div>
                 </>
