@@ -5,6 +5,7 @@ import { Mail, Check, ChevronDown, Plus, Server, ShieldCheck } from 'lucide-reac
 
 export interface Mailbox {
   id: string;
+  email?: string;
   smtpUsername: string;
   smtpHost: string;
   customDomain?: string;
@@ -31,6 +32,8 @@ export const MailboxSwitcher: React.FC<MailboxSwitcherProps> = ({
 
   const getFullEmail = (m?: Mailbox) => {
     if (!m) return 'Select Mailbox';
+    if (m.email) return m.email;
+    if (m.smtpUsername.includes('@')) return m.smtpUsername;
     const domain = m.customDomain || m.smtpHost.replace(/^mail\./, '');
     return `${m.smtpUsername}@${domain}`;
   };

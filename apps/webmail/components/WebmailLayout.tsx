@@ -138,8 +138,9 @@ export const WebmailLayout: React.FC = () => {
   // Background Auto-Polling (Every 30 seconds)
   useEffect(() => {
     const interval = setInterval(() => {
+      const categoryParam = activeFolder === 'inbox' && activeCategory ? activeCategory : undefined;
       api.webmail
-        .listMessages(activeFolder, searchQuery, activeMailboxId || undefined)
+        .listMessages(activeFolder, searchQuery, activeMailboxId || undefined, categoryParam)
         .then((res) => {
           setMessages(res.messages || []);
           setUnreadCount(res.unreadCount || 0);
@@ -147,7 +148,7 @@ export const WebmailLayout: React.FC = () => {
         .catch(() => {});
     }, 30000);
     return () => clearInterval(interval);
-  }, [activeFolder, searchQuery, activeMailboxId]);
+  }, [activeFolder, activeCategory, searchQuery, activeMailboxId]);
 
   // Global Keyboard Shortcuts (Gmail / Fastmail style)
   useEffect(() => {
@@ -212,7 +213,7 @@ export const WebmailLayout: React.FC = () => {
   const loadMailboxes = async () => {
     try {
       const res = await api.email.mailboxes();
-      const accounts = res.smtpAccounts || [];
+      const accounts = res.mailboxes || res.smtpAccounts || [];
       setMailboxes(accounts);
       if (accounts.length > 0 && !activeMailboxId) {
         setActiveMailboxId(accounts[0].id);
@@ -236,10 +237,12 @@ export const WebmailLayout: React.FC = () => {
   const loadMessages = async () => {
     setIsLoadingMessages(true);
     try {
+      const categoryParam = activeFolder === 'inbox' && activeCategory ? activeCategory : undefined;
       const res = await api.webmail.listMessages(
         activeFolder,
         searchQuery,
-        activeMailboxId || undefined
+        activeMailboxId || undefined,
+        categoryParam
       );
       setMessages(res.messages || []);
       setUnreadCount(res.unreadCount || 0);
@@ -343,8 +346,31 @@ export const WebmailLayout: React.FC = () => {
   };
 
   const handleLogout = () => {
+    try {
+      localStorage.removeItem('webmail_token');
+    } catch (_) {}
     firebaseAuth.signOut();
     window.location.href = '/login';
+  };
+
+  const handleQuickReply = async (recipient: string, replySub: string, msgId: string, text: string) => {
+    try {
+      await api.webmail.send({
+        recipientEmail: recipient,
+        subject: replySub,
+        htmlBody: text.replace(/\n/g, '<br/>'),
+        inReplyTo: msgId,
+        smtpAccountId: activeMailboxId || undefined,
+      });
+      addToast('Reply sent successfully', 'success');
+      if (selectedMessageId) {
+        handleSelectMessage(selectedMessageId);
+      }
+      loadMessages();
+    } catch (err: any) {
+      addToast(err.message || 'Failed to send reply', 'error');
+      throw err;
+    }
   };
 
   const navFolders = [
@@ -797,6 +823,7 @@ export const WebmailLayout: React.FC = () => {
               subject={selectedThreadSubject}
               onBack={() => setSelectedMessageId(null)}
               onReply={handleOpenReply}
+              onQuickReply={handleQuickReply}
               onForward={handleOpenForward}
               onDelete={handleDeleteMessage}
               onStar={handleToggleStar}

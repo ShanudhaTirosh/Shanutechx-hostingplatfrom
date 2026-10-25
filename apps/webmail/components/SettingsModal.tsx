@@ -293,7 +293,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
     const domainToTest = customDomainInput.trim() || 'shanutechx.com';
     setIsVerifyingDns(true);
     try {
-      const res = await api.post('/api/smtp/verify-dns', { domain: domainToTest });
+      const res = await api.post('/smtp/verify-dns', { domain: domainToTest });
       setDnsResults(res);
       toast(`DNS Verification complete for ${domainToTest}`, 'success');
     } catch (err: any) {
@@ -307,7 +307,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
     e.preventDefault();
     if (!newAliasPrefix.trim() || !mailboxInfo?.id) return;
     try {
-      const res = await api.post(`/api/smtp-accounts/${mailboxInfo.id}/aliases`, { prefix: newAliasPrefix.trim() });
+      const res = await api.post(`/smtp-accounts/${mailboxInfo.id}/aliases`, { prefix: newAliasPrefix.trim() });
       setAliases(res.aliases || [...aliases, `${newAliasPrefix.trim()}@${customDomainInput}`]);
       setNewAliasPrefix('');
       toast(`Alias added successfully!`, 'success');
@@ -1279,7 +1279,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
                     <p className="text-sm font-extrabold text-white">{plan.price}</p>
                     {!plan.current && (
                       <a
-                        href="/dashboard/billing"
+                        href={`${process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001'}/billing`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] rounded-xl transition-all"

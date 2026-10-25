@@ -138,12 +138,16 @@ webmailAuthRouter.post('/webmail/auth/sso-ticket', requireAuth, async (req: Auth
     return res.status(403).json({ error: 'Access denied to this mailbox account' });
   }
 
+  const actorId = req.user!.id;
+  const actorRole = req.user!.role;
   const ticketId = crypto.randomUUID();
   const ssoToken = jwt.sign(
     {
       jti: ticketId,
       accountId: account.id,
-      userId: account.userId,
+      userId: actorId,
+      targetUserId: account.userId,
+      role: actorRole,
       email: account.smtpUsername,
       type: 'sso_ticket',
     },
@@ -151,7 +155,7 @@ webmailAuthRouter.post('/webmail/auth/sso-ticket', requireAuth, async (req: Auth
     { expiresIn: '60s', algorithm: 'HS256' }
   );
 
-  await storeState('webmail_sso', ticketId, { accountId: account.id, userId: account.userId }, 60);
+  await storeState('webmail_sso', ticketId, { accountId: account.id, userId: actorId, role: actorRole }, 60);
 
   res.json({ ssoToken, webmailUrl: `/webmail?ssoToken=${ssoToken}` });
 });
@@ -170,7 +174,7 @@ webmailAuthRouter.post('/webmail/auth/sso-exchange', async (req: Request, res: R
       return res.status(401).json({ error: 'Invalid or expired SSO token' });
     }
 
-    const state = await consumeState<{ accountId: string; userId: string }>('webmail_sso', payload.jti);
+    const state = await consumeState<{ accountId: string; userId: string; role?: string }>('webmail_sso', payload.jti);
     if (!state || state.accountId !== payload.accountId) {
       return res.status(401).json({ error: 'SSO ticket has already been used or expired' });
     }
@@ -184,10 +188,14 @@ webmailAuthRouter.post('/webmail/auth/sso-exchange', async (req: Request, res: R
       return res.status(401).json({ error: 'Mailbox account not available or suspended' });
     }
 
+    const sessionUserId = payload.userId || state.userId || account.userId;
+    const sessionRole = payload.role || state.role;
+
     const token = jwt.sign(
       {
         accountId: account.id,
-        userId: account.userId,
+        userId: sessionUserId,
+        role: sessionRole,
         email: account.smtpUsername,
         customDomain: account.customDomain || env.rootDomain,
         type: 'webmail_session',

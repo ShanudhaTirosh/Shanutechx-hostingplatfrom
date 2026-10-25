@@ -111,3 +111,23 @@ test('buildOverview', async (t) => {
     assert.equal(e1.domain, 'shop.shanutechx.com');
   });
 });
+
+test('assertHostPortAvailable input validation', async (t) => {
+  await t.test('rejects out of range and non-integer ports', async () => {
+    for (const bad of [0, 80, 1023, 65536, 8080.5, -5]) {
+      await assert.rejects(
+        () => pe.assertHostPortAvailable('node1', bad, 4001),
+        (err: any) => err instanceof pe.PortError && err.code === 'port_out_of_range'
+      );
+    }
+  });
+
+  await t.test('rejects infrastructure reserved ports and agent port', async () => {
+    for (const r of [2375, 2376, 2377, 4001]) {
+      await assert.rejects(
+        () => pe.assertHostPortAvailable('node1', r, 4001),
+        (err: any) => err instanceof pe.PortError && err.code === 'port_reserved'
+      );
+    }
+  });
+});

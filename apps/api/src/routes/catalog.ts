@@ -19,6 +19,7 @@ import { createSubdomainRecord } from '../lib/cloudflare';
 import { claimDeploymentSlot } from '../lib/deploymentSlots';
 import { autoDetectExposureMode } from '../lib/exposureDefaults';
 import { validateComposeSecurity } from '../lib/composeIsolation';
+import { assertHostPortAvailable, PortError } from '../lib/portExposure';
 
 export const catalogRouter = Router();
 catalogRouter.use('/catalog', requireAuth);
@@ -375,6 +376,17 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
     port: meta.port,
     composeYaml: yamlContent,
   });
+
+  if (effectiveExposureMode === 'no_ssl' && meta.port) {
+    try {
+      await assertHostPortAvailable(node.id, meta.port, env.nodeAgentPort);
+    } catch (portErr: any) {
+      if (portErr instanceof PortError) {
+        return res.status(portErr.status || 409).json({ error: portErr.message, code: portErr.code });
+      }
+      throw portErr;
+    }
+  }
 
   const configFiles: Record<string, string> = { ...customerConfigFiles };
   if (configFileContent) {

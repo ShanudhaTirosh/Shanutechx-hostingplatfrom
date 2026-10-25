@@ -30,7 +30,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers['X-Webmail-Token'] = token;
   }
 
-  const res = await fetch(`${API_BASE_URL}${path.startsWith('/') ? path : '/' + path}`, {
+  const normalizedPath = path.startsWith('/api/') ? path.slice(4) : path;
+  const res = await fetch(`${API_BASE_URL}${normalizedPath.startsWith('/') ? normalizedPath : '/' + normalizedPath}`, {
     ...options,
     headers,
   });
@@ -93,10 +94,11 @@ export const api = {
   webmail: {
     getCredentials: () => request<any>('/webmail/account/credentials'),
     planUsage: () => request<any>('/webmail/plan-usage'),
-    listMessages: (folder = 'inbox', search = '', smtpAccountId?: string) => {
+    listMessages: (folder = 'inbox', search = '', smtpAccountId?: string, category?: string) => {
       const q = new URLSearchParams({ folder });
       if (search) q.append('search', search);
       if (smtpAccountId) q.append('smtpAccountId', smtpAccountId);
+      if (category) q.append('category', category);
       return request<any>(`/webmail/messages?${q.toString()}`);
     },
     listThreads: (folder = 'inbox') => request<any>(`/webmail/threads?folder=${folder}`),

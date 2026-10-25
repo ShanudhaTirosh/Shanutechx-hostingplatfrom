@@ -8,6 +8,7 @@ import { fireWebhook } from './webhooks';
 import { encryptSecret } from './secretsVault';
 import { extractEmbeddedToken, stripRepoCredentials } from './gitAuth';
 import { claimDeploymentSlot } from './deploymentSlots';
+import { assertHostPortAvailable } from './portExposure';
 import { env } from '../env';
 
 const SERVICE_TYPE_TO_TAG: Record<string, string> = {
@@ -96,6 +97,14 @@ export async function deployService(params: DeployParams) {
     isAdminDeployment,
     explicitNodeId,
   });
+
+  const isDirectPort = exposureMode === 'no_ssl' || exposureMode === 'raw_tcp';
+  if (isDirectPort || publishedPort) {
+    const hostPort = publishedPort || internalPort;
+    if (hostPort) {
+      await assertHostPortAvailable(node.id, hostPort, env.nodeAgentPort);
+    }
+  }
 
   const isPublic = exposureMode
     ? exposureMode !== 'internal_only'

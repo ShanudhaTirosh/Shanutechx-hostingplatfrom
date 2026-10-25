@@ -30,11 +30,24 @@ export interface MailAttachment {
 export interface MailOptions {
   from: string;
   to: string;
+  cc?: string;
+  bcc?: string;
   subject: string;
   html: string;
   text?: string;
   replyTo?: string;
   attachments?: MailAttachment[];
+}
+
+/**
+ * Extracts a pure email address from a recipient/sender header.
+ * E.g., '"Admin" <admin@example.com>' -> 'admin@example.com'
+ */
+export function extractEmail(addr: string): string {
+  if (!addr) return '';
+  const match = addr.match(/<([^>]+)>/);
+  if (match) return match[1].trim();
+  return addr.trim();
 }
 
 /**
@@ -45,6 +58,8 @@ export async function verifySmtpConnection(options: SmtpServerOptions): Promise<
   return new Promise((resolve) => {
     const isImplicitTls = options.port === 465 || options.secure === true;
     let socket: net.Socket;
+    let upgradedTls = isImplicitTls;
+    let supportsStartTls = false;
 
     const timeout = setTimeout(() => {
       if (socket) socket.destroy();
@@ -69,11 +84,18 @@ export async function verifySmtpConnection(options: SmtpServerOptions): Promise<
         for (const line of lines) {
           if (!line) continue;
           const code = parseInt(line.slice(0, 3), 10);
+          if (/STARTTLS/i.test(line)) supportsStartTls = true;
+          const isFinalResponse = code === 250 && line.charAt(3) !== '-';
 
           if (step === 0 && (code === 220 || code === 250)) {
             step = 1;
             send(`EHLO shanutechx.platform`);
-          } else if (step === 1 && code === 250) {
+          } else if (step === 1 && isFinalResponse) {
+            if (!upgradedTls && supportsStartTls && (options.port === 587 || options.secure === false)) {
+              step = 10;
+              send(`STARTTLS`);
+              return;
+            }
             if (options.user && options.pass) {
               step = 2;
               const authPlain = Buffer.from(`\0${options.user}\0${options.pass}`).toString('base64');
@@ -83,6 +105,29 @@ export async function verifySmtpConnection(options: SmtpServerOptions): Promise<
               socket.end();
               resolve({ ok: true, message: 'EHLO successful (No AUTH provided)', latencyMs: Date.now() - startTime });
             }
+          } else if (step === 10 && code === 220) {
+            upgradedTls = true;
+            socket.removeAllListeners('data');
+            const tlsSocket = tls.connect(
+              {
+                socket,
+                host: options.host,
+                servername: options.host,
+                rejectUnauthorized: !options.allowSelfSigned,
+              },
+              () => {
+                socket = tlsSocket;
+                socket.on('data', handleResponse);
+                step = 1;
+                supportsStartTls = false;
+                send(`EHLO shanutechx.platform`);
+              }
+            );
+            tlsSocket.on('error', (err) => {
+              clearTimeout(timeout);
+              resolve({ ok: false, message: `SMTP STARTTLS error: ${err.message}`, latencyMs: Date.now() - startTime });
+            });
+            return;
           } else if (step === 2) {
             clearTimeout(timeout);
             socket.end();
@@ -95,11 +140,7 @@ export async function verifySmtpConnection(options: SmtpServerOptions): Promise<
         }
       };
 
-      if (socket instanceof tls.TLSSocket) {
-        socket.on('data', handleResponse);
-      } else {
-        socket.on('data', handleResponse);
-      }
+      socket.on('data', handleResponse);
     };
 
     if (isImplicitTls) {
@@ -132,7 +173,26 @@ export async function sendSmtpEmail(
   return new Promise((resolve, reject) => {
     const isImplicitTls = options.port === 465 || options.secure === true;
     let socket: net.Socket;
+    let upgradedTls = isImplicitTls;
+    let supportsStartTls = false;
     const messageId = `<msg_${Date.now()}_${crypto.randomBytes(6).toString('hex')}@${options.host}>`;
+
+    const recipients: string[] = [];
+    const addRecipients = (raw?: string) => {
+      if (!raw) return;
+      for (const part of raw.split(',')) {
+        const email = extractEmail(part);
+        if (email) recipients.push(email);
+      }
+    };
+    addRecipients(mail.to);
+    addRecipients(mail.cc);
+    addRecipients(mail.bcc);
+    if (recipients.length === 0 && mail.to) {
+      recipients.push(mail.to.trim());
+    }
+
+    let recipientIndex = 0;
 
     const timeout = setTimeout(() => {
       if (socket) socket.destroy();
@@ -157,28 +217,64 @@ export async function sendSmtpEmail(
         for (const line of lines) {
           if (!line) continue;
           const code = parseInt(line.slice(0, 3), 10);
+          if (/STARTTLS/i.test(line)) supportsStartTls = true;
+          const isFinalResponse = code === 250 && line.charAt(3) !== '-';
 
           if (step === 0 && code === 220) {
             step = 1;
             send(`EHLO shanutechx.platform`);
-          } else if (step === 1 && code === 250) {
+          } else if (step === 1 && isFinalResponse) {
+            if (!upgradedTls && supportsStartTls && (options.port === 587 || options.secure === false)) {
+              step = 10;
+              send(`STARTTLS`);
+              return;
+            }
             if (options.user && options.pass) {
               step = 2;
               const authPlain = Buffer.from(`\0${options.user}\0${options.pass}`).toString('base64');
               send(`AUTH PLAIN ${authPlain}`);
             } else {
               step = 3;
-              send(`MAIL FROM:<${mail.from}>`);
+              send(`MAIL FROM:<${extractEmail(mail.from)}>`);
             }
+          } else if (step === 10 && code === 220) {
+            upgradedTls = true;
+            socket.removeAllListeners('data');
+            const tlsSocket = tls.connect(
+              {
+                socket,
+                host: options.host,
+                servername: options.host,
+                rejectUnauthorized: !options.allowSelfSigned,
+              },
+              () => {
+                socket = tlsSocket;
+                socket.on('data', handleResponse);
+                step = 1;
+                supportsStartTls = false;
+                send(`EHLO shanutechx.platform`);
+              }
+            );
+            tlsSocket.on('error', (err) => {
+              clearTimeout(timeout);
+              reject(new Error(`SMTP STARTTLS upgrade error: ${err.message}`));
+            });
+            return;
           } else if (step === 2 && (code === 235 || code === 250)) {
             step = 3;
-            send(`MAIL FROM:<${mail.from}>`);
+            send(`MAIL FROM:<${extractEmail(mail.from)}>`);
           } else if (step === 3 && code === 250) {
             step = 4;
-            send(`RCPT TO:<${mail.to}>`);
+            recipientIndex = 0;
+            send(`RCPT TO:<${recipients[recipientIndex]}>`);
           } else if (step === 4 && code === 250) {
-            step = 5;
-            send(`DATA`);
+            recipientIndex++;
+            if (recipientIndex < recipients.length) {
+              send(`RCPT TO:<${recipients[recipientIndex]}>`);
+            } else {
+              step = 5;
+              send(`DATA`);
+            }
           } else if (step === 5 && code === 354) {
             step = 6;
             const plainText = mail.text || mail.html.replace(/<[^>]+>/g, '').trim();
@@ -189,6 +285,7 @@ export async function sendSmtpEmail(
             let rawLines: string[] = [
               `From: ${mail.from}`,
               `To: ${mail.to}`,
+              ...(mail.cc ? [`Cc: ${mail.cc}`] : []),
               ...(mail.replyTo ? [`Reply-To: ${mail.replyTo}`] : []),
               `Subject: ${mail.subject}`,
               `Message-ID: ${messageId}`,

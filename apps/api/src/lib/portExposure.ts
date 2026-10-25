@@ -144,6 +144,94 @@ export function validateExposureChange(req: ExposureRequest, ctx: ValidateContex
   return { exposureMode: STORED_MODE.direct_port, publishedPort: port };
 }
 
+/**
+ * Validates that a requested host port is in range, not reserved by node infrastructure,
+ * and not already claimed by another deployment, Supabase stack, managed database, or node port exposure.
+ */
+export async function assertHostPortAvailable(
+  nodeId: string,
+  port: number,
+  agentPort: number,
+  excludeDeploymentId?: string
+): Promise<void> {
+  if (!Number.isInteger(port) || port < MIN_PUBLISHED_PORT || port > MAX_PORT) {
+    throw new PortError(
+      `Published port must be a whole number between ${MIN_PUBLISHED_PORT} and ${MAX_PORT}.`,
+      'port_out_of_range'
+    );
+  }
+  const reserved = reservedPorts(agentPort);
+  if (reserved.has(port)) {
+    throw new PortError(`Port ${port} is reserved by the node infrastructure.`, 'port_reserved');
+  }
+
+  const { prisma } = await import('./prisma');
+
+  const [clashingDep, clashingExposure, clashingSupabase, clashingDb] = await Promise.all([
+    prisma.deployment.findFirst({
+      where: {
+        nodeId,
+        id: excludeDeploymentId ? { not: excludeDeploymentId } : undefined,
+        status: { notIn: ['deleted', 'failed'] },
+        OR: [
+          { publishedPort: port },
+          { exposureMode: { in: ['no_ssl', 'raw_tcp'] }, internalPort: port },
+        ],
+      },
+      select: { id: true, subdomain: true },
+    }),
+    prisma.nodePortExposure.findFirst({
+      where: { nodeId, port },
+      select: { id: true, subdomain: true },
+    }),
+    prisma.supabaseClientProject.findFirst({
+      where: {
+        nodeId,
+        status: { notIn: ['STOPPED', 'FAILED'] },
+        OR: [{ apiPort: port }, { studioPort: port }, { dbPort: port }],
+      },
+      select: { id: true, name: true },
+    }),
+    prisma.managedDatabase.findFirst({
+      where: {
+        nodeId,
+        status: { notIn: ['failed', 'stopped'] },
+        OR: [{ internalPort: port }, { poolerPort: port }],
+      },
+      select: { id: true, name: true },
+    }),
+  ]);
+
+  if (clashingDep) {
+    throw new PortError(
+      `Port ${port} is already used by deployment "${clashingDep.subdomain || clashingDep.id}" on this node.`,
+      'port_in_use',
+      409
+    );
+  }
+  if (clashingExposure) {
+    throw new PortError(
+      `Port ${port} is claimed by node port exposure "${clashingExposure.subdomain}".`,
+      'port_claimed',
+      409
+    );
+  }
+  if (clashingSupabase) {
+    throw new PortError(
+      `Port ${port} is already used by Supabase project "${clashingSupabase.name}" on this node.`,
+      'port_in_use',
+      409
+    );
+  }
+  if (clashingDb) {
+    throw new PortError(
+      `Port ${port} is already used by managed database "${clashingDb.name}" on this node.`,
+      'port_in_use',
+      409
+    );
+  }
+}
+
 // ───────────────────────────── overview ─────────────────────────────
 
 export type IssueSeverity = 'error' | 'warning' | 'info';

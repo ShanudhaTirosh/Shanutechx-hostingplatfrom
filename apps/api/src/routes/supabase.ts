@@ -10,6 +10,7 @@ import { verifySmtpConnection, sendSmtpEmail } from '../lib/smtpDispatcher';
 
 import { createSubdomainRecord, deleteSubdomainRecord } from '../lib/cloudflare';
 import { callNodeAgent } from '../lib/nodeAgentClient';
+import { INFRASTRUCTURE_PORTS } from '../lib/portExposure';
 
 export const supabaseRouter = Router();
 
@@ -439,15 +440,56 @@ async function autoExposeSupabaseProjectPorts(
     return { apiPort: 8001, studioPort: 8000, dbPort: 5432, mainSub, studioSub, dbSub };
   }
 
-  // Find existing exposures on this node to calculate safe port offsets
-  const existingExposures = await prisma.nodePortExposure.findMany({
-    where: { nodeId },
-    select: { port: true },
-  });
-  const usedPorts = new Set(existingExposures.map((e) => e.port));
+  // Comprehensive port collision scan: collect every active port on this node
+  const [existingExposures, existingDeployments, existingSupabase, existingManagedDbs] = await Promise.all([
+    prisma.nodePortExposure.findMany({
+      where: { nodeId },
+      select: { port: true },
+    }),
+    prisma.deployment.findMany({
+      where: { nodeId, status: { notIn: ['deleted', 'failed'] } },
+      select: { exposureMode: true, publishedPort: true, internalPort: true },
+    }),
+    prisma.supabaseClientProject.findMany({
+      where: { nodeId, status: { notIn: ['STOPPED', 'FAILED'] } },
+      select: { apiPort: true, studioPort: true, dbPort: true },
+    }),
+    prisma.managedDatabase.findMany({
+      where: { nodeId, status: { notIn: ['failed', 'stopped'] } },
+      select: { internalPort: true, poolerPort: true },
+    }),
+  ]);
+
+  const usedPorts = new Set<number>();
+  for (const p of INFRASTRUCTURE_PORTS) usedPorts.add(p);
+  if (env.nodeAgentPort) usedPorts.add(env.nodeAgentPort);
+
+  for (const exp of existingExposures) {
+    if (exp.port) usedPorts.add(exp.port);
+  }
+  for (const dep of existingDeployments) {
+    const isDirect = dep.exposureMode === 'no_ssl' || dep.exposureMode === 'raw_tcp';
+    if (isDirect) {
+      const p = dep.publishedPort || dep.internalPort;
+      if (p) usedPorts.add(p);
+    }
+  }
+  for (const sup of existingSupabase) {
+    if (sup.apiPort) usedPorts.add(sup.apiPort);
+    if (sup.studioPort) usedPorts.add(sup.studioPort);
+    if (sup.dbPort) usedPorts.add(sup.dbPort);
+  }
+  for (const db of existingManagedDbs) {
+    if (db.internalPort) usedPorts.add(db.internalPort);
+    if (db.poolerPort) usedPorts.add(db.poolerPort);
+  }
 
   let offset = 0;
-  while (usedPorts.has(8001 + offset) || usedPorts.has(8000 + offset) || usedPorts.has(5432 + offset)) {
+  while (
+    usedPorts.has(8001 + offset) ||
+    usedPorts.has(8000 + offset) ||
+    usedPorts.has(5432 + offset)
+  ) {
     offset += 10;
   }
 

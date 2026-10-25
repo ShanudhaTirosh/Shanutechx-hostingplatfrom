@@ -61,6 +61,8 @@ export interface WildDuckMessageDetails extends WildDuckMessageSummary {
 export interface SendMailOptions {
   from: string; // e.g. "John Doe <john@domain.com>" or "john@domain.com"
   to: string[];
+  cc?: string[];
+  bcc?: string[];
   subject: string;
   html?: string;
   text?: string;
@@ -359,6 +361,8 @@ export const wildduckClient = {
         body: {
           from: options.from,
           to: options.to,
+          cc: options.cc,
+          bcc: options.bcc,
           subject: options.subject,
           html: options.html,
           text: options.text,

@@ -81,7 +81,7 @@ emailRouter.get('/email/mailboxes', async (req: AuthedRequest, res) => {
       const domain = acc.customDomain || acc.smtpHost.replace(/^mail\./, '');
       const isExpired = acc.expiresAt ? new Date(acc.expiresAt) < now : false;
       const isCancelled = orderStatus ? (orderStatus === 'cancelled' || orderStatus === 'failed') : false;
-      const isSuspended = !acc.isActive || acc.isSuspended || isExpired || isCancelled;
+      const isSuspended = acc.isSuspended || isExpired || isCancelled;
       const status = acc.isSuspended
         ? 'suspended'
         : isExpired
@@ -92,10 +92,13 @@ emailRouter.get('/email/mailboxes', async (req: AuthedRequest, res) => {
         ? 'pending'
         : 'active';
 
+      const fullEmail = acc.smtpUsername.includes('@') ? acc.smtpUsername : `${acc.smtpUsername}@${domain}`;
+      const username = acc.smtpUsername.includes('@') ? acc.smtpUsername.split('@')[0] : acc.smtpUsername;
+
       return {
         id: acc.id,
-        email: `${acc.smtpUsername}@${domain}`,
-        username: acc.smtpUsername,
+        email: fullEmail,
+        username,
         domain,
         smtpHost: acc.smtpHost,
         smtpPort: acc.smtpPort,

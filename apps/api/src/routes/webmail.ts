@@ -184,7 +184,22 @@ webmailRouter.get('/webmail/messages', async (req: AuthedRequest, res: Response)
     where.folder = folder;
   }
 
-  if (category) where.category = category;
+  if (category) {
+    if (category === 'primary') {
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { category: 'primary' },
+            { category: null },
+            { category: '' },
+          ],
+        },
+      ];
+    } else {
+      where.category = category;
+    }
+  }
   if (smtpAccountId) where.smtpAccountId = smtpAccountId;
 
   const take = Math.min(100, Math.max(1, Number(req.query.take) || 50));
@@ -414,12 +429,59 @@ webmailRouter.get('/webmail/messages/:id', async (req: AuthedRequest, res: Respo
   return res.status(404).json({ error: 'Message not found' });
 });
 
+// 1.5 Download Attachment Binary
+webmailRouter.get('/webmail/messages/:id/attachments/:filename', async (req: AuthedRequest, res: Response) => {
+  const userId = req.user!.id;
+  const role = req.user!.role;
+  const { id, filename } = req.params;
+  const decodedFilename = decodeURIComponent(filename);
+
+  const message = await prisma.webmailMessage.findFirst({
+    where: role === 'dev' ? { id } : { id, userId },
+  });
+
+  if (!message) {
+    return res.status(404).json({ error: 'Message not found' });
+  }
+
+  const attachments = (message.attachmentsJson as any[]) || [];
+  const att = attachments.find(
+    (a: any) => a.filename === decodedFilename || a.filename === filename
+  );
+
+  if (!att) {
+    return res.status(404).json({ error: 'Attachment not found' });
+  }
+
+  if (att.url && /^https?:\/\//i.test(att.url)) {
+    return res.redirect(att.url);
+  }
+
+  if (att.content) {
+    let base64Data = att.content;
+    let contentType = att.contentType || 'application/octet-stream';
+    const match = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      contentType = match[1];
+      base64Data = match[2];
+    }
+    const buffer = Buffer.from(base64Data, 'base64');
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(att.filename)}"`);
+    return res.send(buffer);
+  }
+
+  return res.status(404).json({ error: 'Attachment content unavailable' });
+});
+
 // =====================================================================
 // 2. SENDING, DRAFTS & BULK ACTIONS
 // =====================================================================
 
 const sendSchema = z.object({
   recipientEmail: z.string().email(),
+  cc: z.string().optional(),
+  bcc: z.string().optional(),
   subject: z.string().min(1),
   htmlBody: z.string().min(1),
   smtpAccountId: z.string().optional(),
@@ -428,7 +490,13 @@ const sendSchema = z.object({
   scheduledAt: z.string().optional(),
   readReceipt: z.boolean().optional(),
   labels: z.array(z.string()).optional(),
-  attachments: z.array(z.object({ filename: z.string(), sizeStr: z.string(), url: z.string().optional() })).optional(),
+  attachments: z.array(z.object({
+    filename: z.string(),
+    sizeStr: z.string().optional(),
+    url: z.string().optional(),
+    content: z.string().optional(),
+    contentType: z.string().optional(),
+  })).optional(),
 });
 
 // In-memory idempotency cache for webmail send requests (TTL 10 mins)
@@ -458,7 +526,7 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
     }
   }
 
-  const { recipientEmail, subject, htmlBody, smtpAccountId, threadId, inReplyTo, scheduledAt, readReceipt, labels, attachments } = parsed.data;
+  const { recipientEmail, cc, bcc, subject, htmlBody, smtpAccountId, threadId, inReplyTo, scheduledAt, readReceipt, labels, attachments } = parsed.data;
   const userId = req.user!.id;
   const role = req.user!.role;
 
@@ -493,7 +561,10 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
     });
   }
 
-  const senderEmail = account.smtpUsername;
+  const senderDomain = account.customDomain || account.smtpHost.replace(/^mail\./, '');
+  const senderEmail = account.smtpUsername.includes('@')
+    ? account.smtpUsername
+    : `${account.smtpUsername}@${senderDomain}`;
   const profile = normalizeMailboxProfile(account.profileJson, (req.user as any)?.displayName || req.user?.email, senderEmail);
   const rawSenderName = profile.displayName || (req.user as any)?.displayName || req.user?.email || senderEmail;
   const senderName = String(rawSenderName).replace(/[\r\n]/g, '').trim();
@@ -527,9 +598,14 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
   if (!isScheduled) {
     try {
       if (account.wildduckUserId) {
+        const toList = [recipientEmail];
+        const ccList = cc ? cc.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+        const bccList = bcc ? bcc.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
         await wildduckClient.submitMessage(account.wildduckUserId, {
           from: `"${senderName}" <${senderEmail}>`,
-          to: [recipientEmail],
+          to: toList,
+          cc: ccList,
+          bcc: bccList,
           subject,
           html: htmlBody,
           text: htmlBody.replace(/<[^>]+>/g, ''),
@@ -539,7 +615,15 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
         const password = decryptSecret(account.credentialRef, env.secretsEncryptionKey);
         const sendResult = await sendSmtpEmail(
           { host: account.smtpHost, port: account.smtpPort, user: account.smtpUsername, pass: password },
-          { from: `"${senderName}" <${senderEmail}>`, to: recipientEmail, subject, html: htmlBody, attachments }
+          {
+            from: `"${senderName}" <${senderEmail}>`,
+            to: recipientEmail,
+            cc,
+            bcc,
+            subject,
+            html: htmlBody,
+            attachments,
+          }
         );
         logger.info({ recipientEmail, messageId: sendResult.messageId, senderUserId: userId }, 'Delegated webmail message delivered via SMTP');
       }
@@ -575,6 +659,12 @@ webmailRouter.post('/webmail/drafts', async (req: AuthedRequest, res: Response) 
   const { recipientEmail, subject, htmlBody, id } = req.body || {};
 
   if (id) {
+    const existing = await prisma.webmailMessage.findFirst({
+      where: (req.user as any)?.role === 'dev' ? { id } : { id, userId },
+    });
+    if (!existing) {
+      return res.status(404).json({ error: 'Draft not found or access denied' });
+    }
     const updated = await prisma.webmailMessage.update({
       where: { id },
       data: {
@@ -665,7 +755,7 @@ const patchSchema = z.object({
   isRead: z.boolean().optional(),
   isStarred: z.boolean().optional(),
   isPinned: z.boolean().optional(),
-  folder: z.enum(FOLDERS).optional(),
+  folder: z.string().min(1).optional(),
   category: z.string().optional(),
   labels: z.array(z.string()).optional(),
   snoozedUntil: z.string().optional(),

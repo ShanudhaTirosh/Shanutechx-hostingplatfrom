@@ -67,7 +67,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const [showTemplates, setShowTemplates] = useState(false);
 
   // Attachments
-  const [attachments, setAttachments] = useState<{ filename: string; sizeStr: string; url?: string }[]>([]);
+  const [attachments, setAttachments] = useState<{ filename: string; sizeStr: string; url?: string; content?: string; contentType?: string }[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -121,6 +121,8 @@ export const Composer: React.FC<ComposerProps> = ({
     try {
       await api.webmail.send({
         recipientEmail: recipient.trim(),
+        cc: cc.trim() || undefined,
+        bcc: bcc.trim() || undefined,
         subject: subject.trim(),
         htmlBody: finalHtml,
         smtpAccountId,
@@ -146,11 +148,29 @@ export const Composer: React.FC<ComposerProps> = ({
     addFiles(Array.from(files));
   };
 
-  const addFiles = (files: File[]) => {
-    const newAtts = files.map((f) => ({
-      filename: f.name,
-      sizeStr: (f.size / 1024).toFixed(1) + ' KB',
-    }));
+  const addFiles = async (files: File[]) => {
+    const filePromises = files.map((f) => {
+      return new Promise<{ filename: string; sizeStr: string; url?: string; content?: string; contentType?: string }>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          resolve({
+            filename: f.name,
+            sizeStr: (f.size / 1024).toFixed(1) + ' KB',
+            contentType: f.type || 'application/octet-stream',
+            content: reader.result as string,
+          });
+        };
+        reader.onerror = () => {
+          resolve({
+            filename: f.name,
+            sizeStr: (f.size / 1024).toFixed(1) + ' KB',
+            contentType: f.type || 'application/octet-stream',
+          });
+        };
+        reader.readAsDataURL(f);
+      });
+    });
+    const newAtts = await Promise.all(filePromises);
     setAttachments((prev) => [...prev, ...newAtts]);
   };
 

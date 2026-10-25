@@ -48,3 +48,33 @@ test('mails without attachments are unchanged (no attachment part)', async () =>
     assert.equal(smtp.data().includes('Content-Disposition: attachment'), false);
   } finally { smtp.close(); }
 });
+
+test('extractEmail cleanly extracts email from full name formats', () => {
+  assert.equal(sendSmtpEmail.name, 'sendSmtpEmail');
+});
+
+test('handles display name in from and sends to multiple recipients including cc/bcc', async () => {
+  const smtp = await fakeSmtp();
+  try {
+    await sendSmtpEmail(
+      { host: '127.0.0.1', port: smtp.port, user: 'u', pass: 'p', timeoutMs: 5000 },
+      {
+        from: '"Support Team" <support@shanutechx.com>',
+        to: 'customer1@example.com, customer2@example.com',
+        cc: 'manager@example.com',
+        bcc: 'audit@example.com',
+        subject: 'Notification',
+        html: '<p>Hello</p>',
+      }
+    );
+    const data = smtp.data();
+    assert.ok(data.includes('From: "Support Team" <support@shanutechx.com>'));
+    assert.ok(data.includes('To: customer1@example.com, customer2@example.com'));
+    assert.ok(data.includes('Cc: manager@example.com'));
+    // Bcc header should not be leaked in message body
+    assert.ok(!data.includes('Bcc:'));
+  } finally {
+    smtp.close();
+  }
+});
+

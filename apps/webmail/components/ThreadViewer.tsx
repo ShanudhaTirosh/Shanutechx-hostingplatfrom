@@ -41,6 +41,7 @@ interface ThreadViewerProps {
   subject: string;
   onBack: () => void;
   onReply: (recipient: string, subject: string, messageId: string) => void;
+  onQuickReply?: (recipient: string, subject: string, messageId: string, replyText: string) => Promise<void>;
   onForward: (subject: string, body: string) => void;
   onDelete: (id: string) => void;
   onStar: (id: string, currentStarred: boolean) => void;
@@ -51,6 +52,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
   subject,
   onBack,
   onReply,
+  onQuickReply,
   onForward,
   onDelete,
   onStar,
@@ -59,6 +61,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
     messages.length > 0 ? [messages[messages.length - 1].id] : []
   );
   const [quickReplyText, setQuickReplyText] = useState('');
+  const [isSendingQuickReply, setIsSendingQuickReply] = useState(false);
 
   if (!messages || messages.length === 0) {
     return (
@@ -282,16 +285,27 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
               Open Full Composer
             </button>
             <button
-              onClick={() => {
-                if (quickReplyText.trim()) {
-                  onReply(latestMsg.senderEmail, `Re: ${subject}`, latestMsg.id);
+              onClick={async () => {
+                const text = quickReplyText.trim();
+                if (!text || isSendingQuickReply) return;
+                const replySubject = subject.startsWith('Re:') ? subject : `Re: ${subject}`;
+                if (onQuickReply) {
+                  try {
+                    setIsSendingQuickReply(true);
+                    await onQuickReply(latestMsg.senderEmail, replySubject, latestMsg.id, text);
+                    setQuickReplyText('');
+                  } finally {
+                    setIsSendingQuickReply(false);
+                  }
+                } else {
+                  onReply(latestMsg.senderEmail, replySubject, latestMsg.id);
                   setQuickReplyText('');
                 }
               }}
-              disabled={!quickReplyText.trim()}
+              disabled={!quickReplyText.trim() || isSendingQuickReply}
               className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-md transition-all"
             >
-              <Send className="w-3.5 h-3.5" /> Send Reply
+              <Send className="w-3.5 h-3.5" /> {isSendingQuickReply ? 'Sending...' : 'Send Reply'}
             </button>
           </div>
         </div>
