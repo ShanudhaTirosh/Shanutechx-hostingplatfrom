@@ -1823,16 +1823,33 @@ webmailRouter.get('/webmail/domains', async (req: AuthedRequest, res: Response) 
       }
     }
 
-    const result = Array.from(domainStatusMap.entries()).map(([domain, status]) => ({
-      domain,
-      status,
-      records: {
-        mx: `mail.${rootDomain}`,
-        spf: `v=spf1 include:_spf.${rootDomain} ~all`,
-        dkim: `wildduck._domainkey.${domain}`,
-        dmarc: `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${rootDomain}`,
-      },
-    }));
+    const result = await Promise.all(
+      Array.from(domainStatusMap.entries()).map(async ([domain, status]) => {
+        let dkimRecord = `v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQ...`;
+        let dkimSelector = 'wildduck';
+        if (env.wildduckApiKey) {
+          try {
+            const dkim = await wildduckClient.getOrCreateDkim(domain, 'wildduck');
+            if (dkim?.publicKey) {
+              dkimRecord = dkim.txtRecord;
+              dkimSelector = dkim.selector || 'wildduck';
+            }
+          } catch (_) {}
+        }
+
+        return {
+          domain,
+          status,
+          records: {
+            mx: `mail.${rootDomain}`,
+            spf: `v=spf1 include:_spf.${rootDomain} ~all`,
+            dkim: dkimRecord,
+            dkimHost: `${dkimSelector}._domainkey`,
+            dmarc: `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${rootDomain}`,
+          },
+        };
+      })
+    );
 
     return res.json({ domains: result });
   } catch (err: any) {

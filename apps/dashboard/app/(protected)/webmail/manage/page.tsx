@@ -39,6 +39,7 @@ interface DomainItem {
     mx: string;
     spf: string;
     dkim: string;
+    dkimHost?: string;
     dmarc: string;
   };
 }
@@ -72,8 +73,15 @@ export default function CustomerMailManagementHub() {
         api.get('/webmail/domains').catch(() => ({ domains: [] })),
       ]);
 
-      if (usageRes?.data) setPlanUsage(usageRes.data);
-      if (domainsRes?.data?.domains) setDomains(domainsRes.data.domains);
+      const usage = usageRes?.quotas ? usageRes : usageRes?.data;
+      if (usage?.quotas) setPlanUsage(usage);
+
+      const domainList = Array.isArray(domainsRes?.domains)
+        ? domainsRes.domains
+        : Array.isArray(domainsRes?.data?.domains)
+        ? domainsRes.data.domains
+        : [];
+      setDomains(domainList);
     } catch (err: any) {
       toast('Failed to load mailbox hub data', 'error');
     } finally {
@@ -90,20 +98,22 @@ export default function CustomerMailManagementHub() {
       toast(`Domain ${newDomain} connected! Please configure DNS records below.`, 'success');
       setNewDomain('');
       loadHubData();
-      if (res.data?.dnsRecords) {
+      const payload = res?.dnsRecords ? res : res?.data;
+      if (payload?.dnsRecords) {
         setSelectedDomainForWizard({
-          domain: res.data.domain,
+          domain: payload.domain,
           status: 'pending',
           records: {
-            mx: res.data.dnsRecords.mx.value,
-            spf: res.data.dnsRecords.spf.value,
-            dkim: res.data.dnsRecords.dkim.value,
-            dmarc: res.data.dnsRecords.dmarc.value,
+            mx: payload.dnsRecords.mx.value,
+            spf: payload.dnsRecords.spf.value,
+            dkim: payload.dnsRecords.dkim.value,
+            dkimHost: payload.dnsRecords.dkim.host || 'wildduck._domainkey',
+            dmarc: payload.dnsRecords.dmarc.value,
           },
         });
       }
     } catch (err: any) {
-      toast(err.response?.data?.error || 'Failed to connect domain', 'error');
+      toast(err.response?.data?.error || err.message || 'Failed to connect domain', 'error');
     } finally {
       setConnectingDomain(false);
     }
@@ -115,8 +125,11 @@ export default function CustomerMailManagementHub() {
     setVerifyingDns(true);
     try {
       const res = await api.post(`/webmail/domains/${domain}/verify`);
-      setDnsChecks(res.data.checks);
-      if (res.data.verified) {
+      const verifyData = res?.checks ? res : res?.data;
+      if (verifyData?.checks) {
+        setDnsChecks(verifyData.checks);
+      }
+      if (verifyData?.verified) {
         toast(`DNS records for ${domain} fully verified and active!`, 'success');
       } else {
         toast(`DNS verification in progress. Check details below.`, 'info');
@@ -395,10 +408,10 @@ export default function CustomerMailManagementHub() {
                       </div>
 
                       <div className="flex items-center justify-between rounded bg-slate-100 p-2 dark:bg-slate-800">
-                        <div>
-                          <span className="font-bold text-indigo-600 dark:text-indigo-400">TXT shanutechx._domainkey:</span> {d.records.dkim}
+                        <div className="overflow-hidden text-ellipsis">
+                          <span className="font-bold text-indigo-600 dark:text-indigo-400">TXT {d.records.dkimHost || 'wildduck._domainkey'}:</span> {d.records.dkim}
                         </div>
-                        <button onClick={() => copyToClipboard(d.records.dkim)} className="text-slate-400 hover:text-slate-600">
+                        <button onClick={() => copyToClipboard(d.records.dkim)} className="ml-2 flex-shrink-0 text-slate-400 hover:text-slate-600" title="Copy DKIM Record">
                           <Copy className="h-4 w-4" />
                         </button>
                       </div>

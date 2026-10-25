@@ -7,8 +7,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * (30/365 days rather than calendar months/years) so renewal math is
  * trivially testable and never lands on an ambiguous date like Feb 30.
  */
-export function periodLengthMs(billingPeriod: 'monthly' | 'yearly'): number {
-  return billingPeriod === 'monthly' ? 30 * DAY_MS : 365 * DAY_MS;
+export function periodLengthMs(billingPeriod: 'monthly' | 'yearly' | 'quarterly' | string): number {
+  if (billingPeriod === 'monthly') return 30 * DAY_MS;
+  if (billingPeriod === 'quarterly') return 90 * DAY_MS;
+  return 365 * DAY_MS;
 }
 
 /**
@@ -20,7 +22,7 @@ export function periodLengthMs(billingPeriod: 'monthly' | 'yearly'): number {
  */
 export function computeRenewedPeriodEnd(
   currentPeriodEnd: Date,
-  billingPeriod: 'monthly' | 'yearly',
+  billingPeriod: 'monthly' | 'yearly' | 'quarterly' | string,
   now: Date = new Date()
 ): Date {
   const base = currentPeriodEnd.getTime() > now.getTime() ? currentPeriodEnd.getTime() : now.getTime();

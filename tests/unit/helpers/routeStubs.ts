@@ -49,17 +49,18 @@ export async function mountRouter(routeName: string, exportName: string, prisma:
   const M: any = Module;
   const origLoad = M._load;
   // `require` caches modules, which would keep the FIRST test's fake prisma bound inside the router.
-  for (const k of Object.keys(req.cache)) if (k.includes('/apps/api/src/')) delete req.cache[k];
+  for (const k of Object.keys(req.cache)) if (k.replace(/\\/g, '/').includes('/apps/api/src/')) delete req.cache[k];
   // Redis / BullMQ are only imported as side effects of shared libs: stub them (no sockets, no noise).
   const noop: any = new Proxy(function () {}, { get: (_t, k) => (k === 'then' ? undefined : k === 'status' ? 'ready' : noop), apply: () => noop, construct: () => noop });
   const noopModule = { __esModule: true, default: noop, Redis: noop, Queue: noop, Worker: noop, QueueEvents: noop, FlowProducer: noop };
   const prismaModule = { PrismaClient: class { constructor() { return prisma; } }, Prisma: {}, prisma, default: prisma };
   M._load = function (request: string, parent: any, ...rest: any[]) {
-    const from: string = parent?.filename || '';
-    if (request === 'ioredis' || request === 'bullmq') return noopModule;
-    if (request === '@prisma/client' || request === '.prisma/client/default' || request === '@shanutechx/db') return prismaModule;
-    if (/apps\/api\/src/.test(from) && /(^|\/)prisma(\.ts|\.js)?$/.test(request)) return prismaModule;
-    if (/apps\/api\/src\/routes/.test(from) && /middleware\/auth(\.ts|\.js)?$/.test(request)) {
+    const from: string = (parent?.filename || '').replace(/\\/g, '/');
+    const normRequest: string = request.replace(/\\/g, '/');
+    if (normRequest === 'ioredis' || normRequest === 'bullmq') return noopModule;
+    if (normRequest === '@prisma/client' || normRequest === '.prisma/client/default' || normRequest === '@shanutechx/db') return prismaModule;
+    if (/apps\/api\/src/.test(from) && /(^|\/)prisma(\.ts|\.js)?$/.test(normRequest)) return prismaModule;
+    if (/apps\/api\/src\/routes/.test(from) && /middleware\/auth(\.ts|\.js)?$/.test(normRequest)) {
       const passthrough = (_q: any, _s: any, next: any) => next();
       const requireAuth = (q: any, _s: any, next: any) => {
         q.user = { id: q.headers['x-test-user'], role: q.headers['x-test-role'] || 'customer', email: 'test@example.com' };
@@ -100,15 +101,16 @@ export function loadApiModule(relFromApiSrc: string, prisma: any): any {
   const file = fileURLToPath(new URL(`../../../apps/api/src/${relFromApiSrc}.ts`, import.meta.url));
   const M: any = Module;
   const origLoad = M._load;
-  for (const k of Object.keys(req.cache)) if (k.includes('/apps/api/src/')) delete req.cache[k];
+  for (const k of Object.keys(req.cache)) if (k.replace(/\\/g, '/').includes('/apps/api/src/')) delete req.cache[k];
   const noop: any = new Proxy(function () {}, { get: (_t, k) => (k === 'then' ? undefined : k === 'status' ? 'ready' : noop), apply: () => noop, construct: () => noop });
   const noopModule = { __esModule: true, default: noop, Redis: noop, Queue: noop, Worker: noop, QueueEvents: noop, FlowProducer: noop };
   const prismaModule = { PrismaClient: class { constructor() { return prisma; } }, Prisma: {}, prisma, default: prisma };
   M._load = function (request: string, parent: any, ...rest: any[]) {
-    const from: string = parent?.filename || '';
-    if (request === 'ioredis' || request === 'bullmq') return noopModule;
-    if (request === '@prisma/client' || request === '.prisma/client/default' || request === '@shanutechx/db') return prismaModule;
-    if (/apps\/api\/src/.test(from) && /(^|\/)prisma(\.ts|\.js)?$/.test(request)) return prismaModule;
+    const from: string = (parent?.filename || '').replace(/\\/g, '/');
+    const normRequest: string = request.replace(/\\/g, '/');
+    if (normRequest === 'ioredis' || normRequest === 'bullmq') return noopModule;
+    if (normRequest === '@prisma/client' || normRequest === '.prisma/client/default' || normRequest === '@shanutechx/db') return prismaModule;
+    if (/apps\/api\/src/.test(from) && /(^|\/)prisma(\.ts|\.js)?$/.test(normRequest)) return prismaModule;
     return origLoad.call(this, request, parent, ...rest);
   };
   try { return req(file); } finally { M._load = origLoad; }

@@ -5,11 +5,15 @@ const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 async function getIdToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
   const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) return null;
+  if (!currentUser) {
+    const webmailToken = localStorage.getItem('webmail_token');
+    return webmailToken || null;
+  }
   try {
     return await currentUser.getIdToken();
   } catch {
-    return null;
+    const webmailToken = localStorage.getItem('webmail_token');
+    return webmailToken || null;
   }
 }
 
@@ -23,6 +27,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+    headers['X-Webmail-Token'] = token;
   }
 
   const res = await fetch(`${API_BASE_URL}${path.startsWith('/') ? path : '/' + path}`, {

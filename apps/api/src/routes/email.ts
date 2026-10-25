@@ -212,15 +212,17 @@ emailRouter.get('/email/mailboxes/:id/website-connect', async (req: AuthedReques
 
     const password = decryptSecret(account.credentialRef, env.secretsEncryptionKey);
     const domain = account.customDomain || account.smtpHost.replace(/^mail\./, '');
-    const fullEmail = `${account.smtpUsername}@${domain}`;
-    const imapHost = account.smtpHost.replace(/^mail\./, 'imap.');
+    const fullEmail = account.smtpUsername.includes('@')
+      ? account.smtpUsername
+      : `${account.smtpUsername}@${domain}`;
+    const imapHost = account.smtpHost;
     const appDisplayName = account.user?.displayName || 'Website Application';
     const apiBaseUrl = process.env.NODE_ENV === 'production' ? `https://api.${env.rootDomain}` : 'http://localhost:4000';
 
     const credentials = {
       mailboxId: account.id,
       email: fullEmail,
-      username: account.smtpUsername,
+      username: fullEmail,
       fullUsername: fullEmail,
       password,
       domain,
@@ -597,16 +599,21 @@ emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
   }
 
   const finalSendLimit = parse.data.dailySendLimit || quotaValidation.quotas.dailySendLimit;
-  const smtpHost = `mail.${domainStr}`;
+  const smtpHost = `mail.${env.rootDomain}`;
   const credentialRef = encryptSecret(password, env.secretsEncryptionKey);
-  const webmailUrl = process.env.NODE_ENV === 'production' ? `https://mail.${domainStr}` : 'http://localhost:3001/email';
+  const webmailUrl = process.env.NODE_ENV === 'production' ? `https://mail.${env.rootDomain}` : 'http://localhost:3001/webmail';
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const fullEmail = `${username}@${domainStr}`;
 
   let wildduckUserId: string | undefined;
   let wildduckAddressId: string | undefined;
 
   try {
-    const fullEmail = `${username}@${domainStr}`;
+    if (env.wildduckApiKey && domainStr) {
+      await wildduckClient.createDomain(domainStr).catch(() => null);
+      await wildduckClient.getOrCreateDkim(domainStr, 'wildduck').catch(() => null);
+    }
+
     const wdUser = await wildduckClient.createUser({
       username: fullEmail,
       password,
@@ -632,7 +639,7 @@ emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
         wildduckAddressId,
         smtpHost,
         smtpPort: 587,
-        smtpUsername: username,
+        smtpUsername: fullEmail,
         credentialRef,
         webmailUrl,
         storageQuotaMb,
@@ -1303,25 +1310,30 @@ emailRouter.get('/email/domains', async (req: AuthedRequest, res) => {
     const where = isStaff ? {} : { userId: req.user!.id };
     const accounts = await prisma.smtpAccount.findMany({
       where,
-      select: { id: true, userId: true, smtpHost: true, createdAt: true },
+      select: { id: true, userId: true, smtpHost: true, customDomain: true, createdAt: true },
     });
 
     const domainSet = new Set<string>();
     const domainList: any[] = [];
 
     for (const acc of accounts) {
-      const domain = acc.smtpHost.replace(/^mail\./, '');
+      const domain = acc.customDomain || acc.smtpHost.replace(/^mail\./, '');
       if (!domainSet.has(domain)) {
         domainSet.add(domain);
+        let dkimRecord = `v=DKIM1; k=rsa; p=<managed by mail server>`;
+        if (env.wildduckApiKey) {
+          try {
+            const dkim = await wildduckClient.getOrCreateDkim(domain, 'wildduck');
+            if (dkim?.publicKey) dkimRecord = dkim.txtRecord;
+          } catch (_) {}
+        }
         domainList.push({
           id: `smtp-${acc.id}`,
           domain,
           status: 'verified',
-                    mxRecord: `10 ${mailHost}`,
+          mxRecord: `10 ${mailHost}`,
           spfRecord: buildSpfRecord(env.rootDomain),
-          dkimRecord: `v=DKIM1; k=rsa; p=<managed by mail server>`,
-
-
+          dkimRecord,
           dmarcRecord: `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${domain}`,
           createdAt: acc.createdAt.toISOString(),
         });
@@ -1336,13 +1348,20 @@ emailRouter.get('/email/domains', async (req: AuthedRequest, res) => {
       if (isStaff || record.userId === req.user!.id) {
         if (!domainSet.has(record.domain)) {
           domainSet.add(record.domain);
+          let dkimRecord = `v=DKIM1; k=rsa; p=<managed by mail server>`;
+          if (env.wildduckApiKey) {
+            try {
+              const dkim = await wildduckClient.getOrCreateDkim(record.domain, 'wildduck');
+              if (dkim?.publicKey) dkimRecord = dkim.txtRecord;
+            } catch (_) {}
+          }
           domainList.push({
             id: record.id,
             domain: record.domain,
             status: record.status,
             mxRecord: `10 ${mailHost}`,
-            spfRecord: `v=spf1 mx ip4:${serverIp} include:_spf.${env.rootDomain} ~all`,
-            dkimRecord: `v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQ...`,
+            spfRecord: buildSpfRecord(env.rootDomain),
+            dkimRecord,
             dmarcRecord: `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${record.domain}`,
             createdAt: record.createdAt,
           });
@@ -1392,6 +1411,23 @@ emailRouter.post('/email/domains', async (req: AuthedRequest, res) => {
     return res.status(409).json({ error: 'This domain is already registered.' });
   }
 
+  if (env.wildduckApiKey) {
+    try {
+      await wildduckClient.createDomain(domainStr);
+      await wildduckClient.getOrCreateDkim(domainStr, 'wildduck');
+    } catch (err: any) {
+      logger.warn({ domain: domainStr, err: err.message }, 'WildDuck domain/DKIM registration during domain add warning');
+    }
+  }
+
+  let dkimRecord = `v=DKIM1; k=rsa; p=<managed by mail server>`;
+  if (env.wildduckApiKey) {
+    try {
+      const dkim = await wildduckClient.getOrCreateDkim(domainStr, 'wildduck');
+      if (dkim?.publicKey) dkimRecord = dkim.txtRecord;
+    } catch (_) {}
+  }
+
   const newRecord = await prisma.emailDomain.create({
     data: { userId: req.user!.id, domain: domainStr, status: 'pending_dns' },
   });
@@ -1403,7 +1439,7 @@ emailRouter.post('/email/domains', async (req: AuthedRequest, res) => {
       status: 'pending_dns',
       mxRecord: `10 ${mailHost}`,
       spfRecord: buildSpfRecord(env.rootDomain),
-      dkimRecord: `v=DKIM1; k=rsa; p=<managed by mail server>`,
+      dkimRecord,
       dmarcRecord: `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${domainStr}`,
       createdAt: newRecord.createdAt,
     },
@@ -1444,7 +1480,17 @@ emailRouter.post('/email/domains/:id/verify', async (req: AuthedRequest, res) =>
     try {
       const dkimTxt = await dns.promises.resolveTxt(`wildduck._domainkey.${domainStr!}`);
       dkimVerified = dkimTxt.some((t) => t.join('').includes('v=DKIM1') || t.join('').includes('p='));
-    } catch {}
+    } catch {
+      try {
+        const dkimTxt2 = await dns.promises.resolveTxt(`default._domainkey.${domainStr!}`);
+        dkimVerified = dkimTxt2.some((t) => t.join('').includes('v=DKIM1') || t.join('').includes('p='));
+      } catch {
+        try {
+          const dkimTxt3 = await dns.promises.resolveTxt(`shanutechx._domainkey.${domainStr!}`);
+          dkimVerified = dkimTxt3.some((t) => t.join('').includes('v=DKIM1') || t.join('').includes('p='));
+        } catch {}
+      }
+    }
 
     let dmarcVerified = false;
     try {
@@ -2044,6 +2090,18 @@ emailRouter.get('/email/domains/:id/dns', async (req: AuthedRequest, res) => {
     const serverIp = getServerIp();
     const rootHost = `mail.${env.rootDomain}`;
 
+    let dkimValue = `v=DKIM1; k=rsa; p=<managed by mail server>`;
+    let dkimSelector = 'wildduck';
+    if (env.wildduckApiKey) {
+      try {
+        const dkim = await wildduckClient.getOrCreateDkim(domain, 'wildduck');
+        if (dkim?.publicKey) {
+          dkimValue = dkim.txtRecord;
+          dkimSelector = dkim.selector || 'wildduck';
+        }
+      } catch (_) {}
+    }
+
     res.json({
       domain,
       status: domainRecord.status,
@@ -2066,8 +2124,8 @@ emailRouter.get('/email/domains/:id/dns', async (req: AuthedRequest, res) => {
         },
         {
           type: 'TXT (DKIM)',
-          name: 'default._domainkey',
-          value: `v=DKIM1; k=rsa; p=<managed by mail server>`,
+          name: `${dkimSelector}._domainkey`,
+          value: dkimValue,
           purpose: 'DomainKeys Identified Mail - cryptographic signature for outbound email',
         },
         {

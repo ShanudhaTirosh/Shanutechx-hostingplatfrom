@@ -36,7 +36,7 @@ export default function WebmailPage() {
   const { toast } = useToast();
 
   // ── Screen state ──────────────────────────────────────────────────────────
-  const [activeScreen, setActiveScreen] = useState<'login' | 'loading' | 'mail'>('login');
+  const [activeScreen, setActiveScreen] = useState<'login' | 'loading' | 'mail' | 'no_mailboxes'>('loading');
 
   // ── Auth & mailbox state ──────────────────────────────────────────────────
   const [loginEmail, setLoginEmail] = useState('');
@@ -115,7 +115,7 @@ export default function WebmailPage() {
   // ──────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     async function bootSession() {
-      // SSO token takes priority
+      // 1. SSO token from URL parameter
       if (ssoToken) {
         setActiveScreen('loading');
         setLoadingStatus('Exchanging SSO security ticket…');
@@ -130,36 +130,86 @@ export default function WebmailPage() {
           if (res.ok && data.ok) {
             localStorage.setItem('webmail_token', data.token);
             setToken(data.token);
-            await loadMailboxes();
+            const accounts = await loadMailboxes();
             setLoadingProgress(100);
-            setTimeout(() => setActiveScreen('mail'), 300);
+            setTimeout(() => {
+              if (accounts.length === 0) {
+                setActiveScreen('no_mailboxes');
+              } else {
+                setActiveScreen('mail');
+              }
+            }, 300);
             return;
           }
         } catch {
-          // fall through to login
+          // fall through
         }
       }
 
+      // 2. Existing active token
       const activeToken = localStorage.getItem('webmail_token');
       if (activeToken) {
         setToken(activeToken);
-        await loadMailboxes();
-        setActiveScreen('mail');
+        const accounts = await loadMailboxes();
+        if (accounts && accounts.length > 0) {
+          setActiveScreen('mail');
+          return;
+        }
+      }
+
+      // 3. Auto-SSO via dashboard session
+      try {
+        setActiveScreen('loading');
+        setLoadingStatus('Authenticating your mailbox SSO session…');
+        setLoadingProgress(50);
+        const ticketRes = await api.smtp.getSsoTicket().catch(() => null);
+        if (ticketRes?.ssoToken) {
+          setLoadingProgress(75);
+          const exchangeRes = await fetch('/api/webmail/auth/sso-exchange', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ssoToken: ticketRes.ssoToken }),
+          });
+          const data = await exchangeRes.json().catch(() => null);
+          if (exchangeRes.ok && data?.ok) {
+            localStorage.setItem('webmail_token', data.token);
+            setToken(data.token);
+            const accounts = await loadMailboxes();
+            setLoadingProgress(100);
+            setTimeout(() => {
+              if (accounts.length === 0) {
+                setActiveScreen('no_mailboxes');
+              } else {
+                setActiveScreen('mail');
+              }
+            }, 250);
+            return;
+          }
+        }
+      } catch (err) {
+        // Fallback
+      }
+
+      // 4. Check mailboxes to determine if user has mailboxes or needs to create one
+      const finalAccounts = await loadMailboxes();
+      if (!finalAccounts || finalAccounts.length === 0) {
+        setActiveScreen('no_mailboxes');
       } else {
-        setActiveScreen('login');
+        setActiveScreen('mail');
       }
     }
     void bootSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ssoToken]);
 
-  const loadMailboxes = async () => {
+  const loadMailboxes = async (): Promise<any[]> => {
+    let accounts: any[] = [];
     try {
       const res = await api.email.mailboxes();
-      const accounts = res.mailboxes || [];
+      accounts = res.mailboxes || [];
       setMailboxes(accounts);
       if (accounts.length > 0) {
-        setSelectedMailboxId(accounts[0].id);
+        setSelectedMailboxId((prev) => prev || accounts[0].id);
       }
     } catch {}
 
@@ -168,6 +218,8 @@ export default function WebmailPage() {
       const me = await api.me();
       if (me?.user?.role) setUserRole(me.user.role);
     } catch {}
+
+    return accounts;
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -490,6 +542,33 @@ export default function WebmailPage() {
               className="h-full bg-gradient-to-r from-violet-600 to-indigo-500 transition-all duration-300 rounded-full"
               style={{ width: `${loadingProgress}%` }}
             />
+          </div>
+        </div>
+      )}
+
+      {/* ─── Screen: No Mailboxes Provisioned ────────────────────────────── */}
+      {activeScreen === 'no_mailboxes' && (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-lg mx-auto">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white mb-6 shadow-xl shadow-violet-500/20">
+            <Mail className="h-8 w-8" />
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight text-white mb-2">No Mailboxes Provisioned Yet</h2>
+          <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+            You don't have any business email mailboxes created yet. Provision your custom domain mailboxes (e.g. info@yourdomain.com) or configure DNS to begin sending and receiving emails.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 w-full">
+            <a
+              href="/email"
+              className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-violet-500/25 transition-all text-center"
+            >
+              Provision Mailbox &amp; DNS
+            </a>
+            <a
+              href="/webmail/manage"
+              className="flex-1 py-3 px-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-semibold text-sm transition-all text-center"
+            >
+              Domain Management Hub
+            </a>
           </div>
         </div>
       )}

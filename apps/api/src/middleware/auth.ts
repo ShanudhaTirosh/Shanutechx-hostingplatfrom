@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { canImpersonate } from '../lib/impersonation';
 import { firebaseAuth } from '../lib/firebaseAdmin';
 import { prisma } from '../lib/prisma';
@@ -74,6 +75,23 @@ export async function requireAuth(
       }
       decoded = await firebaseAuth.verifyIdToken(idToken);
     } catch (firebaseErr: any) {
+      // Check if this is a webmail_session JWT token signed with env.projectAuthJwtSecret
+      try {
+        const payload = jwt.verify(idToken, env.projectAuthJwtSecret, { algorithms: ['HS256'] }) as any;
+        if (payload?.type === 'webmail_session' && payload?.userId) {
+          const webmailUser = await prisma.user.findUnique({ where: { id: payload.userId } });
+          if (webmailUser && !webmailUser.isBanned) {
+            req.user = {
+              id: webmailUser.id,
+              firebaseUid: webmailUser.firebaseUid,
+              email: webmailUser.email,
+              role: webmailUser.role,
+            };
+            return next();
+          }
+        }
+      } catch (_) {}
+
       return res.status(401).json({ error: 'Invalid or expired token', detail: firebaseErr.code ?? firebaseErr.message });
     }
 

@@ -179,14 +179,34 @@ export default function DynamicDnsSetupGuide({
       <div className="space-y-3 mb-8">
         <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Required DNS Records to Add in your Domain Registrar (Cloudflare, Namecheap, GoDaddy)</h3>
         <div className="border border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-800/60 bg-slate-950/40">
-          {defaultRecords.map((rec, i) => {
-            const isMxVerified = rec.type === 'MX' && verificationResult?.verification?.mx;
-            const isSpfVerified = rec.type.includes('SPF') && verificationResult?.verification?.spf;
-            const isDmarcVerified = rec.type.includes('DMARC') && verificationResult?.verification?.dmarc;
-            const isVerified = isMxVerified || isSpfVerified || isDmarcVerified;
-
+          {(verificationResult?.expectedDns && verificationResult.expectedDns.length > 0
+            ? verificationResult.expectedDns.map((rec: any) => {
+                const isMxVerified = rec.type === 'MX' && (rec.status === 'verified' || verificationResult?.verification?.mx);
+                const isSpfVerified = rec.type.includes('SPF') && (rec.status === 'verified' || verificationResult?.verification?.spf);
+                const isDkimVerified = rec.type.includes('DKIM') && (rec.status === 'verified' || verificationResult?.verification?.dkim);
+                const isDmarcVerified = rec.type.includes('DMARC') && (rec.status === 'verified' || verificationResult?.verification?.dmarc);
+                const isVerified = rec.status === 'verified' || isMxVerified || isSpfVerified || isDkimVerified || isDmarcVerified;
+                const matchDefault = defaultRecords.find((d) => d.type.split(' ')[0] === rec.type.split(' ')[0]);
+                return {
+                  type: rec.type,
+                  name: rec.name,
+                  value: rec.value,
+                  priority: rec.priority,
+                  explanation: matchDefault?.explanation || 'Domain DNS routing and authentication record.',
+                  isVerified,
+                };
+              })
+            : defaultRecords.map((rec) => {
+                const isMxVerified = rec.type === 'MX' && verificationResult?.verification?.mx;
+                const isSpfVerified = rec.type.includes('SPF') && verificationResult?.verification?.spf;
+                const isDkimVerified = rec.type.includes('DKIM') && verificationResult?.verification?.dkim;
+                const isDmarcVerified = rec.type.includes('DMARC') && verificationResult?.verification?.dmarc;
+                const isVerified = isMxVerified || isSpfVerified || isDkimVerified || isDmarcVerified;
+                return { ...rec, isVerified };
+              })
+          ).map((rec: any, i: number) => {
             return (
-              <div key={rec.type} className="p-4 hover:bg-slate-800/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div key={`${rec.type}-${rec.name}`} className="p-4 hover:bg-slate-800/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1.5 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-purple-950 text-purple-300 border border-purple-800">
@@ -200,11 +220,11 @@ export default function DynamicDnsSetupGuide({
 
                     {verificationResult && (
                       <span className={`ml-auto md:ml-2 px-2 py-0.5 rounded text-[10px] font-semibold border ${
-                        isVerified
+                        rec.isVerified
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                           : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                       }`}>
-                        {isVerified ? '✓ Verified' : 'Pending Propagation'}
+                        {rec.isVerified ? '✓ Verified' : 'Pending Propagation'}
                       </span>
                     )}
                   </div>

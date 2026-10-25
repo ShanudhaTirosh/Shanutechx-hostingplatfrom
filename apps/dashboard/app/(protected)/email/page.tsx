@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui';
 import DynamicDnsSetupGuide from '@/components/email/DynamicDnsSetupGuide';
 import {
   Mail,
+  Inbox,
   KeyRound,
   Globe,
   Tag,
@@ -123,7 +124,7 @@ interface MailHost {
 }
 
 export default function BusinessEmailManagementDashboard() {
-  const [activeTab, setActiveTab] = useState<'mailboxes' | 'dns' | 'credentials' | 'aliases' | 'admin_hosts' | 'admin_bulk'>('mailboxes');
+  const [activeTab, setActiveTab] = useState<'mailboxes' | 'inbox' | 'dns' | 'credentials' | 'aliases' | 'admin_hosts' | 'admin_bulk'>('mailboxes');
 
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [selectedMailboxId, setSelectedMailboxId] = useState<string>('');
@@ -134,6 +135,12 @@ export default function BusinessEmailManagementDashboard() {
   const [revealedPassword, setRevealedPassword] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedCodeSnippet, setSelectedCodeSnippet] = useState<'node' | 'python' | 'curl'>('node');
+
+  // Live Inbox state
+  const [inboxMessages, setInboxMessages] = useState<any[]>([]);
+  const [inboxLoading, setInboxLoading] = useState(false);
+  const [selectedInboxMsg, setSelectedInboxMsg] = useState<any | null>(null);
+  const [inboxSearch, setInboxSearch] = useState('');
 
   // Plan Quotas state
   const [planQuotas, setPlanQuotas] = useState<EmailPlanQuotas | null>(null);
@@ -258,11 +265,38 @@ export default function BusinessEmailManagementDashboard() {
 
   const activeMailbox = mailboxes.find((m) => m.id === selectedMailboxId) || mailboxes[0];
 
-  const handleOpenWebmail = (targetMailbox?: Mailbox) => {
+  const handleOpenWebmail = async (targetMailbox?: Mailbox) => {
     const target = targetMailbox || activeMailbox;
+    try {
+      const ticketRes = await api.smtp.getSsoTicket(target?.id).catch(() => null);
+      if (ticketRes?.ssoToken) {
+        const dest = ticketRes.webmailUrl || target?.webmailUrl || webmailBaseUrl;
+        const separator = dest.includes('?') ? '&' : '?';
+        window.open(`${dest}${separator}ssoToken=${encodeURIComponent(ticketRes.ssoToken)}`, '_blank');
+        return;
+      }
+    } catch {}
     const webmailUrl = target?.webmailUrl || webmailBaseUrl;
     window.open(webmailUrl, '_blank');
   };
+
+  const loadInboxMessages = async (mailboxId?: string, search = '') => {
+    setInboxLoading(true);
+    try {
+      const res = await api.webmail.listMessages('inbox', search, mailboxId || selectedMailboxId || undefined);
+      setInboxMessages(res.messages || []);
+    } catch {
+      setInboxMessages([]);
+    } finally {
+      setInboxLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'inbox') {
+      void loadInboxMessages(selectedMailboxId, inboxSearch);
+    }
+  }, [activeTab, selectedMailboxId]);
 
   const handleRevealPassword = async () => {
     if (!activeMailbox) return;
@@ -646,6 +680,7 @@ EOF`;
       <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto">
         {[
           { id: 'mailboxes', label: 'Mailboxes & Aliases', icon: Mail },
+          { id: 'inbox', label: 'Inbox & Live Messages', icon: Inbox },
           { id: 'dns', label: 'Domain & DNS Checklist', icon: Globe },
           { id: 'credentials', label: 'Developer Credentials', icon: KeyRound },
           { id: 'aliases', label: 'Alias Configuration', icon: Tag },
@@ -1071,6 +1106,174 @@ EOF`;
         </div>
       )}
 
+      {/* TAB: INBOX & LIVE MESSAGES */}
+      {activeTab === 'inbox' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Inbox className="h-5 w-5 text-indigo-400" />
+                  Live Mailbox Messages
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  View and manage inbound messages directly for your provisioned business email addresses.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => loadInboxMessages(selectedMailboxId, inboxSearch)}
+                  disabled={inboxLoading}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${inboxLoading ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </button>
+                <button
+                  onClick={() => handleOpenWebmail()}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition-all"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Launch Full Webmail UI</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filter bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Mailbox Account</label>
+                <select
+                  value={selectedMailboxId}
+                  onChange={(e) => {
+                    setSelectedMailboxId(e.target.value);
+                    setSelectedInboxMsg(null);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                >
+                  {mailboxes.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Search Subject or Sender</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Search messages..."
+                    value={inboxSearch}
+                    onChange={(e) => setInboxSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') loadInboxMessages(selectedMailboxId, inboxSearch);
+                    }}
+                    className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 placeholder-slate-600"
+                  />
+                  <button
+                    onClick={() => loadInboxMessages(selectedMailboxId, inboxSearch)}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200"
+                  >
+                    Search
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Master-Detail Messages View */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[420px]">
+              {/* Message List */}
+              <div className="lg:col-span-5 bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden flex flex-col">
+                <div className="p-3 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider flex justify-between items-center bg-slate-900/40">
+                  <span>Inbox ({inboxMessages.length})</span>
+                  {inboxLoading && <RefreshCw className="h-3 w-3 animate-spin text-indigo-400" />}
+                </div>
+
+                <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 max-h-[500px]">
+                  {inboxMessages.length === 0 ? (
+                    <div className="p-8 text-center text-slate-500 text-xs">
+                      {inboxLoading ? 'Loading messages…' : 'No messages found in inbox.'}
+                    </div>
+                  ) : (
+                    inboxMessages.map((msg) => {
+                      const isSelected = selectedInboxMsg?.id === msg.id;
+                      return (
+                        <div
+                          key={msg.id}
+                          onClick={() => setSelectedInboxMsg(msg)}
+                          className={`p-3.5 cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-indigo-600/15 border-l-4 border-indigo-500'
+                              : 'hover:bg-slate-900/60'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-xs truncate max-w-[180px] ${!msg.isRead ? 'font-bold text-white' : 'text-slate-300'}`}>
+                              {msg.senderName || msg.senderEmail || msg.from}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {msg.createdAt ? new Date(msg.createdAt).toLocaleDateString() : ''}
+                            </span>
+                          </div>
+                          <div className={`text-xs truncate ${!msg.isRead ? 'font-semibold text-indigo-200' : 'text-slate-400'}`}>
+                            {msg.subject || '(no subject)'}
+                          </div>
+                          <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                            {msg.snippet || msg.textBody || ''}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Message Detail / Preview */}
+              <div className="lg:col-span-7 bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col">
+                {selectedInboxMsg ? (
+                  <div className="space-y-4 flex-1 flex flex-col">
+                    <div className="border-b border-slate-800 pb-3 flex justify-between items-start gap-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-white">{selectedInboxMsg.subject || '(no subject)'}</h3>
+                        <div className="text-xs text-slate-400 mt-1">
+                          From: <span className="text-slate-200 font-medium">{selectedInboxMsg.senderName ? `${selectedInboxMsg.senderName} <${selectedInboxMsg.senderEmail}>` : selectedInboxMsg.senderEmail || selectedInboxMsg.from}</span>
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          To: <span className="text-slate-300">{selectedInboxMsg.recipientEmail || activeMailbox?.email}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleOpenWebmail()}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold flex items-center gap-1 shrink-0"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Reply in Webmail
+                      </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto max-h-[420px] text-xs text-slate-200 leading-relaxed font-sans bg-slate-900/30 p-4 rounded-xl border border-slate-800/80">
+                      {selectedInboxMsg.htmlBody ? (
+                        <div dangerouslySetInnerHTML={{ __html: selectedInboxMsg.htmlBody }} />
+                      ) : (
+                        <pre className="whitespace-pre-wrap font-sans text-xs">{selectedInboxMsg.textBody || selectedInboxMsg.snippet || '(empty message body)'}</pre>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500">
+                    <Mail className="h-10 w-10 text-slate-700 mb-3" />
+                    <p className="text-xs font-medium">Select a message from the list to view its contents.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TAB 2: DOMAIN & DNS CHECKLIST */}
       {activeTab === 'dns' && (
         <div className="space-y-8 max-w-5xl mx-auto">
@@ -1311,7 +1514,7 @@ EOF`;
                 <div className="space-y-2 font-mono">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Host:</span>
-                    <span className="text-white font-bold">{activeMailbox?.smtpHost.replace(/^mail\./, 'imap.') || 'imap.shanutechx.com'}</span>
+                    <span className="text-white font-bold">{activeMailbox?.smtpHost || 'mail.shanutechx.com'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">SSL/TLS Port:</span>

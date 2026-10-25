@@ -80,7 +80,12 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
     } catch {}
   }
 
-  return fetch(`${API_BASE}${path}`, {
+  const normalizedPath =
+    path.startsWith('/api') || path.startsWith('http')
+      ? path
+      : `/api${path.startsWith('/') ? '' : '/'}${path}`;
+
+  return fetch(`${API_BASE}${normalizedPath}`, {
     ...init,
     headers: {
       ...init.headers,

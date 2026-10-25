@@ -123,6 +123,26 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
     // 1. Business Email & Mailbox Hosting (using canonical category — BUG-H01 FIX above)
 
     if (isSmtp) {
+      const configObj = item.configJson as Record<string, any> | null;
+
+      // Handle mailbox subscription renewal if specified in configJson
+      if (configObj?.type === 'mailbox_renewal' || configObj?.mailboxId) {
+        const renewalMailboxId = String(configObj.mailboxId);
+        const existingAcc = await prisma.smtpAccount.findUnique({ where: { id: renewalMailboxId } });
+        if (existingAcc) {
+          const months = Number(configObj.months) || 1;
+          const baseDate = existingAcc.expiresAt && existingAcc.expiresAt.getTime() > Date.now() ? existingAcc.expiresAt : new Date();
+          const newExpiresAt = new Date(baseDate.getTime() + months * 30 * 24 * 60 * 60 * 1000);
+          await prisma.smtpAccount.update({
+            where: { id: existingAcc.id },
+            data: { expiresAt: newExpiresAt, isSuspended: false },
+          });
+          fulfilledItems.push(`SMTP Mailbox Renewal (${existingAcc.smtpUsername})`);
+          logger.info({ orderId: order.id, mailboxId: existingAcc.id, newExpiresAt }, 'Auto-renewed SMTP account on payment approval');
+          continue;
+        }
+      }
+
       const existingAccount = await prisma.smtpAccount.findFirst({
         where: { orderItemId: item.id },
       });
@@ -131,20 +151,54 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
         try {
           const tier = getTierFromPlanName(item.plan?.name || 'Starter Mail');
           const autoPassword = `Smtp_${crypto.randomBytes(12).toString('base64url')}`;
-          const username = `mail_${order.user.id.slice(0, 8)}`;
           const smtpHost = `mail.${env.rootDomain}`;
-          const webmailUrl = process.env.WEBMAIL_URL || (process.env.NODE_ENV === 'production' ? `https://mail.${env.rootDomain}` : 'http://localhost:3001/email');
-          const aliases = generateDefaultAliases(env.rootDomain, tier.maxAliases);
+          const webmailUrl = process.env.WEBMAIL_URL || (process.env.NODE_ENV === 'production' ? `https://mail.${env.rootDomain}` : 'http://localhost:3001/webmail');
           const credentialRef = encryptSecret(autoPassword, env.secretsEncryptionKey);
+
+          // Custom domain detection from checkout configJson
+          const rawDomain = (configObj?.customDomain || configObj?.domain || '').trim().toLowerCase();
+          const customDomain = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(rawDomain) && rawDomain !== env.rootDomain
+            ? rawDomain
+            : undefined;
+          const mailDomain = customDomain || env.rootDomain;
+
+          // Username / mailbox prefix
+          const rawPrefix = (configObj?.username || configObj?.prefix || '').trim().toLowerCase();
+          const usernamePrefix = /^[a-z0-9._-]+$/.test(rawPrefix)
+            ? rawPrefix
+            : `mail_${order.user.id.slice(0, 8)}`;
+          const fullEmail = `${usernamePrefix}@${mailDomain}`;
+          const aliases = generateDefaultAliases(mailDomain, tier.maxAliases);
 
           const specs: any = item.plan?.specsJson || {};
           const storageQuotaMb = specs.storageQuotaMb !== undefined ? specs.storageQuotaMb : (specs.storageLimitGb ? (specs.storageLimitGb === -1 ? -1 : specs.storageLimitGb * 1024) : 1024);
           const maxAliases = specs.maxAliases !== undefined ? specs.maxAliases : (specs.emailAliases !== undefined ? specs.emailAliases : 2);
           const dailySendLimit = specs.dailyQuota !== undefined ? specs.dailyQuota : (specs.dailySendLimit !== undefined ? specs.dailySendLimit : 1000);
 
-          // Default 3-month (90 days) commitment expiration from payment approval date
+          // Default commitment expiration from payment approval date
           const expiresAt = new Date();
           expiresAt.setDate(expiresAt.getDate() + (specs.minCommitmentMonths ? specs.minCommitmentMonths * 30 : 90));
+
+          // Register custom domain in WildDuck & DB if customer provided one
+          if (customDomain) {
+            if (env.wildduckApiKey) {
+              await wildduckClient.createDomain(customDomain).catch((err: any) =>
+                logger.warn({ domain: customDomain, err: err.message }, 'WildDuck createDomain error during order fulfillment (non-fatal)')
+              );
+              await wildduckClient.getOrCreateDkim(customDomain, 'wildduck').catch((err: any) =>
+                logger.warn({ domain: customDomain, err: err.message }, 'WildDuck getOrCreateDkim error during order fulfillment (non-fatal)')
+              );
+            }
+            await prisma.emailDomain.upsert({
+              where: { domain: customDomain },
+              update: { userId: order.userId },
+              create: {
+                domain: customDomain,
+                userId: order.userId,
+                status: 'pending_dns',
+              },
+            }).catch((err) => logger.warn({ err: err.message }, 'EmailDomain upsert error during fulfillment'));
+          }
 
           let wildduckUserId: string | undefined;
           let wildduckAddressId: string | undefined;
@@ -153,13 +207,12 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
             try {
               const quotaGb = storageQuotaMb === -1 ? 100 : Math.max(1, Math.ceil(storageQuotaMb / 1024));
               const wdUser = await wildduckClient.createUser({
-                username,
+                username: fullEmail,
                 password: autoPassword,
                 name: order.user.displayName || order.user.email,
                 quotaGb,
               });
               wildduckUserId = wdUser.id;
-              const fullEmail = `${username}@${env.rootDomain}`;
               const addr = await wildduckClient.createAddress(wdUser.id, fullEmail, order.user.displayName || undefined).catch(() => null);
               if (addr) wildduckAddressId = addr.id;
             } catch (wdErr: any) {
@@ -176,7 +229,8 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
               wildduckAddressId,
               smtpHost,
               smtpPort: 587,
-              smtpUsername: username,
+              smtpUsername: fullEmail,
+              customDomain: customDomain || null,
               credentialRef,
               webmailUrl,
               storageQuotaMb,
@@ -187,8 +241,20 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
             },
           });
 
+          // Retrieve authentic DKIM record for customer connection instructions
+          let dkimRecordStr = `v=DKIM1; k=rsa; p=<managed by mail server>`;
+          let dkimSelector = 'wildduck';
+          if (env.wildduckApiKey) {
+            try {
+              const dkimInfo = await wildduckClient.getOrCreateDkim(mailDomain, 'wildduck');
+              if (dkimInfo?.publicKey) {
+                dkimRecordStr = dkimInfo.txtRecord;
+                dkimSelector = dkimInfo.selector || 'wildduck';
+              }
+            } catch (_) {}
+          }
+
           // Deliver immediate welcome email into the customer's Webmail inbox
-          const mailboxEmail = `${username}@${env.rootDomain}`;
           const welcomeHtml = `
             <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 640px; margin: 0 auto; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 12px; padding: 24px;">
               <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; padding-bottom: 16px; margin-bottom: 20px;">
@@ -202,8 +268,8 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
               <div style="background: #1e293b; border-radius: 8px; padding: 16px; margin: 20px 0; border: 1px solid #334155;">
                 <h3 style="margin-top: 0; color: #94a3b8; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em;">Mailbox Configuration</h3>
                 <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #e2e8f0;">
-                  <tr><td style="padding: 6px 0; color: #94a3b8; width: 150px;">Primary Email:</td><td style="padding: 6px 0; font-family: monospace; color: #38bdf8;">${mailboxEmail}</td></tr>
-                  <tr><td style="padding: 6px 0; color: #94a3b8;">SMTP Username:</td><td style="padding: 6px 0; font-family: monospace;">${username}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8; width: 150px;">Primary Email:</td><td style="padding: 6px 0; font-family: monospace; color: #38bdf8;">${fullEmail}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">SMTP / IMAP Login:</td><td style="padding: 6px 0; font-family: monospace;">${fullEmail}</td></tr>
                   <tr><td style="padding: 6px 0; color: #94a3b8;">Plan Tier:</td><td style="padding: 6px 0;">${item.plan?.name || tier.name}</td></tr>
                   <tr><td style="padding: 6px 0; color: #94a3b8;">Storage Limit:</td><td style="padding: 6px 0;">${storageQuotaMb === -1 ? 'Unlimited' : `${storageQuotaMb} MB`}</td></tr>
                 </table>
@@ -212,16 +278,17 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
               <div style="background: #1e293b; border-radius: 8px; padding: 16px; margin: 20px 0; border: 1px solid #334155;">
                 <h3 style="margin-top: 0; color: #94a3b8; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em;">Server & DNS Connection Settings</h3>
                 <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #e2e8f0;">
-                  <tr><td style="padding: 6px 0; color: #94a3b8; width: 150px;">SMTP Host:</td><td style="padding: 6px 0; font-family: monospace;">${smtpHost} (Port 587 TLS / 465 SSL)</td></tr>
-                  <tr><td style="padding: 6px 0; color: #94a3b8;">IMAP / POP3 Host:</td><td style="padding: 6px 0; font-family: monospace;">${smtpHost} (Port 993 SSL / 995 SSL)</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8; width: 150px;">SMTP Host:</td><td style="padding: 6px 0; font-family: monospace;">${smtpHost} (Port 587 STARTTLS / 465 SSL)</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">IMAP Host:</td><td style="padding: 6px 0; font-family: monospace;">${smtpHost} (Port 993 SSL)</td></tr>
                   <tr><td style="padding: 6px 0; color: #94a3b8;">MX Record:</td><td style="padding: 6px 0; font-family: monospace;">10 ${smtpHost}</td></tr>
                   <tr><td style="padding: 6px 0; color: #94a3b8;">SPF Record:</td><td style="padding: 6px 0; font-family: monospace;">v=spf1 include:${env.rootDomain} ~all</td></tr>
-                  <tr><td style="padding: 6px 0; color: #94a3b8;">DKIM Selector:</td><td style="padding: 6px 0; font-family: monospace;">shanutechx._domainkey.${env.rootDomain}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">DKIM Selector:</td><td style="padding: 6px 0; font-family: monospace;">${dkimSelector}._domainkey.${mailDomain}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">DKIM Record:</td><td style="padding: 6px 0; font-family: monospace; word-break: break-all;">${dkimRecordStr}</td></tr>
                 </table>
               </div>
 
               <p style="font-size: 13px; color: #94a3b8; margin-top: 24px;">
-                You can now send and receive emails, manage custom aliases, configure signatures, and attach domain names directly from this interface.
+                You can access your inbox directly with single sign-on from your dashboard, manage custom aliases, configure signatures, and attach domain names.
               </p>
             </div>
           `;
@@ -235,8 +302,8 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
               senderName: 'ShanuTechX Mail System',
               senderEmail: `noreply@${env.rootDomain}`,
               recipientEmail: order.user.email,
-              subject: `🚀 Welcome to ShanuTechX Webmail (${mailboxEmail})`,
-              snippet: `Your enterprise mailbox ${mailboxEmail} is ready. View server connection settings and credentials.`,
+              subject: `🚀 Welcome to ShanuTechX Webmail (${fullEmail})`,
+              snippet: `Your enterprise mailbox ${fullEmail} is ready. View server connection settings and credentials.`,
               htmlBody: welcomeHtml,
               category: 'primary',
               priority: 'high',
@@ -252,18 +319,18 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
             tier,
             smtpHost,
             smtpPort: 587,
-            smtpUsername: username,
+            smtpUsername: fullEmail,
             smtpPassword: autoPassword,
             webmailUrl,
-            domain: env.rootDomain,
+            domain: mailDomain,
             aliases,
             orderId: order.id,
             paymentId: 'AUTO_PROVISION',
             amountPaid: formatCurrency(order.totalLkr, 'LKR'),
           });
 
-          fulfilledItems.push(`SMTP Mailbox (${username}@${env.rootDomain})`);
-          logger.info({ orderId: order.id, username }, 'Auto-provisioned SMTP Account and delivered Welcome Message');
+          fulfilledItems.push(`SMTP Mailbox (${fullEmail})`);
+          logger.info({ orderId: order.id, fullEmail }, 'Auto-provisioned SMTP Account and delivered Welcome Message');
         } catch (err) {
           logger.error({ orderId: order.id, err }, 'Failed to auto-provision SMTP account');
         }

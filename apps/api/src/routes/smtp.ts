@@ -15,6 +15,7 @@ import {
 } from '../lib/smtpProvisioner';
 import { logger } from '../lib/logger';
 import dns from 'dns';
+import { wildduckClient } from '../lib/wildduckClient';
 import { getServerIp, buildSpfRecord } from '../lib/mailAuth';
 
 import { useForOwnRoutes } from '../lib/routerGuard';
@@ -234,6 +235,18 @@ smtpRouter.post('/smtp/verify-dns', async (req: AuthedRequest, res) => {
     // DKIM check (WildDuck uses selector 'wildduck', legacy uses 'default')
     let dkimVerified = false;
     let dkimSelector = 'wildduck';
+    let dkimValue = `v=DKIM1; k=rsa; p=<managed by WildDuck mail server>`;
+
+    if (env.wildduckApiKey) {
+      try {
+        const dkim = await wildduckClient.getOrCreateDkim(cleanDomain, 'wildduck');
+        if (dkim?.publicKey) {
+          dkimValue = dkim.txtRecord;
+          dkimSelector = dkim.selector || 'wildduck';
+        }
+      } catch (_) {}
+    }
+
     try {
       const dkimTxt = await dnsPromises.resolveTxt(`wildduck._domainkey.${cleanDomain}`);
       dkimVerified = dkimTxt.some((t) => t.join('').includes('v=DKIM1'));
@@ -256,6 +269,14 @@ smtpRouter.post('/smtp/verify-dns', async (req: AuthedRequest, res) => {
       dmarcVerified = false;
     }
 
+    const allVerified = mxVerified && (spfVerified || dkimVerified);
+    if (allVerified) {
+      await prisma.emailDomain.updateMany({
+        where: { domain: cleanDomain },
+        data: { status: 'verified' },
+      }).catch(() => {});
+    }
+
     res.json({
       domain: cleanDomain,
       serverIp,
@@ -265,7 +286,7 @@ smtpRouter.post('/smtp/verify-dns', async (req: AuthedRequest, res) => {
         spf: spfVerified,
         dkim: dkimVerified,
         dmarc: dmarcVerified,
-        allVerified: mxVerified && spfVerified && dkimVerified,
+        allVerified,
       },
       records: {
         mxRecords,
@@ -274,7 +295,7 @@ smtpRouter.post('/smtp/verify-dns', async (req: AuthedRequest, res) => {
       expectedDns: [
         { type: 'MX', name: '@', value: `${rootHost}`, priority: 10, status: mxVerified ? 'verified' : 'pending' },
         { type: 'TXT (SPF)', name: '@', value: buildSpfRecord(env.rootDomain), status: spfVerified ? 'verified' : 'pending' },
-        { type: 'TXT (DKIM)', name: `${dkimSelector}._domainkey`, value: `v=DKIM1; k=rsa; p=<managed by WildDuck mail server>`, status: dkimVerified ? 'verified' : 'pending' },
+        { type: 'TXT (DKIM)', name: `${dkimSelector}._domainkey`, value: dkimValue, status: dkimVerified ? 'verified' : 'pending' },
         { type: 'TXT (DMARC)', name: '_dmarc', value: `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${cleanDomain}`, status: dmarcVerified ? 'verified' : 'pending' },
       ],
     });
