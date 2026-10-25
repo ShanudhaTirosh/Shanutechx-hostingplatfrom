@@ -38,7 +38,7 @@ import DatabaseMigrationScaleModal from '@/components/DatabaseMigrationScaleModa
 
 export default function UnifiedDevProjectsPage() {
   const { apiUser } = useAppUser();
-  const isDev = apiUser?.role === 'dev' || apiUser?.role === 'admin';
+  const isDev = apiUser?.role === 'dev';
 
   // Data state
   const [supabaseProjects, setSupabaseProjects] = useState<SupabaseClientProject[]>([]);
@@ -54,8 +54,14 @@ export default function UnifiedDevProjectsPage() {
 
   // Supabase Studio Sub-Tab navigation state
   const [studioSubTab, setStudioSubTab] = useState<
-    'overview' | 'sql' | 'auth' | 'storage' | 'advisors' | 'observability' | 'settings'
+    'overview' | 'tables' | 'sql' | 'auth' | 'storage' | 'advisors' | 'observability' | 'settings'
   >('overview');
+
+  // Table browser state
+  const [selectedSchema, setSelectedSchema] = useState<string>('public');
+  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [tableData, setTableData] = useState<any[] | null>(null);
+  const [isLoadingTableData, setIsLoadingTableData] = useState(false);
 
   // Interactive Project Studio Data State
   const [projectSchemas, setProjectSchemas] = useState<any[]>([]);
@@ -148,6 +154,24 @@ export default function UnifiedDevProjectsPage() {
 
   function toggleKeyReveal(keyId: string) {
     setRevealedKeys((prev) => ({ ...prev, [keyId]: !prev[keyId] }));
+  }
+
+  async function loadTableData(tableName: string, schema: string = 'public') {
+    if (!selectedSupabaseProject) return;
+    setSelectedTable(tableName);
+    setIsLoadingTableData(true);
+    setTableData(null);
+    try {
+      const res = await api.devSupabase.executeQuery(
+        `SELECT * FROM "${schema}"."${tableName}" LIMIT 100;`,
+        selectedSupabaseProject.id,
+      );
+      setTableData(Array.isArray(res) ? res : res.rows || []);
+    } catch (err: any) {
+      setTableData([]);
+    } finally {
+      setIsLoadingTableData(false);
+    }
   }
 
   async function loadProjectStudioData(projectId: string) {
@@ -990,6 +1014,18 @@ export default function UnifiedDevProjectsPage() {
                     </button>
 
                     <button
+                      onClick={() => setStudioSubTab('tables')}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                        studioSubTab === 'tables'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'text-text-muted hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <Database className="w-3.5 h-3.5" />
+                      <span>Table Browser ({projectTables.length})</span>
+                    </button>
+
+                    <button
                       onClick={() => setStudioSubTab('sql')}
                       className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
                         studioSubTab === 'sql'
@@ -1137,6 +1173,153 @@ export default function UnifiedDevProjectsPage() {
                               {selectedSupabaseProject.dbUrl || `postgresql://postgres:postgres@${selectedSupabaseProject.nodeIp || 'localhost'}:${selectedSupabaseProject.dbPort || 5432}/${selectedSupabaseProject.dbName}`}
                             </div>
                           </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUB-TAB: TABLE BROWSER */}
+                  {studioSubTab === 'tables' && (
+                    <div className="space-y-4">
+                      <div className="flex gap-4">
+                        {/* Schema + Table Sidebar */}
+                        <div className="w-56 shrink-0 space-y-3">
+                          {/* Schema selector */}
+                          <div>
+                            <label className="text-[10px] text-text-muted uppercase font-mono font-bold block mb-1">Schema</label>
+                            <select
+                              value={selectedSchema}
+                              onChange={(e) => {
+                                setSelectedSchema(e.target.value);
+                                setSelectedTable(null);
+                                setTableData(null);
+                              }}
+                              className="w-full bg-[#0b0c16] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                            >
+                              {projectSchemas.length === 0
+                                ? <option value="public">public</option>
+                                : projectSchemas.map((s: any) => (
+                                    <option key={s.name || s} value={s.name || s}>{s.name || s}</option>
+                                  ))}
+                            </select>
+                          </div>
+
+                          {/* Table list */}
+                          <div className="bg-[#05060b] border border-white/10 rounded-2xl overflow-hidden">
+                            <div className="px-3 py-2 border-b border-white/10 text-[10px] text-text-muted uppercase font-mono font-bold">
+                              Tables
+                            </div>
+                            <div className="max-h-80 overflow-y-auto">
+                              {projectTables.length === 0 ? (
+                                <div className="p-3 text-xs text-text-muted font-mono">No tables found.</div>
+                              ) : (
+                                projectTables
+                                  .filter((t: any) => !selectedSchema || (t.schema || 'public') === selectedSchema)
+                                  .map((t: any) => {
+                                    const tName = t.name || t;
+                                    return (
+                                      <button
+                                        key={tName}
+                                        onClick={() => loadTableData(tName, selectedSchema)}
+                                        className={`w-full text-left px-3 py-2 text-xs font-mono transition-all flex items-center gap-2 ${
+                                          selectedTable === tName
+                                            ? 'bg-emerald-500/15 text-emerald-300'
+                                            : 'text-text-muted hover:text-white hover:bg-white/5'
+                                        }`}
+                                      >
+                                        <Database className="w-3 h-3 shrink-0 opacity-50" />
+                                        <span className="truncate">{tName}</span>
+                                      </button>
+                                    );
+                                  })
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Table data grid */}
+                        <div className="flex-1 min-w-0">
+                          {!selectedTable ? (
+                            <div className="bg-[#05060b] border border-white/10 rounded-2xl p-10 flex flex-col items-center justify-center gap-3 h-full text-center">
+                              <Database className="w-8 h-8 text-emerald-500/40" />
+                              <p className="text-xs text-text-muted font-mono">Select a table from the sidebar to browse its data.</p>
+                            </div>
+                          ) : isLoadingTableData ? (
+                            <div className="bg-[#05060b] border border-white/10 rounded-2xl p-10 flex items-center justify-center h-full">
+                              <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                            </div>
+                          ) : (
+                            <div className="bg-[#05060b] border border-white/10 rounded-2xl overflow-hidden">
+                              {/* Table header bar */}
+                              <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                                <div className="flex items-center gap-2 font-mono">
+                                  <Database className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span className="text-xs font-bold text-white">{selectedSchema}.{selectedTable}</span>
+                                  {tableData && (
+                                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold">
+                                      {tableData.length} rows
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setSqlQuery(`SELECT * FROM "${selectedSchema}"."${selectedTable}" LIMIT 100;`);
+                                      setStudioSubTab('sql');
+                                    }}
+                                    title="Edit in SQL Console"
+                                    className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white text-[10px] font-mono transition-all flex items-center gap-1"
+                                  >
+                                    <Code className="w-3 h-3" />
+                                    <span>Open in SQL</span>
+                                  </button>
+                                  <button
+                                    onClick={() => loadTableData(selectedTable, selectedSchema)}
+                                    className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white text-[10px] font-mono transition-all"
+                                  >
+                                    <RefreshCw className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Data grid */}
+                              {!tableData || tableData.length === 0 ? (
+                                <div className="p-8 text-center text-xs text-text-muted font-mono">
+                                  Table is empty or no rows returned.
+                                </div>
+                              ) : (
+                                <div className="overflow-x-auto max-h-[420px]">
+                                  <table className="w-full text-left text-xs font-mono">
+                                    <thead className="bg-white/5 text-text-muted text-[10px] uppercase sticky top-0">
+                                      <tr>
+                                        {Object.keys(tableData[0]).map((col) => (
+                                          <th key={col} className="px-3 py-2.5 border-b border-white/10 whitespace-nowrap font-bold">{col}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                      {tableData.map((row: any, idx: number) => (
+                                        <tr key={idx} className="hover:bg-white/[0.03] transition-colors">
+                                          {Object.values(row).map((val: any, vIdx: number) => (
+                                            <td key={vIdx} className="px-3 py-2 text-white whitespace-nowrap max-w-[200px] truncate">
+                                              {val === null
+                                                ? <span className="text-text-muted italic">null</span>
+                                                : typeof val === 'object'
+                                                ? <span className="text-violet-300">{JSON.stringify(val)}</span>
+                                                : typeof val === 'boolean'
+                                                ? <span className={val ? 'text-emerald-400' : 'text-amber-400'}>{String(val)}</span>
+                                                : <span>{String(val)}</span>
+                                              }
+                                            </td>
+                                          ))}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -2312,6 +2312,23 @@ export const api = {
       const queryStr = params.toString() ? `?${params.toString()}` : '';
       return apiFetch(`/api/supabase/logs${queryStr}`).then((r) => asJson<{ logs: any[] }>(r));
     },
+    getFunctions: (projectId?: string) =>
+      apiFetch(`/api/supabase/functions${projectId ? `?projectId=${projectId}` : ''}`).then((r) => asJson<{ functions: any[] }>(r)),
+    invokeFunction: (name: string, payload: any, projectId?: string) =>
+      apiFetch(`/api/supabase/functions/${name}/invoke${projectId ? `?projectId=${projectId}` : ''}`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }).then((r) => asJson<any>(r)),
+    getIntegrations: (projectId?: string) =>
+      apiFetch(`/api/supabase/integrations${projectId ? `?projectId=${projectId}` : ''}`).then((r) =>
+        asJson<{ webhooks: any[]; vaultSecrets: any[]; fdw: any[] }>(r)
+      ),
+    getTableRows: (tableName: string, schema = 'public', limit = 50, projectId?: string) =>
+      apiFetch('/api/supabase/db/query', {
+        method: 'POST',
+        body: JSON.stringify({ sql: `SELECT * FROM "${schema}"."${tableName}" LIMIT ${limit};`, projectId }),
+      }).then((r) => asJson<any>(r)),
   },
 };
+
 
