@@ -29,7 +29,7 @@ export default function AdminMailGrowthPage() {
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <RefreshCw className="h-8 w-8 animate-spin text-indigo-500" />
+        <RefreshCw className="h-8 w-8 animate-spin text-white" />
       </div>
     );
   }
@@ -41,7 +41,7 @@ export default function AdminMailGrowthPage() {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <TrendingUp className="h-7 w-7 text-indigo-500" />
+            <TrendingUp className="h-7 w-7 text-white" />
             Operational Admin Console — SaaS Mail Usage & Growth Analytics
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -52,7 +52,7 @@ export default function AdminMailGrowthPage() {
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-          <HardDrive className="h-5 w-5 text-indigo-500" />
+          <HardDrive className="h-5 w-5 text-white" />
           Top 10 Storage Consumer Mailboxes
         </h2>
         <div className="mt-4 overflow-x-auto">
@@ -83,7 +83,7 @@ export default function AdminMailGrowthPage() {
                     <td className="p-3 w-48">
                       <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800">
                         <div
-                          className="h-2 rounded-full bg-indigo-600"
+                          className="h-2 rounded-full bg-white text-black"
                           style={{ width: `${Math.min(100, (item.storageUsedMb / item.storageQuotaMb) * 100)}%` }}
                         />
                       </div>

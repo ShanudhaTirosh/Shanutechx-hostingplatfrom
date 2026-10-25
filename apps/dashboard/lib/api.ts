@@ -21,6 +21,7 @@ import {
   TicketStatus,
   TicketPriority,
   Customer,
+  CustomerDetails,
   Subscription,
   Project,
   ProjectMember,
@@ -166,18 +167,60 @@ export const api = {
     ),
 
   admin: {
-    customers: (takeOrSearch?: number | string, skip = 0, search?: string) => {
+    customers: (
+      takeOrOptions?: number | string | { take?: number; skip?: number; search?: string; role?: string; scoped?: boolean },
+      skip = 0,
+      search?: string,
+      role?: string,
+      scoped?: boolean
+    ) => {
       let takeVal = 50;
+      let skipVal = skip;
       let searchVal = search;
-      if (typeof takeOrSearch === 'string') {
-        searchVal = takeOrSearch;
-      } else if (typeof takeOrSearch === 'number') {
-        takeVal = takeOrSearch;
+      let roleVal = role;
+      let scopedVal = scoped;
+
+      if (typeof takeOrOptions === 'object' && takeOrOptions !== null) {
+        takeVal = takeOrOptions.take ?? 50;
+        skipVal = takeOrOptions.skip ?? 0;
+        searchVal = takeOrOptions.search;
+        roleVal = takeOrOptions.role;
+        scopedVal = takeOrOptions.scoped;
+      } else if (typeof takeOrOptions === 'string') {
+        searchVal = takeOrOptions;
+      } else if (typeof takeOrOptions === 'number') {
+        takeVal = takeOrOptions;
       }
-      return apiFetch(`/api/admin/customers?take=${takeVal}&skip=${skip}${searchVal ? `&search=${encodeURIComponent(searchVal)}` : ''}`).then(
-        (r) => asJson<{ customers: Customer[]; total: number }>(r)
+
+      const params = new URLSearchParams();
+      params.set('take', String(takeVal));
+      params.set('skip', String(skipVal));
+      if (searchVal) params.set('search', searchVal);
+      if (roleVal && roleVal !== 'all') params.set('role', roleVal);
+      if (scopedVal) params.set('scoped', 'true');
+
+      return apiFetch(`/api/admin/customers?${params.toString()}`).then(
+        (r) => asJson<{ customers: Customer[]; total: number; isScoped?: boolean }>(r)
       );
     },
+    customerDetails: (userId: string) =>
+      apiFetch(`/api/admin/customers/${userId}`).then((r) =>
+        asJson<{ customer: CustomerDetails }>(r)
+      ),
+    assignCustomer: (userId: string, adminId: string | null) =>
+      apiFetch(`/api/admin/customers/${userId}/assign`, {
+        method: 'PATCH',
+        body: JSON.stringify({ adminId }),
+      }).then((r) =>
+        asJson<{ user: { id: string; email: string; assignedAdminId: string | null; assignedAdmin: any } }>(r)
+      ),
+    setUserRole: (userId: string, role: string) =>
+      apiFetch(`/api/admin/customers/${userId}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role }),
+      }).then((r) =>
+        asJson<{ user: { id: string; email: string; role: string } }>(r)
+      ),
     createUser: (data: { email: string; displayName?: string; role?: string }) =>
       apiFetch('/api/admin/users', { method: 'POST', body: JSON.stringify(data) }).then(
         (r) => asJson<{ user: any }>(r)
@@ -616,11 +659,12 @@ export const api = {
 
 
   knowledgebase: {
-    list: (category?: string, query?: string, targetRole?: string) => {
+    list: (category?: string, query?: string, targetRole?: string, includeDrafts?: boolean) => {
       const params = new URLSearchParams();
       if (category && category !== 'all') params.append('category', category);
       if (query && query.trim()) params.append('q', query.trim());
       if (targetRole && targetRole !== 'all') params.append('targetRole', targetRole);
+      if (includeDrafts) params.append('includeDrafts', 'true');
       const qs = params.toString() ? `?${params.toString()}` : '';
       return apiFetch(`/api/knowledgebase${qs}`).then((r) =>
         asJson<{ categories: import('./types').KbCategory[]; articles: import('./types').KbArticle[]; total: number }>(r)
@@ -646,8 +690,6 @@ export const api = {
       ),
   },
 
-
-
   discordWebhooks: {
     list: () =>
       apiFetch('/api/discord-webhooks').then((r) =>
@@ -668,6 +710,7 @@ export const api = {
         asJson<{ ok: boolean; status?: number; error?: string }>(r)
       ),
   },
+
 
   cart: {
     get: () => apiFetch('/api/cart').then((r) => asJson<{ order: Order; items: OrderItem[] }>(r)),
@@ -704,9 +747,17 @@ export const api = {
 
   orders: {
     list: () => apiFetch('/api/orders').then((r) => asJson<{ orders: Order[] }>(r)),
-    uploadProof: (orderId: string, file: File, idempotencyKey?: string) => {
+    uploadProof: (
+      orderId: string,
+      file: File,
+      options?: { paymentMethod?: string; reference?: string; notes?: string },
+      idempotencyKey?: string
+    ) => {
       const formData = new FormData();
       formData.append('proof', file);
+      if (options?.paymentMethod) formData.append('paymentMethod', options.paymentMethod);
+      if (options?.reference) formData.append('reference', options.reference);
+      if (options?.notes) formData.append('notes', options.notes);
       return apiFetch(`/api/orders/${orderId}/payments/proof`, {
         method: 'POST',
         body: formData,
@@ -715,6 +766,7 @@ export const api = {
     },
     invoiceUrl: (orderId: string) => `/api/orders/${orderId}/invoice`,
   },
+
 
   invoices: {
     list: () => apiFetch('/api/invoices').then((r) => asJson<{ invoices: any[] }>(r)),
@@ -903,8 +955,9 @@ export const api = {
         frameworkPreset?: string;
         publishedPort?: number;
         teamId?: string | null;
+        envVars?: Record<string, string>;
       },
-      onEvent: (event: BuildEvent) => void
+      onEvent?: (event: BuildEvent) => void
     ): Promise<void> => {
       const res = await apiFetch('/api/deployments', { method: 'POST', body: JSON.stringify(data) });
       if (!res.ok) {
@@ -924,7 +977,7 @@ export const api = {
         const lines = buffered.split('\n');
         buffered = lines.pop() ?? '';
         for (const line of lines) {
-          if (line.trim()) onEvent(JSON.parse(line));
+          if (line.trim() && onEvent) onEvent(JSON.parse(line));
         }
       }
     },
@@ -1108,6 +1161,20 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ approve, reason }),
       }).then((r) => asJson<{ payment: Payment }>(r)),
+    getPaymentMethods: () =>
+      apiFetch('/api/payment-methods').then((r) => asJson<{ channels: any[] }>(r)),
+    adminGetChannels: () =>
+      apiFetch('/api/admin/payment-methods').then((r) => asJson<{ channels: any[] }>(r)),
+    adminSaveChannels: (channels: any[]) =>
+      apiFetch('/api/admin/payment-methods', {
+        method: 'PUT',
+        body: JSON.stringify({ channels }),
+      }).then((r) => asJson<{ channels: any[]; message: string }>(r)),
+    adminToggleChannel: (channelId: string, enabled: boolean) =>
+      apiFetch(`/api/admin/payment-methods/${channelId}/toggle`, {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled }),
+      }).then((r) => asJson<{ channel: any }>(r)),
   },
 
   smtp: {
@@ -1684,6 +1751,20 @@ export const api = {
           runs: Array<{ id: string; triggeredBy: string; success: boolean; r2Key: string | null; sizeBytes: number | null; durationMs: number | null; error: string | null; createdAt: string }>;
         }>(r)
       ),
+    exportZipUrl: '/api/admin/backup/export-zip',
+    exportZip: async () => {
+      const res = await apiFetch('/api/admin/backup/export-zip');
+      if (!res.ok) throw new Error(`Backup export failed (HTTP ${res.status})`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `shanutechx_platform_backup_${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    },
   },
 
   fs: {
@@ -1788,6 +1869,8 @@ export const api = {
       configFiles?: Record<string, string>;
       configFileContent?: string;
       configFileName?: string;
+      cpuLimit?: string;
+      memoryLimit?: string;
     }) =>
       apiFetch('/api/catalog/deploy', { method: 'POST', body: JSON.stringify(body) }).then((r) =>
         asJson<{ deployment: Deployment; agent: Record<string, unknown>; generatedSecrets?: Record<string, string>; configFiles?: string[] }>(r)
@@ -1799,10 +1882,15 @@ export const api = {
   },
 
   products: {
-    list: (category?: string) =>
-      apiFetch(`/api/products${category ? `?category=${category}` : ''}`).then((r) =>
+    list: (category?: string, all = false) => {
+      const params = new URLSearchParams();
+      if (category) params.set('category', category);
+      if (all) params.set('all', 'true');
+      const qs = params.toString();
+      return apiFetch(`/api/products${qs ? `?${qs}` : ''}`).then((r) =>
         asJson<{ products: Product[] }>(r)
-      ),
+      );
+    },
     get: (id: string) => apiFetch(`/api/products/${id}`).then((r) => asJson<{ product: Product }>(r)),
     createProduct: (data: {
       category: string;
@@ -1886,9 +1974,14 @@ export const api = {
       apiFetch(`/api/plans/${id}`, { method: 'PUT', body: JSON.stringify(data) }).then((r) =>
         asJson<{ plan: Plan }>(r)
       ),
+    togglePlan: (id: string, isActive?: boolean) =>
+      apiFetch(`/api/plans/${id}/toggle`, {
+        method: 'PATCH',
+        body: JSON.stringify(typeof isActive === 'boolean' ? { isActive } : {}),
+      }).then((r) => asJson<{ ok: boolean; plan: Plan }>(r)),
     deletePlan: (id: string) =>
       apiFetch(`/api/plans/${id}`, { method: 'DELETE' }).then((r) =>
-        asJson<{ ok: boolean; plan: Plan }>(r)
+        asJson<{ ok: boolean; message?: string; deactivated?: boolean; deleted?: boolean; plan?: Plan }>(r)
       ),
   },
 
@@ -1973,6 +2066,18 @@ export const api = {
           message: string;
         }>(r)
       ),
+    getSmtpConfig: () =>
+      apiFetch('/api/settings/smtp').then((r) => asJson<{ config: any }>(r)),
+    saveSmtpConfig: (data: any) =>
+      apiFetch('/api/settings/smtp', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
+    testSmtpConnection: (data: any) =>
+      apiFetch('/api/settings/smtp/test', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) => asJson<{ ok: boolean; message: string; latencyMs: number }>(r)),
   },
 
   managedDatabases: {

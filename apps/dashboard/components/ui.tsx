@@ -852,15 +852,15 @@ export function Modal({
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
       <div
         className="absolute inset-0 animate-fade-in"
-        style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+        style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
         onClick={() => { if (closeOnOverlayClick) onClose(); }}
       />
       <div
-        className={`relative z-10 w-full ${width} rounded-xl p-6 animate-scale-in`}
+        className={`relative z-10 w-full ${width} rounded-3xl p-6 md:p-8 animate-scale-in`}
         style={{
-          background: 'var(--card-bg)',
-          border: '1px solid var(--color-border-strong)',
-          boxShadow: '0 24px 48px rgba(0,0,0,0.35)',
+          background: '#0a0a0d',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.95), 0 0 1px rgba(255,255,255,0.1)',
         }}
       >
         <div className="flex items-center justify-between mb-5">

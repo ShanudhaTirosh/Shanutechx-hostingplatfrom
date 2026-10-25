@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireAdmin, AuthedRequest } from '../middleware/auth';
 import { paymentReviewVisibilityWhere, canReviewPayment } from '../middleware/rbac';
-import { uploadPaymentProof, getPublicProofUrl, normalizeProofUrl } from '../lib/uploads';
+import { uploadPaymentProof, processAndSavePaymentProof, getPublicProofUrl, normalizeProofUrl } from '../lib/uploads';
+import { getPaymentChannels, savePaymentChannels, togglePaymentChannel, PaymentChannel } from '../lib/paymentConfig';
 import { notifyCustomer, notifyAdmins, sendInvoiceDeliveryNotification } from '../lib/notifications';
 
 import { notifyDiscordChannel } from '../lib/discordWebhooks';
@@ -23,9 +24,54 @@ import { formatCurrency } from '../lib/currency';
 
 export const paymentsRouter = Router();
 
-// Covers every route in this file. The old path-scoped gate only matched /payments, so routes under
-// other prefixes in this router were only authenticated by accident (via another router's global requireAuth).
-useForOwnRoutes(paymentsRouter, requireAuth);
+// Covers routes in this file. Allow public GET /payment-methods while enforcing requireAuth on all other payment operations.
+useForOwnRoutes(paymentsRouter, (req, res, next) => {
+  if (req.path === '/payment-methods' && req.method === 'GET') {
+    return next();
+  }
+  return requireAuth(req, res, next);
+});
+
+/**
+ * Public/client endpoint: get all active/enabled payment methods (Bank Transfer, HelaPay, eZ Cash, Bybit Crypto).
+ */
+paymentsRouter.get('/payment-methods', async (_req, res) => {
+  const channels = await getPaymentChannels(false);
+  res.json({ channels });
+});
+
+/**
+ * Admin endpoint: get all configured payment channels, including temporarily disabled ones.
+ */
+paymentsRouter.get('/admin/payment-methods', requireAdmin, async (_req, res) => {
+  const channels = await getPaymentChannels(true);
+  res.json({ channels });
+});
+
+/**
+ * Admin endpoint: update/save payment methods configuration (enable/disable, bank details, crypto addresses).
+ */
+paymentsRouter.put('/admin/payment-methods', requireAdmin, async (req: AuthedRequest, res) => {
+  const { channels } = req.body;
+  if (!Array.isArray(channels)) {
+    return res.status(400).json({ error: 'channels array is required' });
+  }
+  const updated = await savePaymentChannels(channels);
+  res.json({ channels: updated, message: 'Payment channels updated successfully.' });
+});
+
+/**
+ * Admin endpoint: toggle a payment channel enabled or disabled.
+ */
+paymentsRouter.patch('/admin/payment-methods/:channelId/toggle', requireAdmin, async (req: AuthedRequest, res) => {
+  const { channelId } = req.params;
+  const { enabled } = req.body;
+  const updated = await togglePaymentChannel(channelId, enabled);
+  if (!updated) {
+    return res.status(404).json({ error: 'Payment method not found' });
+  }
+  res.json({ channel: updated });
+});
 
 async function loadOwnedOrder(req: AuthedRequest, orderId: string) {
   const order = await prisma.order.findUnique({
@@ -38,7 +84,8 @@ async function loadOwnedOrder(req: AuthedRequest, orderId: string) {
 }
 
 /**
- * Customer uploads a payment proof screenshot for an order.
+ * Customer uploads a payment proof screenshot or PDF for an order.
+ * All uploads (images and PDFs) are converted into optimized WebP and stored.
  */
 paymentsRouter.post(
   '/orders/:orderId/payments/proof',
@@ -64,36 +111,78 @@ paymentsRouter.post(
 
       if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-      const relativeProofUrl = getPublicProofUrl(order.id, req.file.filename);
+      try {
+        // Convert any incoming image (JPEG/PNG/WebP/etc) or PDF document directly to optimized WebP
+        const { filename, relativeUrl, webpBytes } = await processAndSavePaymentProof(order.id, req.file);
 
-      const payment = await prisma.payment.create({
-        data: {
-          orderId: order.id,
-          method: 'proof_upload',
-          proofUrl: relativeProofUrl,
-          status: 'manual_review',
-        },
-      });
+        const selectedMethodId = typeof req.body.paymentMethod === 'string' ? req.body.paymentMethod.trim() : 'bank_transfer';
+        const clientReference = typeof req.body.reference === 'string' ? req.body.reference.trim() : null;
+        const clientNotes = typeof req.body.notes === 'string' ? req.body.notes.trim() : null;
 
-      const baseUrl = process.env.API_URL || `http://localhost:${env.port}`;
-      const fullDiscordProofUrl = relativeProofUrl
-        ? (relativeProofUrl.startsWith('http') ? relativeProofUrl : `${baseUrl}${relativeProofUrl}`)
-        : '(none)';
+        const allChannels = await getPaymentChannels(true);
+        const channel = allChannels.find((c) => c.id === selectedMethodId);
+        const channelName = channel?.name || (
+          selectedMethodId === 'bybit_crypto'
+            ? 'Bybit Crypto Transfer (USDT)'
+            : selectedMethodId === 'helapay'
+            ? 'Helakuru HelaPay'
+            : selectedMethodId === 'ezcash'
+            ? 'Dialog eZ Cash'
+            : 'Bank Transfer'
+        );
 
-      void notifyAdmins(
-        `New payment proof uploaded for order ${order.id}. Awaiting manual admin review.`
-      );
-      void notifyDiscordChannel('new_payment_submitted', {
-        'Order': order.id,
-        'Customer': order.user.email,
-        'Amount (LKR)': formatCurrency(order.totalLkr, 'LKR'),
-        'Proof': fullDiscordProofUrl,
-      });
+        const payment = await prisma.payment.create({
+          data: {
+            orderId: order.id,
+            method: 'proof_upload',
+            proofUrl: relativeUrl,
+            status: 'manual_review',
+            extractedJson: {
+              selectedMethod: selectedMethodId,
+              methodName: channelName,
+              reference: clientReference,
+              notes: clientNotes,
+              originalMimeType: req.file.mimetype,
+              originalName: req.file.originalname,
+              format: 'image/webp',
+              sizeBytes: webpBytes,
+              submittedAt: new Date().toISOString(),
+            },
+          },
+        });
 
-      res.status(202).json({
-        payment: { ...payment, proofUrl: normalizeProofUrl(payment.proofUrl) },
-        reasons: ['Proof received — submitted for manual admin review. An admin will approve or decline it shortly.'],
-      });
+        if (order.status === 'draft') {
+          await prisma.order.update({
+            where: { id: order.id },
+            data: { status: 'awaiting_payment' },
+          });
+        }
+
+        const baseUrl = process.env.API_URL || `http://localhost:${env.port}`;
+        const fullDiscordProofUrl = relativeUrl
+          ? (relativeUrl.startsWith('http') ? relativeUrl : `${baseUrl}${relativeUrl}`)
+          : '(none)';
+
+        void notifyAdmins(
+          `New payment proof uploaded for order ${order.id} via ${channelName}. Awaiting manual admin review.`
+        );
+        void notifyDiscordChannel('new_payment_submitted', {
+          'Order': order.id,
+          'Customer': order.user.email,
+          'Method': channelName,
+          'Reference': clientReference || 'N/A',
+          'Amount (LKR)': formatCurrency(order.totalLkr, 'LKR'),
+          'Proof (WebP)': fullDiscordProofUrl,
+        });
+
+        res.status(202).json({
+          payment: { ...payment, proofUrl: normalizeProofUrl(payment.proofUrl) },
+          reasons: ['Proof received and processed into WebP format — submitted for manual admin review. An admin will approve or decline it shortly.'],
+        });
+      } catch (procErr: any) {
+        logger.error({ procErr, orderId: order.id }, 'Failed processing payment proof upload');
+        return res.status(500).json({ error: procErr.message || 'Failed to process payment proof image.' });
+      }
     });
   }
 );

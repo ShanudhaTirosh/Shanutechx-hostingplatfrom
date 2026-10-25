@@ -90,7 +90,7 @@ export default function SupabaseAdvisorsPage() {
           onClick={() => setActiveTab('security')}
           className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
             activeTab === 'security'
-              ? 'bg-accent-violet text-white shadow-glow-violet'
+              ? 'bg-accent-violet text-white shadow-md'
               : 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]'
           }`}
         >
@@ -100,7 +100,7 @@ export default function SupabaseAdvisorsPage() {
           onClick={() => setActiveTab('performance')}
           className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
             activeTab === 'performance'
-              ? 'bg-accent-violet text-white shadow-glow-violet'
+              ? 'bg-accent-violet text-white shadow-md'
               : 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]'
           }`}
         >

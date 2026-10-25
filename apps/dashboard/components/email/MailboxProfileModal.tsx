@@ -155,7 +155,7 @@ export const MailboxProfileModal: React.FC<MailboxProfileModalProps> = ({
         {/* Header */}
         <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+            <div className="p-2.5 rounded-2xl bg-white/5 border border-white/15 text-white">
               <UserCircle className="h-5 w-5" />
             </div>
             <div>
@@ -206,14 +206,14 @@ export const MailboxProfileModal: React.FC<MailboxProfileModalProps> = ({
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-indigo-600/30 to-purple-600/30 flex items-center justify-center text-slate-400">
-                      <Camera className="h-8 w-8 text-indigo-400" />
+                      <Camera className="h-8 w-8 text-white" />
                     </div>
                   )}
                 </div>
 
                 {uploading && (
                   <div className="absolute inset-0 bg-black/60 rounded-3xl flex items-center justify-center">
-                    <Loader2 className="h-6 w-6 text-indigo-400 animate-spin" />
+                    <Loader2 className="h-6 w-6 text-white animate-spin" />
                   </div>
                 )}
               </div>
@@ -236,8 +236,8 @@ export const MailboxProfileModal: React.FC<MailboxProfileModalProps> = ({
                   onClick={() => fileInputRef.current?.click()}
                   className={`p-4 rounded-xl border-2 border-dashed cursor-pointer transition-all flex flex-col items-center justify-center gap-1.5 ${
                     dragOver
-                      ? 'border-indigo-500 bg-indigo-500/10'
-                      : 'border-slate-700 hover:border-indigo-500/60 bg-slate-900/60'
+                      ? 'border-white/30 bg-white/5'
+                      : 'border-slate-700 hover:border-white/15 bg-slate-900/60'
                   }`}
                 >
                   <input
@@ -251,7 +251,7 @@ export const MailboxProfileModal: React.FC<MailboxProfileModalProps> = ({
                       }
                     }}
                   />
-                  <UploadCloud className="h-5 w-5 text-indigo-400" />
+                  <UploadCloud className="h-5 w-5 text-white" />
                   <span className="text-xs font-bold text-slate-200">
                     Click to browse or drag & drop photo
                   </span>
@@ -282,7 +282,7 @@ export const MailboxProfileModal: React.FC<MailboxProfileModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 mb-1.5">
-                <UserCircle className="h-3.5 w-3.5 text-indigo-400" />
+                <UserCircle className="h-3.5 w-3.5 text-white" />
                 <span>Display Name</span>
               </label>
               <input
@@ -290,14 +290,14 @@ export const MailboxProfileModal: React.FC<MailboxProfileModalProps> = ({
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="e.g. Alex Morgan"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white/30"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">Shown as sender name in outbound emails.</span>
             </div>
 
             <div>
               <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 mb-1.5">
-                <Briefcase className="h-3.5 w-3.5 text-indigo-400" />
+                <Briefcase className="h-3.5 w-3.5 text-white" />
                 <span>Job Title / Role</span>
               </label>
               <input
@@ -305,13 +305,13 @@ export const MailboxProfileModal: React.FC<MailboxProfileModalProps> = ({
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
                 placeholder="e.g. Lead Technical Architect"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white/30"
               />
             </div>
 
             <div>
               <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 mb-1.5">
-                <Building className="h-3.5 w-3.5 text-indigo-400" />
+                <Building className="h-3.5 w-3.5 text-white" />
                 <span>Company / Department</span>
               </label>
               <input
@@ -319,13 +319,13 @@ export const MailboxProfileModal: React.FC<MailboxProfileModalProps> = ({
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
                 placeholder="e.g. Acme Corp / Cloud Ops"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white/30"
               />
             </div>
 
             <div>
               <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 mb-1.5">
-                <Phone className="h-3.5 w-3.5 text-indigo-400" />
+                <Phone className="h-3.5 w-3.5 text-white" />
                 <span>Contact Phone</span>
               </label>
               <input
@@ -333,14 +333,14 @@ export const MailboxProfileModal: React.FC<MailboxProfileModalProps> = ({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="e.g. +1 (555) 019-2834"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white/30"
               />
             </div>
           </div>
 
           <div>
             <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 mb-1.5">
-              <FileText className="h-3.5 w-3.5 text-indigo-400" />
+              <FileText className="h-3.5 w-3.5 text-white" />
               <span>Bio / Mailbox Signature Note</span>
             </label>
             <textarea
@@ -348,13 +348,13 @@ export const MailboxProfileModal: React.FC<MailboxProfileModalProps> = ({
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               placeholder="Short bio or business note attached to this mailbox profile..."
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500 resize-none"
+              className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-white/30 resize-none"
             />
           </div>
 
           <div>
             <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 mb-1.5">
-              <Globe className="h-3.5 w-3.5 text-indigo-400" />
+              <Globe className="h-3.5 w-3.5 text-white" />
               <span>Website</span>
             </label>
             <input
@@ -362,14 +362,14 @@ export const MailboxProfileModal: React.FC<MailboxProfileModalProps> = ({
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
               placeholder="https://example.com"
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white/30 font-mono"
             />
           </div>
 
           {/* SECTION 3: Live Preview Card */}
-          <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-bold text-indigo-300">
-              <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+          <div className="p-4 rounded-2xl bg-indigo-500/5 border border-white/15 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-neutral-300">
+              <Sparkles className="h-3.5 w-3.5 text-white" />
               <span>Recipient Header Preview</span>
             </div>
             <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-3">
@@ -377,7 +377,7 @@ export const MailboxProfileModal: React.FC<MailboxProfileModalProps> = ({
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="font-bold text-indigo-400 text-sm">
+                  <span className="font-bold text-white text-sm">
                     {(displayName || mailbox.username || 'M').charAt(0).toUpperCase()}
                   </span>
                 )}
@@ -412,7 +412,7 @@ export const MailboxProfileModal: React.FC<MailboxProfileModalProps> = ({
             <button
               type="submit"
               disabled={saving || uploading}
-              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2 disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl bg-white text-black hover:bg-neutral-200 text-white font-bold text-xs shadow-lg shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               <span>Save Profile</span>

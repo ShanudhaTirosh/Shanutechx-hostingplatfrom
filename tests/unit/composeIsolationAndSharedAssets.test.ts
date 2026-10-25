@@ -146,6 +146,22 @@ services:
       assert.match(res.hardenedYaml, /cpus:\s*['"]?1\.5['"]?/);
     });
 
+    it('applies custom resource limits including 0.5 CPU core on the agent', () => {
+      const inputYaml = `
+version: '3.8'
+services:
+  app:
+    image: node:20-alpine
+`;
+      const res = validateAndHardenCompose(inputYaml, 'proj-halfcore', '/tmp/test-proj', {
+        cpus: '0.5',
+        memory: '512M',
+      });
+      assert.equal(res.valid, true);
+      assert.match(res.hardenedYaml, /cpus:\s*['"]?0\.5['"]?/);
+      assert.match(res.hardenedYaml, /memory:\s*512M/);
+    });
+
     it('blocks docker.sock and host path escapes on the agent', () => {
       const attackYaml = `
 version: '3.8'

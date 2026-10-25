@@ -100,7 +100,7 @@ export default function SupabaseStoragePage() {
             onClick={() => setSelectedBucket(b.name)}
             className={`px-4 py-2 rounded-xl text-xs font-medium transition-all shrink-0 ${
               selectedBucket === b.name
-                ? 'bg-accent-violet text-white shadow-glow-violet'
+                ? 'bg-accent-violet text-white shadow-md'
                 : 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]'
             }`}
           >

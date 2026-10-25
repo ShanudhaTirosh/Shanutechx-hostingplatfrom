@@ -270,7 +270,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-3xl w-full space-y-6 shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <Settings className="h-4 w-4 text-indigo-400" />
+            <Settings className="h-4 w-4 text-white" />
             <span>Webmail Studio Settings & Preferences</span>
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-white p-1">
@@ -282,7 +282,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
           <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-150 ${
             toastMessage.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' :
             toastMessage.type === 'error' ? 'bg-rose-500/10 border-rose-500/20 text-rose-300' :
-            'bg-indigo-500/10 border-indigo-500/20 text-indigo-300'
+            'bg-white/5 border-white/15 text-neutral-300'
           }`}>
             <CheckCircle2 className="w-4 h-4" />
             <span>{toastMessage.message}</span>
@@ -308,7 +308,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
                 onClick={() => setActiveSubTab(tab.id as any)}
                 className={`flex-1 min-w-[72px] py-2 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${
                   activeSubTab === tab.id
-                    ? tab.id === 'upgrade' ? 'bg-amber-500 text-white shadow' : 'bg-indigo-600 text-white shadow'
+                    ? tab.id === 'upgrade' ? 'bg-amber-500 text-white shadow' : 'bg-white text-black text-white shadow'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -323,12 +323,12 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
         {activeSubTab === 'profile' && (
           <form onSubmit={handleSaveProfile} className="space-y-4 text-xs">
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-4">
-              <h4 className="font-bold text-indigo-400 flex items-center gap-2">
+              <h4 className="font-bold text-white flex items-center gap-2">
                 <User className="h-4 w-4" /> Account Profile & Avatar
               </h4>
 
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white text-lg font-bold shadow-lg border border-indigo-500/30 overflow-hidden">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-neutral-800 to-black flex items-center justify-center text-white text-lg font-bold shadow-lg border border-white/15 overflow-hidden">
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
@@ -356,8 +356,8 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
                 <label className="text-slate-400 block mb-1 font-semibold">Profile Avatar Picture</label>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   {/* Upload File Button */}
-                  <label className="flex-1 flex items-center justify-center gap-2 p-2.5 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-800/60 text-slate-200 rounded-xl text-xs font-semibold cursor-pointer transition-all shadow-sm">
-                    <Upload className="w-4 h-4 text-indigo-400" />
+                  <label className="flex-1 flex items-center justify-center gap-2 p-2.5 bg-slate-900 border border-slate-800 hover:border-white/15 hover:bg-slate-800/60 text-slate-200 rounded-xl text-xs font-semibold cursor-pointer transition-all shadow-sm">
+                    <Upload className="w-4 h-4 text-white" />
                     <span>Upload Image File</span>
                     <input
                       type="file"
@@ -377,7 +377,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
                       value={avatarUrl}
                       onChange={(e) => setAvatarUrl(e.target.value)}
                       placeholder="Paste image URL (https://...)"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 pr-8 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/60"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 pr-8 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-white/15"
                     />
                     {avatarUrl && (
                       <button
@@ -397,7 +397,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
               <button
                 type="submit"
                 disabled={isSavingProfile}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow flex items-center gap-2 disabled:opacity-50"
+                className="px-5 py-2 bg-white text-black hover:bg-neutral-200 text-white font-bold rounded-xl shadow flex items-center gap-2 disabled:opacity-50"
               >
                 {isSavingProfile ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                 <span>Save Profile Preferences</span>
@@ -412,7 +412,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
             {/* Mailbox SMTP & REST API Credentials Overview */}
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-indigo-400 flex items-center gap-2">
+                <h4 className="font-bold text-white flex items-center gap-2">
                   <Server className="h-4 w-4" /> Mailbox SMTP & API Credentials
                 </h4>
                 <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold">
@@ -431,7 +431,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
                     <button
                       type="button"
                       onClick={() => copyConnectText(websiteConnectData?.credentials?.smtpHost || 'mail.shanutechx.com', 'smtpHost')}
-                      className="text-slate-400 hover:text-indigo-400"
+                      className="text-slate-400 hover:text-white"
                     >
                       {copiedConnectField === 'smtpHost' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
@@ -452,7 +452,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
                     <button
                       type="button"
                       onClick={() => copyConnectText(mailboxInfo?.email || 'user@shanutechx.com', 'username')}
-                      className="text-slate-400 hover:text-indigo-400 ml-1"
+                      className="text-slate-400 hover:text-white ml-1"
                     >
                       {copiedConnectField === 'username' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
@@ -480,7 +480,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
                     <button
                       type="button"
                       onClick={() => copyConnectText(websiteConnectData?.credentials?.password || mailboxInfo?.smtpPassword || '', 'password')}
-                      className="text-slate-400 hover:text-indigo-400"
+                      className="text-slate-400 hover:text-white"
                     >
                       {copiedConnectField === 'password' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
@@ -492,7 +492,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
             {/* Quick Integration Guides & Code Snippets */}
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <h4 className="font-bold text-indigo-400 flex items-center gap-2">
+                <h4 className="font-bold text-white flex items-center gap-2">
                   <Code className="h-4 w-4" /> Ready-to-Use Website & API Code
                 </h4>
                 <div className="flex flex-wrap gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-[10px]">
@@ -511,7 +511,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
                       onClick={() => setConnectLang(item.id as any)}
                       className={`px-2 py-1 rounded-lg font-mono transition-all ${
                         connectLang === item.id
-                          ? 'bg-indigo-600 text-white font-bold shadow'
+                          ? 'bg-white text-black text-white font-bold shadow'
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
@@ -522,7 +522,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
               </div>
 
               {/* Code Snippet Box */}
-              <div className="relative bg-slate-900 border border-slate-800 rounded-xl p-3 font-mono text-[11px] text-indigo-300 overflow-x-auto max-h-56">
+              <div className="relative bg-slate-900 border border-slate-800 rounded-xl p-3 font-mono text-[11px] text-neutral-300 overflow-x-auto max-h-56">
                 <button
                   type="button"
                   onClick={() => {
@@ -646,13 +646,13 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
             {/* Domain DNS Verification */}
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-indigo-400 flex items-center gap-2">
+                <h4 className="font-bold text-white flex items-center gap-2">
                   <Globe className="h-4 w-4" /> Domain DNS Record Verification
                 </h4>
                 <button
                   onClick={handleVerifyDns}
                   disabled={isVerifyingDns}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-xl flex items-center gap-1.5 transition-all disabled:opacity-50"
+                  className="px-3 py-1.5 bg-white text-black hover:bg-neutral-200 text-white text-[11px] font-bold rounded-xl flex items-center gap-1.5 transition-all disabled:opacity-50"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${isVerifyingDns ? 'animate-spin' : ''}`} />
                   Verify DNS Now
@@ -709,7 +709,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
 
             {/* Aliases Config */}
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
-              <h4 className="font-bold text-indigo-400 flex items-center gap-2">
+              <h4 className="font-bold text-white flex items-center gap-2">
                 <Layers className="h-4 w-4" /> Mailbox Custom Aliases
               </h4>
 
@@ -725,7 +725,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
                   />
                   <span className="text-slate-500 font-mono text-[11px]">@{customDomainInput}</span>
                 </div>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow">
+                <button type="submit" className="px-4 py-2 bg-white text-black text-white font-bold rounded-xl shadow">
                   Add Alias
                 </button>
               </form>
@@ -733,7 +733,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
               <div className="space-y-1.5 pt-2">
                 {aliases.map((al) => (
                   <div key={al} className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between font-mono text-[11px]">
-                    <span className="text-indigo-300">{al}</span>
+                    <span className="text-neutral-300">{al}</span>
                     <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
                       Active Alias
                     </span>
@@ -748,7 +748,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
         {activeSubTab === 'signatures' && (
           <div className="space-y-4 text-xs">
             <form onSubmit={handleSaveSignature} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
-              <h4 className="font-bold text-indigo-400">Add New HTML Signature</h4>
+              <h4 className="font-bold text-white">Add New HTML Signature</h4>
               <input
                 type="text"
                 placeholder="Signature Label (e.g. Official Corporate)"
@@ -765,7 +765,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
                 className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white resize-none font-mono"
                 required
               />
-              <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow flex items-center gap-1.5">
+              <button type="submit" className="px-4 py-2 bg-white text-black text-white font-bold rounded-xl shadow flex items-center gap-1.5">
                 <Plus className="h-3.5 w-3.5" />
                 <span>Save Signature</span>
               </button>
@@ -775,7 +775,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
               {signatures.map((s) => (
                 <div key={s.id} className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex justify-between items-start">
                   <div>
-                    <span className="font-bold text-white">{s.name}</span> {s.isDefault && <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded ml-2">Default</span>}
+                    <span className="font-bold text-white">{s.name}</span> {s.isDefault && <span className="text-[10px] bg-white/10 text-neutral-300 px-1.5 py-0.5 rounded ml-2">Default</span>}
                     <div className="text-[11px] text-slate-400 mt-1 whitespace-pre-wrap">{s.htmlContent}</div>
                   </div>
                   <button onClick={() => api.webmail.signatures.delete(s.id).then(fetchAllSettings)} className="text-slate-500 hover:text-rose-400 p-1">
@@ -791,7 +791,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
         {activeSubTab === 'templates' && (
           <div className="space-y-4 text-xs">
             <form onSubmit={handleSaveTemplate} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
-              <h4 className="font-bold text-indigo-400">Create Canned Response / Template</h4>
+              <h4 className="font-bold text-white">Create Canned Response / Template</h4>
               <input
                 type="text"
                 placeholder="Template Title (e.g. Sales Inquiry Response)"
@@ -815,7 +815,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
                 className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white resize-none"
                 required
               />
-              <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow flex items-center gap-1.5">
+              <button type="submit" className="px-4 py-2 bg-white text-black text-white font-bold rounded-xl shadow flex items-center gap-1.5">
                 <Plus className="h-3.5 w-3.5" />
                 <span>Save Template</span>
               </button>
@@ -871,7 +871,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
                 />
               </div>
 
-              <button type="submit" className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow">
+              <button type="submit" className="px-5 py-2 bg-white text-black text-white font-bold rounded-xl shadow">
                 Save Auto-Reply Settings
               </button>
             </div>
@@ -933,7 +933,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
                 </div>
               </div>
               <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 flex items-center gap-2">
-                <MailCheck className="h-4 w-4 text-indigo-400" />
+                <MailCheck className="h-4 w-4 text-white" />
                 <span className="text-slate-300">
                   <span className="font-bold text-white">{mailboxInfo?.email || 'user@shanutechx.com'}</span>
                   {' '}&mdash; <span className="text-emerald-400 font-bold">Active Service</span>
@@ -961,8 +961,8 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
                   sends: 2000,
                   price: '$4/mo',
                   features: ['Everything in Starter', 'AI Drafts & Summarise', '5 Aliases', 'Priority Support'],
-                  color: 'border-indigo-500/40',
-                  badge: 'text-indigo-300 bg-indigo-500/20',
+                  color: 'border-white/15',
+                  badge: 'text-neutral-300 bg-white/10',
                   current: mailboxInfo?.storageQuotaMb > 2048 && mailboxInfo?.storageQuotaMb <= 10240,
                 },
                 {
@@ -1008,7 +1008,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
                         href="/dashboard/billing"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] rounded-xl transition-all"
+                        className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 bg-white text-black hover:bg-neutral-200 text-white font-bold text-[10px] rounded-xl transition-all"
                       >
                         <ArrowUpCircle className="h-3 w-3" />
                         Upgrade

@@ -403,7 +403,7 @@ export default function WebmailPage() {
           <div className="flex-1 min-w-[320px] max-w-[520px] flex flex-col p-8 sm:p-14 overflow-y-auto bg-[#13131a] justify-between">
             {/* Logo */}
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white font-extrabold text-xs shadow-lg shadow-violet-500/30">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white font-extrabold text-xs shadow-lg shadow-md">
                 STX
               </div>
               <span className="font-bold text-xl tracking-tight text-white">STX Mail</span>
@@ -435,7 +435,7 @@ export default function WebmailPage() {
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     placeholder="user@yourdomain.com"
-                    className="w-full px-4 py-3.5 rounded-xl border border-white/10 bg-white/5 text-white text-sm outline-none focus:border-violet-500 focus:bg-violet-500/5 transition-all placeholder-slate-600"
+                    className="w-full px-4 py-3.5 rounded-xl border border-white/10 bg-white/5 text-white text-sm outline-none focus:border-white/30 focus:bg-violet-500/5 transition-all placeholder-slate-600"
                   />
                 </div>
 
@@ -450,7 +450,7 @@ export default function WebmailPage() {
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full px-4 py-3.5 pr-12 rounded-xl border border-white/10 bg-white/5 text-white text-sm outline-none focus:border-violet-500 focus:bg-violet-500/5 transition-all placeholder-slate-600"
+                      className="w-full px-4 py-3.5 pr-12 rounded-xl border border-white/10 bg-white/5 text-white text-sm outline-none focus:border-white/30 focus:bg-violet-500/5 transition-all placeholder-slate-600"
                     />
                     <button
                       type="button"
@@ -465,7 +465,7 @@ export default function WebmailPage() {
                 <button
                   type="submit"
                   disabled={loginLoading}
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-violet-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-neutral-800 to-black hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                 >
                   {loginLoading ? (
                     <><Loader2 className="h-4 w-4 animate-spin" /> Authenticating…</>
@@ -487,7 +487,7 @@ export default function WebmailPage() {
                       setActiveScreen('mail');
                     }, 400);
                   }}
-                  className="w-full py-3.5 rounded-2xl border border-white/10 bg-white/5 text-slate-300 font-semibold text-xs hover:border-violet-500/50 hover:text-white flex items-center justify-center gap-2 transition-all"
+                  className="w-full py-3.5 rounded-2xl border border-white/10 bg-white/5 text-slate-300 font-semibold text-xs hover:border-white/15 hover:text-white flex items-center justify-center gap-2 transition-all"
                 >
                   <Mail className="h-4 w-4" />
                   Launch Workspace Without Login
@@ -499,14 +499,14 @@ export default function WebmailPage() {
           </div>
 
           {/* Right panel */}
-          <div className="flex-1 hidden md:flex relative overflow-hidden bg-gradient-to-br from-[#0f0f13] via-violet-950/30 to-indigo-950/40 items-center justify-center p-12">
+          <div className="flex-1 hidden md:flex relative overflow-hidden bg-gradient-to-br from-[#0f0f13] via-black to-[#0c0d12] items-center justify-center p-12">
             <div className="absolute inset-0 overflow-hidden">
               {/* Decorative orbs */}
-              <div className="absolute top-1/4 left-1/3 w-72 h-72 rounded-full bg-violet-600/10 blur-3xl" />
-              <div className="absolute bottom-1/4 right-1/3 w-56 h-56 rounded-full bg-indigo-600/10 blur-3xl" />
+              <div className="absolute top-1/4 left-1/3 w-72 h-72 rounded-full bg-white/5 blur-3xl" />
+              <div className="absolute bottom-1/4 right-1/3 w-56 h-56 rounded-full bg-white/5 blur-3xl" />
             </div>
             <div className="relative z-10 text-center max-w-md">
-              <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-violet-500/30 border border-white/10">
+              <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-md border border-white/10">
                 <Mail className="h-12 w-12 text-white" />
               </div>
               <h2 className="text-2xl font-bold mb-3 tracking-tight text-white">Enterprise Cloud Webmail</h2>
@@ -532,7 +532,7 @@ export default function WebmailPage() {
       {/* ─── Screen 2: Loading ───────────────────────────────────────────── */}
       {activeScreen === 'loading' && (
         <div className="flex-1 flex flex-col items-center justify-center bg-[#0f0f13] text-white p-6 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xl shadow-xl shadow-violet-500/30 mb-6 animate-pulse">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xl shadow-xl shadow-md mb-6 animate-pulse">
             STX
           </div>
           <h2 className="text-2xl font-bold mb-2 tracking-tight">STX Webmail</h2>
@@ -549,7 +549,7 @@ export default function WebmailPage() {
       {/* ─── Screen: No Mailboxes Provisioned ────────────────────────────── */}
       {activeScreen === 'no_mailboxes' && (
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-lg mx-auto">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white mb-6 shadow-xl shadow-violet-500/20">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white mb-6 shadow-xl shadow-md">
             <Mail className="h-8 w-8" />
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-white mb-2">No Mailboxes Provisioned Yet</h2>
@@ -559,7 +559,7 @@ export default function WebmailPage() {
           <div className="flex flex-col sm:flex-row gap-3 w-full">
             <a
               href="/email"
-              className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-violet-500/25 transition-all text-center"
+              className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-neutral-800 to-black hover:from-violet-500 hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-md transition-all text-center"
             >
               Provision Mailbox &amp; DNS
             </a>

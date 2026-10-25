@@ -45,7 +45,7 @@ export default function SupabaseObservabilityPage() {
                 onClick={() => setTimeRange(r)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono uppercase transition-all ${
                   timeRange === r
-                    ? 'bg-accent-violet text-white font-bold shadow-glow-violet'
+                    ? 'bg-accent-violet text-white font-bold shadow-md'
                     : 'bg-white/[0.04] text-text-muted hover:text-white'
                 }`}
               >
@@ -116,7 +116,7 @@ export default function SupabaseObservabilityPage() {
 
             <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] flex items-center justify-between">
               <span className="text-xs font-medium text-text-muted">Postgres Cache Hit Ratio</span>
-              <span className="font-mono text-sm font-bold text-violet-300">{m.cacheHitRatePercent}%</span>
+              <span className="font-mono text-sm font-bold text-neutral-300">{m.cacheHitRatePercent}%</span>
             </div>
           </div>
         </Card>

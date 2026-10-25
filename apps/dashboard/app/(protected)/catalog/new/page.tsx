@@ -203,7 +203,7 @@ export default function CreateTemplatePage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="border-b border-white/[0.06] bg-gradient-to-b from-[#13101f] to-surface px-6 py-5">
+      <div className="border-b border-white/[0.08] bg-black px-6 py-5">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
@@ -218,19 +218,19 @@ export default function CreateTemplatePage() {
               </button>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-violet-500/20 border border-violet-500/30">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2">
+                  <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/10 border border-white/15">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
                       <path d="M12 5v14M5 12h14" />
                     </svg>
                   </span>
-                  <span className="text-xs font-medium text-violet-400 uppercase tracking-widest">New Template</span>
+                  <span className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">New Template</span>
                 </div>
                 <input
                   type="text"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
                   placeholder={name ? slugify(name) : 'template-slug'}
-                  className="text-xl font-bold text-text-primary bg-transparent border-none outline-none placeholder:text-text-faint/50 w-64"
+                  className="text-xl font-bold text-white bg-transparent border-none outline-none placeholder:text-neutral-500 w-64"
                 />
               </div>
             </div>
@@ -238,14 +238,14 @@ export default function CreateTemplatePage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => router.push('/catalog')}
-                className="px-4 py-2 rounded-xl text-sm text-text-muted border border-white/10 hover:bg-white/[0.04] transition-colors"
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-neutral-300 border border-white/10 hover:bg-white/[0.04] transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving || !!yamlError}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 transition-all shadow-lg shadow-violet-500/25 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-black bg-white hover:bg-neutral-200 transition-all shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {saving ? 'Creating...' : 'Create Template'}
               </button>

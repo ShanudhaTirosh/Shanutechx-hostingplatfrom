@@ -57,7 +57,7 @@ const INFRA_PANELS = [
     label: 'App Catalog & Deploy Hub',
     description: 'Deploy 1-click stack templates, inspect Docker Compose YAML specs, or deploy custom Git/Docker/ZIP workloads.',
     icon: <ServerIcon />,
-    color: 'bg-purple-500/10 text-purple-300',
+    color: 'bg-white/5 text-neutral-300',
     countKey: 'catalog',
   },
   {

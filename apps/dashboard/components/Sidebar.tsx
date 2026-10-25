@@ -128,8 +128,16 @@ export const CUSTOMER_DASHBOARD: DashboardConfig = {
   links: [
     { href: '/dashboard',            label: 'Overview',               icon: 'overview' },
     { href: '/services',             label: 'Services & Products',    icon: 'services' },
-    { href: '/orders?tab=cart',      label: 'Shopping Cart',          icon: 'cart' },
-    { href: '/orders?tab=subscriptions', label: 'Subscriptions',     icon: 'billing' },
+    {
+      href: '/orders',
+      label: 'Subscriptions & Orders',
+      icon: 'billing',
+      children: [
+        { href: '/orders?tab=subscriptions', label: 'Subscriptions & Active Services', icon: 'billing' },
+        { href: '/orders?tab=orders',        label: 'Orders & Invoices',               icon: 'orders' },
+        { href: '/orders?tab=cart',          label: 'Shopping Cart',                   icon: 'cart' },
+      ],
+    },
     { href: '/deployments',          label: 'Deployments',            icon: 'deployments' },
     { href: '/email',                label: 'Business Email',         icon: 'smtp' },
     { href: '/webmail/manage',       label: 'Mailbox Hub & Domains',  icon: 'smtp' },
@@ -156,13 +164,14 @@ export const ADMIN_DASHBOARD: DashboardConfig = {
   defaultHref: '/admin',
   links: [
     { href: '/admin',                label: 'Admin Overview',         icon: 'overview' },
-    { href: '/admin/vps-plans',      label: 'VPS Plans & Pricing',    icon: 'vps' },
+    { href: '/admin/tickets',        label: 'Support Tickets',        icon: 'tickets' },
+    { href: '/admin/services',       label: 'Products & Pricing Plans', icon: 'services' },
     { href: '/admin/review-queue',   label: 'Payment Review',         icon: 'review' },
     { href: '/admin/customers',      label: 'Customers Directory',    icon: 'customers' },
-    { href: '/admin/services',       label: 'Products & Catalog',     icon: 'services' },
     { href: '/admin/email',          label: 'Business Email Host',    icon: 'smtp' },
+    { href: '/support',              label: 'Helpdesk Console',       icon: 'overview' },
+    { href: '/support/kb',           label: 'Support Runbooks',       icon: 'knowledgebase' },
     { href: '/admin/knowledgebase',  label: 'Knowledge Base Mgr',     icon: 'knowledgebase' },
-    { href: '/admin/catalog',        label: 'Catalog Manager',        icon: 'catalog' },
     { href: '/settings',             label: 'Platform Settings',      icon: 'settings' },
   ],
 };
@@ -182,6 +191,7 @@ export const DEV_DASHBOARD: DashboardConfig = {
   defaultHref: '/dev',
   links: [
     { href: '/dev',                  label: 'Dev Studio Overview',    icon: 'infra' },
+    { href: '/admin/tickets',        label: 'Support Tickets',        icon: 'tickets' },
     { href: '/dev/supabase',         label: 'Supabase Studio & DBs',  icon: 'databases' },
     { href: '/dev/deploy',           label: 'Deploy Pipeline',        icon: 'deployments' },
     {
@@ -198,9 +208,10 @@ export const DEV_DASHBOARD: DashboardConfig = {
       ],
     },
     { href: '/dev/vps',              label: 'Global VPS Fleet',       icon: 'vps' },
+    { href: '/admin/services',       label: 'Products & Pricing Plans', icon: 'services' },
     { href: '/dev/bots',             label: 'Bot Studio',             icon: 'bots' },
     { href: '/dev/webmail',          label: 'Webmail & S3 Storage',   icon: 'smtp' },
-    { href: '/dev/observability',    label: 'Observability & Metrics',icon: 'monitoring' },
+    { href: '/support',              label: 'Helpdesk Console',       icon: 'overview' },
     { href: '/dev/reverse-proxy',    label: 'Reverse Proxy & Domains',icon: 'proxy' },
     { href: '/dev/ports',            label: 'Exposed Node Ports',     icon: 'proxy' },
     { href: '/dev/staff',            label: 'Staff Directory',        icon: 'staff' },
@@ -208,31 +219,13 @@ export const DEV_DASHBOARD: DashboardConfig = {
     { href: '/dev/cms',              label: 'Site Content (CMS)',     icon: 'cms' },
     { href: '/dev/audit-log',        label: 'Audit Log',              icon: 'audit' },
     { href: '/dev/catalog',          label: 'Catalog Inspector',      icon: 'catalog' },
-    { href: '/dev/docs',             label: 'Dev & API Docs',         icon: 'knowledgebase' },
   ],
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 4. SUPPORT OPERATIONS DASHBOARD SIDEBAR CONFIG
+// 4. SUPPORT DASHBOARD (Integrated into Admin / Dev)
 // ═════════════════════════════════════════════════════════════════════════════
-export const SUPPORT_DASHBOARD: DashboardConfig = {
-  role: 'support',
-  title: 'SUPPORT OPERATIONS',
-  badge: 'SUPPORT',
-  badgeStyle: {
-    color: 'var(--color-info)',
-    bg: 'var(--color-info-bg)',
-    border: 'var(--color-info-border)',
-  },
-  defaultHref: '/support',
-  links: [
-    { href: '/support',              label: 'Support Dashboard',      icon: 'overview' },
-    { href: '/admin/tickets',        label: 'Ticket Queue',           icon: 'tickets' },
-    { href: '/admin/chat',           label: 'Live Customer Chat',     icon: 'chat' },
-    { href: '/support/kb',           label: 'Support Runbooks',       icon: 'knowledgebase' },
-    { href: '/admin/customers',      label: 'Customer Directory',     icon: 'customers' },
-  ],
-};
+export const SUPPORT_DASHBOARD: DashboardConfig = ADMIN_DASHBOARD;
 
 function isSidebarLinkActive(
   linkHref: string,
@@ -243,6 +236,23 @@ function isSidebarLinkActive(
   const linkParams = new URLSearchParams(linkQuery || "");
   const activeTabParam = searchParams.get("tab");
 
+  // Specific handling for Unified Orders Portal (/orders, /billing, /cart)
+  const isOrdersPortal = pathname === "/orders" || pathname === "/billing" || pathname === "/cart";
+  if (linkPath === "/orders" || linkPath === "/billing" || linkPath === "/cart") {
+    // If the sidebar item has a specific ?tab query param (it's a child tab link)
+    if (linkParams.has("tab")) {
+      const targetTab = linkParams.get("tab");
+      if (!isOrdersPortal) return false;
+      if (pathname === "/cart") return targetTab === "cart";
+      if (pathname === "/billing") return targetTab === "subscriptions";
+      const effectiveTab = activeTabParam || "subscriptions";
+      return effectiveTab === targetTab;
+    }
+    // Parent link: active if user is anywhere in the portal
+    return isOrdersPortal;
+  }
+
+  // Handle other links with tab query params (e.g., /dev/containers?tab=...)
   if (linkQuery && linkParams.has("tab")) {
     const targetTab = linkParams.get("tab");
     if (pathname === linkPath) {
@@ -251,19 +261,16 @@ function isSidebarLinkActive(
     }
     return false;
   }
-  if (linkPath === "/cart" || (linkPath === "/orders" && linkParams.get("tab") === "cart")) {
-    if (pathname === "/cart") return true;
-    if (pathname === "/orders" && activeTabParam === "cart") return true;
-    return false;
-  }
-  if (linkPath === "/billing" || (linkPath === "/orders" && (!linkParams.has("tab") || linkParams.get("tab") !== "cart"))) {
-    if (pathname === "/billing") return true;
-    if (pathname === "/orders" && activeTabParam !== "cart") return true;
-    return false;
-  }
+
+  // Exact match for role roots
   if (linkHref === "/dashboard" || linkHref === "/admin" || linkHref === "/dev" || linkHref === "/support") {
     return pathname === linkHref;
   }
+
+  if (linkPath === "/admin/services" && (pathname.startsWith("/admin/vps-plans") || pathname.startsWith("/vps-plans"))) {
+    return true;
+  }
+
   return pathname === linkPath || pathname.startsWith(linkPath);
 }
 
@@ -297,7 +304,6 @@ export function DashboardSidebarView({
   const userRole = apiUser?.role || 'customer';
   const canAccessAdmin = userRole === 'admin' || userRole === 'dev';
   const canAccessDev = userRole === 'dev' || userRole === 'admin';
-  const canAccessSupport = userRole === 'support' || userRole === 'admin' || userRole === 'dev';
 
   return (
     <aside className="stx-sidebar w-[var(--sidebar-width)] shrink-0 flex flex-col h-screen overflow-y-auto">
@@ -345,19 +351,39 @@ export function DashboardSidebarView({
           if (hasChildren) {
             return (
               <div key={link.href} className="flex flex-col">
-                <button
-                  type="button"
-                  onClick={() => toggleDropdown(link.href)}
-                  className={`stx-nav-link w-full justify-between focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] ${isActive ? 'active' : ''}`}
+                <div
+                  className={`flex items-center justify-between rounded-lg transition-colors group ${
+                    isActive
+                      ? 'bg-[var(--color-surface-2)] text-[var(--color-text-primary)] font-semibold'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]'
+                  }`}
                 >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <span className="text-current opacity-70">{ICONS[link.icon]}</span>
-                    <span className="truncate text-[13.5px]">{link.label}</span>
-                  </div>
-                  <ChevronDown className={isOpen ? 'rotate-180' : ''} />
-                </button>
+                  <Link
+                    href={link.href}
+                    onClick={() => {
+                      if (!isOpen) toggleDropdown(link.href);
+                      onNavigate?.();
+                    }}
+                    className="flex items-center gap-2.5 flex-1 min-w-0 px-3 py-2 text-[13.5px]"
+                  >
+                    <span className="text-current opacity-70 shrink-0">{ICONS[link.icon]}</span>
+                    <span className="truncate">{link.label}</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleDropdown(link.href);
+                    }}
+                    className="p-2 hover:opacity-100 opacity-60 text-current transition-opacity shrink-0 cursor-pointer"
+                    aria-label={`Toggle ${link.label} submenu`}
+                  >
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
                 {isOpen && (
-                  <div className="ml-4 pl-3 mt-0.5 mb-0.5 flex flex-col gap-0.5 border-l border-[var(--color-border-subtle)]">
+                  <div className="ml-4 pl-3 mt-1 mb-1 flex flex-col gap-0.5 border-l border-[var(--color-border-subtle)]">
                     {link.children!.map((child) => {
                       const childActive = isSidebarLinkActive(child.href, pathname, searchParams);
                       return (
@@ -365,11 +391,15 @@ export function DashboardSidebarView({
                           key={child.href}
                           href={child.href}
                           onClick={() => onNavigate?.()}
-                          className={`stx-nav-link text-[12.5px] py-1.5 ${childActive ? 'active' : ''}`}
+                          className={`stx-nav-link text-[12.5px] py-1.5 transition-all ${
+                            childActive
+                              ? 'bg-white text-black font-bold shadow-sm'
+                              : 'text-[var(--color-text-muted)] hover:text-white hover:bg-white/[0.06]'
+                          }`}
                         >
-                          <span className="text-current opacity-60 shrink-0">
+                          <span className={`shrink-0 ${childActive ? 'text-black' : 'text-current opacity-60'}`}>
                             {child.icon ? ICONS[child.icon] : (
-                              <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60 inline-block" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-current inline-block" />
                             )}
                           </span>
                           <span className="truncate">{child.label}</span>
@@ -399,7 +429,7 @@ export function DashboardSidebarView({
       {/* ── Footer: Dashboard Switcher + User Info + Sign Out ── */}
       <div className="border-t border-[var(--color-border-subtle)] px-4 py-3 shrink-0 space-y-2.5">
         {/* Quick Dashboard Switcher (if staff/dev) */}
-        {(canAccessAdmin || canAccessSupport) && (
+        {canAccessAdmin && (
           <div className="flex items-center gap-1 p-1 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border-subtle)]">
             <span className="text-[10px] font-semibold text-[var(--color-text-faint)] px-1 uppercase">Go To:</span>
             <div className="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-none">
@@ -414,19 +444,6 @@ export function DashboardSidebarView({
               >
                 Client
               </Link>
-              {canAccessSupport && (
-                <Link
-                  href="/support"
-                  onClick={() => onNavigate?.()}
-                  className={`text-[10.5px] px-1.5 py-0.5 rounded font-medium transition-colors ${
-                    config.role === 'support'
-                      ? 'bg-[var(--color-bg)] text-[var(--color-text-primary)] shadow-sm'
-                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
-                  }`}
-                >
-                  Support
-                </Link>
-              )}
               {canAccessAdmin && (
                 <Link
                   href="/admin"
@@ -559,11 +576,11 @@ function AutoSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     return <DevSidebar onNavigate={onNavigate} />;
   }
 
-  if (pathname.startsWith("/support") || (pathname.startsWith("/admin/tickets") && apiUser?.role === "support")) {
-    return <SupportSidebar onNavigate={onNavigate} />;
-  }
-
-  if (pathname.startsWith("/admin") || pathname.startsWith("/settings")) {
+  if (
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/support")
+  ) {
     return <AdminSidebar onNavigate={onNavigate} />;
   }
 

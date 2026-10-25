@@ -78,9 +78,10 @@ function initializeSharedCache() {
  * @param {string} rawYaml - Raw Compose YAML content
  * @param {string} safeProject - Sanitized project identifier
  * @param {string} [projectDir] - Target project filesystem directory
+ * @param {{ cpus?: string | number; memory?: string }} [resourceLimits] - Custom container CPU and memory limits
  * @returns {{ valid: boolean; error?: string; hardenedYaml: string }}
  */
-function validateAndHardenCompose(rawYaml, safeProject, projectDir) {
+function validateAndHardenCompose(rawYaml, safeProject, projectDir, resourceLimits = {}) {
   if (!rawYaml || typeof rawYaml !== 'string') {
     return { valid: false, error: 'Compose YAML content is empty or invalid' };
   }
@@ -260,15 +261,21 @@ function validateAndHardenCompose(rawYaml, safeProject, projectDir) {
       }
     }
 
-    // 9. Resource Guardrails (Noisy-neighbor mitigation)
+    // 9. Resource Guardrails (Noisy-neighbor mitigation & CPU/RAM specs enforcement)
     if (!svc.deploy) svc.deploy = {};
     if (!svc.deploy.resources) svc.deploy.resources = {};
     if (!svc.deploy.resources.limits) {
-      svc.deploy.resources.limits = {
-        cpus: '1.5',
-        memory: '1G',
-      };
+      svc.deploy.resources.limits = {};
     }
+
+    const cpuLimit = (resourceLimits && resourceLimits.cpus) ? String(resourceLimits.cpus) : (svc.deploy.resources.limits.cpus || '1.5');
+    const memLimit = (resourceLimits && resourceLimits.memory) ? String(resourceLimits.memory) : (svc.deploy.resources.limits.memory || '1G');
+
+    svc.deploy.resources.limits.cpus = cpuLimit;
+    svc.deploy.resources.limits.memory = memLimit;
+    svc.cpus = parseFloat(cpuLimit) || 0.5;
+    svc.mem_limit = memLimit;
+
     if (!svc.pids_limit && !svc.deploy.resources.limits.pids) {
       svc.pids_limit = 256;
     }

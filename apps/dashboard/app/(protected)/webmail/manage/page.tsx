@@ -167,7 +167,7 @@ export default function CustomerMailManagementHub() {
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <RefreshCw className="h-8 w-8 animate-spin text-indigo-500" />
+        <RefreshCw className="h-8 w-8 animate-spin text-white" />
       </div>
     );
   }
@@ -180,7 +180,7 @@ export default function CustomerMailManagementHub() {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Mail className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
+            <Mail className="h-7 w-7 text-indigo-600 dark:text-white" />
             Customer Mailbox & SMTP Hub
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -192,19 +192,19 @@ export default function CustomerMailManagementHub() {
             href="/email"
             className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
           >
-            <Mail className="h-3.5 w-3.5 text-indigo-500" />
+            <Mail className="h-3.5 w-3.5 text-white" />
             Mailboxes &amp; SMTP
           </a>
           <a
             href="/webmail"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700"
+            className="flex items-center gap-1.5 rounded-lg bg-white text-black px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             Launch Webmail UI
           </a>
-          <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300">
+          <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/50 dark:text-neutral-300">
             {planUsage?.planName || 'Pro Mail Tier'}
           </span>
         </div>
@@ -216,14 +216,14 @@ export default function CustomerMailManagementHub() {
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
               <span className="text-sm font-medium">Mailboxes</span>
-              <Mail className="h-5 w-5 text-indigo-500" />
+              <Mail className="h-5 w-5 text-white" />
             </div>
             <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
               {q.mailboxes.used} / {q.mailboxes.limit}
             </div>
             <div className="mt-2 h-2 rounded-full bg-slate-100 dark:bg-slate-800">
               <div
-                className="h-2 rounded-full bg-indigo-600"
+                className="h-2 rounded-full bg-white text-black"
                 style={{ width: `${Math.min(100, (q.mailboxes.used / q.mailboxes.limit) * 100)}%` }}
               />
             </div>
@@ -264,7 +264,7 @@ export default function CustomerMailManagementHub() {
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
               <span className="text-sm font-medium">Email Aliases</span>
-              <Users className="h-5 w-5 text-purple-500" />
+              <Users className="h-5 w-5 text-white" />
             </div>
             <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
               {q.aliases.used} / {q.aliases.limit}
@@ -282,7 +282,7 @@ export default function CustomerMailManagementHub() {
       {/* Connect Domain & DNS Setup Wizard */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-          <Globe className="h-5 w-5 text-indigo-500" />
+          <Globe className="h-5 w-5 text-white" />
           Connect Custom Domain & Auto DNS Setup Wizard
         </h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -295,12 +295,12 @@ export default function CustomerMailManagementHub() {
             placeholder="example.com"
             value={newDomain}
             onChange={(e) => setNewDomain(e.target.value)}
-            className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-900 focus:border-white/30 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
           />
           <button
             type="submit"
             disabled={connectingDomain}
-            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-white text-black px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             {connectingDomain ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             Connect Domain
@@ -344,7 +344,7 @@ export default function CustomerMailManagementHub() {
                     <button
                       onClick={() => handleVerifyDns(d.domain)}
                       disabled={verifyingDns}
-                      className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-md bg-white text-black px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                     >
                       {verifyingDns ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                       1-Click Verify DNS
@@ -391,7 +391,7 @@ export default function CustomerMailManagementHub() {
                     <div className="space-y-2 text-xs font-mono">
                       <div className="flex items-center justify-between rounded bg-slate-100 p-2 dark:bg-slate-800">
                         <div>
-                          <span className="font-bold text-indigo-600 dark:text-indigo-400">MX @:</span> {d.records.mx} (Priority 10)
+                          <span className="font-bold text-indigo-600 dark:text-white">MX @:</span> {d.records.mx} (Priority 10)
                         </div>
                         <button onClick={() => copyToClipboard(d.records.mx)} className="text-slate-400 hover:text-slate-600">
                           <Copy className="h-4 w-4" />
@@ -400,7 +400,7 @@ export default function CustomerMailManagementHub() {
 
                       <div className="flex items-center justify-between rounded bg-slate-100 p-2 dark:bg-slate-800">
                         <div>
-                          <span className="font-bold text-indigo-600 dark:text-indigo-400">TXT @ (SPF):</span> {d.records.spf}
+                          <span className="font-bold text-indigo-600 dark:text-white">TXT @ (SPF):</span> {d.records.spf}
                         </div>
                         <button onClick={() => copyToClipboard(d.records.spf)} className="text-slate-400 hover:text-slate-600">
                           <Copy className="h-4 w-4" />
@@ -409,7 +409,7 @@ export default function CustomerMailManagementHub() {
 
                       <div className="flex items-center justify-between rounded bg-slate-100 p-2 dark:bg-slate-800">
                         <div className="overflow-hidden text-ellipsis">
-                          <span className="font-bold text-indigo-600 dark:text-indigo-400">TXT {d.records.dkimHost || 'wildduck._domainkey'}:</span> {d.records.dkim}
+                          <span className="font-bold text-indigo-600 dark:text-white">TXT {d.records.dkimHost || 'wildduck._domainkey'}:</span> {d.records.dkim}
                         </div>
                         <button onClick={() => copyToClipboard(d.records.dkim)} className="ml-2 flex-shrink-0 text-slate-400 hover:text-slate-600" title="Copy DKIM Record">
                           <Copy className="h-4 w-4" />
@@ -418,7 +418,7 @@ export default function CustomerMailManagementHub() {
 
                       <div className="flex items-center justify-between rounded bg-slate-100 p-2 dark:bg-slate-800">
                         <div>
-                          <span className="font-bold text-indigo-600 dark:text-indigo-400">TXT _dmarc:</span> {d.records.dmarc}
+                          <span className="font-bold text-indigo-600 dark:text-white">TXT _dmarc:</span> {d.records.dmarc}
                         </div>
                         <button onClick={() => copyToClipboard(d.records.dmarc)} className="text-slate-400 hover:text-slate-600">
                           <Copy className="h-4 w-4" />

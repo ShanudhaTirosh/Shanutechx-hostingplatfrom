@@ -260,7 +260,7 @@ export default function DevBotStudioPage() {
                 </div>
               ) : (
                 <div className="my-8 flex flex-col items-center justify-center p-8 rounded-2xl border border-white/10 bg-white/5 text-text-muted space-y-3">
-                  <RefreshCw className="h-8 w-8 animate-spin text-indigo-400" />
+                  <RefreshCw className="h-8 w-8 animate-spin text-white" />
                   <p className="text-xs">Generating fresh pairing QR code...</p>
                 </div>
               )}
@@ -273,7 +273,7 @@ export default function DevBotStudioPage() {
             <Card className="border border-white/[0.06] bg-white/[0.01] p-6 flex flex-col justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2 mb-2">
-                  <Phone className="h-4 w-4 text-indigo-400" />
+                  <Phone className="h-4 w-4 text-white" />
                   Link via 8-Digit Pairing Code
                 </h3>
                 <p className="text-xs text-text-muted mb-4">
@@ -294,8 +294,8 @@ export default function DevBotStudioPage() {
                 </form>
 
                 {pairingCode && (
-                  <div className="mt-6 p-4 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-center space-y-2">
-                    <p className="text-xs text-indigo-300 font-semibold uppercase tracking-wider">Your Pairing Code</p>
+                  <div className="mt-6 p-4 rounded-xl border border-white/15 bg-white/5 text-center space-y-2">
+                    <p className="text-xs text-neutral-300 font-semibold uppercase tracking-wider">Your Pairing Code</p>
                     <div className="text-2xl font-mono font-bold tracking-widest text-white">{pairingCode}</div>
                     <p className="text-[11px] text-text-muted">Enter this code in WhatsApp on your phone under Linked Devices.</p>
                   </div>
@@ -317,7 +317,7 @@ export default function DevBotStudioPage() {
           <Card className="border border-white/[0.06] bg-white/[0.01] p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <div className="h-12 w-12 rounded-2xl bg-white/5 border border-white/15 flex items-center justify-center text-white">
                   <Bot className="h-6 w-6" />
                 </div>
                 <div>
@@ -349,7 +349,7 @@ export default function DevBotStudioPage() {
             <Card className="border border-white/[0.06] bg-white/[0.01] p-5 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-text-muted">Connected Guilds</span>
-                <Radio className="h-4 w-4 text-indigo-400" />
+                <Radio className="h-4 w-4 text-white" />
               </div>
               <p className="text-2xl font-bold text-white">{discordState?.guildsCount ?? 0}</p>
               <p className="text-[11px] text-text-muted">Discord servers where bot resides</p>
@@ -381,7 +381,7 @@ export default function DevBotStudioPage() {
         <Card className="border border-white/[0.06] bg-white/[0.01] p-6 space-y-6">
           <div>
             <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <Send className="h-4 w-4 text-indigo-400" />
+              <Send className="h-4 w-4 text-white" />
               Multi-Channel Bot Message Dispatcher
             </h3>
             <p className="text-xs text-text-muted mt-1">
@@ -397,9 +397,9 @@ export default function DevBotStudioPage() {
                 onChange={(e) => setTestTarget(e.target.value as any)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-violet/50"
               >
-                <option value="whatsapp" className="bg-[#0a0a14]">WhatsApp DM (via Phone Number)</option>
-                <option value="discord_channel" className="bg-[#0a0a14]">Discord Channel (Support / Dedicated Ticket)</option>
-                <option value="discord_dm" className="bg-[#0a0a14]">Discord User DM (via Discord User ID)</option>
+                <option value="whatsapp" className="bg-[#0a0a0c]">WhatsApp DM (via Phone Number)</option>
+                <option value="discord_channel" className="bg-[#0a0a0c]">Discord Channel (Support / Dedicated Ticket)</option>
+                <option value="discord_dm" className="bg-[#0a0a0c]">Discord User DM (via Discord User ID)</option>
               </select>
             </div>
 

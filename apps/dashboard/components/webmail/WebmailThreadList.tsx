@@ -21,7 +21,7 @@ interface WebmailThreadListProps {
 }
 
 const AVATAR_GRADIENTS = [
-  'from-violet-500 to-purple-600',
+  'from-neutral-800 to-black',
   'from-blue-500 to-cyan-500',
   'from-emerald-500 to-teal-500',
   'from-orange-500 to-amber-400',
@@ -131,7 +131,7 @@ export function WebmailThreadList({
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/5 shrink-0">
         {selectedIds.size > 0 ? (
           <>
-            <span className="text-xs font-bold text-violet-400">{selectedIds.size} selected</span>
+            <span className="text-xs font-bold text-white">{selectedIds.size} selected</span>
             <div className="flex-1" />
             <button
               onClick={() => { onBulkAction('markRead', [...selectedIds]); clearSelection(); }}
@@ -181,7 +181,7 @@ export function WebmailThreadList({
             {activeFolder === 'inbox' && (
               <button
                 onClick={onOpenCompose}
-                className="mt-4 px-4 py-2 rounded-xl bg-violet-600/20 text-violet-300 text-xs font-semibold hover:bg-violet-600/30 transition-all"
+                className="mt-4 px-4 py-2 rounded-xl bg-white/10 text-neutral-300 text-xs font-semibold hover:bg-white/15 transition-all"
               >
                 Compose New Email
               </button>
@@ -210,7 +210,7 @@ export function WebmailThreadList({
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={() => isThreaded ? onSelectThread(item) : onSelectMessage(item)}
                 className={`relative flex items-start gap-3 px-3 ${itemPy} cursor-pointer border-b border-white/[0.04] transition-all group
-                  ${isActive ? 'bg-violet-600/10 border-l-2 border-l-violet-500' : 'hover:bg-white/[0.03]'}
+                  ${isActive ? 'bg-white/5 border-l-2 border-l-violet-500' : 'hover:bg-white/[0.03]'}
                   ${!isRead ? 'bg-white/[0.02]' : ''}
                 `}
               >
@@ -221,7 +221,7 @@ export function WebmailThreadList({
                       onClick={(e) => toggleSelect(id, e)}
                       className={`w-8 h-8 rounded-full flex items-center justify-center transition-all border-2 ${
                         isChecked
-                          ? 'bg-violet-600 border-violet-500'
+                          ? 'bg-white text-black border-white/30'
                           : 'border-slate-600 bg-transparent hover:border-violet-400'
                       }`}
                     >
@@ -269,7 +269,7 @@ export function WebmailThreadList({
                       </span>
                     )}
                     {item.labels?.slice(0, 2).map((label: string) => (
-                      <span key={label} className="text-[9px] font-semibold bg-violet-600/25 text-violet-300 px-1.5 py-0.5 rounded-full ring-1 ring-violet-500/20">
+                      <span key={label} className="text-[9px] font-semibold bg-white/10 text-neutral-300 px-1.5 py-0.5 rounded-full ring-1 ring-white/20">
                         {label}
                       </span>
                     ))}
@@ -292,7 +292,7 @@ export function WebmailThreadList({
                     </button>
                     <button
                       onClick={() => onBulkAction('archive', [id])}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
                       title="Archive"
                       aria-label="Archive message"
                     >

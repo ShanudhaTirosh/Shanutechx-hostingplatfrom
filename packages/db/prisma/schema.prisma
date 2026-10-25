@@ -290,6 +290,7 @@ enum ProductCategory {
   database
   app_catalog
   bot_hosting
+  app_deployment
   node_app_hosting
   python_app_hosting
   discordbot_node

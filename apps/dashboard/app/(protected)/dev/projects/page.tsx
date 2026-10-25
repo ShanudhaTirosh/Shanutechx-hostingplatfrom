@@ -523,7 +523,7 @@ export default function UnifiedDevProjectsPage() {
 
         <button
           onClick={() => setShowCreateModal(true)}
-          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white font-bold text-xs shadow-lg shadow-violet-500/25 transition-all flex items-center gap-2"
+          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white font-bold text-xs shadow-lg shadow-md transition-all flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           <span>Provision New Project / DB</span>
@@ -532,7 +532,7 @@ export default function UnifiedDevProjectsPage() {
 
       {/* ACTION NOTICE BANNER */}
       {actionNotice && (
-        <div className="p-4 bg-violet-500/10 border border-violet-500/30 rounded-2xl flex items-center justify-between text-xs text-violet-300 font-mono">
+        <div className="p-4 bg-white/5 border border-white/15 rounded-2xl flex items-center justify-between text-xs text-neutral-300 font-mono">
           <span>{actionNotice}</span>
           <button onClick={() => setActionNotice(null)} className="text-text-muted hover:text-white font-bold">
             ✕
@@ -571,7 +571,7 @@ export default function UnifiedDevProjectsPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-white/30 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <>
@@ -631,7 +631,7 @@ export default function UnifiedDevProjectsPage() {
                         const found = supabaseProjects.find((p) => p.id === e.target.value);
                         if (found) setSelectedSupabaseProject(found);
                       }}
-                      className="bg-[#121324] border border-emerald-500/40 text-emerald-300 rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-emerald-400"
+                      className="bg-[#0a0a0c] border border-emerald-500/40 text-emerald-300 rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-emerald-400"
                     >
                       {supabaseProjects.map((p) => (
                         <option key={p.id} value={p.id}>
@@ -808,7 +808,7 @@ export default function UnifiedDevProjectsPage() {
                               </div>
                               <div>
                                 <span className="text-text-muted text-[9px] uppercase block">Storage</span>
-                                <span className="font-bold text-violet-400 flex items-center gap-1">
+                                <span className="font-bold text-white flex items-center gap-1">
                                   <HardDrive className="w-3 h-3 inline text-text-muted" /> {proj.resourceUsage.diskMb} MB
                                 </span>
                               </div>
@@ -936,7 +936,7 @@ export default function UnifiedDevProjectsPage() {
                                   setProjectMigrateModal(proj);
                                   setTargetMigrateNodeId(proj.nodeId || (nodes[0]?.id || ''));
                                 }}
-                                className="px-2.5 py-1.5 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 border border-violet-500/20 font-bold transition-all flex items-center gap-1"
+                                className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-violet-500/20 text-neutral-300 border border-white/15 font-bold transition-all flex items-center gap-1"
                                 title="Migrate / Rebalance to another node"
                               >
                                 <Send className="w-3 h-3" />
@@ -1223,7 +1223,7 @@ export default function UnifiedDevProjectsPage() {
 
                           <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
                             <label className="text-[10px] text-text-muted uppercase font-bold">Supabase Meta / Admin API</label>
-                            <div className="text-xs text-violet-300 font-bold truncate">
+                            <div className="text-xs text-neutral-300 font-bold truncate">
                               {selectedSupabaseProject.metaUrl || `http://${selectedSupabaseProject.nodeIp || 'localhost'}:8080`}
                             </div>
                           </div>
@@ -1538,7 +1538,7 @@ export default function UnifiedDevProjectsPage() {
                                               {val === null
                                                 ? <span className="text-text-muted italic">null</span>
                                                 : typeof val === 'object'
-                                                ? <span className="text-violet-300">{JSON.stringify(val)}</span>
+                                                ? <span className="text-neutral-300">{JSON.stringify(val)}</span>
                                                 : typeof val === 'boolean'
                                                 ? <span className={val ? 'text-emerald-400' : 'text-amber-400'}>{String(val)}</span>
                                                 : <span>{String(val)}</span>
@@ -1855,7 +1855,7 @@ export default function UnifiedDevProjectsPage() {
                               setLogsServiceFilter(e.target.value);
                               if (selectedSupabaseProject?.id) loadProjectStudioData(selectedSupabaseProject.id);
                             }}
-                            className="bg-[#121324] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white font-mono"
+                            className="bg-[#0a0a0c] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white font-mono"
                           >
                             <option value="all">All Services</option>
                             <option value="postgres">PostgreSQL Engine</option>
@@ -2108,7 +2108,7 @@ export default function UnifiedDevProjectsPage() {
                     <select
                       value={supaNodeId}
                       onChange={(e) => setSupaNodeId(e.target.value)}
-                      className="w-full bg-[#121324] border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                      className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
                     >
                       {nodes.map((n) => {
                         const isMain = n.roleTags?.includes('main-node') || n.label.toLowerCase().includes('main');
@@ -2144,7 +2144,7 @@ export default function UnifiedDevProjectsPage() {
                     <select
                       value={dbType}
                       onChange={(e: any) => setDbType(e.target.value)}
-                      className="w-full bg-[#121324] border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                      className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
                     >
                       <option value="postgres">PostgreSQL 16 Engine</option>
                       <option value="mysql">MySQL 8.0 Engine</option>
@@ -2166,7 +2166,7 @@ export default function UnifiedDevProjectsPage() {
                 <button
                   type="submit"
                   disabled={isProvisioning}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-xs font-bold text-white shadow-lg shadow-violet-500/25 disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-neutral-800 to-black text-xs font-bold text-white shadow-lg shadow-md disabled:opacity-50"
                 >
                   {isProvisioning ? 'Provisioning...' : 'Provision Resource'}
                 </button>
@@ -2181,7 +2181,7 @@ export default function UnifiedDevProjectsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-[#0f1021] border border-white/15 rounded-2xl p-6 max-w-md w-full space-y-5 shadow-2xl">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Send className="w-5 h-5 text-violet-400" />
+              <Send className="w-5 h-5 text-white" />
               <span>Migrate Supabase Project to VPS Node</span>
             </h3>
 
@@ -2195,7 +2195,7 @@ export default function UnifiedDevProjectsPage() {
                 <select
                   value={targetMigrateNodeId}
                   onChange={(e) => setTargetMigrateNodeId(e.target.value)}
-                  className="w-full bg-[#121324] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-violet-500 font-mono"
+                  className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-white/30 font-mono"
                 >
                   {nodes.map((n) => (
                     <option key={n.id} value={n.id}>
@@ -2216,7 +2216,7 @@ export default function UnifiedDevProjectsPage() {
                 <button
                   type="submit"
                   disabled={actionLoading[`migrate-${projectMigrateModal.id}`]}
-                  className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-xs font-bold text-white shadow-lg shadow-violet-500/25 disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-white text-black hover:bg-violet-500 text-xs font-bold text-white shadow-lg shadow-md disabled:opacity-50"
                 >
                   {actionLoading[`migrate-${projectMigrateModal.id}`] ? 'Migrating...' : 'Confirm Migration'}
                 </button>

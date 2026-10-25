@@ -1532,7 +1532,7 @@ function resolveEnvVars(yamlContent, userEnvVars = {}) {
  * Writes the YAML to disk, then runs `docker compose up -d`.
  */
 app.post('/agent/compose/up', async (req, res) => {
-  const { composeYaml, projectName, envVars, configFiles, configFileContent, configFileName } = req.body || {};
+  const { composeYaml, projectName, envVars, configFiles, configFileContent, configFileName, cpuLimit, memoryLimit } = req.body || {};
   const effectiveProject = projectName || (req.body?.deploymentId ? `proj-${req.body.deploymentId}` : '');
   if (!composeYaml || !effectiveProject) {
     return res.status(400).json({ error: 'composeYaml and projectName are required' });
@@ -1541,8 +1541,11 @@ app.post('/agent/compose/up', async (req, res) => {
   const safeProject = effectiveProject.replace(/[^a-z0-9-]/gi, '-').toLowerCase().slice(0, 60);
   const projectDir = `${COMPOSE_DIR}/${safeProject}`;
 
-  // Multi-tenant isolation & security validation
-  const validation = validateAndHardenCompose(composeYaml, safeProject, projectDir);
+  // Multi-tenant isolation & security validation with dynamic CPU/RAM specs (e.g. 0.5 vCPU)
+  const validation = validateAndHardenCompose(composeYaml, safeProject, projectDir, {
+    cpus: cpuLimit,
+    memory: memoryLimit,
+  });
   if (!validation.valid) {
     logger.warn({ safeProject, error: validation.error }, 'Compose stack rejected by isolation engine');
     return res.status(400).json({ error: validation.error });

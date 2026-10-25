@@ -1,49 +1,94 @@
-import { mkdir } from 'fs/promises';
+import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
+import crypto from 'crypto';
 import multer from 'multer';
+import sharp from 'sharp';
+import { getDocumentProxy, renderPageAsImage } from 'unpdf';
+import { logger } from './logger';
 
-// Stored on the API server's own disk — no Cloudflare/Firebase storage
-// product is used here, consistent with keeping Firebase scoped to just
-// Auth + the Realtime DB chat. Mount this directory as a persistent Docker
-// volume in production so proofs survive container restarts/redeploys.
 export const UPLOADS_DIR = process.env.UPLOADS_DIR || '/var/lib/shanutechx/uploads';
 
-const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
-const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024; // 8MB — plenty for a screenshot
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/bmp',
+  'image/tiff',
+  'image/heic',
+  'image/heif',
+  'application/pdf',
+]);
 
-import crypto from 'crypto';
+const MAX_FILE_SIZE_BYTES = 12 * 1024 * 1024; // 12MB limit
 
-const MIME_EXTENSION_MAP: Record<string, string> = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'application/pdf': '.pdf',
-};
-
-const storage = multer.diskStorage({
-  destination: async (req, _file, cb) => {
-    const rawOrderId = req.params.orderId || 'default';
-    const safeOrderId = path.basename(rawOrderId).replace(/[^a-zA-Z0-9_-]/g, '_');
-    const dir = path.join(UPLOADS_DIR, 'payments', safeOrderId);
-    await mkdir(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (_req, file, cb) => {
-    const ext = MIME_EXTENSION_MAP[file.mimetype] || '.bin';
-    cb(null, `${Date.now()}_${crypto.randomBytes(6).toString('hex')}${ext}`);
-  },
-});
+// In-memory buffer upload so we can convert any incoming image or PDF directly to WebP
+const memoryStorage = multer.memoryStorage();
 
 export const uploadPaymentProof = multer({
-  storage,
+  storage: memoryStorage,
   limits: { fileSize: MAX_FILE_SIZE_BYTES },
   fileFilter: (_req, file, cb) => {
     if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      return cb(new Error('Unsupported file type. Upload a JPEG, PNG, WebP, or PDF.'));
+      return cb(new Error('Unsupported file type. Please upload an image (JPEG, PNG, WebP) or PDF.'));
     }
     cb(null, true);
   },
 }).single('proof');
+
+/**
+ * Converts an uploaded proof buffer (image or PDF) directly to high-quality WebP.
+ * For PDFs, the first page is rendered at high resolution and encoded to WebP.
+ * For all images, Sharp converts them to WebP format.
+ */
+export async function convertProofBufferToWebp(buffer: Buffer, mimetype: string): Promise<Buffer> {
+  if (mimetype === 'application/pdf') {
+    try {
+      const pdf = await getDocumentProxy(new Uint8Array(buffer));
+      // Render first page with napi-rs canvas at scale 2.0 for crisp text readability
+      const pageImage = await renderPageAsImage(pdf, 1, {
+        scale: 2.0,
+        canvasImport: () => import('@napi-rs/canvas'),
+      });
+      return await sharp(Buffer.from(pageImage))
+        .webp({ quality: 85, effort: 4 })
+        .toBuffer();
+    } catch (pdfErr) {
+      logger.error({ pdfErr }, 'Failed converting PDF proof to WebP, attempting fallback');
+      throw new Error('Failed to process PDF document. Please upload a clear image screenshot of your payment slip.');
+    }
+  }
+
+  // All image types (JPEG, PNG, BMP, TIFF, WebP) converted to optimized WebP
+  return await sharp(buffer)
+    .webp({ quality: 85, effort: 4 })
+    .toBuffer();
+}
+
+/**
+ * Processes an uploaded file in memory, converts it to WebP format, and writes it to disk.
+ * Returns the final filename and public relative URL path.
+ */
+export async function processAndSavePaymentProof(
+  orderId: string,
+  file: Express.Multer.File
+): Promise<{ filename: string; relativeUrl: string; webpBytes: number }> {
+  const safeOrderId = path.basename(orderId).replace(/[^a-zA-Z0-9_-]/g, '_');
+  const targetDir = path.join(UPLOADS_DIR, 'payments', safeOrderId);
+  await mkdir(targetDir, { recursive: true });
+
+  const webpBuffer = await convertProofBufferToWebp(file.buffer, file.mimetype);
+  const filename = `${Date.now()}_${crypto.randomBytes(6).toString('hex')}.webp`;
+  const filePath = path.join(targetDir, filename);
+
+  await writeFile(filePath, webpBuffer);
+
+  const relativeUrl = `/uploads/payments/${safeOrderId}/${filename}`;
+  return {
+    filename,
+    relativeUrl,
+    webpBytes: webpBuffer.length,
+  };
+}
 
 /**
  * Returns a web-accessible relative URL path for an uploaded payment proof file.
@@ -65,4 +110,3 @@ export function normalizeProofUrl(proofUrl: string | null | undefined): string |
   }
   return proofUrl;
 }
-

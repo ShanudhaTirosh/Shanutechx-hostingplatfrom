@@ -3,6 +3,7 @@ import './globals.css';
 import { ThemeScript } from '@/components/ThemeProvider';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'),
   title: 'STX HOSTING Control Panel',
   description: 'Manage your VPS hosting, cloud deployments, databases, bots, and invoices.',
   icons: {

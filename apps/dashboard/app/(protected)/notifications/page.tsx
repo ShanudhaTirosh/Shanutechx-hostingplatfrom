@@ -111,7 +111,7 @@ export default function NotificationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 pb-5">
         <div>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-white/5 text-neutral-300 border border-white/15">
             Multi-Channel Alerts
           </span>
           <h1 className="text-2xl font-bold text-white mt-1">Notification Channels</h1>
@@ -122,7 +122,7 @@ export default function NotificationsPage() {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2.5 rounded-xl font-bold text-xs bg-indigo-500 hover:bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2"
+          className="px-4 py-2.5 rounded-xl font-bold text-xs bg-indigo-500 hover:bg-white text-black text-white shadow-lg shadow-md transition-all flex items-center gap-2"
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 5v14M5 12h14" />
@@ -132,7 +132,7 @@ export default function NotificationsPage() {
       </div>
 
       {notice && (
-        <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-xs font-semibold text-indigo-300 flex items-center justify-between">
+        <div className="p-3 bg-white/5 border border-white/15 rounded-xl text-xs font-semibold text-neutral-300 flex items-center justify-between">
           <span>{notice}</span>
           <button onClick={() => setNotice(null)} className="text-white hover:text-red-400">✕</button>
         </div>
@@ -153,7 +153,7 @@ export default function NotificationsPage() {
             <div key={channel.id} className="bg-[#0b0c16] border border-white/10 rounded-2xl p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/15 text-white">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                       <path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -190,7 +190,7 @@ export default function NotificationsPage() {
                   <button
                     onClick={() => handleTestChannel(channel.id)}
                     disabled={testingId === channel.id}
-                    className="px-3 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 text-xs font-semibold disabled:opacity-30"
+                    className="px-3 py-1 rounded-lg bg-white/5 border border-white/15 text-neutral-300 hover:bg-white/10 text-xs font-semibold disabled:opacity-30"
                   >
                     {testingId === channel.id ? 'Testing...' : 'Test Alert'}
                   </button>
@@ -226,7 +226,7 @@ export default function NotificationsPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Production Alerts Discord"
-                  className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-white/30"
                 />
               </div>
 
@@ -235,7 +235,7 @@ export default function NotificationsPage() {
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value as any)}
-                  className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-white/30"
                 >
                   <option value="discord">Discord Webhook</option>
                   <option value="whatsapp">WhatsApp Gateway</option>
@@ -253,7 +253,7 @@ export default function NotificationsPage() {
                     value={webhookUrl}
                     onChange={(e) => setWebhookUrl(e.target.value)}
                     placeholder="https://discord.com/api/webhooks/..."
-                    className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-white/30"
                   />
                 </div>
               )}
@@ -267,7 +267,7 @@ export default function NotificationsPage() {
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     placeholder="+94771234567"
-                    className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-white/30"
                   />
                 </div>
               )}
@@ -281,7 +281,7 @@ export default function NotificationsPage() {
                     value={emailAddress}
                     onChange={(e) => setEmailAddress(e.target.value)}
                     placeholder="devs@mycompany.com"
-                    className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-white/30"
                   />
                 </div>
               )}
@@ -297,7 +297,7 @@ export default function NotificationsPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-bold disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-white text-black text-white font-bold disabled:opacity-50"
                 >
                   {isSubmitting ? 'Creating...' : 'Save Channel'}
                 </button>

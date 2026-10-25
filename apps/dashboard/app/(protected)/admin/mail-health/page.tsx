@@ -29,7 +29,7 @@ export default function AdminMailHealthPage() {
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <RefreshCw className="h-8 w-8 animate-spin text-indigo-500" />
+        <RefreshCw className="h-8 w-8 animate-spin text-white" />
       </div>
     );
   }

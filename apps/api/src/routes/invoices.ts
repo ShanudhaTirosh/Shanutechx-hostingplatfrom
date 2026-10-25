@@ -88,20 +88,28 @@ invoicesRouter.get('/orders/:orderId/invoice', async (req: AuthedRequest, res) =
   let invoice = order.invoice;
 
   if (!invoice || !invoice.pdfUrl || !existsSync(invoice.pdfUrl)) {
+    const invoiceNumber = `STX-${order.createdAt.getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`;
     const pdfBytes = await generateInvoicePdf({
       invoiceId: order.id,
-      issuedAt: new Date(),
+      invoiceNumber,
+      issuedAt: order.createdAt,
+      dueDate: new Date(order.createdAt.getTime() + 14 * 24 * 60 * 60 * 1000),
+      customerName: order.user.displayName || order.user.email.split('@')[0],
       customerEmail: order.user.email,
       items: order.items.map((item: any) => {
-        const name = item.service ? item.service.name : item.plan ? `${item.plan.product?.name} — ${item.plan.name}` : 'Unknown Product';
+        const name = item.service ? item.service.name : item.plan ? `${item.plan.product?.name} — ${item.plan.name}` : 'Cloud Service';
+        const description = item.plan?.specsJson ? Object.entries(item.plan.specsJson).map(([k, v]) => `${k}: ${v}`).slice(0, 3).join(' · ') : undefined;
         const unitPrice = item.service ? item.service.price : item.plan ? item.plan.price : 0;
         return {
           name,
+          description,
           quantity: item.quantity,
           unitPrice,
         };
       }),
       total: order.total,
+      currencyLabel: order.currency || 'LKR',
+      isPaid: order.status === 'paid',
     });
 
     await mkdir(INVOICES_DIR, { recursive: true });
@@ -128,7 +136,7 @@ invoicesRouter.get('/orders/:orderId/invoice/json', async (req: AuthedRequest, r
   const order = await loadOwnedOrderWithItems(req, req.params.orderId);
   if (!order) return res.status(404).json({ error: 'Order not found' });
 
-  const invoiceNumber = `INV-${order.createdAt.getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`;
+  const invoiceNumber = `STX-${order.createdAt.getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`;
 
   const lineItems = order.items.map((item: any) => {
     const name = item.service
@@ -140,6 +148,7 @@ invoicesRouter.get('/orders/:orderId/invoice/json', async (req: AuthedRequest, r
     return {
       id: item.id,
       name,
+      description: item.plan?.specsJson ? Object.entries(item.plan.specsJson).map(([k, v]) => `${k}: ${v}`).slice(0, 3).join(' · ') : undefined,
       quantity: item.quantity,
       unitPrice,
       total: unitPrice * item.quantity,
@@ -160,11 +169,12 @@ invoicesRouter.get('/orders/:orderId/invoice/json', async (req: AuthedRequest, r
       whatsapp: order.user.phoneNumber,
     },
     company: {
-      name: 'ShanuTechX Platform (Pvt) Ltd',
-      address: 'Level 18, Orion City Towers, Colombo 09, Sri Lanka',
+      name: 'STX Enterprises',
+      subtitle: 'DIGITAL EMPIRE STUDIO',
+      address: 'Negombo, Western Province, Sri Lanka',
       taxId: 'LK-884920492-STX',
-      email: 'billing@shanutechx.com',
-      website: 'https://shanutechx.com',
+      email: 'hello@stxenterprises.com',
+      website: 'www.stxenterprises.com',
     },
     items: lineItems,
     subtotal: order.total,

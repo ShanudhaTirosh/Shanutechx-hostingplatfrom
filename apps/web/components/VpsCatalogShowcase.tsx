@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ArrowRight, CheckCircle2, ShieldAlert, Sparkles, MessageSquare } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ShieldAlert, Sparkles, MessageSquare, Clock, Server } from 'lucide-react';
 import type { Product, Plan } from '../lib/api';
 
 interface VpsCatalogShowcaseProps {
@@ -92,6 +92,12 @@ export default function VpsCatalogShowcase({ products, dashboardUrl }: VpsCatalo
         )}
       </div>
 
+      {/* VPS Delivery Notice Banner */}
+      <div className="max-w-2xl mx-auto p-3.5 rounded-2xl bg-[#0b0c22]/90 border border-purple-500/20 text-center text-xs text-purple-200 font-medium flex items-center justify-center gap-2 shadow-lg">
+        <Clock className="h-4 w-4 text-purple-400 shrink-0" />
+        <span><strong>Notice:</strong> VPS servers are delivered within <strong>24 to 72 hours</strong>.</span>
+      </div>
+
       {/* Plan Cards Grid (Exact matching vps.png design) */}
       {activePlans.length === 0 ? (
         <div
@@ -155,6 +161,14 @@ export default function VpsCatalogShowcase({ products, dashboardUrl }: VpsCatalo
                     <div className="pt-2 border-t border-white/[0.06]">
                       <span className="text-[10px] text-text-muted uppercase font-bold block">BANDWIDTH</span>
                       <span className="font-extrabold text-white">{bandwidth}</span>
+                    </div>
+                  </div>
+
+                  {/* Delivery Notice Chip */}
+                  <div className="text-[11px] font-mono">
+                    <div className="flex items-center justify-between px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300">
+                      <span className="text-amber-400 text-[10px] uppercase font-bold">DELIVERY</span>
+                      <span className="font-bold">24 to 72 Hours</span>
                     </div>
                   </div>
 

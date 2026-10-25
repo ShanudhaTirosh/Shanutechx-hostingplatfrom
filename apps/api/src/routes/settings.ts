@@ -8,6 +8,7 @@ import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { issueSettingsUnlockToken, verifySettingsUnlockToken, SETTINGS_UNLOCK_TTL_MS } from '../lib/settingsUnlock';
 
 import { authRateLimiter } from '../middleware/rateLimit';
+import { logger } from '../lib/logger';
 
 export const settingsRouter = Router();
 
@@ -343,6 +344,176 @@ settingsRouter.post('/github-backup/test', requireAdminOrDev, requireSettingsUnl
     });
   } catch (err: any) {
     return res.status(500).json({ ok: false, error: err.message || 'Network error connecting to GitHub API' });
+  }
+});
+
+const smtpConfigSchema = z.object({
+  host: z.string().trim().min(1, 'Host is required'),
+  port: z.number().int().min(1).max(65535),
+  user: z.string().trim().min(1, 'Username is required'),
+  pass: z.string().optional(),
+  fromEmail: z.string().trim().email('Valid from email required'),
+  fromName: z.string().trim().optional(),
+  secure: z.boolean().default(false),
+  unlockToken: z.string().optional(),
+});
+
+/**
+ * GET /api/settings/smtp
+ * Returns current global SMTP configuration (without plaintext password).
+ */
+settingsRouter.get('/smtp', requireAdminOrDev, async (_req: AuthedRequest, res) => {
+  let host = process.env.SMTP_HOST || '';
+  let port = parseInt(process.env.SMTP_PORT || '587', 10);
+  let user = process.env.SMTP_USER || '';
+  let fromEmail = process.env.SMTP_FROM || 'support@shanutech.com';
+  let fromName = process.env.SMTP_FROM_NAME || 'ShanuTechX Cloud';
+  let secure = process.env.SMTP_SECURE === 'true' || port === 465;
+  let hasPassword = !!process.env.SMTP_PASS;
+
+  try {
+    const item = await prisma.secretItem.findFirst({ where: { key: 'GLOBAL_SMTP_CONFIG' } });
+    if (item?.valueEnc) {
+      const decrypted = JSON.parse(decryptSecret(item.valueEnc, env.secretsEncryptionKey));
+      if (decrypted.host) host = decrypted.host;
+      if (decrypted.port) port = Number(decrypted.port);
+      if (decrypted.user) user = decrypted.user;
+      if (decrypted.fromEmail) fromEmail = decrypted.fromEmail;
+      if (decrypted.fromName) fromName = decrypted.fromName;
+      if (typeof decrypted.secure === 'boolean') secure = decrypted.secure;
+      if (decrypted.pass) hasPassword = true;
+    }
+  } catch {}
+
+  res.json({
+    config: {
+      host,
+      port,
+      user,
+      fromEmail,
+      fromName,
+      secure,
+      configured: Boolean(host && user),
+      hasPassword,
+    },
+  });
+});
+
+/**
+ * PUT /api/settings/smtp
+ * Saves global SMTP configuration with password encryption.
+ */
+settingsRouter.put('/smtp', requireAdminOrDev, requireSettingsUnlock, async (req: AuthedRequest, res) => {
+  const parsed = smtpConfigSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { host, port, user, pass, fromEmail, fromName, secure } = parsed.data;
+
+  let existingPass = process.env.SMTP_PASS || '';
+  try {
+    const existing = await prisma.secretItem.findFirst({ where: { key: 'GLOBAL_SMTP_CONFIG' } });
+    if (existing?.valueEnc) {
+      const dec = JSON.parse(decryptSecret(existing.valueEnc, env.secretsEncryptionKey));
+      if (dec.pass) existingPass = dec.pass;
+    }
+  } catch {}
+
+  const finalPass = pass && pass.trim() ? pass.trim() : existingPass;
+
+  const toStore = {
+    host,
+    port,
+    user,
+    pass: finalPass,
+    fromEmail,
+    fromName: fromName || 'ShanuTechX Cloud',
+    secure,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const encrypted = encryptSecret(JSON.stringify(toStore), env.secretsEncryptionKey);
+
+  try {
+    let systemProject = await prisma.secretProject.findFirst({
+      where: { name: 'Platform System Integrations' },
+    });
+    if (!systemProject) {
+      systemProject = await prisma.secretProject.create({
+        data: {
+          name: 'Platform System Integrations',
+          environment: 'production',
+        },
+      });
+    }
+
+    await prisma.secretItem.upsert({
+      where: {
+        projectId_key: {
+          projectId: systemProject.id,
+          key: 'GLOBAL_SMTP_CONFIG',
+        },
+      },
+      update: {
+        valueEnc: encrypted,
+        comment: 'Global SMTP / Transactional Mail Server Credentials',
+      },
+      create: {
+        projectId: systemProject.id,
+        key: 'GLOBAL_SMTP_CONFIG',
+        valueEnc: encrypted,
+        comment: 'Global SMTP / Transactional Mail Server Credentials',
+      },
+    });
+  } catch (err: any) {
+    logger.warn({ err }, 'Failed to persist SMTP config to secrets store');
+  }
+
+  process.env.SMTP_HOST = host;
+  process.env.SMTP_PORT = String(port);
+  process.env.SMTP_USER = user;
+  if (finalPass) process.env.SMTP_PASS = finalPass;
+  process.env.SMTP_FROM = fromEmail;
+  process.env.SMTP_FROM_NAME = fromName || 'ShanuTechX Cloud';
+  process.env.SMTP_SECURE = String(secure);
+
+  res.json({ ok: true, message: 'Global SMTP Mail Server configuration saved successfully.' });
+});
+
+/**
+ * POST /api/settings/smtp/test
+ * Tests the live SMTP handshake and authentication.
+ */
+settingsRouter.post('/smtp/test', requireAdminOrDev, async (req: AuthedRequest, res) => {
+  let { host, port, user, pass, secure } = req.body;
+  if (!pass) {
+    try {
+      const existing = await prisma.secretItem.findFirst({ where: { key: 'GLOBAL_SMTP_CONFIG' } });
+      if (existing?.valueEnc) {
+        const dec = JSON.parse(decryptSecret(existing.valueEnc, env.secretsEncryptionKey));
+        pass = dec.pass;
+      }
+    } catch {}
+    if (!pass) pass = process.env.SMTP_PASS || '';
+  }
+
+  if (!host || !user) {
+    return res.status(400).json({ ok: false, error: 'Host and user are required to test SMTP connection.' });
+  }
+
+  try {
+    const { verifySmtpConnection } = await import('../lib/smtpDispatcher');
+    const result = await verifySmtpConnection({
+      host,
+      port: Number(port) || 587,
+      user,
+      pass: pass || '',
+      secure: Boolean(secure),
+      timeoutMs: 8000,
+      allowSelfSigned: true,
+    });
+    return res.json(result);
+  } catch (err: any) {
+    return res.json({ ok: false, message: err.message || 'SMTP handshake failed', latencyMs: 0 });
   }
 });
 

@@ -245,10 +245,10 @@ export default function TemplateEditorPage() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center gap-3">
-          <svg className="animate-spin w-8 h-8 text-violet-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg className="animate-spin w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
           </svg>
-          <p className="text-sm text-text-muted">Loading template...</p>
+          <p className="text-sm text-neutral-400">Loading template...</p>
         </div>
       </div>
     );
@@ -257,7 +257,7 @@ export default function TemplateEditorPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="border-b border-white/[0.06] bg-gradient-to-b from-[#13101f] to-surface px-6 py-5">
+      <div className="border-b border-white/[0.08] bg-black px-6 py-5">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
@@ -272,28 +272,28 @@ export default function TemplateEditorPage() {
               </button>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-violet-500/20 border border-violet-500/30">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2">
+                  <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/10 border border-white/15">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
                       <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
                     </svg>
                   </span>
-                  <span className="text-xs font-medium text-violet-400 uppercase tracking-widest">Edit Template</span>
+                  <span className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">Edit Template</span>
                 </div>
-                <h1 className="text-xl font-bold text-text-primary">{slug}</h1>
+                <h1 className="text-xl font-bold text-white">{slug}</h1>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={() => router.push('/catalog')}
-                className="px-4 py-2 rounded-xl text-sm text-text-muted border border-white/10 hover:bg-white/[0.04] transition-colors"
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-neutral-300 border border-white/10 hover:bg-white/[0.04] transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving || !!yamlError}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 transition-all shadow-lg shadow-violet-500/25 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-black bg-white hover:bg-neutral-200 transition-all shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {saving ? (
                   <>

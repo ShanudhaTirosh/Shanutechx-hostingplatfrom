@@ -118,7 +118,7 @@ export function WebmailCalendarTab() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-950/80 p-5 rounded-3xl border border-slate-800">
         <div>
           <h2 className="text-base font-extrabold text-white flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-indigo-400" />
+            <Calendar className="h-5 w-5 text-white" />
             <span>Integrated Calendar & Scheduling</span>
           </h2>
           <p className="text-xs text-slate-400">Manage meetings, .ics invites, and Google Calendar / iCal feeds.</p>
@@ -135,7 +135,7 @@ export function WebmailCalendarTab() {
 
           <button
             onClick={() => setShowAddEventModal(true)}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5"
+            className="px-4 py-2 bg-white text-black hover:bg-neutral-200 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>New Event</span>
@@ -146,12 +146,12 @@ export function WebmailCalendarTab() {
       {/* CONNECTED CALENDAR FEEDS BADGES */}
       {syncs.length > 0 && (
         <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800 space-y-2">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-400">Active External Calendar Syncs</p>
+          <p className="text-[10px] font-extrabold uppercase tracking-wider text-white">Active External Calendar Syncs</p>
           <div className="flex flex-wrap gap-2">
             {syncs.map((s) => (
               <div key={s.id} className="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs flex items-center gap-2">
                 <span className="font-bold text-white flex items-center gap-1.5">
-                  <Globe className="h-3.5 w-3.5 text-indigo-400" />
+                  <Globe className="h-3.5 w-3.5 text-white" />
                   <span>{s.provider === 'google' ? 'Google Calendar' : 'iCal Feed'}: {s.name}</span>
                 </span>
                 <button onClick={() => handleRemoveSync(s.id)} className="text-slate-500 hover:text-rose-400 p-0.5">
@@ -192,7 +192,7 @@ export function WebmailCalendarTab() {
                   key={day}
                   className={`py-2 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
                     isToday
-                      ? 'bg-indigo-600 text-white font-extrabold border-indigo-500 shadow-md'
+                      ? 'bg-white text-black text-white font-extrabold border-white/30 shadow-md'
                       : 'bg-slate-900/60 border-slate-800/60 text-slate-300 hover:border-slate-700'
                   }`}
                 >
@@ -205,7 +205,7 @@ export function WebmailCalendarTab() {
 
         {/* UPCOMING SCHEDULED EVENTS LIST */}
         <div className="lg:col-span-7 bg-slate-950/60 border border-slate-800 rounded-3xl p-5 space-y-4">
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-indigo-400">Upcoming Scheduled Meetings & Events</h3>
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-white">Upcoming Scheduled Meetings & Events</h3>
           <div className="space-y-3">
             {events.length === 0 ? (
               <div className="p-8 text-center text-slate-500 text-xs font-medium border border-dashed border-slate-800 rounded-2xl">
@@ -216,14 +216,14 @@ export function WebmailCalendarTab() {
                 <div key={ev.id} className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-2">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-white">{ev.title}</h4>
-                    <span className="text-[10px] bg-indigo-500/20 text-indigo-300 font-mono px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="text-[10px] bg-white/10 text-neutral-300 font-mono px-2 py-0.5 rounded-full flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       <span>{ev.dateStr} @ {ev.timeStr}</span>
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-slate-400">
                     <span>Participants: {ev.participants.join(', ')}</span>
-                    <button onClick={() => toast(`RSVP Accepted for ${ev.title}!`, 'success')} className="text-indigo-400 hover:underline font-bold flex items-center gap-1">
+                    <button onClick={() => toast(`RSVP Accepted for ${ev.title}!`, 'success')} className="text-white hover:underline font-bold flex items-center gap-1">
                       <UserCheck className="h-3.5 w-3.5" />
                       <span>RSVP Accepted</span>
                     </button>
@@ -241,7 +241,7 @@ export function WebmailCalendarTab() {
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Link2 className="h-4 w-4 text-indigo-400" />
+                <Link2 className="h-4 w-4 text-white" />
                 <span>Sync External Calendar (Google / iCal)</span>
               </h3>
               <button onClick={() => setShowSyncModal(false)} className="text-slate-400 hover:text-white p-1">
@@ -290,7 +290,7 @@ export function WebmailCalendarTab() {
               )}
 
               {syncProvider === 'google' && (
-                <div className="bg-indigo-500/10 border border-indigo-500/30 p-3 rounded-2xl text-[11px] text-indigo-300">
+                <div className="bg-white/5 border border-white/15 p-3 rounded-2xl text-[11px] text-neutral-300">
                   Google Calendar OAuth integration configured. Clicking Connect will sync events between ShanuTechX Webmail and your Google Calendar account.
                 </div>
               )}
@@ -299,7 +299,7 @@ export function WebmailCalendarTab() {
                 <button type="button" onClick={() => setShowSyncModal(false)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold">
                   Cancel
                 </button>
-                <button type="submit" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow">
+                <button type="submit" className="px-5 py-2 bg-white text-black hover:bg-neutral-200 text-white font-bold rounded-xl shadow">
                   Connect & Sync Calendar
                 </button>
               </div>
@@ -314,7 +314,7 @@ export function WebmailCalendarTab() {
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-indigo-400" />
+                <Calendar className="h-4 w-4 text-white" />
                 <span>Create Meeting Event</span>
               </h3>
               <button onClick={() => setShowAddEventModal(false)} className="text-slate-400 hover:text-white p-1">
@@ -354,7 +354,7 @@ export function WebmailCalendarTab() {
                 onChange={(e) => setNewParticipants(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
               />
-              <button type="submit" className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5">
+              <button type="submit" className="w-full py-2.5 bg-white text-black hover:bg-neutral-200 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5">
                 <Plus className="h-3.5 w-3.5" />
                 <span>Save Event to Calendar</span>
               </button>

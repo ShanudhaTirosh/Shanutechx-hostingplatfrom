@@ -29,7 +29,7 @@ export default function AdminKnowledgeBasePage() {
   async function loadArticles() {
     setLoading(true);
     try {
-      const data = await api.knowledgebase.list('all', '', filterRole === 'ALL' ? undefined : filterRole);
+      const data = await api.knowledgebase.list('all', '', filterRole === 'ALL' ? undefined : filterRole, true);
       setArticles(data.articles || []);
     } catch (err: any) {
       toast(err.message || 'Failed to load admin articles', 'error');
@@ -116,21 +116,26 @@ export default function AdminKnowledgeBasePage() {
           title="Admin Knowledge Base & Documentation Manager"
           description="Create, edit, target by user persona role, publish, and maintain platform documentation articles across all workspaces."
         />
-        <Button variant="primary" onClick={openCreateModal}>+ New Documentation Article</Button>
+        <Button
+          onClick={openCreateModal}
+          className="bg-white text-black hover:bg-neutral-200 font-bold shadow-md"
+        >
+          + New Documentation Article
+        </Button>
       </div>
 
       {/* Role Filter Toolbar */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-text-muted">Target Role Persona:</span>
+          <span className="text-xs text-neutral-400">Target Role Persona:</span>
           {(['ALL', 'customer', 'support', 'dev', 'admin', 'all'] as const).map((r) => (
             <button
               key={r}
               onClick={() => setFilterRole(r as any)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-all cursor-pointer ${
                 filterRole === r
-                  ? 'bg-amber-500 text-black font-bold'
-                  : 'bg-white/5 text-text-muted hover:text-white'
+                  ? 'bg-white text-black font-bold shadow-sm'
+                  : 'bg-white/5 text-neutral-400 hover:text-white'
               }`}
             >
               {r}
@@ -142,15 +147,15 @@ export default function AdminKnowledgeBasePage() {
         </Button>
       </div>
 
-      <Card className="border border-white/10 bg-neutral-900/60 backdrop-blur-md">
+      <Card className="border border-white/10 bg-[#0c0d12] shadow-xl">
         {loading ? (
           <div className="py-12 text-center"><Spinner label="Loading article repository..." /></div>
         ) : articles.length === 0 ? (
-          <p className="text-xs text-text-muted italic text-center py-8">No articles found matching role filter.</p>
+          <p className="text-xs text-neutral-500 italic text-center py-8">No articles found matching role filter.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-white/5 text-text-muted border-b border-white/10 uppercase text-[10px] tracking-wider">
+              <thead className="bg-white/5 text-neutral-400 border-b border-white/10 uppercase text-[10px] tracking-wider">
                 <tr>
                   <th className="p-3">Title</th>
                   <th className="p-3">Category</th>
@@ -166,11 +171,11 @@ export default function AdminKnowledgeBasePage() {
                 {articles.map((art) => (
                   <tr key={art.id} className="hover:bg-white/5 transition-colors">
                     <td className="p-3 font-sans font-semibold text-white max-w-xs truncate">{art.title}</td>
-                    <td className="p-3 uppercase text-[10px] text-accent-teal font-bold">{art.category}</td>
+                    <td className="p-3 uppercase text-[10px] text-neutral-300 font-bold">{art.category}</td>
                     <td className="p-3 uppercase text-[10px]">
                       <span className={`px-2 py-0.5 rounded font-bold ${
                         art.targetRole === 'dev'
-                          ? 'bg-purple-500/20 text-purple-300'
+                          ? 'bg-white/10 text-white border border-white/10'
                           : art.targetRole === 'support'
                           ? 'bg-cyan-500/20 text-cyan-300'
                           : art.targetRole === 'admin'
@@ -181,13 +186,13 @@ export default function AdminKnowledgeBasePage() {
                       </span>
                     </td>
                     <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${art.published ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${art.published ? 'bg-emerald-500/20 text-emerald-300' : 'bg-neutral-700 text-neutral-300'}`}>
                         {art.published ? 'PUBLISHED' : 'DRAFT'}
                       </span>
                     </td>
-                    <td className="p-3 text-text-muted">{art.views}</td>
+                    <td className="p-3 text-neutral-400">{art.views}</td>
                     <td className="p-3 text-emerald-400">👍 {art.helpfulCount}</td>
-                    <td className="p-3 text-text-muted">{new Date(art.updatedAt).toLocaleDateString()}</td>
+                    <td className="p-3 text-neutral-500">{new Date(art.updatedAt).toLocaleDateString()}</td>
                     <td className="p-3 text-right space-x-2">
                       <Button size="sm" variant="secondary" onClick={() => openEditModal(art)}>Edit</Button>
                       <Button size="sm" variant="danger" onClick={() => handleDelete(art.id, art.title)}>Delete</Button>
@@ -202,78 +207,78 @@ export default function AdminKnowledgeBasePage() {
 
       {/* Create / Edit Article Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-neutral-900 border border-white/20 rounded-3xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-[#0a0a0d] border border-white/15 rounded-3xl p-6 md:p-8 w-full max-w-2xl max-h-[85vh] overflow-y-auto space-y-4 shadow-2xl shadow-black relative scrollbar-thin">
             <h3 className="font-bold text-base text-white">
               {editingArticle ? 'Edit Documentation Article' : 'Create New Documentation Article'}
             </h3>
 
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="text-text-muted block mb-1">Title *</label>
+                <label className="text-neutral-400 block mb-1">Title *</label>
                 <input
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Setting up SSL Certificates on Traefik Reverse Proxy"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                  className="w-full bg-[#0a0a0c] border border-white/15 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-white/40 font-mono"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-text-muted block mb-1">Category *</label>
+                  <label className="text-neutral-400 block mb-1">Category *</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                    className="w-full bg-[#0a0a0c] border border-white/15 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-white/40 font-mono"
                   >
-                    <option value="deployments" className="bg-neutral-900">Deployments & Apps</option>
-                    <option value="vps" className="bg-neutral-900">VPS Fleet & SSH</option>
-                    <option value="databases" className="bg-neutral-900">Managed Databases</option>
-                    <option value="domains" className="bg-neutral-900">Domains & SSL</option>
-                    <option value="billing" className="bg-neutral-900">Billing & Invoices</option>
-                    <option value="api" className="bg-neutral-900">API & Developer SDK</option>
-                    <option value="troubleshooting" className="bg-neutral-900">Troubleshooting</option>
+                    <option value="deployments" className="bg-[#0a0a0c]">Deployments & Apps</option>
+                    <option value="vps" className="bg-[#0a0a0c]">VPS Fleet & SSH</option>
+                    <option value="databases" className="bg-[#0a0a0c]">Managed Databases</option>
+                    <option value="domains" className="bg-[#0a0a0c]">Domains & SSL</option>
+                    <option value="billing" className="bg-[#0a0a0c]">Billing & Invoices</option>
+                    <option value="api" className="bg-[#0a0a0c]">API & Developer SDK</option>
+                    <option value="troubleshooting" className="bg-[#0a0a0c]">Troubleshooting</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-text-muted block mb-1">Target Persona Role *</label>
+                  <label className="text-neutral-400 block mb-1">Target Persona Role *</label>
                   <select
                     value={targetRole}
                     onChange={(e) => setTargetRole(e.target.value as KbTargetRole)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                    className="w-full bg-[#0a0a0c] border border-white/15 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-white/40 font-mono"
                   >
-                    <option value="customer" className="bg-neutral-900">Customer Storefront (/knowledgebase)</option>
-                    <option value="support" className="bg-neutral-900">Support Operations (/support/kb)</option>
-                    <option value="dev" className="bg-neutral-900">Developer Architecture (/dev/docs)</option>
-                    <option value="admin" className="bg-neutral-900">Admin Control Panel</option>
-                    <option value="all" className="bg-neutral-900">All Persona Workspaces</option>
+                    <option value="customer" className="bg-[#0a0a0c]">Customer Storefront (/knowledgebase)</option>
+                    <option value="support" className="bg-[#0a0a0c]">Support Operations (/support/kb)</option>
+                    <option value="dev" className="bg-[#0a0a0c]">Developer Architecture</option>
+                    <option value="admin" className="bg-[#0a0a0c]">Admin Control Panel</option>
+                    <option value="all" className="bg-[#0a0a0c]">All Persona Workspaces</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="text-text-muted block mb-1">Summary *</label>
+                <label className="text-neutral-400 block mb-1">Summary *</label>
                 <input
                   required
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
                   placeholder="Short description snippet for search previews..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-accent-teal font-mono"
+                  className="w-full bg-[#0a0a0c] border border-white/15 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-white/40 font-mono"
                 />
               </div>
 
               <div>
-                <label className="text-text-muted block mb-1">Article Content (Markdown & code blocks ``` supported) *</label>
+                <label className="text-neutral-400 block mb-1">Article Content (Markdown & code blocks ``` supported) *</label>
                 <textarea
                   required
                   rows={10}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="Full documentation body..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs font-mono text-white focus:outline-none focus:border-accent-teal resize-none leading-relaxed"
+                  className="w-full bg-[#0a0a0c] border border-white/15 rounded-xl p-3 text-xs font-mono text-white focus:outline-none focus:border-white/40 resize-none leading-relaxed"
                 />
               </div>
 
@@ -292,7 +297,12 @@ export default function AdminKnowledgeBasePage() {
 
               <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
                 <Button type="button" variant="secondary" size="sm" onClick={() => setShowModal(false)}>Cancel</Button>
-                <Button type="submit" size="sm" loading={saving}>
+                <Button
+                  type="submit"
+                  size="sm"
+                  loading={saving}
+                  className="bg-white text-black hover:bg-neutral-200 font-bold shadow-md"
+                >
                   {saving ? 'Saving...' : editingArticle ? 'Update Article' : 'Create Article'}
                 </Button>
               </div>

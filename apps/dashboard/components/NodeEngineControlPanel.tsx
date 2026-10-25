@@ -386,7 +386,7 @@ export function NodeEngineControlPanel({ nodeId, nodeLabel, ipAddress }: NodeEng
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
                   activeTab === tab.id
-                    ? 'bg-accent-violet text-white shadow-glow-violet'
+                    ? 'bg-accent-violet text-white shadow-md'
                     : 'text-text-muted hover:text-text-primary hover:bg-white/[0.05]'
                 }`}
               >
@@ -425,8 +425,8 @@ export function NodeEngineControlPanel({ nodeId, nodeLabel, ipAddress }: NodeEng
                 {/* RAM Memory */}
                 <div className="glass p-5 rounded-2xl border border-white/[0.08] space-y-2">
                   <div className="flex justify-between items-center text-xs text-text-muted font-medium">
-                    <span className="flex items-center gap-1.5"><HardDrive className="w-3.5 h-3.5 text-indigo-400" /> RAM Memory</span>
-                    <span className="font-mono text-indigo-400 font-bold">{monitoringData.memory?.usedPct}%</span>
+                    <span className="flex items-center gap-1.5"><HardDrive className="w-3.5 h-3.5 text-white" /> RAM Memory</span>
+                    <span className="font-mono text-white font-bold">{monitoringData.memory?.usedPct}%</span>
                   </div>
                   <div className="w-full bg-black/50 rounded-full h-2.5 overflow-hidden border border-white/10">
                     <div
@@ -585,7 +585,7 @@ export function NodeEngineControlPanel({ nodeId, nodeLabel, ipAddress }: NodeEng
                         </td>
                         <td className="p-3 text-text-muted truncate max-w-xs">{svc.description}</td>
                         <td className="p-3 text-right space-x-2">
-                          <button onClick={() => viewServiceLogs(svc.name)} className="text-indigo-400 hover:underline">Logs</button>
+                          <button onClick={() => viewServiceLogs(svc.name)} className="text-white hover:underline">Logs</button>
                           <button onClick={() => handleServiceAction(svc.name, 'restart')} className="text-amber-400 hover:underline">Restart</button>
                           {svc.status === 'active' ? (
                             <button onClick={() => handleServiceAction(svc.name, 'stop')} className="text-red-400 hover:underline">Stop</button>
@@ -754,7 +754,7 @@ export function NodeEngineControlPanel({ nodeId, nodeLabel, ipAddress }: NodeEng
                         </td>
                         <td className="p-3 font-mono text-text-muted truncate max-w-xs">{c.image}</td>
                         <td className="p-3 text-right space-x-2">
-                          <button onClick={() => viewContainerLogs(c.id, c.names[0])} className="text-indigo-400 hover:underline">Logs</button>
+                          <button onClick={() => viewContainerLogs(c.id, c.names[0])} className="text-white hover:underline">Logs</button>
                           <button onClick={() => handleContainerAction(c.id, 'restart')} className="text-amber-400 hover:underline">Restart</button>
                           {c.state === 'running' ? (
                             <button onClick={() => handleContainerAction(c.id, 'stop')} className="text-red-400 hover:underline">Stop</button>

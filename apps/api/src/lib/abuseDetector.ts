@@ -43,6 +43,12 @@ export async function banUserAndTeardownResources({
   actorId?: string;
 }): Promise<{ ok: boolean; stoppedDeploymentsCount: number }> {
   try {
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!targetUser || targetUser.role === 'dev') {
+      logger.warn(`Attempted ban on immune dev user ${userId} aborted.`);
+      return { ok: false, stoppedDeploymentsCount: 0 };
+    }
+
     // 1. Update user ban status
     const updatedUser = await prisma.user.update({
       where: { id: userId },

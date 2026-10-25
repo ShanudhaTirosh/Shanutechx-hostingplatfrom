@@ -72,8 +72,8 @@ export default function SupabaseOverviewPage() {
       <div className="grid md:grid-cols-3 gap-4">
         <Link href="/supabase/auth">
           <Card className="h-full border border-white/[0.06] hover:border-white/12 hover:bg-white/[0.04] transition-all cursor-pointer group">
-            <div className="h-10 w-10 rounded-xl bg-violet-500/10 text-violet-300 flex items-center justify-center mb-3">
-              <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="h-10 w-10 rounded-xl bg-white/5 text-neutral-300 flex items-center justify-center mb-3">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
             </div>

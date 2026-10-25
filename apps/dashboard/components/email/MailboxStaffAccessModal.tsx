@@ -142,14 +142,14 @@ export const MailboxStaffAccessModal: React.FC<MailboxStaffAccessModalProps> = (
         {/* Modal Header */}
         <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+            <div className="p-2.5 rounded-2xl bg-white/5 border border-white/15 text-white">
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-white tracking-tight">Staff Access & Permissions</h3>
                 {mailbox.isInternal && (
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-500/20 text-neutral-300 border border-white/15 flex items-center gap-1">
                     <Shield className="h-3 w-3" /> System Mailbox
                   </span>
                 )}
@@ -182,9 +182,9 @@ export const MailboxStaffAccessModal: React.FC<MailboxStaffAccessModalProps> = (
           )}
 
           {/* Dev Superuser Notice */}
-          <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 text-xs text-slate-300 space-y-1">
-            <div className="font-bold text-indigo-300 flex items-center gap-2">
-              <Shield className="h-4 w-4 text-indigo-400" />
+          <div className="p-4 rounded-2xl bg-indigo-500/5 border border-white/15 text-xs text-slate-300 space-y-1">
+            <div className="font-bold text-neutral-300 flex items-center gap-2">
+              <Shield className="h-4 w-4 text-white" />
               <span>Granular Role-Based Access Control</span>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
@@ -196,7 +196,7 @@ export const MailboxStaffAccessModal: React.FC<MailboxStaffAccessModalProps> = (
 
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center text-slate-400 space-y-3">
-              <Loader2 className="h-7 w-7 animate-spin text-indigo-500" />
+              <Loader2 className="h-7 w-7 animate-spin text-white" />
               <span className="text-xs">Loading staff access permissions...</span>
             </div>
           ) : (
@@ -205,7 +205,7 @@ export const MailboxStaffAccessModal: React.FC<MailboxStaffAccessModalProps> = (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                    <Users className="h-3.5 w-3.5 text-indigo-400" />
+                    <Users className="h-3.5 w-3.5 text-white" />
                     <span>Delegated Staff ({aclList.length})</span>
                   </h4>
                 </div>
@@ -279,7 +279,7 @@ export const MailboxStaffAccessModal: React.FC<MailboxStaffAccessModalProps> = (
                               }}
                               className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
                                 hasWrite
-                                  ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                                  ? 'bg-white/10 text-neutral-300 border-white/15'
                                   : 'bg-slate-800 text-slate-400 border-slate-700'
                               }`}
                               title={hasWrite ? 'Write / Send access granted' : 'Click to enable write / send access'}
@@ -299,7 +299,7 @@ export const MailboxStaffAccessModal: React.FC<MailboxStaffAccessModalProps> = (
                               }}
                               className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
                                 hasManage
-                                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                                  ? 'bg-purple-500/20 text-neutral-300 border-white/15'
                                   : 'bg-slate-800 text-slate-400 border-slate-700'
                               }`}
                               title={hasManage ? 'Manage settings access granted' : 'Click to enable settings access'}
@@ -332,7 +332,7 @@ export const MailboxStaffAccessModal: React.FC<MailboxStaffAccessModalProps> = (
               {/* SECTION 2: Grant New Staff Access */}
               <div className="pt-4 border-t border-slate-800 space-y-4">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                  <UserCheck className="h-3.5 w-3.5 text-indigo-400" />
+                  <UserCheck className="h-3.5 w-3.5 text-white" />
                   <span>Grant New Staff Access</span>
                 </h4>
 
@@ -349,7 +349,7 @@ export const MailboxStaffAccessModal: React.FC<MailboxStaffAccessModalProps> = (
                       <select
                         value={selectedStaffId}
                         onChange={(e) => setSelectedStaffId(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white/30"
                       >
                         <option value="">-- Choose an Admin or Support Member --</option>
                         {availableStaffToGrant.map((user) => (
@@ -416,7 +416,7 @@ export const MailboxStaffAccessModal: React.FC<MailboxStaffAccessModalProps> = (
                         if (allowManage) perms.push('manage');
                         handleGrantOrUpdate(selectedStaffId, perms);
                       }}
-                      className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow-lg transition-all flex items-center gap-2"
+                      className="px-5 py-2.5 rounded-xl bg-white text-black hover:bg-neutral-200 disabled:opacity-50 text-white font-bold text-xs shadow-lg transition-all flex items-center gap-2"
                     >
                       {actionLoading === selectedStaffId ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

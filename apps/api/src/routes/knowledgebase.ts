@@ -21,14 +21,15 @@ function serializeArticle(a: { category: { slug: string } } & Record<string, any
 // GET /api/knowledgebase - Authenticated: List categories & articles
 // Automatically fails over to Firebase Firestore if PostgreSQL is offline
 knowledgebaseRouter.get('/', requireAuth, async (req: Request, res: Response) => {
-  const { category, q, targetRole } = req.query;
+  const { category, q, targetRole, includeDrafts } = req.query;
   const categoryStr = typeof category === 'string' ? category : undefined;
   const searchStr = typeof q === 'string' ? q : undefined;
   const targetRoleStr = typeof targetRole === 'string' ? targetRole : undefined;
+  const showDrafts = includeDrafts === 'true';
 
   const result = await withDbFallback(
     async () => {
-      const where: any = { published: true };
+      const where: any = showDrafts ? {} : { published: true };
       if (categoryStr && categoryStr !== 'all') {
         where.category = { slug: categoryStr };
       }

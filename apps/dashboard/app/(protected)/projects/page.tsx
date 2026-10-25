@@ -150,7 +150,7 @@ export default function ProjectsPage() {
           <Button
             variant="primary"
             onClick={() => setCreateModalOpen(true)}
-            className="flex items-center gap-2 shadow-lg shadow-violet-500/20"
+            className="flex items-center gap-2 shadow-lg shadow-md"
           >
             <FolderPlus className="w-4 h-4" />
             <span>Create Project</span>
@@ -163,7 +163,7 @@ export default function ProjectsPage() {
         <div className="bg-[#0b0c16] border border-white/10 rounded-2xl p-4 space-y-1">
           <div className="flex items-center justify-between text-text-muted">
             <span className="uppercase tracking-wider text-[10px]">Total Projects</span>
-            <Layers className="w-4 h-4 text-violet-400" />
+            <Layers className="w-4 h-4 text-white" />
           </div>
           <p className="text-2xl font-black text-white">{projects?.length ?? 0}</p>
         </div>
@@ -325,7 +325,7 @@ export default function ProjectsPage() {
                     Table Editor
                   </span>
                   <span className="px-2 py-1 rounded bg-white/5 text-text-muted border border-white/5 flex items-center gap-1">
-                    <Shield className="w-3 h-3 text-violet-400" />
+                    <Shield className="w-3 h-3 text-white" />
                     PgBouncer Pool
                   </span>
                 </div>

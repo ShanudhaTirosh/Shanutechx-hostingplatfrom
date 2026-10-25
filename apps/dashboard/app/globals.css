@@ -17,19 +17,19 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* ── Backgrounds ── */
-  --color-bg:              #0a0a0a;
-  --color-bg-raised:       #111111;
-  --color-surface:         #141414;
-  --color-surface-2:       #1e1e1e;
-  --color-surface-3:       #262626;
+  /* ── Backgrounds (Pure Deep Black) ── */
+  --color-bg:              #000000;
+  --color-bg-raised:       #06070a;
+  --color-surface:         #0c0d12;
+  --color-surface-2:       #111218;
+  --color-surface-3:       #181922;
   --color-surface-hover:   rgba(255, 255, 255, 0.05);
   --color-surface-active:  rgba(255, 255, 255, 0.08);
 
-  /* ── Borders ── */
-  --color-border:          rgba(255, 255, 255, 0.08);
-  --color-border-subtle:   rgba(255, 255, 255, 0.05);
-  --color-border-strong:   rgba(255, 255, 255, 0.15);
+  /* ── Borders (Subtle Glass) ── */
+  --color-border:          rgba(255, 255, 255, 0.10);
+  --color-border-subtle:   rgba(255, 255, 255, 0.06);
+  --color-border-strong:   rgba(255, 255, 255, 0.18);
 
   /* ── Text ── */
   --color-text-primary:    #ffffff;
@@ -37,12 +37,12 @@
   --color-text-muted:      #a1a1aa;
   --color-text-faint:      #71717a;
 
-  /* ── Accent (monochrome solid white primary CTA with black text) ── */
+  /* ── Accent (monochrome solid white primary CTA with pitch black text) ── */
   --color-accent:          #ffffff;
-  --color-accent-contrast: #0a0a0a;
+  --color-accent-contrast: #000000;
   --color-accent-hover:    #e5e5e5;
-  --color-accent-subtle:   rgba(255, 255, 255, 0.08);
-  --color-accent-border:   rgba(255, 255, 255, 0.16);
+  --color-accent-subtle:   rgba(255, 255, 255, 0.10);
+  --color-accent-border:   rgba(255, 255, 255, 0.18);
 
   /* ── Semantic Status Colors ── */
   --color-success:         #10b981;
@@ -58,21 +58,21 @@
   --color-info-bg:         rgba(255, 255, 255, 0.06);
   --color-info-border:     rgba(255, 255, 255, 0.14);
 
-  /* ── Sidebar ── */
-  --sidebar-bg:            #0a0a0a;
-  --sidebar-border:        rgba(255, 255, 255, 0.06);
+  /* ── Sidebar (Pure Pitch Black) ── */
+  --sidebar-bg:            #000000;
+  --sidebar-border:        rgba(255, 255, 255, 0.08);
 
-  /* ── Inputs ── */
-  --input-bg:              rgba(255, 255, 255, 0.04);
-  --input-border:          rgba(255, 255, 255, 0.10);
+  /* ── Inputs (Pure Dark Glass Input) ── */
+  --input-bg:              #0a0a0c;
+  --input-border:          rgba(255, 255, 255, 0.14);
   --input-focus-border:    #ffffff;
-  --input-focus-ring:      rgba(255, 255, 255, 0.15);
+  --input-focus-ring:      rgba(255, 255, 255, 0.20);
 
-  /* ── Cards ── */
-  --card-bg:               #121212;
-  --card-border:           rgba(255, 255, 255, 0.08);
-  --card-shadow:           0 1px 3px rgba(0, 0, 0, 0.6), 0 1px 2px rgba(0, 0, 0, 0.4);
-  --card-shadow-hover:     0 4px 14px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.4);
+  /* ── Cards (Pitch Black Surface #0c0d12 with Fine Glass Border) ── */
+  --card-bg:               #0c0d12;
+  --card-border:           rgba(255, 255, 255, 0.10);
+  --card-shadow:           0 1px 3px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.7);
+  --card-shadow-hover:     0 4px 14px rgba(0, 0, 0, 0.95), 0 2px 6px rgba(0, 0, 0, 0.8);
 
   /* ── Scrollbar ── */
   --scrollbar-thumb:       rgba(255, 255, 255, 0.08);

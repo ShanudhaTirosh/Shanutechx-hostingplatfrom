@@ -237,11 +237,12 @@ function DiscordWebhooksTab() {
   );
 }
 
-// ── Tab 2: Database Backups Component ──
+// ── Tab 2: Database Backups & Cloudflare R2 Component ──
 function DatabaseBackupsTab() {
   const [runs, setRuns] = useState<BackupRun[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  const [exportingZip, setExportingZip] = useState(false);
   const { toast } = useToast();
 
   function load() {
@@ -267,103 +268,378 @@ function DatabaseBackupsTab() {
     }
   }
 
+  async function handleExportZip() {
+    setExportingZip(true);
+    try {
+      await api.backups.exportZip();
+      toast('Full platform backup ZIP archive exported successfully!', 'success');
+    } catch (err: any) {
+      toast(err.message || 'Failed to export platform backup ZIP', 'error');
+    } finally {
+      setExportingZip(false);
+    }
+  }
+
+  const successfulRuns = runs?.filter((r) => r.success) || [];
+  const latestRun = runs?.[0];
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between mb-2">
+    <div className="space-y-6 w-full">
+      {/* Top Banner & Action Buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-sm font-semibold text-text-primary">Platform Database Backups</h3>
-          <p className="text-xs text-text-muted">Postgres database snapshots synced to Cloudflare R2 (even/odd day retention).</p>
+          <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+            <span>Cloudflare R2 Database Backups &amp; Archive Engine</span>
+          </h3>
+          <p className="text-xs text-text-muted mt-0.5">
+            Automated PostgreSQL database snapshots synced to Cloudflare R2 with daily rotating retention.
+          </p>
         </div>
-        <Button onClick={handleRunNow} loading={running} size="sm">Run Backup Now</Button>
+        <div className="flex items-center gap-2.5">
+          <Button variant="secondary" onClick={handleExportZip} loading={exportingZip} size="sm">
+            📦 Export Full Backup as ZIP
+          </Button>
+          <Button onClick={handleRunNow} loading={running} size="sm">
+            ☁️ Run R2 Backup Now
+          </Button>
+        </div>
+      </div>
+
+      {/* Cloudflare R2 Overview Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="border border-white/10 p-4 bg-white/[0.02]">
+          <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Storage Target</div>
+          <div className="text-sm font-bold text-text-primary mt-1 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+            Cloudflare R2 Object Storage
+          </div>
+          <div className="text-[11px] font-mono text-text-muted mt-0.5 truncate">s3.r2.cloudflarestorage.com</div>
+        </Card>
+
+        <Card className="border border-white/10 p-4 bg-white/[0.02]">
+          <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Retention Policy</div>
+          <div className="text-sm font-bold text-emerald-400 mt-1">Daily Differential (Even/Odd)</div>
+          <div className="text-[11px] text-text-muted mt-0.5">Zero storage bloat retention</div>
+        </Card>
+
+        <Card className="border border-white/10 p-4 bg-white/[0.02]">
+          <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total Stored Runs</div>
+          <div className="text-xl font-bold text-text-primary mt-1">{runs?.length || 0}</div>
+          <div className="text-[11px] text-text-muted mt-0.5">{successfulRuns.length} successful snapshots</div>
+        </Card>
+
+        <Card className="border border-white/10 p-4 bg-white/[0.02]">
+          <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Latest Status</div>
+          <div className="text-sm font-bold text-text-primary mt-1">
+            {latestRun ? (
+              <span className={latestRun.success ? 'text-emerald-400' : 'text-rose-400'}>
+                {latestRun.success ? 'Healthy' : 'Failed'} ({formatBytes(latestRun.sizeBytes)})
+              </span>
+            ) : (
+              'No runs yet'
+            )}
+          </div>
+          <div className="text-[11px] text-text-muted mt-0.5">
+            {latestRun ? new Date(latestRun.createdAt).toLocaleDateString() : 'Awaiting snapshot'}
+          </div>
+        </Card>
       </div>
 
       {error && <ErrorBanner message={error} />}
-      {runs === null && <Spinner label="Loading backup history..." />}
+      {runs === null && <Spinner label="Loading Cloudflare R2 backup history..." />}
       {runs?.length === 0 && (
-        <EmptyState message="No backups have run yet." />
+        <EmptyState message="No database backups have been recorded yet. Click 'Run R2 Backup Now' above to take the first snapshot." />
       )}
 
-      <div className="space-y-2">
-        {runs?.map((run) => (
-          <Card key={run.id} className="border border-white/[0.06] flex items-center justify-between p-4">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <Badge status={run.success ? 'running' : 'failed'} />
-                <span className="text-xs text-text-muted">
-                  {run.triggeredBy === 'cron' ? 'Scheduled (cron)' : 'Manual trigger'}
-                </span>
-              </div>
-              <p className="text-xs text-text-faint">
-                {new Date(run.createdAt).toLocaleString()}
-                {run.r2Key && <span className="font-mono ml-2 text-text-primary">{run.r2Key}</span>}
-              </p>
-              {run.error && <p className="text-xs text-red-400 mt-1">{run.error}</p>}
-            </div>
-            <div className="text-right text-xs text-text-muted shrink-0 ml-4">
-              <p>{formatBytes(run.sizeBytes)}</p>
-              <p>{run.durationMs ? `${(run.durationMs / 1000).toFixed(1)}s` : '—'}</p>
-            </div>
-          </Card>
-        ))}
-      </div>
+      {/* Backup Runs Ledger */}
+      {runs && runs.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
+            Historical Snapshots ({runs.length})
+          </h4>
+          <div className="space-y-2">
+            {runs.map((run) => (
+              <Card key={run.id} className="border border-white/[0.08] flex items-center justify-between p-4 bg-[#0a0a0f]">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <Badge status={run.success ? 'running' : 'failed'} />
+                    <span className="text-xs font-medium text-text-primary">
+                      {run.triggeredBy.startsWith('manual') ? 'Manual Operator Trigger' : 'Automated Cron Snapshot'}
+                    </span>
+                    <span className="text-[11px] text-text-muted">·</span>
+                    <span className="text-xs text-text-faint">{new Date(run.createdAt).toLocaleString()}</span>
+                  </div>
+                  {run.r2Key && (
+                    <p className="text-xs font-mono text-emerald-400/90 mt-0.5 truncate">
+                      R2 Key: {run.r2Key}
+                    </p>
+                  )}
+                  {run.error && <p className="text-xs text-red-400 mt-1 font-mono">{run.error}</p>}
+                </div>
+                <div className="text-right text-xs text-text-muted shrink-0 ml-4 font-mono">
+                  <p className="text-text-primary font-bold">{formatBytes(run.sizeBytes)}</p>
+                  <p className="text-[11px] text-text-muted">{run.durationMs ? `${(run.durationMs / 1000).toFixed(1)}s` : '—'}</p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Tab 3: API Configurations Component ──
+// ── Tab 3: Global SMTP & API Configurations Component ──
 function ApiConfigsTab() {
   const [configs, setConfigs] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    api.settings
-      .getConfigs()
-      .then((data) => setConfigs(data.configs))
+  // SMTP Form State
+  const [smtpHost, setSmtpHost] = useState('');
+  const [smtpPort, setSmtpPort] = useState(587);
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPass, setSmtpPass] = useState('');
+  const [smtpFrom, setSmtpFrom] = useState('');
+  const [smtpFromName, setSmtpFromName] = useState('');
+  const [smtpSecure, setSmtpSecure] = useState(false);
+  const [hasExistingPassword, setHasExistingPassword] = useState(false);
+
+  const [savingSmtp, setSavingSmtp] = useState(false);
+  const [testingSmtp, setTestingSmtp] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string; latencyMs: number } | null>(null);
+
+  const { toast } = useToast();
+
+  function loadAll() {
+    setLoading(true);
+    Promise.all([
+      api.settings.getConfigs().catch(() => ({ configs: null })),
+      api.settings.getSmtpConfig().catch(() => ({ config: null })),
+    ])
+      .then(([configsData, smtpData]) => {
+        setConfigs(configsData.configs);
+        if (smtpData.config) {
+          setSmtpHost(smtpData.config.host || '');
+          setSmtpPort(smtpData.config.port || 587);
+          setSmtpUser(smtpData.config.user || '');
+          setSmtpFrom(smtpData.config.fromEmail || 'support@shanutech.com');
+          setSmtpFromName(smtpData.config.fromName || 'ShanuTechX Cloud');
+          setSmtpSecure(Boolean(smtpData.config.secure));
+          setHasExistingPassword(Boolean(smtpData.config.hasPassword));
+        }
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(loadAll, []);
+
+  async function handleTestSmtp() {
+    setTestingSmtp(true);
+    setTestResult(null);
+    try {
+      const res = await api.settings.testSmtpConnection({
+        host: smtpHost.trim(),
+        port: Number(smtpPort),
+        user: smtpUser.trim(),
+        pass: smtpPass.trim() || undefined,
+        secure: smtpSecure,
+      });
+      setTestResult(res);
+      if (res.ok) {
+        toast(`SMTP Test Succeeded! Handshake completed in ${res.latencyMs}ms`, 'success');
+      } else {
+        toast(`SMTP Test Failed: ${res.message}`, 'error');
+      }
+    } catch (err: any) {
+      setTestResult({ ok: false, message: err.message || 'Connection failed', latencyMs: 0 });
+      toast(err.message || 'SMTP test error', 'error');
+    } finally {
+      setTestingSmtp(false);
+    }
+  }
+
+  async function handleSaveSmtp(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingSmtp(true);
+    try {
+      await api.settings.saveSmtpConfig({
+        host: smtpHost.trim(),
+        port: Number(smtpPort),
+        user: smtpUser.trim(),
+        pass: smtpPass.trim() || undefined,
+        fromEmail: smtpFrom.trim(),
+        fromName: smtpFromName.trim(),
+        secure: smtpSecure,
+      });
+      toast('Global SMTP Mail Server credentials saved and encrypted!', 'success');
+      setSmtpPass('');
+      loadAll();
+    } catch (err: any) {
+      toast(err.message || 'Failed to save SMTP configuration', 'error');
+    } finally {
+      setSavingSmtp(false);
+    }
+  }
 
   if (loading) return <Spinner label="Checking system API integrations..." />;
 
-  const INTEGRATIONS = [
-    {
-      name: 'Global SMTP / Mail Server',
-      status: configs?.smtpServer?.configured ? 'Configured' : 'Not Configured',
-      color: configs?.smtpServer?.configured ? 'emerald' : 'white',
-      hint: 'Required for automated transactional emails and customer webmail inboxes.',
-    },
-    {
-      name: 'Cloudflare R2 Object Storage',
-      status: configs?.r2Storage?.configured ? 'Configured' : 'Not Configured',
-      color: configs?.r2Storage?.configured ? 'emerald' : 'white',
-      hint: 'Required for automated database backups and project file uploads.',
-    },
-    {
-      name: 'Discord Notification Gateway',
-      status: configs?.discordWebhooks?.configured ? `${configs.discordWebhooks.count} Webhooks` : 'Not Configured',
-      color: configs?.discordWebhooks?.configured ? 'emerald' : 'white',
-      hint: 'Sends live events and alert notifications to Discord channels.',
-    },
-  ];
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 w-full">
       <div>
-        <h3 className="text-sm font-semibold text-text-primary">System Integration Configs</h3>
-        <p className="text-xs text-text-muted">Overview of platform environment credentials and external integrations.</p>
+        <h3 className="text-base font-bold text-text-primary">System Integrations &amp; Global SMTP Server</h3>
+        <p className="text-xs text-text-muted mt-0.5">
+          Configure production mail delivery credentials, transactional dispatching, and view cloud services status.
+        </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        {INTEGRATIONS.map((item) => (
-          <Card key={item.name} className="border border-white/[0.06]">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-semibold text-sm text-text-primary">{item.name}</h4>
-              <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${item.color === 'emerald' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-text-muted'}`}>
-                {item.status}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column: Interactive Global SMTP Mail Server Form */}
+        <div className="lg:col-span-8">
+          <Card className="border border-white/10 p-6 bg-[#0a0a0f] shadow-xl space-y-5">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold">
+                  ✉️
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-text-primary">Global SMTP / Mail Server Credentials</h4>
+                  <p className="text-[11px] text-text-muted">
+                    Required for automated password resets, transactional order receipts, and customer notifications.
+                  </p>
+                </div>
+              </div>
+              <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${configs?.smtpServer?.configured ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-text-muted'}`}>
+                {configs?.smtpServer?.configured ? 'Configured' : 'Not Configured'}
               </span>
             </div>
-            <p className="text-xs text-text-muted leading-relaxed">{item.hint}</p>
+
+            <form onSubmit={handleSaveSmtp} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <Input
+                    label="SMTP Host / Server"
+                    placeholder="mail.shanutech.com or smtp.gmail.com"
+                    value={smtpHost}
+                    onChange={(e) => setSmtpHost(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Input
+                    label="Port"
+                    type="number"
+                    placeholder="587"
+                    value={smtpPort}
+                    onChange={(e) => setSmtpPort(parseInt(e.target.value, 10) || 587)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="SMTP Username"
+                  placeholder="notifications@shanutech.com"
+                  value={smtpUser}
+                  onChange={(e) => setSmtpUser(e.target.value)}
+                  required
+                />
+                <Input
+                  label={hasExistingPassword ? 'Password (leave blank to keep existing)' : 'Password'}
+                  type="password"
+                  placeholder="••••••••••••"
+                  value={smtpPass}
+                  onChange={(e) => setSmtpPass(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="Sender 'From' Email"
+                  type="email"
+                  placeholder="support@shanutech.com"
+                  value={smtpFrom}
+                  onChange={(e) => setSmtpFrom(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Sender 'From' Name"
+                  placeholder="ShanuTechX Cloud"
+                  value={smtpFromName}
+                  onChange={(e) => setSmtpFromName(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="smtpSecureCheckbox"
+                  checked={smtpSecure}
+                  onChange={(e) => setSmtpSecure(e.target.checked)}
+                  className="rounded border-white/20 bg-white/5 text-emerald-500 focus:ring-0"
+                />
+                <label htmlFor="smtpSecureCheckbox" className="text-xs text-text-primary select-none cursor-pointer">
+                  Use Implicit SSL / TLS (typically Port 465). Uncheck for STARTTLS (Port 587 or 25).
+                </label>
+              </div>
+
+              {testResult && (
+                <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${testResult.ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-rose-500/10 border-rose-500/30 text-rose-300'}`}>
+                  <span>{testResult.ok ? `Handshake Successful: ${testResult.message}` : `Test Failed: ${testResult.message}`}</span>
+                  {testResult.ok && <span className="font-mono text-[11px] opacity-80">{testResult.latencyMs}ms</span>}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleTestSmtp}
+                  loading={testingSmtp}
+                  disabled={!smtpHost.trim() || !smtpUser.trim()}
+                >
+                  ⚡ Test SMTP Handshake
+                </Button>
+
+                <Button type="submit" size="sm" loading={savingSmtp}>
+                  Save SMTP Configuration
+                </Button>
+              </div>
+            </form>
           </Card>
-        ))}
+        </div>
+
+        {/* Right Column: Cloud Services Status Cards */}
+        <div className="lg:col-span-4 space-y-4">
+          <Card className="border border-white/10 p-5 bg-[#0a0a0f] space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-sm text-text-primary flex items-center gap-2">
+                <span>☁️ Cloudflare R2 Storage</span>
+              </h4>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${configs?.r2Storage?.configured ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-text-muted'}`}>
+                {configs?.r2Storage?.configured ? 'Active' : 'Unconfigured'}
+              </span>
+            </div>
+            <p className="text-xs text-text-muted leading-relaxed">
+              Provides S3-compatible cloud object storage for Postgres database backups and client attachment proofs.
+            </p>
+          </Card>
+
+          <Card className="border border-white/10 p-5 bg-[#0a0a0f] space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-sm text-text-primary flex items-center gap-2">
+                <span>💬 Discord Notifications</span>
+              </h4>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${configs?.discordWebhooks?.configured ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-text-muted'}`}>
+                {configs?.discordWebhooks?.configured ? `${configs.discordWebhooks.count} Webhooks` : 'Unconfigured'}
+              </span>
+            </div>
+            <p className="text-xs text-text-muted leading-relaxed">
+              Dispatches alerts for pending payment review, new customer tickets, and node incidents to Discord channels.
+            </p>
+          </Card>
+        </div>
       </div>
     </div>
   );
@@ -428,9 +704,9 @@ function SecurityPinTab() {
 
   if (isSocialProvider) {
     return (
-      <Card className="max-w-lg border border-indigo-500/20 p-6 space-y-4 bg-indigo-950/20">
+      <Card className="max-w-lg border border-white/15 p-6 space-y-4 bg-indigo-950/20">
         <div className="flex items-start gap-3">
-          <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-300 font-bold shrink-0">
+          <div className="p-2.5 rounded-xl bg-white/10 text-neutral-300 font-bold shrink-0">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
@@ -499,532 +775,391 @@ function SecurityPinTab() {
 }
 
 
-// ── Tab 6: Payment Info Configuration Component ──
+// ── Tab 6: Payment Info & Multi-Channel Gateways Configuration Component ──
+interface AdminPaymentChannel {
+  id: string;
+  name: string;
+  category: 'bank' | 'mobile_wallet' | 'crypto';
+  enabled: boolean;
+  badge?: string;
+  details: {
+    bankName?: string;
+    accountNumber?: string;
+    accountName?: string;
+    branch?: string;
+    swiftCode?: string;
+    mobileNumber?: string;
+    helaPayId?: string;
+    currency?: string;
+    network?: string;
+    walletAddress?: string;
+    bybitUid?: string;
+    memo?: string;
+    note?: string;
+    qrCodeUrl?: string;
+  };
+}
+
 function PaymentInfoTab() {
-  const [bankName, setBankName] = useState('Commercial Bank of Ceylon');
-  const [accountName, setAccountName] = useState('ShanuTechX Cloud Hostings Pvt Ltd');
-  const [accountNumber, setAccountNumber] = useState('8001234567801');
-  const [branch, setBranch] = useState('Colombo Main Branch (Code 001)');
-  const [swiftCode, setSwiftCode] = useState('COMBCLKX');
-  const [instructions, setInstructions] = useState('Please transfer the invoice total and upload your bank transfer deposit slip / receipt for instant manual verification.');
-  const [currency, setCurrency] = useState('LKR');
-  const [busy, setBusy] = useState(false);
+  const [channels, setChannels] = useState<AdminPaymentChannel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
-  async function handleSavePaymentInfo(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
+  useEffect(() => {
+    loadChannels();
+  }, []);
+
+  async function loadChannels() {
+    setLoading(true);
     try {
-      await new Promise((r) => setTimeout(r, 600));
-      toast('Payment gateway configuration saved successfully!', 'success');
+      const data = await api.payments.adminGetChannels();
+      if (data?.channels && Array.isArray(data.channels) && data.channels.length > 0) {
+        setChannels(data.channels);
+      } else {
+        // Fallback default structure
+        setChannels([
+          {
+            id: 'bank_transfer',
+            name: 'Commercial Bank of Ceylon (Direct Deposit / Transfer)',
+            category: 'bank',
+            enabled: true,
+            badge: 'Popular',
+            details: {
+              bankName: 'Commercial Bank of Ceylon',
+              branch: 'Negombo Branch (Code 001)',
+              accountName: 'STX Enterprises (Shanudha Tirosh)',
+              accountNumber: '100012345678',
+              swiftCode: 'CCEYLKJA',
+              note: 'Transfer the invoice amount and upload your deposit slip or transaction screenshot for instant verification.',
+            },
+          },
+          {
+            id: 'helapay',
+            name: 'Helakuru HelaPay',
+            category: 'mobile_wallet',
+            enabled: true,
+            badge: 'Instant QR / Mobile',
+            details: {
+              mobileNumber: '0712345678',
+              helaPayId: 'shanudha@helapay',
+              accountName: 'STX Enterprises / Shanudha Tirosh',
+              note: 'Pay via Helakuru app using HelaPay QR or mobile number transfer. Upload the success receipt screenshot.',
+            },
+          },
+          {
+            id: 'ezcash',
+            name: 'Dialog eZ Cash',
+            category: 'mobile_wallet',
+            enabled: true,
+            badge: 'Fast Mobile Wallet',
+            details: {
+              mobileNumber: '0771234567',
+              accountName: 'STX Enterprises',
+              note: 'Send payment to Dialog eZ Cash wallet (Dial #111# or use eZ Cash app). Upload a screenshot of the confirmation SMS or receipt.',
+            },
+          },
+          {
+            id: 'bybit_crypto',
+            name: 'Bybit Crypto USDT Transfer',
+            category: 'crypto',
+            enabled: true,
+            badge: 'Global / Crypto',
+            details: {
+              currency: 'USDT',
+              network: 'TRC20 (Tron Network) / Internal UID Transfer',
+              walletAddress: 'TYxShanuTechXUSDTDepositWalletAddress9988',
+              bybitUid: '88291041',
+              memo: 'STX-ORDER',
+              note: 'Zero-fee instant transfer via Bybit Internal UID Transfer (UID: 88291041) or TRC20 USDT transfer. Upload your Bybit withdrawal or tx screenshot.',
+            },
+          },
+        ]);
+      }
     } catch (err: any) {
-      toast(err.message || 'Failed to update payment info', 'error');
+      toast(err.message || 'Failed to load payment channels', 'error');
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
   }
 
+  function updateChannelField(index: number, key: keyof AdminPaymentChannel['details'], val: string) {
+    setChannels((prev) => {
+      const copy = [...prev];
+      copy[index] = {
+        ...copy[index],
+        details: {
+          ...copy[index].details,
+          [key]: val,
+        },
+      };
+      return copy;
+    });
+  }
+
+  function toggleChannelEnabled(index: number, enabled: boolean) {
+    setChannels((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], enabled };
+      return copy;
+    });
+  }
+
+  async function handleSaveChannels(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.payments.adminSaveChannels(channels);
+      toast('Payment gateways and channels saved successfully!', 'success');
+      loadChannels();
+    } catch (err: any) {
+      toast(err.message || 'Failed to save payment methods', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Spinner label="Loading payment gateways..." />
+      </div>
+    );
+  }
+
   return (
-    <Card className="max-w-2xl border border-white/[0.06] p-6 space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold text-text-primary">Payment Information & Bank Transfer Gateway</h3>
-        <p className="text-xs text-text-muted mt-0.5">
-          Configure official bank accounts and payment instructions shown to customers during checkout.
-        </p>
+    <div className="space-y-6 w-full">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+            <span>Payment Methods &amp; Gateways Engine</span>
+            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              Live Checkout Channels
+            </span>
+          </h3>
+          <p className="text-xs text-text-muted mt-0.5">
+            Configure official Commercial Bank, Helakuru HelaPay, Dialog eZ Cash, and Bybit Crypto channels shown to customers.
+          </p>
+        </div>
+        <Button
+          onClick={handleSaveChannels}
+          loading={saving}
+          variant="primary"
+          size="sm"
+        >
+          💾 Save All Payment Methods
+        </Button>
       </div>
 
-      <form onSubmit={handleSavePaymentInfo} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Bank Name"
-            placeholder="Commercial Bank"
-            value={bankName}
-            onChange={(e) => setBankName(e.target.value)}
-            required
-          />
+      <form onSubmit={handleSaveChannels} className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {channels.map((channel, idx) => {
+            const isHelaPay = channel.id === 'helapay';
+            const isEzCash = channel.id === 'ezcash';
+            const isBank = channel.id === 'bank_transfer';
+            const isCrypto = channel.id === 'bybit_crypto';
+            const requiresPhone = isHelaPay || isEzCash;
+            const phoneMissing = requiresPhone && (!channel.details.mobileNumber || channel.details.mobileNumber.trim().length < 7);
 
-          <Input
-            label="Account Beneficiary Name"
-            placeholder="ShanuTechX Hostings"
-            value={accountName}
-            onChange={(e) => setAccountName(e.target.value)}
-            required
-          />
+            return (
+              <Card
+                key={channel.id}
+                className={`border p-5 space-y-4 transition-all w-full ${
+                  channel.enabled
+                    ? 'border-white/10 bg-white/[0.02]'
+                    : 'border-white/[0.05] bg-black/40 opacity-75'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3 pb-3 border-b border-white/[0.06]">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-sm font-bold">
+                      {isBank && '🏦'}
+                      {isHelaPay && '🇱🇰'}
+                      {isEzCash && '📱'}
+                      {isCrypto && '🪙'}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white">{channel.name}</span>
+                        {channel.badge && (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
+                            {channel.badge}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] font-mono text-text-muted capitalize">
+                        Channel ID: {channel.id}
+                      </span>
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <span className="text-xs text-text-muted">
+                      {channel.enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={channel.enabled}
+                      onChange={(e) => toggleChannelEnabled(idx, e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 relative" />
+                  </label>
+                </div>
+
+                {requiresPhone && (
+                  <div
+                    className={`p-3 rounded-xl border text-xs ${
+                      phoneMissing
+                        ? 'bg-amber-950/30 border-amber-500/40 text-amber-200'
+                        : 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold">
+                      {phoneMissing ? '⚠️ Phone Number Required' : '✅ Phone Number Configured'}
+                    </div>
+                    <p className="text-[11px] text-text-muted mt-0.5">
+                      {phoneMissing
+                        ? 'This channel requires a valid Sri Lankan mobile number. If empty or missing, it will automatically be hidden from customers at checkout.'
+                        : 'Customers can send payments directly to this mobile wallet during checkout.'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Specific Fields per Channel */}
+                {isBank && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input
+                        label="Bank Name"
+                        value={channel.details.bankName || ''}
+                        onChange={(e) => updateChannelField(idx, 'bankName', e.target.value)}
+                        placeholder="e.g. Commercial Bank of Ceylon"
+                      />
+                      <Input
+                        label="Account Beneficiary Name"
+                        value={channel.details.accountName || ''}
+                        onChange={(e) => updateChannelField(idx, 'accountName', e.target.value)}
+                        placeholder="e.g. STX Enterprises (Pvt) Ltd"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input
+                        label="Account Number"
+                        value={channel.details.accountNumber || ''}
+                        onChange={(e) => updateChannelField(idx, 'accountNumber', e.target.value)}
+                        placeholder="e.g. 100012345678"
+                      />
+                      <Input
+                        label="Branch Name &amp; Code"
+                        value={channel.details.branch || ''}
+                        onChange={(e) => updateChannelField(idx, 'branch', e.target.value)}
+                        placeholder="e.g. Negombo Branch (001)"
+                      />
+                    </div>
+                    <Input
+                      label="SWIFT / BIC Code (Optional)"
+                      value={channel.details.swiftCode || ''}
+                      onChange={(e) => updateChannelField(idx, 'swiftCode', e.target.value)}
+                      placeholder="e.g. CCEYLKJA"
+                    />
+                  </div>
+                )}
+
+                {isHelaPay && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input
+                        label="HelaPay Mobile Phone Number *"
+                        value={channel.details.mobileNumber || ''}
+                        onChange={(e) => updateChannelField(idx, 'mobileNumber', e.target.value)}
+                        placeholder="e.g. 071-234-5678"
+                        required
+                      />
+                      <Input
+                        label="HelaPay ID (Optional)"
+                        value={channel.details.helaPayId || ''}
+                        onChange={(e) => updateChannelField(idx, 'helaPayId', e.target.value)}
+                        placeholder="e.g. shanutechx@helapay"
+                      />
+                    </div>
+                    <Input
+                      label="Registered Beneficiary Name"
+                      value={channel.details.accountName || ''}
+                      onChange={(e) => updateChannelField(idx, 'accountName', e.target.value)}
+                      placeholder="e.g. Shanudha Tirosh"
+                    />
+                  </div>
+                )}
+
+                {isEzCash && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input
+                        label="Dialog eZ Cash Mobile Number *"
+                        value={channel.details.mobileNumber || ''}
+                        onChange={(e) => updateChannelField(idx, 'mobileNumber', e.target.value)}
+                        placeholder="e.g. 077-123-4567"
+                        required
+                      />
+                      <Input
+                        label="eZ Cash Account Holder Name"
+                        value={channel.details.accountName || ''}
+                        onChange={(e) => updateChannelField(idx, 'accountName', e.target.value)}
+                        placeholder="e.g. STX Enterprises"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {isCrypto && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input
+                        label="Bybit Internal UID (Zero Fees)"
+                        value={channel.details.bybitUid || ''}
+                        onChange={(e) => updateChannelField(idx, 'bybitUid', e.target.value)}
+                        placeholder="e.g. 88291041"
+                      />
+                      <Input
+                        label="Currency &amp; Network"
+                        value={channel.details.network || ''}
+                        onChange={(e) => updateChannelField(idx, 'network', e.target.value)}
+                        placeholder="e.g. USDT - TRC20"
+                      />
+                    </div>
+                    <Input
+                      label="Deposit Wallet Address (TRC20)"
+                      value={channel.details.walletAddress || ''}
+                      onChange={(e) => updateChannelField(idx, 'walletAddress', e.target.value)}
+                      placeholder="e.g. TYxShanuTechXUSDTDepositWalletAddress9988"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5 pt-1">
+                  <label className="text-xs font-medium text-text-muted">
+                    Customer Payment Instructions &amp; Notes
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={channel.details.note || ''}
+                    onChange={(e) => updateChannelField(idx, 'note', e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-amber-500 font-sans"
+                    placeholder="Provide step-by-step transfer instructions shown to the customer..."
+                  />
+                </div>
+              </Card>
+            );
+          })}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Account Number"
-            placeholder="8001234567801"
-            value={accountNumber}
-            onChange={(e) => setAccountNumber(e.target.value)}
-            required
-          />
-
-          <Input
-            label="Branch Name & Code"
-            placeholder="Colombo Fort - 001"
-            value={branch}
-            onChange={(e) => setBranch(e.target.value)}
-            required
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="SWIFT / BIC Code (Optional)"
-            placeholder="COMBCLKX"
-            value={swiftCode}
-            onChange={(e) => setSwiftCode(e.target.value)}
-          />
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-muted">Primary Platform Currency</label>
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none text-text-primary"
-            >
-              <option value="LKR" className="bg-bg text-text-primary">LKR - Sri Lankan Rupee (₨)</option>
-              <option value="USD" className="bg-bg text-text-primary">USD - US Dollar ($)</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-text-muted">Checkout Instructions for Customers</label>
-          <textarea
-            rows={3}
-            value={instructions}
-            onChange={(e) => setInstructions(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-text-primary focus:outline-none focus:border-amber-500"
-          />
-        </div>
-
-        <div className="pt-2 flex justify-end">
-          <Button type="submit" variant="primary" size="sm" loading={busy}>
-            Save Payment Settings
+        <div className="flex justify-end pt-2">
+          <Button type="submit" variant="primary" loading={saving} size="sm">
+            💾 Save All Payment Methods
           </Button>
         </div>
       </form>
-    </Card>
-  );
-}
-
-// ── Tab 5: Client Team & Granular RBAC Component ──
-function ClientTeamTab() {
-  const [teamsData, setTeamsData] = useState<{ ownedTeams: any[]; joinedTeams: any[] } | null>(null);
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [teamDetail, setTeamDetail] = useState<{ team: any; myRole: string; resources: any } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [newTeamName, setNewTeamName] = useState('');
-  const [creatingTeam, setCreatingTeam] = useState(false);
-
-  const [inviteModalOpen, setInviteModalOpen] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'admin' | 'developer' | 'billing' | 'viewer'>('developer');
-  const [resourcePermissions, setResourcePermissions] = useState<Record<string, 'manage' | 'view' | 'none'>>({});
-  const [generatedInviteLink, setGeneratedInviteLink] = useState<string | null>(null);
-  const [inviting, setInviting] = useState(false);
-
-  const { toast } = useToast();
-
-  function loadTeams() {
-    api.teams
-      .list()
-      .then((data) => {
-        setTeamsData(data);
-        if (data.ownedTeams.length > 0 && !selectedTeamId) {
-          setSelectedTeamId(data.ownedTeams[0].id);
-        } else if (data.joinedTeams.length > 0 && !selectedTeamId) {
-          setSelectedTeamId(data.joinedTeams[0].id);
-        }
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(loadTeams, []);
-
-  useEffect(() => {
-    if (!selectedTeamId) return;
-    api.teams
-      .get(selectedTeamId)
-      .then((d) => setTeamDetail(d))
-      .catch((err) => toast(err.message, 'error'));
-  }, [selectedTeamId]);
-
-  async function handleCreateTeam(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newTeamName.trim()) return;
-    setCreatingTeam(true);
-    try {
-      const res = await api.teams.create(newTeamName.trim());
-      toast(`Team workspace "${newTeamName}" created!`, 'success');
-      setNewTeamName('');
-      setSelectedTeamId(res.team.id);
-      loadTeams();
-    } catch (err: any) {
-      toast(err.message || 'Failed to create team', 'error');
-    } finally {
-      setCreatingTeam(false);
-    }
-  }
-
-  async function handleSendInvite(e: React.FormEvent) {
-    e.preventDefault();
-    if (!selectedTeamId || !inviteEmail.trim()) return;
-    setInviting(true);
-    try {
-      const permsArray: any[] = [];
-      Object.entries(resourcePermissions).forEach(([key, val]) => {
-        const [resourceType, resourceId] = key.split(':');
-        if (val && val !== 'none') {
-          permsArray.push({ resourceType, resourceId, permission: val });
-        }
-      });
-
-      const res = await api.teams.invite(selectedTeamId, {
-        email: inviteEmail.trim(),
-        role: inviteRole,
-        resourcePermissions: permsArray.length > 0 ? permsArray : undefined,
-      });
-
-      toast(`Invitation email automatically sent to ${inviteEmail}`, 'success');
-      setGeneratedInviteLink(res.inviteLink);
-      setInviteEmail('');
-      if (selectedTeamId) api.teams.get(selectedTeamId).then(setTeamDetail);
-    } catch (err: any) {
-      toast(err.message || 'Failed to send invite', 'error');
-    } finally {
-      setInviting(false);
-    }
-  }
-
-  async function handleRemoveMember(memberId: string) {
-    if (!selectedTeamId) return;
-    if (!window.confirm('Are you sure you want to remove this team member?')) return;
-    try {
-      await api.teams.removeMember(selectedTeamId, memberId);
-      toast('Team member removed', 'success');
-      api.teams.get(selectedTeamId).then(setTeamDetail);
-    } catch (err: any) {
-      toast(err.message, 'error');
-    }
-  }
-
-  if (loading) return <Spinner label="Loading team workspaces..." />;
-
-  const allTeams = [...(teamsData?.ownedTeams || []), ...(teamsData?.joinedTeams || [])];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-text-primary">Team Management &amp; Role-Based Access Control (RBAC)</h3>
-          <p className="text-xs text-text-muted">Invite team members via email or unique link to manage deployments, databases, VPS, and SMTP servers with granular permissions.</p>
-        </div>
-
-        {allTeams.length > 0 && (
-          <Button size="sm" onClick={() => setInviteModalOpen(true)}>+ Invite Team Member</Button>
-        )}
-      </div>
-
-      {error && <ErrorBanner message={error} />}
-
-      {/* Create Team Form if no team */}
-      {allTeams.length === 0 ? (
-        <Card className="border border-white/10 p-6 space-y-4 max-w-lg">
-          <h4 className="font-bold text-sm text-white">Create Your First Team Workspace</h4>
-          <form onSubmit={handleCreateTeam} className="space-y-3">
-            <Input
-              label="Team Name"
-              placeholder="e.g. Acme Corp Infrastructure"
-              value={newTeamName}
-              onChange={(e) => setNewTeamName(e.target.value)}
-            />
-            <Button type="submit" size="sm" loading={creatingTeam}>Create Team Workspace</Button>
-          </form>
-        </Card>
-      ) : (
-        <div className="space-y-6">
-          {/* Team Switcher Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            {allTeams.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setSelectedTeamId(t.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 flex items-center gap-2 ${
-                  selectedTeamId === t.id
-                    ? 'bg-indigo-600 text-white shadow-glow-violet'
-                    : 'glass text-text-muted hover:text-white'
-                }`}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-                {t.name}
-              </button>
-            ))}
-          </div>
-
-          {teamDetail && (
-            <div className="space-y-6">
-              {/* Active Members Table */}
-              <Card className="border border-white/[0.06] p-5 space-y-4">
-                <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-                  <div>
-                    <h4 className="font-bold text-sm text-white">Team Members ({teamDetail.team.members.length})</h4>
-                    <p className="text-xs text-text-muted">Users who have access to manage this team's purchased services.</p>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300">
-                    My Role: {teamDetail.myRole}
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  {teamDetail.team.members.map((m: any) => (
-                    <div key={m.id} className="flex items-center justify-between bg-white/[0.02] border border-white/[0.06] rounded-xl p-3.5">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-indigo-600/30 text-indigo-300 font-bold flex items-center justify-center text-xs">
-                          {m.user.displayName ? m.user.displayName[0].toUpperCase() : m.user.email[0].toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-white">{m.user.displayName || m.user.email}</p>
-                          <p className="text-[11px] text-text-muted font-mono">{m.user.email}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/10 text-white">
-                          {m.role}
-                        </span>
-
-                        {teamDetail.myRole === 'owner' && m.role !== 'owner' && (
-                          <button
-                            onClick={() => handleRemoveMember(m.id)}
-                            className="text-xs text-red-400 hover:underline"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Pending Invitations */}
-              {teamDetail.team.invites && teamDetail.team.invites.length > 0 && (
-                <Card className="border border-white/[0.06] p-5 space-y-3">
-                  <h4 className="font-bold text-sm text-white">Pending Invitations ({teamDetail.team.invites.length})</h4>
-                  <div className="space-y-2">
-                    {teamDetail.team.invites.map((inv: any) => {
-                      const inviteUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/team/accept?token=${inv.token}`;
-                      return (
-                        <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs p-3 glass rounded-xl border border-white/[0.06]">
-                          <div>
-                            <span className="font-bold text-white font-mono">{inv.email}</span>
-                            <span className="text-text-muted ml-2">Role: <strong className="text-indigo-300 uppercase">{inv.role}</strong></span>
-                            <span className="ml-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300">
-                              {inv.status}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(inviteUrl);
-                                toast('Unique invitation URL copied!', 'success');
-                              }}
-                              className="px-2.5 py-1 glass rounded text-[11px] font-semibold text-white hover:bg-white/10 transition-colors"
-                            >
-                              Copy URL
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                try {
-                                  await api.teams.resendInvite(selectedTeamId!, inv.id);
-                                  toast(`Invitation email re-sent to ${inv.email}`, 'success');
-                                } catch (err: any) {
-                                  toast(err.message, 'error');
-                                }
-                              }}
-                              className="px-2.5 py-1 glass rounded text-[11px] font-semibold text-indigo-300 hover:bg-white/10 transition-colors"
-                            >
-                              Resend Email
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (!confirm(`Revoke invitation for ${inv.email}?`)) return;
-                                try {
-                                  await api.teams.revokeInvite(selectedTeamId!, inv.id);
-                                  toast('Invitation revoked', 'success');
-                                  if (selectedTeamId) api.teams.get(selectedTeamId).then(setTeamDetail);
-                                } catch (err: any) {
-                                  toast(err.message, 'error');
-                                }
-                              }}
-                              className="px-2.5 py-1 rounded text-[11px] font-semibold bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors"
-                            >
-                              Revoke
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Card>
-              )}
-
-              {/* Purchased Services Scope */}
-              <Card className="border border-white/[0.06] p-5 space-y-3">
-                <h4 className="font-bold text-sm text-white">Team Purchased Services</h4>
-                <div className="grid md:grid-cols-4 gap-3 text-xs">
-                  <div className="glass p-3 rounded-xl">
-                    <span className="text-text-muted block text-[11px]">Deployments</span>
-                    <span className="font-bold text-white text-base">{teamDetail.resources.deployments.length}</span>
-                  </div>
-                  <div className="glass p-3 rounded-xl">
-                    <span className="text-text-muted block text-[11px]">Managed Databases</span>
-                    <span className="font-bold text-white text-base">{teamDetail.resources.databases.length}</span>
-                  </div>
-                  <div className="glass p-3 rounded-xl">
-                    <span className="text-text-muted block text-[11px]">VPS Servers</span>
-                    <span className="font-bold text-white text-base">{teamDetail.resources.vpsInstances.length}</span>
-                  </div>
-                  <div className="glass p-3 rounded-xl">
-                    <span className="text-text-muted block text-[11px]">SMTP Mailboxes</span>
-                    <span className="font-bold text-white text-base">{teamDetail.resources.smtpAccounts.length}</span>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Invite Member Modal */}
-      {inviteModalOpen && (
-        <Modal open={inviteModalOpen} onClose={() => { setInviteModalOpen(false); setGeneratedInviteLink(null); }} title="Invite Team Member">
-          <form onSubmit={handleSendInvite} className="space-y-4">
-            <Input
-              label="Recipient Email Address"
-              placeholder="colleague@domain.com"
-              type="email"
-              required
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-            />
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-text-muted">Assigned Team Role</label>
-              <select
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value as any)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none text-white"
-              >
-                <option value="admin" className="bg-bg">Admin — Full manage access to all team resources</option>
-                <option value="developer" className="bg-bg">Developer — Deploy apps, manage DBs and containers</option>
-                <option value="billing" className="bg-bg">Billing — Manage invoices and subscriptions</option>
-                <option value="viewer" className="bg-bg">Viewer — Read-only access to metrics and logs</option>
-              </select>
-            </div>
-
-            {/* Granular Resource Permissions Selection Matrix */}
-            {teamDetail && (
-              <div className="space-y-2 border-t border-white/10 pt-3">
-                <label className="text-xs font-bold text-white">Granular Resource Permissions (Optional)</label>
-                <p className="text-[11px] text-text-muted">Grant specific manage or view permissions per resource item:</p>
-                <div className="max-h-44 overflow-y-auto space-y-2 pr-1">
-                  {teamDetail.resources.deployments.map((d: any) => (
-                    <div key={d.id} className="flex items-center justify-between text-xs glass p-2 rounded-lg">
-                      <span className="font-mono text-text-muted truncate max-w-[200px]">Deployment: {d.subdomain}</span>
-                      <select
-                        value={resourcePermissions[`deployment:${d.id}`] || 'manage'}
-                        onChange={(e) => setResourcePermissions({ ...resourcePermissions, [`deployment:${d.id}`]: e.target.value as any })}
-                        className="bg-black/50 border border-white/10 rounded px-2 py-1 text-[11px] text-white"
-                      >
-                        <option value="manage">Manage</option>
-                        <option value="view">View</option>
-                        <option value="none">None</option>
-                      </select>
-                    </div>
-                  ))}
-                  {teamDetail.resources.databases.map((db: any) => (
-                    <div key={db.id} className="flex items-center justify-between text-xs glass p-2 rounded-lg">
-                      <span className="font-mono text-text-muted truncate max-w-[200px]">DB ({db.type}): {db.internalHost || db.id}</span>
-                      <select
-                        value={resourcePermissions[`managed_database:${db.id}`] || 'manage'}
-                        onChange={(e) => setResourcePermissions({ ...resourcePermissions, [`managed_database:${db.id}`]: e.target.value as any })}
-                        className="bg-black/50 border border-white/10 rounded px-2 py-1 text-[11px] text-white"
-                      >
-                        <option value="manage">Manage</option>
-                        <option value="view">View</option>
-                        <option value="none">None</option>
-                      </select>
-                    </div>
-                  ))}
-                  {teamDetail.resources.vpsInstances.map((v: any) => (
-                    <div key={v.id} className="flex items-center justify-between text-xs glass p-2 rounded-lg">
-                      <span className="font-mono text-text-muted truncate max-w-[200px]">VPS: {v.provider} ({v.id.slice(0, 8)})</span>
-                      <select
-                        value={resourcePermissions[`vps:${v.id}`] || 'manage'}
-                        onChange={(e) => setResourcePermissions({ ...resourcePermissions, [`vps:${v.id}`]: e.target.value as any })}
-                        className="bg-black/50 border border-white/10 rounded px-2 py-1 text-[11px] text-white"
-                      >
-                        <option value="manage">Manage</option>
-                        <option value="view">View</option>
-                        <option value="none">None</option>
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {generatedInviteLink && (
-              <div className="bg-black/50 border border-emerald-500/30 rounded-xl p-3 space-y-2">
-                <p className="text-xs font-bold text-emerald-400">Invitation Email Dispatched Automatically!</p>
-                <p className="text-[11px] text-text-muted">You can also copy the unique invitation link directly below:</p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={generatedInviteLink}
-                    className="flex-1 bg-black text-[11px] font-mono text-text-muted p-1.5 rounded border border-white/10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(generatedInviteLink);
-                      toast('Invitation link copied to clipboard!', 'success');
-                    }}
-                    className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold shrink-0 hover:bg-emerald-500 transition-colors"
-                  >
-                    Copy Link
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3 justify-end pt-2 border-t border-white/10">
-              <Button type="button" variant="ghost" size="sm" onClick={() => { setInviteModalOpen(false); setGeneratedInviteLink(null); }}>
-                Close
-              </Button>
-              <Button type="submit" size="sm" loading={inviting}>Send Email &amp; Generate Link</Button>
-            </div>
-          </form>
-        </Modal>
-      )}
     </div>
   );
 }
@@ -1104,7 +1239,7 @@ function GithubSystemIntegrationTab() {
       <Card className="border border-white/[0.06] p-6 space-y-6">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+            <div className="p-3 rounded-2xl bg-white/5 border border-white/15 text-white">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
                 <path d="M9 18c-4.51 2-5-2-7-2" />
@@ -1144,7 +1279,7 @@ function GithubSystemIntegrationTab() {
                 placeholder={maskedToken ? 'Enter new token to update...' : 'ghp_xxxxxxxxxxxxxxxxxxxx or github_pat_xxxx'}
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+                className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-white/30"
               />
               <button
                 type="button"
@@ -1159,7 +1294,7 @@ function GithubSystemIntegrationTab() {
               </button>
             </div>
             <p className="text-[11px] text-text-muted">
-              Required scopes: <code className="text-indigo-300 font-mono">repo</code>, <code className="text-indigo-300 font-mono">workflow</code>, <code className="text-indigo-300 font-mono">admin:org</code> (if using an Organization).
+              Required scopes: <code className="text-neutral-300 font-mono">repo</code>, <code className="text-neutral-300 font-mono">workflow</code>, <code className="text-neutral-300 font-mono">admin:org</code> (if using an Organization).
             </p>
           </div>
 
@@ -1173,12 +1308,12 @@ function GithubSystemIntegrationTab() {
           <div className="flex items-center justify-between p-4 glass rounded-xl border border-white/[0.06]">
             <div>
               <p className="text-xs font-semibold text-white">Enable GitHub Actions Automated CI/CD</p>
-              <p className="text-[11px] text-text-muted">Automatically inject <code className="font-mono text-indigo-300">.github/workflows/deploy.yml</code> into shadow backup repos for build verification.</p>
+              <p className="text-[11px] text-text-muted">Automatically inject <code className="font-mono text-neutral-300">.github/workflows/deploy.yml</code> into shadow backup repos for build verification.</p>
             </div>
             <button
               type="button"
               onClick={() => setActionsEnabled(!actionsEnabled)}
-              className={`w-11 h-6 rounded-full transition-colors relative p-0.5 ${actionsEnabled ? 'bg-indigo-600' : 'bg-white/10'}`}
+              className={`w-11 h-6 rounded-full transition-colors relative p-0.5 ${actionsEnabled ? 'bg-white text-black' : 'bg-white/10'}`}
             >
               <div className={`w-5 h-5 rounded-full bg-white transition-transform ${actionsEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
@@ -1248,27 +1383,26 @@ function GithubSystemIntegrationTab() {
 
 // ── Main Page Component ──
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState('webhooks');
+  const [activeTab, setActiveTab] = useState('payment');
 
   return (
     <PasswordLockGuard
       title="Protected Settings Vault"
-      description="System settings (GitHub System Integration, Discord Webhooks, Database Backups, API Configs, Client Team RBAC, Security PIN) are password protected."
+      description="System settings (Payment Gateways, Database Backups, Global SMTP & APIs, Discord Webhooks, GitHub System, and Security PIN) are password protected."
     >
-      <div className="space-y-6 animate-fade-in max-w-4xl">
+      <div className="w-full max-w-7xl mx-auto space-y-6 animate-fade-in">
         <PageHeader
           title="System Settings"
-          description="Manage sensitive system alerts, client team invitations, GitHub system credentials, automated database backups, API configurations, and security credentials."
+          description="Manage payment gateways, Cloudflare R2 automated database backups, global SMTP mail servers, Discord notification alerts, GitHub backups, and vault security."
         />
 
         <Tabs
           tabs={[
-            { label: 'Payment Config', value: 'payment' },
-            { label: 'Team & RBAC', value: 'team' },
-            { label: 'GitHub System', value: 'github' },
+            { label: 'Payment Gateways & Methods', value: 'payment' },
+            { label: 'Database Backups & R2 Archive', value: 'backups' },
+            { label: 'Global SMTP & APIs', value: 'configs' },
             { label: 'Discord Webhooks', value: 'webhooks' },
-            { label: 'Database Backups', value: 'backups' },
-            { label: 'API Configs', value: 'configs' },
+            { label: 'GitHub System Backup', value: 'github' },
             { label: 'Security PIN', value: 'pin' },
           ]}
           active={activeTab}
@@ -1276,11 +1410,10 @@ export default function SettingsPage() {
         />
 
         {activeTab === 'payment' && <PaymentInfoTab />}
-        {activeTab === 'team' && <ClientTeamTab />}
-        {activeTab === 'github' && <GithubSystemIntegrationTab />}
-        {activeTab === 'webhooks' && <DiscordWebhooksTab />}
         {activeTab === 'backups' && <DatabaseBackupsTab />}
         {activeTab === 'configs' && <ApiConfigsTab />}
+        {activeTab === 'webhooks' && <DiscordWebhooksTab />}
+        {activeTab === 'github' && <GithubSystemIntegrationTab />}
         {activeTab === 'pin' && <SecurityPinTab />}
       </div>
     </PasswordLockGuard>

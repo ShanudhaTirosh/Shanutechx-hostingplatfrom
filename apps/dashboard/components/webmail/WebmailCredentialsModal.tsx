@@ -301,14 +301,14 @@ print("Mail dispatched successfully!")`;
 
         {/* Modal Header */}
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-md">
+          <div className="p-2.5 rounded-xl bg-white/5 text-white border border-white/15 shadow-md">
             <Server className="w-6 h-6" />
           </div>
           <div>
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <span>Mail Server Credentials & Developer Studio</span>
               {isDevOrAdmin && (
-                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-violet-500/20 text-neutral-300 border border-white/15">
                   {userRole} Superuser
                 </span>
               )}
@@ -325,7 +325,7 @@ print("Mail dispatched successfully!")`;
             onClick={() => setActiveTab('desktop')}
             className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
               activeTab === 'desktop'
-                ? 'bg-indigo-600 text-white shadow-md'
+                ? 'bg-white text-black text-white shadow-md'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
             }`}
           >
@@ -336,7 +336,7 @@ print("Mail dispatched successfully!")`;
             onClick={() => setActiveTab('code')}
             className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
               activeTab === 'code'
-                ? 'bg-indigo-600 text-white shadow-md'
+                ? 'bg-white text-black text-white shadow-md'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
             }`}
           >
@@ -348,7 +348,7 @@ print("Mail dispatched successfully!")`;
               onClick={() => setActiveTab('system')}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
                 activeTab === 'system'
-                  ? 'bg-violet-600 text-white shadow-md'
+                  ? 'bg-white text-black text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-900'
               }`}
             >
@@ -360,7 +360,7 @@ print("Mail dispatched successfully!")`;
 
         {loading ? (
           <div className="py-12 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-            <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
+            <RefreshCw className="w-4 h-4 animate-spin text-white" />
             Loading connection credentials...
           </div>
         ) : (
@@ -370,7 +370,7 @@ print("Mail dispatched successfully!")`;
               <div className="space-y-4 text-xs">
                 {/* Incoming Server (IMAP) */}
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-indigo-400">
+                  <div className="flex items-center justify-between text-xs font-bold text-white">
                     <span>INCOMING MAIL SERVER (IMAP)</span>
                     <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold">
                       <ShieldCheck className="w-3.5 h-3.5" /> SSL / TLS Enforced
@@ -383,7 +383,7 @@ print("Mail dispatched successfully!")`;
                         <span className="truncate">{imapHost}</span>
                         <button
                           onClick={() => copyToClipboard(imapHost, 'imapHost')}
-                          className="text-slate-400 hover:text-indigo-400 ml-1.5"
+                          className="text-slate-400 hover:text-white ml-1.5"
                         >
                           {copiedField === 'imapHost' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                         </button>
@@ -400,7 +400,7 @@ print("Mail dispatched successfully!")`;
 
                 {/* Outgoing Server (SMTP) */}
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-indigo-400">
+                  <div className="flex items-center justify-between text-xs font-bold text-white">
                     <span>OUTGOING MAIL SERVER (SMTP)</span>
                     <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold">
                       <ShieldCheck className="w-3.5 h-3.5" /> SSL / STARTTLS
@@ -413,7 +413,7 @@ print("Mail dispatched successfully!")`;
                         <span className="truncate">{smtpHost}</span>
                         <button
                           onClick={() => copyToClipboard(smtpHost, 'smtpHost')}
-                          className="text-slate-400 hover:text-indigo-400 ml-1.5"
+                          className="text-slate-400 hover:text-white ml-1.5"
                         >
                           {copiedField === 'smtpHost' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                         </button>
@@ -435,7 +435,7 @@ print("Mail dispatched successfully!")`;
                     <span>{userEmail}</span>
                     <button
                       onClick={() => copyToClipboard(userEmail, 'email')}
-                      className="text-slate-400 hover:text-indigo-400"
+                      className="text-slate-400 hover:text-white"
                     >
                       {copiedField === 'email' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                     </button>
@@ -450,7 +450,7 @@ print("Mail dispatched successfully!")`;
                 {/* API Key Box */}
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
                       <Key className="w-4 h-4" /> Platform API Bearer Token
                     </span>
                     <span className="text-[10px] text-slate-500">REST API Authentication</span>
@@ -459,7 +459,7 @@ print("Mail dispatched successfully!")`;
                     <span className="truncate max-w-md">{apiKey}</span>
                     <button
                       onClick={() => copyToClipboard(apiKey, 'apiKey')}
-                      className="text-slate-400 hover:text-indigo-400 ml-2"
+                      className="text-slate-400 hover:text-white ml-2"
                     >
                       {copiedField === 'apiKey' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                     </button>
@@ -484,7 +484,7 @@ print("Mail dispatched successfully!")`;
                         type="button"
                         onClick={() => setCodeLanguage(item.id as any)}
                         className={`px-2.5 py-1 rounded font-mono transition-all text-[11px] ${
-                          codeLanguage === item.id ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                          codeLanguage === item.id ? 'bg-white text-black text-white font-bold shadow-sm' : 'text-slate-400 hover:text-slate-200'
                         }`}
                       >
                         {item.label}
@@ -494,7 +494,7 @@ print("Mail dispatched successfully!")`;
                 </div>
 
                 {/* Code Block Container */}
-                <div className="relative bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-[11px] text-indigo-300 overflow-x-auto max-h-64">
+                <div className="relative bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-[11px] text-neutral-300 overflow-x-auto max-h-64">
                   <button
                     onClick={() => {
                       copyToClipboard(getActiveSnippet(), 'codeSnippet');
@@ -516,7 +516,7 @@ print("Mail dispatched successfully!")`;
               <div className="space-y-5 text-xs">
                 <form onSubmit={handleProvisionSystemMailbox} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-violet-400 flex items-center gap-2">
+                    <h4 className="font-bold text-white flex items-center gap-2">
                       <Cpu className="w-4 h-4" /> Provision System Service Mailbox
                     </h4>
                     <span className="text-[10px] text-slate-500">Auto-routes platform system notifications</span>
@@ -567,7 +567,7 @@ print("Mail dispatched successfully!")`;
                   <button
                     type="submit"
                     disabled={isProvisioning}
-                    className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    className="w-full py-2.5 bg-gradient-to-r from-neutral-800 to-black hover:from-violet-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     {isProvisioning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                     <span>Provision System Mailbox</span>
@@ -585,7 +585,7 @@ print("Mail dispatched successfully!")`;
                     systemAccounts.map((acc: any) => (
                       <div key={acc.id} className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                          <div className="p-2 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                          <div className="p-2 rounded-lg bg-white/5 text-white border border-white/15">
                             <Mail className="w-4 h-4" />
                           </div>
                           <div>
@@ -595,7 +595,7 @@ print("Mail dispatched successfully!")`;
                         </div>
                         <button
                           onClick={() => copyToClipboard(`${acc.smtpUsername}@shanutechx.com`, acc.id)}
-                          className="px-2.5 py-1 bg-slate-900 border border-slate-800 hover:border-violet-500/40 text-slate-300 text-[11px] rounded-lg flex items-center gap-1 font-mono"
+                          className="px-2.5 py-1 bg-slate-900 border border-slate-800 hover:border-white/15 text-slate-300 text-[11px] rounded-lg flex items-center gap-1 font-mono"
                         >
                           {copiedField === acc.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                           Copy Address

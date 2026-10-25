@@ -10,14 +10,7 @@ import {
   X,
   Printer,
   Download,
-  CheckCircle2,
   Receipt,
-  Building2,
-  User,
-  Calendar,
-  ShieldCheck,
-  CreditCard,
-  Sparkles,
 } from 'lucide-react';
 
 interface InvoiceModalProps {
@@ -40,6 +33,7 @@ interface InvoiceDetails {
   };
   company: {
     name: string;
+    subtitle?: string;
     address: string;
     taxId: string;
     email: string;
@@ -48,6 +42,7 @@ interface InvoiceDetails {
   items: Array<{
     id: string;
     name: string;
+    description?: string;
     quantity: number;
     unitPrice: number;
     total: number;
@@ -81,6 +76,7 @@ export default function InvoiceModal({ isOpen, onClose, order }: InvoiceModalPro
         const fallbackItems = (order.items || []).map((item) => ({
           id: item.id,
           name: orderItemName(item),
+          description: item.plan?.name ? `STX Managed Cloud · ${item.plan.name}` : undefined,
           quantity: item.quantity,
           unitPrice: item.service ? item.service.price : item.plan ? item.plan.price : 0,
           total: orderItemLineTotal(item),
@@ -88,22 +84,23 @@ export default function InvoiceModal({ isOpen, onClose, order }: InvoiceModalPro
 
         const orderAny = order as any;
         setDetails({
-          invoiceNumber: `INV-${new Date(order.createdAt).getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`,
+          invoiceNumber: `STX-${new Date(order.createdAt).getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`,
           orderId: order.id,
           issuedAt: String(order.createdAt),
           paidAt: String(orderAny.updatedAt || order.createdAt),
           status: order.status,
           customer: {
             id: order.userId,
-            name: orderAny.user?.email ? orderAny.user.email.split('@')[0] : 'Valued Customer',
-            email: orderAny.user?.email || 'customer@shanutechx.com',
+            name: orderAny.user?.email ? orderAny.user.email.split('@')[0] : 'Valued Client',
+            email: orderAny.user?.email || 'client@email.com',
           },
           company: {
-            name: 'ShanuTechX Platform (Pvt) Ltd',
-            address: 'Level 18, Orion City Towers, Colombo 09, Sri Lanka',
+            name: 'STX Enterprises',
+            subtitle: 'DIGITAL EMPIRE STUDIO',
+            address: 'Negombo, Western Province, Sri Lanka',
             taxId: 'LK-884920492-STX',
-            email: 'billing@shanutechx.com',
-            website: 'https://shanutechx.com',
+            email: 'hello@stxenterprises.com',
+            website: 'www.stxenterprises.com',
           },
           items: fallbackItems,
           subtotal: order.total,
@@ -144,39 +141,52 @@ export default function InvoiceModal({ isOpen, onClose, order }: InvoiceModalPro
   };
 
   const isPaid = order.status === 'paid';
+  const issueDate = details?.issuedAt ? new Date(details.issuedAt) : new Date(order.createdAt);
+  const dueDate = new Date(issueDate.getTime() + 14 * 24 * 60 * 60 * 1000);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
       {/* Modal Container */}
-      <div className="bg-[#090b1e] border border-white/15 rounded-3xl max-w-3xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative my-8 text-white text-sans overflow-hidden">
-        {/* Top Header Bar */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+      <div className="bg-[#1b1e24] border border-[#2a2e37] rounded-2xl max-w-4xl w-full p-4 sm:p-7 space-y-5 shadow-2xl relative my-6 text-white overflow-hidden">
+        {/* Top Header Controls Bar */}
+        <div className="flex items-center justify-between border-b border-[#2a2e37] pb-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-300 flex items-center justify-center font-bold">
+            <div className="h-10 w-10 rounded-xl bg-teal-500/15 border border-teal-500/30 text-teal-300 flex items-center justify-center font-bold">
               <Receipt className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-extrabold tracking-tight text-white flex items-center gap-2">
-                Official Tax Invoice
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold uppercase">
-                  {details?.invoiceNumber || `INV-${order.id.slice(0, 8).toUpperCase()}`}
+              <h2 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
+                STX Enterprises Invoice
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-teal-500/10 text-teal-300 border border-teal-500/20 font-bold uppercase">
+                  {details?.invoiceNumber || `STX-${order.id.slice(0, 8).toUpperCase()}`}
                 </span>
               </h2>
-              <p className="text-xs text-slate-400 font-mono">ShanuTechX Autonomous Enterprise Platform</p>
+              <p className="text-xs text-slate-400 font-mono">Digital Empire Studio · Enterprise Document</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors"
-              title="Print Invoice"
+              className="px-3 py-1.5 rounded-full border border-teal-400/40 hover:bg-teal-400 hover:text-black text-teal-300 font-semibold text-xs tracking-wider uppercase transition-all flex items-center gap-1.5"
+              title="Print / Save as PDF"
             >
-              <Printer className="h-4 w-4" />
+              <Printer className="h-3.5 w-3.5" />
+              <span>Print / PDF</span>
             </button>
+            {isPaid && (
+              <button
+                onClick={handleDownloadPdf}
+                disabled={downloading}
+                className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-500 hover:to-teal-500 text-white font-semibold text-xs tracking-wider uppercase transition-all flex items-center gap-1.5 shadow-md"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>{downloading ? 'Preparing...' : 'Download'}</span>
+              </button>
+            )}
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-colors"
+              className="p-1.5 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -184,160 +194,177 @@ export default function InvoiceModal({ isOpen, onClose, order }: InvoiceModalPro
         </div>
 
         {loading ? (
-          <div className="py-16 text-center space-y-3">
-            <div className="h-8 w-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin mx-auto" />
-            <p className="text-xs text-slate-400 font-mono">Generating invoice preview...</p>
+          <div className="py-20 text-center space-y-3">
+            <div className="h-8 w-8 rounded-full border-2 border-teal-400 border-t-transparent animate-spin mx-auto" />
+            <p className="text-xs text-slate-400 font-mono">Loading STX invoice template...</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {/* Printable & Viewable Sample Invoice Card */}
-            <div className="bg-[#050614] border border-white/10 rounded-2xl p-6 sm:p-8 space-y-8 shadow-inner print:text-black print:bg-white">
-              {/* Row 1: Company Logo & Customer Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 border-b border-white/10 pb-6">
-                {/* Company Side */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2.5">
+          <div className="space-y-4">
+            {/* The Authentic STX Enterprises Document Card (White / Paper styling) */}
+            <div className="bg-white text-[#07060d] rounded p-6 sm:p-10 shadow-2xl relative overflow-hidden font-sans">
+              {/* 1. Header: Brand Logo + INVOICE tag */}
+              <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
+                <div className="inline-block">
+                  <div className="flex items-center gap-2">
                     <img
-                      src="/STX.png"
-                      alt="ShanuTechX"
-                      className="w-7 h-7 object-contain filter brightness-0 invert print:filter-none"
+                      src="/STKcdr.svg"
+                      alt="STX Enterprises Logo"
+                      className="h-11 w-auto object-contain block"
                     />
-                    <span className="font-black text-xl tracking-tight text-white print:text-black">
-                      SHANU<span className="text-purple-400 print:text-purple-600">TECHX</span>
-                    </span>
-                    <span className="text-[10px] font-mono bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded border border-purple-500/30">
-                      CLOUD
-                    </span>
                   </div>
-                  <p className="text-xs text-slate-300 font-bold">{details?.company.name}</p>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">{details?.company.address}</p>
-                  <p className="text-[11px] font-mono text-slate-400">TAX ID: {details?.company.taxId}</p>
-                  <p className="text-[11px] font-mono text-purple-300">{details?.company.email}</p>
+                  <div className="mt-1.5 text-[9.5px] font-bold tracking-[0.38em] text-[#07060d] border-t-[2.5px] border-[#07060d] pt-1 uppercase">
+                    DIGITAL EMPIRE STUDIO
+                  </div>
                 </div>
 
-                {/* Customer & Invoice Meta Side */}
-                <div className="sm:text-right space-y-2">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold uppercase border">
-                    {isPaid ? (
-                      <span className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 flex items-center gap-1 px-2.5 py-0.5 rounded-full">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> PAID &amp; VERIFIED
-                      </span>
-                    ) : (
-                      <span className="bg-orange-500/10 text-orange-300 border-orange-500/30 px-2.5 py-0.5 rounded-full">
-                        AWAITING PAYMENT
-                      </span>
-                    )}
+                <div className="text-right">
+                  <div className="font-extrabold text-2xl sm:text-3xl tracking-wider text-[#07060d]">
+                    INVOICE
                   </div>
-
-                  <div className="space-y-1 pt-1">
-                    <p className="text-xs font-bold text-white">Billed To:</p>
-                    <p className="text-xs font-medium text-slate-300">{details?.customer.name}</p>
-                    <p className="text-[11px] font-mono text-slate-400">{details?.customer.email}</p>
-                    {details?.customer.whatsapp && (
-                      <p className="text-[11px] font-mono text-slate-400">WA: {details.customer.whatsapp}</p>
-                    )}
-                  </div>
-
-                  <div className="pt-2 text-[11px] font-mono text-slate-400 space-y-0.5">
-                    <p>Issued Date: {new Date(details?.issuedAt || order.createdAt).toLocaleDateString()}</p>
-                    <p>Order Reference: #{order.id.slice(0, 8).toUpperCase()}</p>
+                  <div className="font-mono text-xs sm:text-sm font-bold text-[#4a32a8] mt-1">
+                    No. {details?.invoiceNumber || `STX-${order.id.slice(0, 8).toUpperCase()}`}
                   </div>
                 </div>
               </div>
 
-              {/* Row 2: Itemized Line Items Table */}
-              <div className="space-y-3">
-                <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">
-                  Itemized Service Breakdown
-                </h3>
-                <div className="border border-white/10 rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-white/5 border-b border-white/10 text-slate-300 font-mono">
-                      <tr>
-                        <th className="p-3">Description &amp; Service Plan</th>
-                        <th className="p-3 text-center">Qty</th>
-                        <th className="p-3 text-right">Unit Price</th>
-                        <th className="p-3 text-right">Amount</th>
+              {/* 2. Distinctive Teal / Purple Accent Bar */}
+              <div className="h-[5px] bg-[#07060d] relative mb-8 w-full">
+                <div className="absolute left-0 top-0 h-full w-[34%] bg-gradient-to-r from-[#7146eb] via-[#4574e1] to-[#20c6e0]" />
+              </div>
+
+              {/* 3. Three-Column Metadata Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8 text-xs leading-relaxed">
+                <div>
+                  <div className="font-mono text-[10px] tracking-widest uppercase text-[#146a8a] font-bold mb-2">
+                    Billed to
+                  </div>
+                  <div className="text-[#20242b] space-y-0.5">
+                    <strong className="block text-sm text-[#07060d]">
+                      {details?.customer.name || 'Valued Client'}
+                    </strong>
+                    <p>{details?.customer.email}</p>
+                    {details?.customer.whatsapp && <p>WA: {details.customer.whatsapp}</p>}
+                    <p className="text-slate-500">Sri Lanka / Global Client</p>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="font-mono text-[10px] tracking-widest uppercase text-[#146a8a] font-bold mb-2">
+                    Invoice details
+                  </div>
+                  <div className="text-[#20242b] space-y-0.5">
+                    <p>Issue date: <strong className="text-[#07060d]">{issueDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></p>
+                    <p>Due date: <strong className="text-[#07060d]">{dueDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></p>
+                    <p>Terms: <strong className="text-[#07060d]">Net 14 (Direct Verification)</strong></p>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="font-mono text-[10px] tracking-widest uppercase text-[#146a8a] font-bold mb-2">
+                    Pay to
+                  </div>
+                  <div className="text-[#20242b] space-y-0.5">
+                    <strong className="block text-[#07060d]">STX Enterprises (Shanudha Tirosh)</strong>
+                    <p>Bank: Commercial Bank · Negombo</p>
+                    <p className="font-mono">Acc: 100012345678</p>
+                    <p className="font-mono text-[#4a32a8]">eZCash / HelaPay: 077-123-4567</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Items Table */}
+              <div className="overflow-x-auto mb-4">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-[#07060d] text-white font-mono text-[10px] uppercase tracking-wider">
+                      <th className="text-left p-3 w-[52%]">Description</th>
+                      <th className="text-center p-3 w-[12%]">Qty</th>
+                      <th className="text-center p-3 w-[18%]">Rate</th>
+                      <th className="text-right p-3 w-[18%]">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#eef1f4] text-xs text-[#20242b]">
+                    {details?.items.map((item, idx) => (
+                      <tr key={idx} className={idx % 2 === 1 ? 'bg-[#f7f8fa]' : 'bg-white'}>
+                        <td className="p-3">
+                          <strong className="block text-[#07060d]">{item.name}</strong>
+                          <span className="text-[11px] text-[#5b6472]">
+                            {item.description || 'Enterprise Cloud Container & Edge Infrastructure Setup'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center font-mono">{item.quantity}</td>
+                        <td className="p-3 text-center font-mono">{formatMoney(item.unitPrice)}</td>
+                        <td className="p-3 text-right font-mono font-bold text-[#07060d]">
+                          {formatMoney(item.total)}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5 text-slate-200">
-                      {details?.items.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-white/[0.02]">
-                          <td className="p-3 font-medium">
-                            <span className="text-white block">{item.name}</span>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              24/7 Automated Edge Provisioned
-                            </span>
-                          </td>
-                          <td className="p-3 text-center font-mono">{item.quantity}</td>
-                          <td className="p-3 text-right font-mono">{formatMoney(item.unitPrice)}</td>
-                          <td className="p-3 text-right font-mono font-bold text-white">
-                            {formatMoney(item.total)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 5. Totals Box */}
+              <div className="flex justify-end mt-4">
+                <div className="w-64 space-y-1.5 text-xs text-[#5b6472]">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span className="font-mono font-semibold text-[#20242b]">
+                      {formatMoney(details?.subtotal || order.total)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Discount</span>
+                    <span className="font-mono">— LKR 0.00</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tax (0%)</span>
+                    <span className="font-mono">LKR 0.00</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t-[2.5px] border-[#07060d] pt-3 text-[#07060d] font-bold text-base">
+                    <span>Total Due</span>
+                    <span className="font-mono text-[#146a8a] text-lg">
+                      {formatMoney(details?.total || order.total)}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Row 3: Totals & Summary Box */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
-                <div className="space-y-1.5">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-[11px] font-mono text-slate-400">
-                    <ShieldCheck className="h-3.5 w-3.5 text-teal-400" />
-                    Electronic Cryptographic Receipt Seal Verified
+              {/* 6. Bottom Notes and Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-10 pt-5 border-t border-[#d8dce1] items-center">
+                <div className="sm:col-span-2 text-xs text-[#3a4048] leading-relaxed">
+                  <div className="font-mono text-[10px] tracking-widest uppercase text-[#146a8a] font-bold mb-1">
+                    Notes
                   </div>
-                  <p className="text-[10px] text-slate-500 max-w-sm">
-                    Thank you for hosting with ShanuTechX. This document serves as official proof of payment.
+                  <p>
+                    Thank you for working with STX Enterprises. Payment is due within 14 days of issue date. VPS setups are delivered within 24 to 72 hours upon manual verification. For questions, reply to hello@stxenterprises.com.
                   </p>
                 </div>
 
-                <div className="w-full sm:w-64 bg-white/5 border border-white/10 rounded-xl p-4 space-y-2 font-mono text-xs text-slate-300 shrink-0">
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>{formatMoney(details?.subtotal || order.total)}</span>
+                <div className="sm:text-right">
+                  <div className="font-mono text-[10px] tracking-widest uppercase text-[#146a8a] font-bold mb-1.5">
+                    Status
                   </div>
-                  <div className="flex justify-between text-slate-400">
-                    <span>Taxes &amp; VAT (0%):</span>
-                    <span>LKR 0.00</span>
-                  </div>
-                  <div className="flex justify-between text-slate-400">
-                    <span>Discounts:</span>
-                    <span>LKR 0.00</span>
-                  </div>
-                  <div className="border-t border-white/10 pt-2 flex justify-between font-extrabold text-sm text-white">
-                    <span>Grand Total:</span>
-                    <span className="text-teal-300">{formatMoney(details?.total || order.total)}</span>
-                  </div>
+                  {isPaid ? (
+                    <span className="inline-block font-mono text-[10px] font-bold tracking-wider uppercase px-3.5 py-1.5 rounded-full border border-emerald-600 text-emerald-700 bg-emerald-50">
+                      PAID &amp; VERIFIED
+                    </span>
+                  ) : (
+                    <span className="inline-block font-mono text-[10px] font-bold tracking-wider uppercase px-3.5 py-1.5 rounded-full border border-[#4a32a8] text-[#4a32a8] bg-[#f2eefd]">
+                      AWAITING PAYMENT
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Bottom Modal Actions */}
-            <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-              <div className="text-xs font-mono text-slate-400">
-                Invoice Status: <span className="text-purple-300 font-bold uppercase">{order.status}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-300 transition-colors"
-                >
-                  Close Window
-                </button>
-
-                {isPaid && (
-                  <button
-                    onClick={handleDownloadPdf}
-                    disabled={downloading}
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-glow-violet transition-all flex items-center gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    {downloading ? 'Downloading PDF...' : 'Download Official PDF Invoice'}
-                  </button>
-                )}
-              </div>
+            {/* Bottom Dismiss */}
+            <div className="flex justify-end pt-1">
+              <button
+                onClick={onClose}
+                className="px-5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-slate-300 transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         )}

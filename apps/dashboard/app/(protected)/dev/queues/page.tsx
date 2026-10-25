@@ -40,7 +40,7 @@ export default function DevQueuesPage() {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Layers className="h-7 w-7 text-indigo-500" />
+            <Layers className="h-7 w-7 text-white" />
             Developer Task Queue Monitor & Action Console
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -50,7 +50,7 @@ export default function DevQueuesPage() {
         <button
           onClick={fetchQueues}
           disabled={loading}
-          className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg bg-white text-black px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh Queues
@@ -62,7 +62,7 @@ export default function DevQueuesPage() {
           <div key={q.name} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <h3 className="font-semibold text-slate-900 dark:text-white text-sm">{q.name}</h3>
             <div className="mt-3 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span>Active: <strong className="text-indigo-600 dark:text-indigo-400">{q.active}</strong></span>
+              <span>Active: <strong className="text-indigo-600 dark:text-white">{q.active}</strong></span>
               <span>Waiting: <strong className="text-amber-600 dark:text-amber-400">{q.waiting}</strong></span>
               <span>Failed: <strong className="text-rose-600 dark:text-rose-400">{q.failed}</strong></span>
             </div>
@@ -81,7 +81,7 @@ export default function DevQueuesPage() {
                 <span className="font-mono text-slate-900 dark:text-white">{JSON.stringify(t)}</span>
                 <button
                   onClick={() => toast('Task manually requeued!', 'success')}
-                  className="flex items-center gap-1 rounded bg-indigo-600 px-3 py-1 text-white hover:bg-indigo-700"
+                  className="flex items-center gap-1 rounded bg-white text-black px-3 py-1 text-white hover:bg-indigo-700"
                 >
                   <Play className="h-3 w-3" /> Requeue Task
                 </button>

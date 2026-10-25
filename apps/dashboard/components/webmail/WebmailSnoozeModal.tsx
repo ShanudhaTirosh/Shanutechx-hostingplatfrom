@@ -64,7 +64,7 @@ export function WebmailSnoozeModal({ isOpen, onClose, messageId, onSnoozed }: We
         </button>
 
         <div className="flex items-center gap-3 mb-5">
-          <div className="p-2.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+          <div className="p-2.5 rounded-lg bg-white/5 text-white border border-white/15">
             <Clock className="w-5 h-5" />
           </div>
           <div>
@@ -86,37 +86,37 @@ export function WebmailSnoozeModal({ isOpen, onClose, messageId, onSnoozed }: We
               <button
                 disabled={isSubmitting}
                 onClick={() => handlePreset(4)}
-                className="flex items-center justify-between p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-indigo-500/40 hover:bg-slate-800/80 transition-all text-left group"
+                className="flex items-center justify-between p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-white/15 hover:bg-slate-800/80 transition-all text-left group"
               >
                 <div>
-                  <div className="text-sm font-medium text-slate-200 group-hover:text-indigo-300">Later today</div>
+                  <div className="text-sm font-medium text-slate-200 group-hover:text-neutral-300">Later today</div>
                   <div className="text-xs text-slate-400">In 4 hours</div>
                 </div>
-                <Clock className="w-4 h-4 text-slate-500 group-hover:text-indigo-400" />
+                <Clock className="w-4 h-4 text-slate-500 group-hover:text-white" />
               </button>
 
               <button
                 disabled={isSubmitting}
                 onClick={() => handlePreset(24)}
-                className="flex items-center justify-between p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-indigo-500/40 hover:bg-slate-800/80 transition-all text-left group"
+                className="flex items-center justify-between p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-white/15 hover:bg-slate-800/80 transition-all text-left group"
               >
                 <div>
-                  <div className="text-sm font-medium text-slate-200 group-hover:text-indigo-300">Tomorrow morning</div>
+                  <div className="text-sm font-medium text-slate-200 group-hover:text-neutral-300">Tomorrow morning</div>
                   <div className="text-xs text-slate-400">Tomorrow at 8:00 AM</div>
                 </div>
-                <Calendar className="w-4 h-4 text-slate-500 group-hover:text-indigo-400" />
+                <Calendar className="w-4 h-4 text-slate-500 group-hover:text-white" />
               </button>
 
               <button
                 disabled={isSubmitting}
                 onClick={() => handlePreset(168)}
-                className="flex items-center justify-between p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-indigo-500/40 hover:bg-slate-800/80 transition-all text-left group"
+                className="flex items-center justify-between p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-white/15 hover:bg-slate-800/80 transition-all text-left group"
               >
                 <div>
-                  <div className="text-sm font-medium text-slate-200 group-hover:text-indigo-300">Next week</div>
+                  <div className="text-sm font-medium text-slate-200 group-hover:text-neutral-300">Next week</div>
                   <div className="text-xs text-slate-400">Next Monday at 8:00 AM</div>
                 </div>
-                <Calendar className="w-4 h-4 text-slate-500 group-hover:text-indigo-400" />
+                <Calendar className="w-4 h-4 text-slate-500 group-hover:text-white" />
               </button>
             </div>
 
@@ -127,12 +127,12 @@ export function WebmailSnoozeModal({ isOpen, onClose, messageId, onSnoozed }: We
                   type="datetime-local"
                   value={customDateTime}
                   onChange={(e) => setCustomDateTime(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-white/30"
                 />
                 <button
                   type="submit"
                   disabled={!customDateTime || isSubmitting}
-                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+                  className="w-full py-2 bg-white text-black hover:bg-neutral-200 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
                 >
                   Confirm Custom Time
                 </button>

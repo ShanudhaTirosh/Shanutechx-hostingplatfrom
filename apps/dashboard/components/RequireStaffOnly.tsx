@@ -16,7 +16,7 @@ export default function RequireStaffOnly({ children }: { children: React.ReactNo
   const { apiUser, loading } = useAppUser();
   const router = useRouter();
 
-  const allowed = apiUser?.role === 'admin' || apiUser?.role === 'support';
+  const allowed = apiUser?.role === 'admin' || apiUser?.role === 'dev' || apiUser?.role === 'support';
 
   useEffect(() => {
     if (!loading && apiUser && !allowed) {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { CatalogTemplate } from '@/lib/types';
+import { CatalogTemplate, Plan } from '@/lib/types';
 
 type DeploySource = 'catalog' | 'docker' | 'git' | 'zip';
 
@@ -17,6 +17,7 @@ export default function DevDeployPage() {
 
   // Dynamic API Data
   const [catalogTemplates, setCatalogTemplates] = useState<CatalogTemplate[]>([]);
+  const [catalogPlan, setCatalogPlan] = useState<Plan | null>(null);
   const [nodes, setNodes] = useState<Array<{ id: string; name: string; location: string }>>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
@@ -38,6 +39,8 @@ export default function DevDeployPage() {
 
   // Catalog selected
   const [selectedTemplateSlug, setSelectedTemplateSlug] = useState('');
+  const [catalogCpuLimit, setCatalogCpuLimit] = useState<'0.5' | '1.0' | '2.0'>('0.5');
+  const [catalogMemoryLimit, setCatalogMemoryLimit] = useState<'512M' | '1G' | '2G'>('1G');
 
   // ZIP Upload fields
   const [zipFile, setZipFile] = useState<File | null>(null);
@@ -51,11 +54,13 @@ export default function DevDeployPage() {
     Promise.all([
       api.catalog.list().catch(() => ({ templates: [] })),
       api.catalog.nodes().catch(() => ({ nodes: [] })),
-    ]).then(([catRes, nodeRes]) => {
+      api.products.list('app_catalog').catch(() => ({ products: [] })),
+    ]).then(([catRes, nodeRes, prodRes]) => {
       setCatalogTemplates(catRes.templates);
       if (catRes.templates.length > 0) {
         setSelectedTemplateSlug(catRes.templates[0].slug);
       }
+      setCatalogPlan(prodRes.products?.[0]?.plans?.[0] || null);
       setNodes(nodeRes.nodes);
       if (nodeRes.nodes.length > 0) {
         setTargetNode(nodeRes.nodes[0].id);
@@ -106,10 +111,12 @@ export default function DevDeployPage() {
           nodeId: targetNode || 'default',
           projectName: projectName.trim(),
           envVars: envObj,
+          cpuLimit: catalogCpuLimit,
+          memoryLimit: catalogMemoryLimit,
         });
         setDeployLogs((prev) => [
           ...prev,
-          `[CATALOG] Triggered deployment for template '${selectedTemplateSlug}'`,
+          `[CATALOG] Triggered deployment for template '${selectedTemplateSlug}' with specs ${catalogCpuLimit} vCPU, ${catalogMemoryLimit} RAM`,
           `[PROVISION] Workload container '${res.deployment.id}' initialized on node '${targetNode || 'default'}'`,
           `[INGRESS] Domain assigned: ${res.deployment.subdomain ?? projectName + '.shanutechx.app'}`,
           `[SUCCESS] 200 OK — Workload active and healthy!`,
@@ -167,7 +174,7 @@ export default function DevDeployPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-white/5 text-neutral-300 border border-white/15">
               Dev Portal
             </span>
             <span className="text-xs text-text-faint">• Live Database Engine</span>
@@ -200,7 +207,7 @@ export default function DevDeployPage() {
               onClick={() => setActiveTab('git')}
               className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all border ${
                 activeTab === 'git'
-                  ? 'bg-violet-500/20 text-violet-300 border-violet-500/40 shadow-sm'
+                  ? 'bg-violet-500/20 text-neutral-300 border-white/15 shadow-sm'
                   : 'text-text-muted hover:text-white border-transparent hover:bg-white/[0.04]'
               }`}
             >
@@ -271,7 +278,7 @@ export default function DevDeployPage() {
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
                 required
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-white/30"
               />
             </div>
 
@@ -280,7 +287,7 @@ export default function DevDeployPage() {
               <select
                 value={targetNode}
                 onChange={(e) => setTargetNode(e.target.value)}
-                className="w-full bg-[#121324] border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
+                className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-white/30"
               >
                 {nodes.length > 0 ? (
                   nodes.map((n) => (
@@ -301,7 +308,7 @@ export default function DevDeployPage() {
                 placeholder="api.example.com"
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-white/30"
               />
             </div>
           </div>
@@ -332,7 +339,7 @@ export default function DevDeployPage() {
                     placeholder="https://github.com/organization/my-api-service.git"
                     value={gitRepoUrl}
                     onChange={(e) => setGitRepoUrl(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-white/30"
                   />
                 </div>
 
@@ -343,7 +350,7 @@ export default function DevDeployPage() {
                     placeholder="main"
                     value={gitBranch}
                     onChange={(e) => setGitBranch(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-white/30"
                   />
                 </div>
               </div>
@@ -356,7 +363,7 @@ export default function DevDeployPage() {
                     placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                     value={githubToken}
                     onChange={(e) => setGithubToken(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-white/30"
                   />
                 </div>
               )}
@@ -421,12 +428,72 @@ export default function DevDeployPage() {
                       }`}
                     >
                       <p className="text-xs font-bold text-white">{tmpl.name}</p>
-                      <span className="text-[10px] text-emerald-400 uppercase font-semibold">{tmpl.category}</span>
+                      <div className="flex items-center justify-between gap-1 mt-0.5">
+                        <span className="text-[10px] text-emerald-400 uppercase font-semibold">{tmpl.category}</span>
+                        {catalogPlan && (
+                          <span className="text-[10px] font-bold text-white font-mono">
+                            {catalogPlan.currency} {(catalogPlan.price / 100).toLocaleString()}/{catalogPlan.billingType === 'monthly' ? 'mo' : catalogPlan.billingType}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] text-text-muted mt-1 line-clamp-2">{tmpl.slogan || 'Ready to deploy'}</p>
+                      <div className="mt-2 text-[10px] text-neutral-400 font-mono bg-white/[0.03] px-1.5 py-0.5 rounded border border-white/5">
+                        {catalogPlan?.specsJson && typeof catalogPlan.specsJson === 'object' && (catalogPlan.specsJson as any).cpuCores
+                          ? `${(catalogPlan.specsJson as any).cpuCores} vCPU • ${((catalogPlan.specsJson as any).ramMb || 1024) >= 1024 ? `${((catalogPlan.specsJson as any).ramMb || 1024) / 1024}GB` : `${(catalogPlan.specsJson as any).ramMb}MB`} RAM • 1 Slot`
+                          : '0.5 vCPU • 1GB RAM • 1 Slot'}
+                      </div>
                     </button>
                   ))}
                 </div>
               )}
+
+              {/* Resource Limit Controls */}
+              <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-white font-semibold">Container Resource Specs (Cgroups Enforced)</span>
+                  <span className="text-[10px] font-mono text-emerald-400">Selected: {catalogCpuLimit} vCPU • {catalogMemoryLimit}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] text-neutral-400 mb-1">CPU Core Allocation:</label>
+                    <div className="grid grid-cols-3 gap-1">
+                      {(['0.5', '1.0', '2.0'] as const).map((core) => (
+                        <button
+                          key={core}
+                          type="button"
+                          onClick={() => setCatalogCpuLimit(core)}
+                          className={`py-1 text-xs rounded-lg border font-semibold transition-all ${
+                            catalogCpuLimit === core
+                              ? 'bg-white text-black border-white'
+                              : 'bg-white/5 text-neutral-300 border-white/10 hover:border-white/20'
+                          }`}
+                        >
+                          {core} vCPU
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-neutral-400 mb-1">Memory (RAM) Limit:</label>
+                    <div className="grid grid-cols-3 gap-1">
+                      {(['512M', '1G', '2G'] as const).map((mem) => (
+                        <button
+                          key={mem}
+                          type="button"
+                          onClick={() => setCatalogMemoryLimit(mem)}
+                          className={`py-1 text-xs rounded-lg border font-semibold transition-all ${
+                            catalogMemoryLimit === mem
+                              ? 'bg-white text-black border-white'
+                              : 'bg-white/5 text-neutral-300 border-white/10 hover:border-white/20'
+                          }`}
+                        >
+                          {mem}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -490,14 +557,14 @@ export default function DevDeployPage() {
                     placeholder="KEY_NAME (e.g. DATABASE_URL)"
                     value={env.key}
                     onChange={(e) => updateEnvVar(idx, e.target.value, env.value)}
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-violet-500"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-white/30"
                   />
                   <input
                     type="text"
                     placeholder="VALUE"
                     value={env.value}
                     onChange={(e) => updateEnvVar(idx, env.key, e.target.value)}
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-violet-500"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-white/30"
                   />
                   <button
                     type="button"
@@ -517,7 +584,7 @@ export default function DevDeployPage() {
             <button
               type="submit"
               disabled={isDeploying}
-              className="px-6 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-lg shadow-violet-500/25 transition-all disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-lg shadow-md transition-all disabled:opacity-50"
             >
               {isDeploying ? 'Deploying Workload...' : 'Trigger One-Click Deploy'}
             </button>

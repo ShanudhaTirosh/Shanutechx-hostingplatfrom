@@ -272,7 +272,7 @@ export default function AdminDatabasesPage() {
                 className="bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-violet/50 capitalize"
               >
                 {DB_TYPES.map((t) => (
-                  <option key={t} value={t} className="bg-[#0a0a14] capitalize">
+                  <option key={t} value={t} className="bg-[#0a0a0c] capitalize">
                     {t}
                   </option>
                 ))}

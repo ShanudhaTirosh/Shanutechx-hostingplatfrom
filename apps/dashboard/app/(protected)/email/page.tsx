@@ -631,17 +631,17 @@ EOF`;
   const isAdminOrDev = userRole === 'admin' || userRole === 'dev';
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 md:p-8 space-y-8 animate-fade-in">
+    <div className="min-h-screen bg-[#0a0a0c] text-slate-100 font-sans p-4 md:p-8 space-y-8 animate-fade-in">
       {/* HEADER SECTION */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-[#0c0d12] border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold text-2xl shadow-xl shadow-indigo-500/20">
+          <div className="h-14 w-14 rounded-2xl bg-white text-black font-bold flex items-center justify-center font-bold text-2xl shadow-xl shadow-md">
             <Mail className="h-7 w-7" />
           </div>
           <div>
             <h1 className="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-3">
               <span>Business Email & DNS Management</span>
-              <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
+              <span className="bg-white/10 text-white border border-white/15 text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
                 WildDuck Engine
               </span>
             </h1>
@@ -661,14 +661,14 @@ EOF`;
               setCreateQuotaMb(Math.min(1024, planQuotas?.remainingStorageMb || 1024));
               setShowCreateModal(true);
             }}
-            className="px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs md:text-sm shadow-xl shadow-indigo-600/30 transition-all flex items-center gap-2"
+            className="px-5 py-3 rounded-2xl bg-white text-black hover:bg-neutral-200 font-bold text-xs md:text-sm shadow-xl shadow-md transition-all flex items-center gap-2"
           >
             <Plus className="h-4 w-4" />
             <span>+ Create Mailbox</span>
           </button>
           <button
             onClick={() => handleOpenWebmail()}
-            className="px-5 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs md:text-sm shadow-xl shadow-indigo-600/30 transition-all flex items-center gap-2"
+            className="px-5 py-3 rounded-2xl bg-white text-black hover:bg-neutral-200 font-bold text-xs md:text-sm shadow-md transition-all flex items-center gap-2"
           >
             <ExternalLink className="h-4 w-4" />
             <span>Launch Webmail Portal ↗</span>
@@ -677,7 +677,7 @@ EOF`;
       </div>
 
       {/* NAVIGATION TABS */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto">
+      <div className="flex items-center gap-2 border-b border-white/10 pb-3 overflow-x-auto">
         {[
           { id: 'mailboxes', label: 'Mailboxes & Aliases', icon: Mail },
           { id: 'inbox', label: 'Inbox & Live Messages', icon: Inbox },
@@ -698,8 +698,8 @@ EOF`;
               onClick={() => setActiveTab(tab.id as any)}
               className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
                 activeTab === tab.id
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                  : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-white text-black font-bold shadow-md'
+                  : 'bg-white/5 text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -714,19 +714,19 @@ EOF`;
         <div className="space-y-6">
           {/* PLAN QUOTAS SUMMARY CARD */}
           {planQuotas && (
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-2xl relative overflow-hidden">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+            <div className="bg-[#0c0d12] border border-white/10 rounded-3xl p-6 md:p-8 space-y-6 shadow-2xl relative overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-5">
                 <div className="space-y-1">
                   <div className="flex items-center gap-3 flex-wrap">
                     <h2 className="text-base md:text-lg font-black text-white flex items-center gap-2">
-                      <ShieldCheck className="h-5 w-5 text-indigo-400" />
+                      <ShieldCheck className="h-5 w-5 text-white" />
                       <span>Subscription Plan & Storage Quotas</span>
                     </h2>
                     <span
                       className={`text-[11px] font-black uppercase px-3 py-1 rounded-full border ${
                         planQuotas.isDev
                           ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                          : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+                          : 'bg-white/10 text-white border-white/15'
                       }`}
                     >
                       {planQuotas.isDev ? 'Dev Superuser — Full Platform Bypass' : planQuotas.planName}
@@ -741,7 +741,7 @@ EOF`;
 
                 <a
                   href="/billing"
-                  className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 px-4 py-2 rounded-xl border border-indigo-500/20 transition-all self-start md:self-auto"
+                  className="text-xs font-bold text-white hover:text-neutral-300 flex items-center gap-1.5 bg-white/10 hover:bg-white/10 px-4 py-2 rounded-xl border border-white/10 transition-all self-start md:self-auto"
                 >
                   <span>Manage Plan & Add-ons</span>
                   <ArrowUpRight className="h-3.5 w-3.5" />
@@ -751,13 +751,13 @@ EOF`;
               {/* 3 Metric Columns */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* 1. Storage Pool */}
-                <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-5 space-y-3">
+                <div className="bg-[#0a0a0c]/60 border border-white/10/80 rounded-2xl p-5 space-y-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-slate-300 flex items-center gap-2">
-                      <HardDrive className="h-4 w-4 text-indigo-400" />
+                      <HardDrive className="h-4 w-4 text-white" />
                       <span>Storage Pool Usage</span>
                     </span>
-                    <span className="font-mono font-bold text-indigo-400">
+                    <span className="font-mono font-bold text-white">
                       {planQuotas.isDev
                         ? `${planQuotas.allocatedStorageMb} MB (Dev)`
                         : `${Math.min(100, Math.round((planQuotas.allocatedStorageMb / (planQuotas.maxStorageMb || 1)) * 100))}%`}
@@ -790,13 +790,13 @@ EOF`;
                 </div>
 
                 {/* 2. Mailbox Slots */}
-                <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-5 space-y-3">
+                <div className="bg-[#0a0a0c]/60 border border-white/10/80 rounded-2xl p-5 space-y-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-slate-300 flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-purple-400" />
+                      <Mail className="h-4 w-4 text-white" />
                       <span>Mailbox Slots</span>
                     </span>
-                    <span className="font-mono font-bold text-purple-400">
+                    <span className="font-mono font-bold text-white">
                       {planQuotas.isDev ? `${planQuotas.usedMailboxes} Active` : `${planQuotas.usedMailboxes} / ${planQuotas.maxMailboxes}`}
                     </span>
                   </div>
@@ -827,7 +827,7 @@ EOF`;
                 </div>
 
                 {/* 3. Daily Rate & Protocols */}
-                <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-5 space-y-2 text-xs">
+                <div className="bg-[#0a0a0c]/60 border border-white/10/80 rounded-2xl p-5 space-y-2 text-xs">
                   <span className="font-bold text-slate-300 flex items-center gap-2">
                     <Zap className="h-4 w-4 text-emerald-400" />
                     <span>Sending Limits & Gateways</span>
@@ -845,7 +845,7 @@ EOF`;
                     </div>
                     <div className="flex justify-between text-slate-300">
                       <span className="text-slate-400">REST API & SMTP:</span>
-                      <span className="font-bold text-indigo-400">Active & Enabled</span>
+                      <span className="font-bold text-white">Active & Enabled</span>
                     </div>
                   </div>
                 </div>
@@ -889,7 +889,7 @@ EOF`;
                 setCreateQuotaMb(Math.min(1024, planQuotas?.remainingStorageMb || 1024));
                 setShowCreateModal(true);
               }}
-              className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2 self-start sm:self-auto"
+              className="px-5 py-2.5 rounded-2xl bg-white text-black hover:bg-neutral-200 font-bold text-xs shadow-lg shadow-sm transition-all flex items-center gap-2 self-start sm:self-auto"
             >
               <Plus className="h-4 w-4" />
               <span>+ Create Mailbox</span>
@@ -898,7 +898,7 @@ EOF`;
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {mailboxes.length === 0 ? (
-              <div className="col-span-full bg-slate-900/50 border border-slate-800 rounded-3xl p-12 text-center space-y-4">
+              <div className="col-span-full bg-slate-900/50 border border-white/10 rounded-3xl p-12 text-center space-y-4">
                 <Mail className="h-12 w-12 text-slate-600 mx-auto" />
                 <h3 className="text-base font-bold text-white">No Mailboxes Provisioned Yet</h3>
                 <p className="text-xs text-slate-400 max-w-md mx-auto">
@@ -912,7 +912,7 @@ EOF`;
                     setCreateQuotaMb(Math.min(1024, planQuotas?.remainingStorageMb || 1024));
                     setShowCreateModal(true);
                   }}
-                  className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg transition-all inline-flex items-center gap-2"
+                  className="px-5 py-2.5 rounded-2xl bg-white text-black hover:bg-neutral-200 font-bold text-xs shadow-lg transition-all inline-flex items-center gap-2"
                 >
                   <Plus className="h-4 w-4" />
                   <span>Create First Mailbox</span>
@@ -927,7 +927,7 @@ EOF`;
                   <div
                     key={mb.id}
                     className={`bg-slate-900 border rounded-3xl p-6 space-y-5 transition-all shadow-xl ${
-                      selectedMailboxId === mb.id ? 'border-indigo-500 shadow-indigo-500/10' : 'border-slate-800 hover:border-slate-700'
+                      selectedMailboxId === mb.id ? 'border-white/30 shadow-md' : 'border-white/10 hover:border-white/10'
                     }`}
                   >
                     <div className="flex items-start gap-3.5">
@@ -937,10 +937,10 @@ EOF`;
                           <img
                             src={mb.profile.avatarUrl}
                             alt={mb.profile?.displayName || mb.username}
-                            className="h-12 w-12 rounded-2xl object-cover border-2 border-indigo-500/40 shadow-md shadow-indigo-500/10"
+                            className="h-12 w-12 rounded-2xl object-cover border-2 border-white/30/40 shadow-md shadow-md"
                           />
                         ) : (
-                          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 text-white font-bold text-base flex items-center justify-center border-2 border-indigo-500/30 shadow-md">
+                          <div className="h-12 w-12 rounded-2xl bg-white/10 text-white font-bold text-base flex items-center justify-center border border-white/20 shadow-md">
                             {(mb.profile?.displayName || mb.username || 'M').charAt(0).toUpperCase()}
                           </div>
                         )}
@@ -966,12 +966,12 @@ EOF`;
                             </span>
                           )}
                           {mb.myPermissions && userRole !== 'dev' && (
-                            <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            <span className="bg-white/10 text-neutral-300 border border-white/15 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
                               {mb.myPermissions.includes('write') ? 'Read & Write' : 'Read-Only'}
                             </span>
                           )}
                         </div>
-                        <span className="font-mono text-xs text-indigo-400 block truncate mt-0.5">{mb.email}</span>
+                        <span className="font-mono text-xs text-white block truncate mt-0.5">{mb.email}</span>
                         {mb.profile?.jobTitle && (
                           <span className="text-[11px] text-slate-400 font-sans block truncate mt-0.5">
                             {mb.profile.jobTitle} {mb.profile.company ? `• ${mb.profile.company}` : ''}
@@ -999,7 +999,7 @@ EOF`;
                               setQuotaModalMailbox(mb);
                               setTargetQuotaMb(mb.storageQuotaMb || 1024);
                             }}
-                            className="text-indigo-400 hover:text-indigo-300 font-sans font-bold text-[10px] bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-0.5 rounded-lg border border-indigo-500/20 flex items-center gap-1 transition-all"
+                            className="text-white hover:text-neutral-300 font-sans font-bold text-[10px] bg-white/10 hover:bg-white/10 px-2 py-0.5 rounded-lg border border-white/10 flex items-center gap-1 transition-all"
                             title="Adjust Storage Quota"
                           >
                             <Sliders className="h-3 w-3" />
@@ -1023,7 +1023,7 @@ EOF`;
                       {hasAliases ? (
                         <div className="flex flex-wrap gap-1.5">
                           {mb.aliases!.map((alias) => (
-                            <span key={alias} className="bg-slate-800 text-slate-200 text-[11px] font-mono px-2.5 py-1 rounded-xl border border-slate-700/60">
+                            <span key={alias} className="bg-slate-800 text-slate-200 text-[11px] font-mono px-2.5 py-1 rounded-xl border border-white/10/60">
                               {alias}
                             </span>
                           ))}
@@ -1034,7 +1034,7 @@ EOF`;
                             setSelectedMailboxId(mb.id);
                             setActiveTab('aliases');
                           }}
-                          className="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-2xl py-2 px-3 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                          className="w-full bg-white/10 hover:bg-white/10 text-white border border-white/15 rounded-2xl py-2 px-3 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                         >
                           <Plus className="h-3.5 w-3.5" />
                           <span>Configure Alias Prompt</span>
@@ -1043,15 +1043,15 @@ EOF`;
                     </div>
 
                     {/* Action Footer */}
-                    <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-2 flex-wrap">
                         {/* Profile & Branding Button */}
                         <button
                           onClick={() => setProfileModalMailbox(mb)}
-                          className="px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-white font-bold text-xs transition-all flex items-center gap-1.5 border border-purple-500/30"
+                          className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs transition-all flex items-center gap-1.5 border border-white/15"
                           title="Configure Mailbox Profile Picture & Info"
                         >
-                          <UserCircle className="h-3.5 w-3.5 text-purple-400" />
+                          <UserCircle className="h-3.5 w-3.5 text-white" />
                           <span>Profile & Branding</span>
                         </button>
 
@@ -1069,9 +1069,9 @@ EOF`;
 
                         <button
                           onClick={() => handleOpenWebsiteConnect(mb)}
-                          className="px-3 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white font-bold text-xs transition-all flex items-center gap-1.5 border border-indigo-500/30"
+                          className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/10 text-neutral-300 hover:text-white font-bold text-xs transition-all flex items-center gap-1.5 border border-white/15"
                         >
-                          <Plug className="h-3.5 w-3.5 text-indigo-400" />
+                          <Plug className="h-3.5 w-3.5 text-white" />
                           <span>Connect & API</span>
                         </button>
                       </div>
@@ -1091,7 +1091,7 @@ EOF`;
 
                         <button
                           onClick={() => handleOpenWebmail(mb)}
-                          className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1"
+                          className="px-3.5 py-1.5 rounded-xl bg-white text-black hover:bg-neutral-200 font-bold text-xs shadow-md transition-all flex items-center gap-1"
                         >
                           <span>Webmail</span>
                           <ChevronRight className="h-3.5 w-3.5" />
@@ -1109,11 +1109,11 @@ EOF`;
       {/* TAB: INBOX & LIVE MESSAGES */}
       {activeTab === 'inbox' && (
         <div className="space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 md:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
               <div>
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <Inbox className="h-5 w-5 text-indigo-400" />
+                  <Inbox className="h-5 w-5 text-white" />
                   Live Mailbox Messages
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
@@ -1132,7 +1132,7 @@ EOF`;
                 </button>
                 <button
                   onClick={() => handleOpenWebmail()}
-                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition-all"
+                  className="px-3.5 py-2 rounded-xl bg-white text-black hover:bg-neutral-200 font-bold text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-sm transition-all"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                   <span>Launch Full Webmail UI</span>
@@ -1150,7 +1150,7 @@ EOF`;
                     setSelectedMailboxId(e.target.value);
                     setSelectedInboxMsg(null);
                   }}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                 >
                   {mailboxes.map((m) => (
                     <option key={m.id} value={m.id}>
@@ -1171,7 +1171,7 @@ EOF`;
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') loadInboxMessages(selectedMailboxId, inboxSearch);
                     }}
-                    className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 placeholder-slate-600"
+                    className="flex-1 bg-[#0a0a0c] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-white/30 placeholder-slate-600"
                   />
                   <button
                     onClick={() => loadInboxMessages(selectedMailboxId, inboxSearch)}
@@ -1186,10 +1186,10 @@ EOF`;
             {/* Master-Detail Messages View */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[420px]">
               {/* Message List */}
-              <div className="lg:col-span-5 bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden flex flex-col">
-                <div className="p-3 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider flex justify-between items-center bg-slate-900/40">
+              <div className="lg:col-span-5 bg-[#0a0a0c] border border-white/10 rounded-2xl overflow-hidden flex flex-col">
+                <div className="p-3 border-b border-white/10 text-[11px] font-bold text-slate-400 uppercase tracking-wider flex justify-between items-center bg-slate-900/40">
                   <span>Inbox ({inboxMessages.length})</span>
-                  {inboxLoading && <RefreshCw className="h-3 w-3 animate-spin text-indigo-400" />}
+                  {inboxLoading && <RefreshCw className="h-3 w-3 animate-spin text-white" />}
                 </div>
 
                 <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 max-h-[500px]">
@@ -1206,8 +1206,8 @@ EOF`;
                           onClick={() => setSelectedInboxMsg(msg)}
                           className={`p-3.5 cursor-pointer transition-all ${
                             isSelected
-                              ? 'bg-indigo-600/15 border-l-4 border-indigo-500'
-                              : 'hover:bg-slate-900/60'
+                              ? 'bg-white/10 border-l-4 border-white'
+                              : 'hover:bg-white/5'
                           }`}
                         >
                           <div className="flex items-center justify-between mb-1">
@@ -1218,7 +1218,7 @@ EOF`;
                               {msg.createdAt ? new Date(msg.createdAt).toLocaleDateString() : ''}
                             </span>
                           </div>
-                          <div className={`text-xs truncate ${!msg.isRead ? 'font-semibold text-indigo-200' : 'text-slate-400'}`}>
+                          <div className={`text-xs truncate ${!msg.isRead ? 'font-semibold text-white' : 'text-slate-400'}`}>
                             {msg.subject || '(no subject)'}
                           </div>
                           <div className="text-[11px] text-slate-500 truncate mt-0.5">
@@ -1232,10 +1232,10 @@ EOF`;
               </div>
 
               {/* Message Detail / Preview */}
-              <div className="lg:col-span-7 bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col">
+              <div className="lg:col-span-7 bg-[#0a0a0c] border border-white/10 rounded-2xl p-5 flex flex-col">
                 {selectedInboxMsg ? (
                   <div className="space-y-4 flex-1 flex flex-col">
-                    <div className="border-b border-slate-800 pb-3 flex justify-between items-start gap-3">
+                    <div className="border-b border-white/10 pb-3 flex justify-between items-start gap-3">
                       <div>
                         <h3 className="text-sm font-bold text-white">{selectedInboxMsg.subject || '(no subject)'}</h3>
                         <div className="text-xs text-slate-400 mt-1">
@@ -1247,14 +1247,14 @@ EOF`;
                       </div>
                       <button
                         onClick={() => handleOpenWebmail()}
-                        className="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold flex items-center gap-1 shrink-0"
+                        className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white border border-white/15 text-xs font-semibold flex items-center gap-1 shrink-0"
                       >
                         <ExternalLink className="h-3 w-3" />
                         Reply in Webmail
                       </button>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto max-h-[420px] text-xs text-slate-200 leading-relaxed font-sans bg-slate-900/30 p-4 rounded-xl border border-slate-800/80">
+                    <div className="flex-1 overflow-y-auto max-h-[420px] text-xs text-slate-200 leading-relaxed font-sans bg-slate-900/30 p-4 rounded-xl border border-white/10/80">
                       {selectedInboxMsg.htmlBody ? (
                         <div dangerouslySetInnerHTML={{ __html: selectedInboxMsg.htmlBody }} />
                       ) : (
@@ -1284,8 +1284,8 @@ EOF`;
             smtpUsername={activeMailbox?.username}
           />
 
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 gap-4">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 md:p-8 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-white/10 pb-4 gap-4">
               <div>
                 <h2 className="text-base font-bold text-white">Custom Domain Registration & DNS Verification</h2>
                 <p className="text-xs text-slate-400">Check required MX, SPF, DKIM, and DMARC records for your custom domain.</p>
@@ -1297,12 +1297,12 @@ EOF`;
                   value={newDomainName}
                   onChange={(e) => setNewDomainName(e.target.value)}
                   placeholder="company.com"
-                  className="bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                  className="bg-[#0a0a0c] border border-white/10 rounded-2xl px-4 py-2 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                 />
                 <button
                   type="submit"
                   disabled={addingDomain}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2 rounded-2xl shadow-lg transition-all"
+                  className="bg-white text-black hover:bg-neutral-200 font-bold text-xs px-4 py-2 rounded-2xl shadow-lg transition-all"
                 >
                   {addingDomain ? 'Adding...' : '+ Add Domain'}
                 </button>
@@ -1310,8 +1310,8 @@ EOF`;
             </div>
 
             {domains.map((dom) => (
-              <div key={dom.id} className="bg-slate-950 border border-slate-800 rounded-3xl p-6 space-y-5">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div key={dom.id} className="bg-[#0a0a0c] border border-white/10 rounded-3xl p-6 space-y-5">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
                   <div className="flex items-center gap-3">
                     <span className="font-mono font-black text-base text-white">{dom.domain}</span>
                     <span
@@ -1340,7 +1340,7 @@ EOF`;
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs font-mono">
                     <thead>
-                      <tr className="text-[11px] font-extrabold text-slate-500 uppercase border-b border-slate-800">
+                      <tr className="text-[11px] font-extrabold text-slate-500 uppercase border-b border-white/10">
                         <th className="pb-3">Record Type</th>
                         <th className="pb-3">Host / Name</th>
                         <th className="pb-3">Target Value</th>
@@ -1350,7 +1350,7 @@ EOF`;
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 text-slate-300">
                       <tr>
-                        <td className="py-3 font-bold text-indigo-400">
+                        <td className="py-3 font-bold text-white">
                           <div className="flex items-center gap-2">
                             <span>MX</span>
                             {dnsCheckDetails[dom.id]?.mx ? (
@@ -1366,14 +1366,14 @@ EOF`;
                         <td className="text-right">
                           <button
                             onClick={() => copyToClipboard(dom.mxRecord || '10 mail.shanutechx.com', 'MX Record')}
-                            className="text-indigo-400 hover:text-indigo-300 font-bold text-[11px] flex items-center gap-1 ml-auto"
+                            className="text-white hover:text-neutral-300 font-bold text-[11px] flex items-center gap-1 ml-auto"
                           >
                             <Copy className="h-3 w-3" /> Copy
                           </button>
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-3 font-bold text-indigo-400">
+                        <td className="py-3 font-bold text-white">
                           <div className="flex items-center gap-2">
                             <span>TXT (SPF)</span>
                             {dnsCheckDetails[dom.id]?.spf ? (
@@ -1389,14 +1389,14 @@ EOF`;
                         <td className="text-right">
                           <button
                             onClick={() => copyToClipboard(dom.spfRecord || 'v=spf1 include:mail.shanutechx.com ~all', 'SPF Record')}
-                            className="text-indigo-400 hover:text-indigo-300 font-bold text-[11px] flex items-center gap-1 ml-auto"
+                            className="text-white hover:text-neutral-300 font-bold text-[11px] flex items-center gap-1 ml-auto"
                           >
                             <Copy className="h-3 w-3" /> Copy
                           </button>
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-3 font-bold text-indigo-400">
+                        <td className="py-3 font-bold text-white">
                           <div className="flex items-center gap-2">
                             <span>TXT (DKIM)</span>
                             {dnsCheckDetails[dom.id]?.dkim ? (
@@ -1412,14 +1412,14 @@ EOF`;
                         <td className="text-right">
                           <button
                             onClick={() => copyToClipboard(dom.dkimRecord || 'v=DKIM1; k=rsa; p=MIGf...', 'DKIM Record')}
-                            className="text-indigo-400 hover:text-indigo-300 font-bold text-[11px] flex items-center gap-1 ml-auto"
+                            className="text-white hover:text-neutral-300 font-bold text-[11px] flex items-center gap-1 ml-auto"
                           >
                             <Copy className="h-3 w-3" /> Copy
                           </button>
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-3 font-bold text-indigo-400">
+                        <td className="py-3 font-bold text-white">
                           <div className="flex items-center gap-2">
                             <span>TXT (DMARC)</span>
                             {dnsCheckDetails[dom.id]?.dmarc ? (
@@ -1435,7 +1435,7 @@ EOF`;
                         <td className="text-right">
                           <button
                             onClick={() => copyToClipboard(dom.dmarcRecord || `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${dom.domain}`, 'DMARC Record')}
-                            className="text-indigo-400 hover:text-indigo-300 font-bold text-[11px] flex items-center gap-1 ml-auto"
+                            className="text-white hover:text-neutral-300 font-bold text-[11px] flex items-center gap-1 ml-auto"
                           >
                             <Copy className="h-3 w-3" /> Copy
                           </button>
@@ -1446,8 +1446,8 @@ EOF`;
                 </div>
 
                 {dnsCheckDetails[dom.id]?.message && (
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 text-xs font-mono text-slate-300 flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-indigo-400 shrink-0" />
+                  <div className="bg-slate-900 border border-white/10 rounded-2xl p-3 text-xs font-mono text-slate-300 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-white shrink-0" />
                     <span>{dnsCheckDetails[dom.id].message}</span>
                   </div>
                 )}
@@ -1460,8 +1460,8 @@ EOF`;
       {/* TAB 3: DEVELOPER CREDENTIALS & CODE SNIPPETS */}
       {activeTab === 'credentials' && (
         <div className="space-y-6 max-w-4xl mx-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
-            <div className="border-b border-slate-800 pb-4">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 md:p-8 space-y-6">
+            <div className="border-b border-white/10 pb-4">
               <h2 className="text-base font-bold text-white">SMTP & IMAP Developer Credentials</h2>
               <p className="text-xs text-slate-400">Use these parameters for programmatic email sending via Node.js Nodemailer, Python, or cURL.</p>
             </div>
@@ -1475,7 +1475,7 @@ EOF`;
                   setSelectedMailboxId(e.target.value);
                   setShowPassword(false);
                 }}
-                className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-[#0a0a0c] border border-white/10 rounded-2xl px-4 py-3 text-xs font-mono text-white focus:outline-none focus:border-white/30"
               >
                 {mailboxes.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -1487,8 +1487,8 @@ EOF`;
 
             {/* Connection Parameters Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-3 text-xs">
-                <span className="font-extrabold text-indigo-400 uppercase tracking-wider block">Outbound SMTP Server</span>
+              <div className="bg-[#0a0a0c] border border-white/10 rounded-2xl p-5 space-y-3 text-xs">
+                <span className="font-extrabold text-white uppercase tracking-wider block">Outbound SMTP Server</span>
                 <div className="space-y-2 font-mono">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Host:</span>
@@ -1509,8 +1509,8 @@ EOF`;
                 </div>
               </div>
 
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-3 text-xs">
-                <span className="font-extrabold text-indigo-400 uppercase tracking-wider block">Inbound IMAP Server</span>
+              <div className="bg-[#0a0a0c] border border-white/10 rounded-2xl p-5 space-y-3 text-xs">
+                <span className="font-extrabold text-white uppercase tracking-wider block">Inbound IMAP Server</span>
                 <div className="space-y-2 font-mono">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Host:</span>
@@ -1529,23 +1529,23 @@ EOF`;
             </div>
 
             {/* Authentication Credentials */}
-            <div className="bg-indigo-950/30 border border-indigo-500/20 rounded-2xl p-5 space-y-4">
-              <span className="font-extrabold text-xs uppercase tracking-wider text-indigo-300 block">Account Authentication</span>
+            <div className="bg-[#0a0a0c] border border-white/10 rounded-2xl p-5 space-y-4">
+              <span className="font-extrabold text-xs uppercase tracking-wider text-neutral-300 block">Account Authentication</span>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
                 <div>
                   <span className="text-slate-400 block mb-1">Username / Email</span>
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center">
+                  <div className="bg-[#0a0a0c] p-3 rounded-xl border border-white/10 flex justify-between items-center">
                     <span>{activeMailbox?.email || 'me@shanutechx.com'}</span>
-                    <button onClick={() => copyToClipboard(activeMailbox?.email || 'me@shanutechx.com', 'Username')} className="text-indigo-400 font-bold text-[11px]">
+                    <button onClick={() => copyToClipboard(activeMailbox?.email || 'me@shanutechx.com', 'Username')} className="text-white font-bold text-[11px]">
                       Copy
                     </button>
                   </div>
                 </div>
                 <div>
                   <span className="text-slate-400 block mb-1">Password</span>
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center">
+                  <div className="bg-[#0a0a0c] p-3 rounded-xl border border-white/10 flex justify-between items-center">
                     <span>{showPassword ? revealedPassword : '••••••••••••'}</span>
-                    <button onClick={handleRevealPassword} className="text-indigo-400 font-bold text-[11px]">
+                    <button onClick={handleRevealPassword} className="text-white font-bold text-[11px]">
                       {showPassword ? 'Hide' : 'Reveal'}
                     </button>
                   </div>
@@ -1557,10 +1557,10 @@ EOF`;
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-xs text-white uppercase tracking-wider flex items-center gap-2">
-                  <Code2 className="h-4 w-4 text-indigo-400" /> Code Integration Snippet
+                  <Code2 className="h-4 w-4 text-white" /> Code Integration Snippet
                 </span>
 
-                <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-1 bg-[#0a0a0c] p-1 rounded-xl border border-white/10">
                   {[
                     { id: 'node', label: 'Node.js (Nodemailer)' },
                     { id: 'python', label: 'Python (smtplib)' },
@@ -1570,7 +1570,7 @@ EOF`;
                       key={snip.id}
                       onClick={() => setSelectedCodeSnippet(snip.id as any)}
                       className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                        selectedCodeSnippet === snip.id ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+                        selectedCodeSnippet === snip.id ? 'bg-white text-black font-bold' : 'text-slate-400 hover:text-white'
                       }`}
                     >
                       {snip.label}
@@ -1579,7 +1579,7 @@ EOF`;
                 </div>
               </div>
 
-              <div className="relative bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
+              <div className="relative bg-[#0a0a0c] border border-white/10 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
                 <button
                   onClick={() => copyToClipboard(getCodeSnippet(), 'Code Snippet')}
                   className="absolute top-3 right-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-3 py-1 rounded-lg flex items-center gap-1 shadow"
@@ -1596,8 +1596,8 @@ EOF`;
       {/* TAB 4: EMAIL ALIAS CONFIGURATION */}
       {activeTab === 'aliases' && (
         <div className="space-y-6 max-w-3xl mx-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
-            <div className="border-b border-slate-800 pb-4">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 md:p-8 space-y-6">
+            <div className="border-b border-white/10 pb-4">
               <h2 className="text-base font-bold text-white">Mailbox Alias Management</h2>
               <p className="text-xs text-slate-400">Configure alias addresses (e.g. sales@domain.com, support@domain.com) routed directly into this mailbox.</p>
             </div>
@@ -1608,7 +1608,7 @@ EOF`;
               <select
                 value={selectedMailboxId}
                 onChange={(e) => setSelectedMailboxId(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-[#0a0a0c] border border-white/10 rounded-2xl px-4 py-3 text-xs font-mono text-white focus:outline-none focus:border-white/30"
               >
                 {mailboxes.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -1622,7 +1622,7 @@ EOF`;
             <form onSubmit={handleAddAlias} className="space-y-3">
               <label className="text-xs font-bold text-slate-300 block">Add New Alias</label>
               <div className="flex items-center gap-2">
-                <div className="flex-1 flex items-center bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white">
+                <div className="flex-1 flex items-center bg-[#0a0a0c] border border-white/10 rounded-2xl px-4 py-2.5 text-xs font-mono text-white">
                   <input
                     type="text"
                     value={newAliasPrefix}
@@ -1635,7 +1635,7 @@ EOF`;
                 <button
                   type="submit"
                   disabled={addingAlias}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-5 py-3 rounded-2xl shadow-lg transition-all"
+                  className="bg-white text-black hover:bg-neutral-200 font-bold text-xs px-5 py-3 rounded-2xl shadow-lg transition-all"
                 >
                   {addingAlias ? 'Adding...' : '+ Add Alias'}
                 </button>
@@ -1646,13 +1646,13 @@ EOF`;
             <div className="space-y-3">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Active Aliases ({activeMailbox?.aliases?.length || 0})</span>
               {(!activeMailbox?.aliases || activeMailbox.aliases.length === 0) ? (
-                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 text-center text-xs text-slate-500">
+                <div className="bg-[#0a0a0c] border border-white/10 rounded-2xl p-6 text-center text-xs text-slate-500">
                   No aliases configured yet for this mailbox.
                 </div>
               ) : (
                 <div className="space-y-2">
                   {activeMailbox.aliases.map((alias) => (
-                    <div key={alias} className="bg-slate-950 border border-slate-800 rounded-2xl p-3 px-4 flex items-center justify-between text-xs font-mono text-white">
+                    <div key={alias} className="bg-[#0a0a0c] border border-white/10 rounded-2xl p-3 px-4 flex items-center justify-between text-xs font-mono text-white">
                       <span>{alias}</span>
                       <button
                         onClick={() => handleRemoveAlias(alias.split('@')[0])}
@@ -1679,7 +1679,7 @@ EOF`;
             </div>
             <button
               onClick={() => setShowAddHostModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-2xl shadow-lg transition-all flex items-center gap-2"
+              className="bg-white text-black hover:bg-neutral-200 font-bold text-xs px-4 py-2.5 rounded-2xl shadow-lg transition-all flex items-center gap-2"
             >
               <Plus className="h-4 w-4" /> Add Mail Host Node
             </button>
@@ -1687,10 +1687,10 @@ EOF`;
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {mailHosts.map((h) => (
-              <div key={h.id} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
+              <div key={h.id} className="bg-slate-900 border border-white/10 rounded-3xl p-6 space-y-4 shadow-xl">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Server className="h-5 w-5 text-indigo-400" />
+                    <Server className="h-5 w-5 text-white" />
                     <span className="font-bold text-sm text-white">{h.label}</span>
                   </div>
                   <span
@@ -1721,7 +1721,7 @@ EOF`;
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-2">
                   <button
                     onClick={() => handleTestMailHost(h.id)}
                     className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs"
@@ -1742,8 +1742,8 @@ EOF`;
           {/* Add Mail Host Modal */}
           {showAddHostModal && (
             <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-md space-y-4 shadow-2xl">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 w-full max-w-md space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
                   <h3 className="font-bold text-sm text-white">Add WildDuck Mail Host Node</h3>
                   <button onClick={() => setShowAddHostModal(false)} className="text-slate-400 hover:text-white text-xs">✕</button>
                 </div>
@@ -1757,7 +1757,7 @@ EOF`;
                       value={hostLabel}
                       onChange={(e) => setHostLabel(e.target.value)}
                       placeholder="e.g. Mail Node US-East-1"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                      className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white"
                     />
                   </div>
 
@@ -1769,7 +1769,7 @@ EOF`;
                       value={hostHostname}
                       onChange={(e) => setHostHostname(e.target.value)}
                       placeholder="mail-node1.example.com"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                      className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white"
                     />
                   </div>
 
@@ -1781,7 +1781,7 @@ EOF`;
                       value={hostApiUrl}
                       onChange={(e) => setHostApiUrl(e.target.value)}
                       placeholder="http://1.2.3.4:8080"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                      className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white"
                     />
                   </div>
 
@@ -1793,7 +1793,7 @@ EOF`;
                       value={hostApiKey}
                       onChange={(e) => setHostApiKey(e.target.value)}
                       placeholder="Secret API key"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                      className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white"
                     />
                   </div>
 
@@ -1803,12 +1803,12 @@ EOF`;
                       id="isDefault"
                       checked={hostIsDefault}
                       onChange={(e) => setHostIsDefault(e.target.checked)}
-                      className="rounded bg-slate-950 border-slate-700 text-indigo-600"
+                      className="rounded bg-[#0a0a0c] border-white/10 text-indigo-600"
                     />
                     <label htmlFor="isDefault" className="text-xs text-slate-300 font-bold">Set as Default Primary Host Node</label>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                  <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
                     <button
                       type="button"
                       onClick={() => setShowAddHostModal(false)}
@@ -1819,7 +1819,7 @@ EOF`;
                     <button
                       type="submit"
                       disabled={submittingHost}
-                      className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold"
+                      className="px-4 py-2 rounded-xl bg-white text-black text-xs font-bold"
                     >
                       {submittingHost ? 'Testing & Saving...' : 'Save Mail Host'}
                     </button>
@@ -1836,7 +1836,7 @@ EOF`;
         <div className="space-y-6 max-w-4xl mx-auto">
           {/* Health Summary Banner */}
           {healthInfo && (
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-1">
                 <span className="text-xs text-slate-400 block">Overall Cluster Status</span>
                 <span className="text-lg font-black text-emerald-400 font-mono uppercase">{healthInfo.overallStatus}</span>
@@ -1847,18 +1847,18 @@ EOF`;
               </div>
               <div className="space-y-1">
                 <span className="text-xs text-slate-400 block">Pending Queue Tasks</span>
-                <span className="text-lg font-black text-indigo-400 font-mono">{healthInfo.tasksCount}</span>
+                <span className="text-lg font-black text-white font-mono">{healthInfo.tasksCount}</span>
               </div>
               <div className="space-y-1">
                 <span className="text-xs text-slate-400 block">Total Storage Allocated</span>
-                <span className="text-lg font-black text-purple-400 font-mono">{healthInfo.totalStorageMb} MB</span>
+                <span className="text-lg font-black text-white font-mono">{healthInfo.totalStorageMb} MB</span>
               </div>
             </div>
           )}
 
           {/* Bulk Provisioning Form */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
-            <div className="border-b border-slate-800 pb-4">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 md:p-8 space-y-6">
+            <div className="border-b border-white/10 pb-4">
               <h2 className="text-base font-bold text-white">Bulk Mailbox Creation (CSV or Naming Pattern)</h2>
               <p className="text-xs text-slate-400">Generate multiple corporate mailboxes simultaneously (e.g. employee1@domain.com ... employee10@domain.com).</p>
             </div>
@@ -1869,7 +1869,7 @@ EOF`;
                 <select
                   value={bulkUserId}
                   onChange={(e) => setBulkUserId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3 text-xs font-mono text-white"
+                  className="w-full bg-[#0a0a0c] border border-white/10 rounded-2xl px-4 py-3 text-xs font-mono text-white"
                 >
                   {usersList.map((u) => (
                     <option key={u.id} value={u.id}>
@@ -1888,7 +1888,7 @@ EOF`;
                     value={bulkDomain}
                     onChange={(e) => setBulkDomain(e.target.value)}
                     placeholder="company.com"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
+                    className="w-full bg-[#0a0a0c] border border-white/10 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
                   />
                 </div>
 
@@ -1900,7 +1900,7 @@ EOF`;
                     value={bulkPattern}
                     onChange={(e) => setBulkPattern(e.target.value)}
                     placeholder="user{n}"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
+                    className="w-full bg-[#0a0a0c] border border-white/10 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
                   />
                 </div>
               </div>
@@ -1914,7 +1914,7 @@ EOF`;
                     max={100}
                     value={bulkCount}
                     onChange={(e) => setBulkCount(parseInt(e.target.value, 10) || 1)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
+                    className="w-full bg-[#0a0a0c] border border-white/10 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
                   />
                 </div>
 
@@ -1924,7 +1924,7 @@ EOF`;
                     type="number"
                     value={bulkQuota}
                     onChange={(e) => setBulkQuota(parseInt(e.target.value, 10) || 1024)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
+                    className="w-full bg-[#0a0a0c] border border-white/10 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
                   />
                 </div>
 
@@ -1936,7 +1936,7 @@ EOF`;
                     value={bulkPassword}
                     onChange={(e) => setBulkPassword(e.target.value)}
                     placeholder="Minimum 8 characters"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
+                    className="w-full bg-[#0a0a0c] border border-white/10 rounded-2xl px-4 py-2.5 text-xs font-mono text-white"
                   />
                 </div>
               </div>
@@ -1945,7 +1945,7 @@ EOF`;
                 <button
                   type="submit"
                   disabled={submittingBulk}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-6 py-3 rounded-2xl shadow-lg transition-all"
+                  className="bg-white text-black hover:bg-neutral-200 font-bold text-xs px-6 py-3 rounded-2xl shadow-lg transition-all"
                 >
                   {submittingBulk ? 'Provisioning Mailboxes...' : `+ Provision ${bulkCount} Mailboxes Now`}
                 </button>
@@ -1958,8 +1958,8 @@ EOF`;
       {/* 1. CREATE MAILBOX MODAL */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 w-full max-w-lg space-y-5 shadow-2xl animate-fade-in">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 md:p-8 w-full max-w-lg space-y-5 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
                 <h3 className="font-black text-base text-white">Create New Corporate Mailbox</h3>
                 <p className="text-xs text-slate-400 mt-0.5">Provision an isolated mailbox with custom storage quota and credentials.</p>
@@ -1980,13 +1980,13 @@ EOF`;
                     value={createUsername}
                     onChange={(e) => setCreateUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
                     placeholder="alex"
-                    className="flex-1 bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                    className="flex-1 bg-[#0a0a0c] border border-white/10 rounded-2xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                   />
                   <span className="text-slate-400 font-mono text-xs">@</span>
                   <select
                     value={createDomain}
                     onChange={(e) => setCreateDomain(e.target.value)}
-                    className="bg-slate-950 border border-slate-700 rounded-2xl px-3 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                    className="bg-[#0a0a0c] border border-white/10 rounded-2xl px-3 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                   >
                     {domains.length > 0 ? (
                       domains.map((d) => (
@@ -2008,7 +2008,7 @@ EOF`;
                   <button
                     type="button"
                     onClick={() => setCreatePassword(generateStrongPassword())}
-                    className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                    className="text-[11px] font-bold text-white hover:text-neutral-300 flex items-center gap-1"
                   >
                     <Sparkles className="h-3 w-3" /> Generate Strong
                   </button>
@@ -2020,7 +2020,7 @@ EOF`;
                     value={createPassword}
                     onChange={(e) => setCreatePassword(e.target.value)}
                     placeholder="Minimum 8 characters"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs font-mono text-white pr-20 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-[#0a0a0c] border border-white/10 rounded-2xl px-4 py-2.5 text-xs font-mono text-white pr-20 focus:outline-none focus:border-white/30"
                   />
                   <button
                     type="button"
@@ -2036,7 +2036,7 @@ EOF`;
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-slate-300">Choose Storage Quota</label>
-                  <span className="text-xs font-mono text-indigo-400 font-bold">{createQuotaMb} MB</span>
+                  <span className="text-xs font-mono text-white font-bold">{createQuotaMb} MB</span>
                 </div>
 
                 <div className="grid grid-cols-4 gap-2">
@@ -2050,10 +2050,10 @@ EOF`;
                         onClick={() => setCreateQuotaMb(mb)}
                         className={`py-2 rounded-xl text-xs font-bold font-mono transition-all border ${
                           createQuotaMb === mb
-                            ? 'bg-indigo-600 text-white border-indigo-500 shadow-md'
+                            ? 'bg-white text-black font-bold border-white shadow-md'
                             : exceeds
-                            ? 'bg-slate-950/40 text-slate-600 border-slate-800/40 cursor-not-allowed'
-                            : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                            ? 'bg-[#0a0a0c]/40 text-slate-600 border-white/10/40 cursor-not-allowed'
+                            : 'bg-[#0a0a0c] text-slate-300 border-white/10 hover:border-white/10'
                         }`}
                       >
                         {mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`}
@@ -2071,7 +2071,7 @@ EOF`;
                     max={planQuotas?.isDev ? 100000 : planQuotas?.remainingStorageMb || 10240}
                     value={createQuotaMb}
                     onChange={(e) => setCreateQuotaMb(Math.max(100, parseInt(e.target.value, 10) || 100))}
-                    className="w-28 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                    className="w-28 bg-[#0a0a0c] border border-white/10 rounded-xl px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                   />
                   {planQuotas && !planQuotas.isDev && (
                     <span className="text-[11px] text-slate-400 font-mono">
@@ -2089,7 +2089,7 @@ EOF`;
                 )}
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
@@ -2104,7 +2104,7 @@ EOF`;
                     (!planQuotas?.isDev && (planQuotas?.remainingStorageMb ?? 0) < createQuotaMb) ||
                     (!planQuotas?.isDev && (planQuotas?.remainingMailboxes ?? 0) <= 0)
                   }
-                  className="px-6 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg transition-all"
+                  className="px-6 py-2.5 rounded-2xl bg-white text-black hover:bg-neutral-200 disabled:opacity-50 text-xs font-bold shadow-md transition-all"
                 >
                   {creatingMailbox ? 'Provisioning...' : 'Create Mailbox'}
                 </button>
@@ -2117,8 +2117,8 @@ EOF`;
       {/* 2. ADJUST QUOTA MODAL */}
       {quotaModalMailbox && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 w-full max-w-md space-y-5 shadow-2xl animate-fade-in">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 md:p-8 w-full max-w-md space-y-5 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
                 <h3 className="font-black text-base text-white">Adjust Storage Quota</h3>
                 <p className="text-xs text-slate-400 mt-0.5 font-mono">{quotaModalMailbox.email}</p>
@@ -2129,17 +2129,17 @@ EOF`;
             </div>
 
             <form onSubmit={handleUpdateQuota} className="space-y-4">
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs space-y-1.5 font-mono">
+              <div className="bg-[#0a0a0c] p-4 rounded-2xl border border-white/10 text-xs space-y-1.5 font-mono">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Current Used:</span>
                   <span className="text-white font-bold">{quotaModalMailbox.storageUsedMb} MB</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Current Quota:</span>
-                  <span className="text-indigo-400 font-bold">{quotaModalMailbox.storageQuotaMb} MB</span>
+                  <span className="text-white font-bold">{quotaModalMailbox.storageQuotaMb} MB</span>
                 </div>
                 {planQuotas && !planQuotas.isDev && (
-                  <div className="flex justify-between border-t border-slate-800 pt-1.5 text-slate-300">
+                  <div className="flex justify-between border-t border-white/10 pt-1.5 text-slate-300">
                     <span className="text-slate-400">Plan Pool Left:</span>
                     <span className="text-emerald-400 font-bold">{planQuotas.remainingStorageMb} MB</span>
                   </div>
@@ -2162,10 +2162,10 @@ EOF`;
                         onClick={() => setTargetQuotaMb(mb)}
                         className={`py-2 rounded-xl text-xs font-bold font-mono transition-all border ${
                           targetQuotaMb === mb
-                            ? 'bg-indigo-600 text-white border-indigo-500 shadow-md'
+                            ? 'bg-white text-black font-bold border-white shadow-md'
                             : exceeds
-                            ? 'bg-slate-950/40 text-slate-600 border-slate-800/40 cursor-not-allowed'
-                            : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                            ? 'bg-[#0a0a0c]/40 text-slate-600 border-white/10/40 cursor-not-allowed'
+                            : 'bg-[#0a0a0c] text-slate-300 border-white/10 hover:border-white/10'
                         }`}
                       >
                         {mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`}
@@ -2181,12 +2181,12 @@ EOF`;
                     min={Math.max(100, quotaModalMailbox.storageUsedMb)}
                     value={targetQuotaMb}
                     onChange={(e) => setTargetQuotaMb(parseInt(e.target.value, 10) || 1024)}
-                    className="w-32 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                    className="w-32 bg-[#0a0a0c] border border-white/10 rounded-xl px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
                 <button
                   type="button"
                   onClick={() => setQuotaModalMailbox(null)}
@@ -2197,7 +2197,7 @@ EOF`;
                 <button
                   type="submit"
                   disabled={updatingQuota}
-                  className="px-6 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg transition-all"
+                  className="px-6 py-2.5 rounded-2xl bg-white text-black hover:bg-neutral-200 disabled:opacity-50 text-xs font-bold shadow-md transition-all"
                 >
                   {updatingQuota ? 'Saving...' : 'Apply New Quota'}
                 </button>
@@ -2210,16 +2210,16 @@ EOF`;
       {/* 3. WEBSITE CONNECT & API INTEGRATION MODAL */}
       {websiteConnectMailbox && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 w-full max-w-4xl space-y-6 shadow-2xl animate-fade-in my-8 max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 md:p-8 w-full max-w-4xl space-y-6 shadow-2xl animate-fade-in my-8 max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-slate-800 pb-4 gap-4">
+            <div className="flex items-start justify-between border-b border-white/10 pb-4 gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <Plug className="h-5 w-5 text-indigo-400" />
+                  <Plug className="h-5 w-5 text-white" />
                   <h3 className="font-black text-lg text-white">Connect Website & Email REST API</h3>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
-                  Programmatic integration credentials and Resend-compatible API for <span className="font-mono text-indigo-300 font-bold">{websiteConnectMailbox.email}</span>
+                  Programmatic integration credentials and Resend-compatible API for <span className="font-mono text-neutral-300 font-bold">{websiteConnectMailbox.email}</span>
                 </p>
               </div>
               <button
@@ -2232,26 +2232,26 @@ EOF`;
 
             {loadingWebsiteConnect ? (
               <div className="py-16 text-center space-y-3">
-                <RefreshCw className="h-8 w-8 text-indigo-400 animate-spin mx-auto" />
+                <RefreshCw className="h-8 w-8 text-white animate-spin mx-auto" />
                 <p className="text-xs text-slate-400 font-mono">Loading connection parameters & security tokens...</p>
               </div>
             ) : websiteConnectData ? (
               <div className="space-y-6">
                 {/* Credentials Quick Bar */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-xs">
+                  <div className="bg-[#0a0a0c] p-3 rounded-2xl border border-white/10 text-xs">
                     <span className="text-slate-500 text-[10px] uppercase font-bold block">SMTP Host</span>
                     <span className="font-mono text-white font-bold truncate block">{websiteConnectData.mailbox.smtpHost}</span>
                   </div>
-                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-xs">
+                  <div className="bg-[#0a0a0c] p-3 rounded-2xl border border-white/10 text-xs">
                     <span className="text-slate-500 text-[10px] uppercase font-bold block">Ports</span>
-                    <span className="font-mono text-indigo-400 font-bold block">587 (TLS) / 465 (SSL)</span>
+                    <span className="font-mono text-white font-bold block">587 (TLS) / 465 (SSL)</span>
                   </div>
-                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-xs">
+                  <div className="bg-[#0a0a0c] p-3 rounded-2xl border border-white/10 text-xs">
                     <span className="text-slate-500 text-[10px] uppercase font-bold block">Username</span>
                     <span className="font-mono text-white font-bold truncate block">{websiteConnectData.credentials.username}</span>
                   </div>
-                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-xs">
+                  <div className="bg-[#0a0a0c] p-3 rounded-2xl border border-white/10 text-xs">
                     <span className="text-slate-500 text-[10px] uppercase font-bold block">Password</span>
                     <span className="font-mono text-emerald-400 font-bold truncate block">
                       {websiteConnectData.credentials.password ? '••••••••' : 'Configured'}
@@ -2260,7 +2260,7 @@ EOF`;
                 </div>
 
                 {/* Sub-Tabs for Integration Types */}
-                <div className="flex items-center gap-1.5 border-b border-slate-800 pb-2 overflow-x-auto">
+                <div className="flex items-center gap-1.5 border-b border-white/10 pb-2 overflow-x-auto">
                   {[
                     { id: 'wordpress', label: 'WordPress (WP Mail SMTP)' },
                     { id: 'resend', label: 'Resend-Style REST API' },
@@ -2276,8 +2276,8 @@ EOF`;
                       onClick={() => setWebsiteConnectTab(t.id as any)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
                         websiteConnectTab === t.id
-                          ? 'bg-indigo-600 text-white shadow-md'
-                          : 'bg-slate-950 text-slate-400 hover:text-white'
+                          ? 'bg-white text-black font-bold shadow-md'
+                          : 'bg-[#0a0a0c] text-slate-400 hover:text-white'
                       }`}
                     >
                       {t.label}
@@ -2288,21 +2288,21 @@ EOF`;
                 {/* Tab: WordPress */}
                 {websiteConnectTab === 'wordpress' && (
                   <div className="space-y-4 text-xs font-sans">
-                    <div className="bg-indigo-950/20 border border-indigo-500/20 rounded-2xl p-4 text-slate-300">
+                    <div className="bg-[#0a0a0c] border border-white/10 rounded-2xl p-4 text-slate-300">
                       <p className="font-bold text-white mb-1">WordPress Integration via WP Mail SMTP / FluentSMTP / Easy WP SMTP</p>
                       <p className="text-slate-400 text-xs">
                         Install your preferred SMTP plugin, select <strong>Other SMTP</strong>, and copy the parameters below:
                       </p>
                     </div>
 
-                    <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden font-mono text-xs">
+                    <div className="bg-[#0a0a0c] rounded-2xl border border-white/10 overflow-hidden font-mono text-xs">
                       <table className="w-full text-left">
                         <tbody className="divide-y divide-slate-800/80">
                           <tr className="hover:bg-slate-900/50">
                             <td className="p-3 text-slate-400 font-bold">From Email</td>
                             <td className="p-3 text-white">{websiteConnectData.configs.wordpress.fromEmail}</td>
                             <td className="p-3 text-right">
-                              <button onClick={() => copyToClipboard(websiteConnectData.configs.wordpress.fromEmail, 'From Email')} className="text-indigo-400 hover:text-indigo-300 font-bold">Copy</button>
+                              <button onClick={() => copyToClipboard(websiteConnectData.configs.wordpress.fromEmail, 'From Email')} className="text-white hover:text-neutral-300 font-bold">Copy</button>
                             </td>
                           </tr>
                           <tr className="hover:bg-slate-900/50">
@@ -2314,7 +2314,7 @@ EOF`;
                             <td className="p-3 text-slate-400 font-bold">SMTP Host</td>
                             <td className="p-3 text-white">{websiteConnectData.configs.wordpress.smtpHost}</td>
                             <td className="p-3 text-right">
-                              <button onClick={() => copyToClipboard(websiteConnectData.configs.wordpress.smtpHost, 'SMTP Host')} className="text-indigo-400 hover:text-indigo-300 font-bold">Copy</button>
+                              <button onClick={() => copyToClipboard(websiteConnectData.configs.wordpress.smtpHost, 'SMTP Host')} className="text-white hover:text-neutral-300 font-bold">Copy</button>
                             </td>
                           </tr>
                           <tr className="hover:bg-slate-900/50">
@@ -2326,7 +2326,7 @@ EOF`;
                             <td className="p-3 text-slate-400 font-bold">SMTP Port</td>
                             <td className="p-3 text-white">587 (or 465 SSL)</td>
                             <td className="p-3 text-right">
-                              <button onClick={() => copyToClipboard('587', 'Port')} className="text-indigo-400 hover:text-indigo-300 font-bold">Copy</button>
+                              <button onClick={() => copyToClipboard('587', 'Port')} className="text-white hover:text-neutral-300 font-bold">Copy</button>
                             </td>
                           </tr>
                           <tr className="hover:bg-slate-900/50">
@@ -2343,14 +2343,14 @@ EOF`;
                             <td className="p-3 text-slate-400 font-bold">SMTP Username</td>
                             <td className="p-3 text-white">{websiteConnectData.configs.wordpress.smtpUsername}</td>
                             <td className="p-3 text-right">
-                              <button onClick={() => copyToClipboard(websiteConnectData.configs.wordpress.smtpUsername, 'Username')} className="text-indigo-400 hover:text-indigo-300 font-bold">Copy</button>
+                              <button onClick={() => copyToClipboard(websiteConnectData.configs.wordpress.smtpUsername, 'Username')} className="text-white hover:text-neutral-300 font-bold">Copy</button>
                             </td>
                           </tr>
                           <tr className="hover:bg-slate-900/50">
                             <td className="p-3 text-slate-400 font-bold">SMTP Password</td>
                             <td className="p-3 text-emerald-400">{websiteConnectData.configs.wordpress.smtpPassword || '••••••••'}</td>
                             <td className="p-3 text-right">
-                              <button onClick={() => copyToClipboard(websiteConnectData.configs.wordpress.smtpPassword, 'Password')} className="text-indigo-400 hover:text-indigo-300 font-bold">Copy</button>
+                              <button onClick={() => copyToClipboard(websiteConnectData.configs.wordpress.smtpPassword, 'Password')} className="text-white hover:text-neutral-300 font-bold">Copy</button>
                             </td>
                           </tr>
                         </tbody>
@@ -2362,15 +2362,15 @@ EOF`;
                 {/* Tab: Resend REST API */}
                 {websiteConnectTab === 'resend' && (
                   <div className="space-y-4">
-                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs space-y-1">
-                      <span className="text-indigo-400 font-bold uppercase tracking-wider block text-[11px]">Resend-Compatible REST API Endpoint</span>
+                    <div className="bg-[#0a0a0c] p-4 rounded-2xl border border-white/10 text-xs space-y-1">
+                      <span className="text-white font-bold uppercase tracking-wider block text-[11px]">Resend-Compatible REST API Endpoint</span>
                       <p className="text-white font-mono text-xs">{websiteConnectData.apiEndpoint || 'POST /api/v1/emails'}</p>
                       <p className="text-slate-400 text-[11px] pt-1">
                         Use Bearer Token authentication with your platform API key or Basic Auth with mailbox credentials.
                       </p>
                     </div>
 
-                    <div className="relative bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
+                    <div className="relative bg-[#0a0a0c] border border-white/10 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
                       <button
                         onClick={() => copyToClipboard(websiteConnectData.configs.resendRestApi.curlSnippet, 'cURL Snippet')}
                         className="absolute top-3 right-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-3 py-1 rounded-lg flex items-center gap-1 shadow"
@@ -2380,34 +2380,34 @@ EOF`;
                       <pre className="text-emerald-400">{websiteConnectData.configs.resendRestApi.curlSnippet}</pre>
                     </div>
 
-                    <div className="relative bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
+                    <div className="relative bg-[#0a0a0c] border border-white/10 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
                       <button
                         onClick={() => copyToClipboard(websiteConnectData.configs.resendRestApi.fetchSnippet, 'Fetch Snippet')}
                         className="absolute top-3 right-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-3 py-1 rounded-lg flex items-center gap-1 shadow"
                       >
                         <Copy className="h-3 w-3" /> Copy Fetch
                       </button>
-                      <pre className="text-indigo-300">{websiteConnectData.configs.resendRestApi.fetchSnippet}</pre>
+                      <pre className="text-neutral-300">{websiteConnectData.configs.resendRestApi.fetchSnippet}</pre>
                     </div>
                   </div>
                 )}
 
                 {/* Tab: Next.js */}
                 {websiteConnectTab === 'nextjs' && (
-                  <div className="relative bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
+                  <div className="relative bg-[#0a0a0c] border border-white/10 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
                     <button
                       onClick={() => copyToClipboard(websiteConnectData.configs.nextjsSnippet, 'Next.js Snippet')}
                       className="absolute top-3 right-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-3 py-1 rounded-lg flex items-center gap-1 shadow"
                     >
                       <Copy className="h-3 w-3" /> Copy Next.js Code
                     </button>
-                    <pre className="text-indigo-300">{websiteConnectData.configs.nextjsSnippet}</pre>
+                    <pre className="text-neutral-300">{websiteConnectData.configs.nextjsSnippet}</pre>
                   </div>
                 )}
 
                 {/* Tab: Node.js */}
                 {websiteConnectTab === 'nodejs' && (
-                  <div className="relative bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
+                  <div className="relative bg-[#0a0a0c] border border-white/10 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
                     <button
                       onClick={() => copyToClipboard(websiteConnectData.configs.nodejsSnippet, 'Node.js Snippet')}
                       className="absolute top-3 right-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-3 py-1 rounded-lg flex items-center gap-1 shadow"
@@ -2420,7 +2420,7 @@ EOF`;
 
                 {/* Tab: Laravel */}
                 {websiteConnectTab === 'laravel' && (
-                  <div className="relative bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
+                  <div className="relative bg-[#0a0a0c] border border-white/10 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
                     <button
                       onClick={() => copyToClipboard(websiteConnectData.configs.laravelEnv, 'Laravel .env')}
                       className="absolute top-3 right-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-3 py-1 rounded-lg flex items-center gap-1 shadow"
@@ -2433,20 +2433,20 @@ EOF`;
 
                 {/* Tab: PHP */}
                 {websiteConnectTab === 'php' && (
-                  <div className="relative bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
+                  <div className="relative bg-[#0a0a0c] border border-white/10 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
                     <button
                       onClick={() => copyToClipboard(websiteConnectData.configs.phpSnippet, 'PHP Snippet')}
                       className="absolute top-3 right-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-3 py-1 rounded-lg flex items-center gap-1 shadow"
                     >
                       <Copy className="h-3 w-3" /> Copy PHP Code
                     </button>
-                    <pre className="text-purple-300">{websiteConnectData.configs.phpSnippet}</pre>
+                    <pre className="text-neutral-300">{websiteConnectData.configs.phpSnippet}</pre>
                   </div>
                 )}
 
                 {/* Tab: Python */}
                 {websiteConnectTab === 'python' && (
-                  <div className="relative bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
+                  <div className="relative bg-[#0a0a0c] border border-white/10 rounded-2xl p-4 font-mono text-xs overflow-x-auto">
                     <button
                       onClick={() => copyToClipboard(websiteConnectData.configs.pythonSnippet, 'Python Snippet')}
                       className="absolute top-3 right-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-3 py-1 rounded-lg flex items-center gap-1 shadow"
@@ -2459,7 +2459,7 @@ EOF`;
 
                 {/* Tab: Live Test Send */}
                 {websiteConnectTab === 'test' && (
-                  <form onSubmit={handleSendTestEmail} className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+                  <form onSubmit={handleSendTestEmail} className="bg-[#0a0a0c] p-5 rounded-2xl border border-white/10 space-y-4">
                     <div>
                       <h4 className="text-sm font-bold text-white mb-1">Send Real-Time Transactional Email</h4>
                       <p className="text-xs text-slate-400">
@@ -2475,7 +2475,7 @@ EOF`;
                         value={testRecipient}
                         onChange={(e) => setTestRecipient(e.target.value)}
                         placeholder="yourname@gmail.com"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                       />
                     </div>
 
@@ -2486,7 +2486,7 @@ EOF`;
                         required
                         value={testSubject}
                         onChange={(e) => setTestSubject(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                       />
                     </div>
 
@@ -2497,7 +2497,7 @@ EOF`;
                         required
                         value={testBody}
                         onChange={(e) => setTestBody(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                       />
                     </div>
 
@@ -2505,7 +2505,7 @@ EOF`;
                       <button
                         type="submit"
                         disabled={sendingTestMail}
-                        className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg transition-all flex items-center gap-2"
+                        className="px-6 py-2.5 rounded-xl bg-white text-black hover:bg-neutral-200 font-bold text-xs shadow-lg transition-all flex items-center gap-2"
                       >
                         <Send className="h-3.5 w-3.5" />
                         <span>{sendingTestMail ? 'Dispatching...' : 'Send Live Test Email'}</span>

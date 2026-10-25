@@ -117,23 +117,64 @@ export default function DevVpsFleetPage() {
     api.admin
       .allUsers(searchQuery)
       .then((res: any) => {
-        const list: AllUserItem[] = res.users || [];
+        let list: AllUserItem[] = res.users || [];
+        if (apiUser && !list.some((u) => u.id === apiUser.id || u.email.toLowerCase() === apiUser.email.toLowerCase())) {
+          list = [
+            {
+              id: apiUser.id,
+              email: apiUser.email,
+              displayName: apiUser.displayName || 'My Dev Account',
+              role: apiUser.role,
+              totalSpent: 0,
+              vpsCount: 0,
+              paidOrderCount: 0,
+              hasPaidVps: true,
+            },
+            ...list,
+          ];
+        }
         setUserOptions(list);
         if (list.length > 0 && !targetUserId) {
-          setTargetUserId(list[0].id);
+          setTargetUserId(apiUser ? apiUser.id : list[0].id);
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (apiUser) {
+          setUserOptions([
+            {
+              id: apiUser.id,
+              email: apiUser.email,
+              displayName: apiUser.displayName || 'My Dev Account',
+              role: apiUser.role,
+              totalSpent: 0,
+              vpsCount: 0,
+              paidOrderCount: 0,
+              hasPaidVps: true,
+            },
+          ]);
+          if (!targetUserId) setTargetUserId(apiUser.id);
+        }
+      })
       .finally(() => setLoadingUsers(false));
   }
 
   useEffect(load, []);
 
+  // Initial load when modal opens
   useEffect(() => {
     if (addModal && isStaff) {
-      loadAllUsers(userSearchQuery);
+      loadAllUsers();
     }
-  }, [addModal, isStaff, userSearchQuery]);
+  }, [addModal, isStaff, apiUser]);
+
+  // Debounced server search for extensive user catalogs
+  useEffect(() => {
+    if (!addModal || !isStaff || !userSearchQuery.trim()) return;
+    const timer = setTimeout(() => {
+      loadAllUsers(userSearchQuery.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [userSearchQuery, addModal, isStaff]);
 
   function openFulfillModal(item?: AdminVpsItem) {
     setSelectedProvision(item || null);
@@ -147,6 +188,8 @@ export default function DevVpsFleetPage() {
       setManualProvider(item.provider || 'Leaseweb');
       setManualNotes(item.notes || '');
     } else {
+      // Default to dev user account automatically if no user selected
+      setTargetUserId(apiUser?.id || '');
       setManualIp('');
       setManualPort(22);
       setManualUsername('root');
@@ -215,13 +258,15 @@ export default function DevVpsFleetPage() {
         });
         toast('VPS provision details updated and customer notified.', 'success');
       } else {
-        if (!targetUserId) {
-          toast('Target customer selection is required', 'error');
+        // Automatically default to dev user if none explicitly selected
+        const finalUserId = targetUserId.trim() || apiUser?.id || '';
+        if (!finalUserId) {
+          toast('Target user selection is required', 'error');
           setBusyId(null);
           return;
         }
         await api.vps.create({
-          userId: targetUserId,
+          userId: finalUserId,
           orderItemId: `manual-${Date.now()}`,
           provider: manualProvider,
           ip: manualIp,
@@ -229,7 +274,7 @@ export default function DevVpsFleetPage() {
           username: manualUsername,
           password: manualPassword || manualSshPrivateKey || 'STX-default-key',
         });
-        toast('VPS provisioned and delivered to customer account.', 'success');
+        toast('VPS provisioned and delivered to user account.', 'success');
       }
       setAddModal(false);
       setSelectedProvision(null);
@@ -289,7 +334,17 @@ export default function DevVpsFleetPage() {
   const activeCount = provisions?.filter((p) => p.status === 'provisioned').length || 0;
   const totalCount = provisions?.length || 0;
 
-  const selectedUserObj = userOptions.find((u) => u.id === targetUserId);
+  const effectiveUserId = targetUserId || apiUser?.id || '';
+  const selectedUserObj =
+    userOptions.find((u) => u.id === effectiveUserId) ||
+    (apiUser && effectiveUserId === apiUser.id
+      ? {
+          id: apiUser.id,
+          email: apiUser.email,
+          displayName: apiUser.displayName || 'Dev User',
+          role: apiUser.role,
+        }
+      : null);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -459,10 +514,22 @@ export default function DevVpsFleetPage() {
                     </label>
                     {selectedUserObj && (
                       <span className="text-[10px] font-mono text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                        Selected: {selectedUserObj.email}
+                        Selected: {selectedUserObj.email} {!targetUserId || targetUserId === apiUser?.id ? '(Default Dev)' : ''}
                       </span>
                     )}
                   </div>
+
+                  {/* Quick-assign to current staff/dev account shortcut */}
+                  {apiUser && targetUserId !== apiUser.id && (
+                    <button
+                      type="button"
+                      onClick={() => setTargetUserId(apiUser.id)}
+                      className="text-[11px] text-neutral-300 hover:text-white flex items-center gap-1.5 px-2.5 py-1 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-colors w-fit"
+                    >
+                      <IconUser size={12} className="text-white" />
+                      <span>Assign to My Account ({apiUser.email})</span>
+                    </button>
+                  )}
 
                   {/* Customer Search Input */}
                   <div className="relative">
@@ -471,32 +538,59 @@ export default function DevVpsFleetPage() {
                       placeholder="Search customer by email, display name, or user ID..."
                       value={userSearchQuery}
                       onChange={(e) => setUserSearchQuery(e.target.value)}
-                      className="w-full bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-xs text-white placeholder:text-text-muted focus:outline-none focus:border-accent-teal font-mono"
+                      className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-white/30 font-sans transition-all"
                     />
                     {loadingUsers && (
-                      <div className="absolute right-3 top-2.5">
-                        <div className="w-3.5 h-3.5 border-2 border-accent-teal border-t-transparent rounded-full animate-spin" />
+                      <div className="absolute right-3 top-3">
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       </div>
                     )}
                   </div>
 
                   {/* Searchable Customer List (Prioritizes Paid VPS Customers at top) */}
-                  <div className="max-h-44 overflow-y-auto border border-white/10 rounded-lg bg-black/50 divide-y divide-white/5 font-mono">
-                    {userOptions.length === 0 ? (
-                      <p className="p-3 text-center text-text-muted text-[11px] italic">
-                        {loadingUsers ? 'Searching customer directory...' : 'No customer accounts match your search.'}
-                      </p>
-                    ) : (
-                      userOptions.map((u) => {
-                        const isSelected = targetUserId === u.id;
+                  <div className="max-h-44 overflow-y-auto border border-white/10 rounded-xl bg-[#0a0a0c] divide-y divide-white/5 font-sans">
+                    {(() => {
+                      const q = userSearchQuery.toLowerCase().trim();
+                      const filteredUsers = userOptions.filter((u) => {
+                        if (!q) return true;
+                        return (
+                          u.email.toLowerCase().includes(q) ||
+                          (u.displayName && u.displayName.toLowerCase().includes(q)) ||
+                          u.id.toLowerCase().includes(q) ||
+                          (u.role && u.role.toLowerCase().includes(q))
+                        );
+                      });
+
+                      if (filteredUsers.length === 0) {
+                        return (
+                          <div className="p-3 text-center text-neutral-400 text-[11px]">
+                            <p>{loadingUsers ? 'Searching customer directory...' : `No accounts match "${userSearchQuery}".`}</p>
+                            {apiUser && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTargetUserId(apiUser.id);
+                                  setUserSearchQuery('');
+                                }}
+                                className="mt-2 text-xs text-white underline hover:text-neutral-200"
+                              >
+                                Select My Account ({apiUser.email})
+                              </button>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return filteredUsers.map((u) => {
+                        const isSelected = effectiveUserId === u.id;
                         return (
                           <div
                             key={u.id}
                             onClick={() => setTargetUserId(u.id)}
-                            className={`p-2.5 flex items-center justify-between cursor-pointer transition-colors ${
+                            className={`p-2.5 flex items-center justify-between cursor-pointer transition-all ${
                               isSelected
-                                ? 'bg-accent-teal/20 border-l-4 border-accent-teal text-white font-bold'
-                                : 'hover:bg-white/5 text-slate-300'
+                                ? 'bg-white/15 border-l-4 border-white text-white font-bold'
+                                : 'hover:bg-white/5 text-neutral-300'
                             }`}
                           >
                             <div className="min-w-0 flex-1">
@@ -511,12 +605,12 @@ export default function DevVpsFleetPage() {
                                     <IconCheckCircle size={10} /> Active VPS ({u.vpsCount})
                                   </span>
                                 ) : u.hasPaidVps ? (
-                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1 shrink-0">
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-white/10 text-white border border-white/20 flex items-center gap-1 shrink-0">
                                     Paid Customer
                                   </span>
                                 ) : null}
                               </div>
-                              <div className="text-[10px] text-text-muted flex items-center gap-3 mt-0.5">
+                              <div className="text-[10px] text-neutral-400 flex items-center gap-3 mt-0.5">
                                 <span>Name: {u.displayName || 'Client'}</span>
                                 <span>Role: {u.role}</span>
                                 <span>Spent: ${(u.totalSpent || 0).toFixed(2)}</span>
@@ -524,11 +618,11 @@ export default function DevVpsFleetPage() {
                               </div>
                             </div>
 
-                            {isSelected && <IconCheck size={16} className="text-accent-teal shrink-0 ml-2" />}
+                            {isSelected && <IconCheck size={16} className="text-white shrink-0 ml-2" />}
                           </div>
                         );
-                      })
-                    )}
+                      });
+                    })()}
                   </div>
                 </div>
               )}

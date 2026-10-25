@@ -16,14 +16,23 @@ adminRouter.use('/admin', requireAuth, requireAdmin);
 
 adminRouter.get('/admin/customers', async (req: AuthedRequest, res) => {
   const { take, skip } = parsePagination(req.query);
-  const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+  const search = typeof req.query.search === 'string' && req.query.search.trim().length > 0 ? req.query.search.trim() : undefined;
+  const roleQuery = typeof req.query.role === 'string' ? req.query.role.trim() : undefined;
+  const scoped = req.query.scoped === 'true';
 
-  // Admin only sees customers explicitly assigned to them by dev.
-  // Dev (which also passes requireAdmin) still sees everyone.
-  const where = {
-    role: 'customer' as const,
-    ...(req.user!.role === 'admin' ? { assignedAdminId: req.user!.id } : {}),
-    ...(search ? { email: { contains: search, mode: 'insensitive' as const } } : {}),
+  // Support filtering across all roles (customer, support, admin, dev) or 'all'
+  const where: any = {
+    ...(roleQuery && roleQuery !== 'all' ? { role: roleQuery } : {}),
+    ...(scoped && req.user!.role === 'admin' ? { assignedAdminId: req.user!.id } : {}),
+    ...(search
+      ? {
+          OR: [
+            { email: { contains: search, mode: 'insensitive' as const } },
+            { displayName: { contains: search, mode: 'insensitive' as const } },
+            { id: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
   };
 
   const [customers, total] = await Promise.all([
@@ -33,17 +42,28 @@ adminRouter.get('/admin/customers', async (req: AuthedRequest, res) => {
       take,
       skip,
       include: {
-        _count: { select: { orders: true } },
+        assignedAdmin: { select: { id: true, email: true, displayName: true } },
+        _count: {
+          select: {
+            orders: true,
+            deployments: true,
+            vpsProvisions: true,
+            tickets: true,
+            managedDatabases: true,
+            smtpAccounts: true,
+          },
+        },
         orders: { where: { status: 'paid' }, select: { total: true } },
       },
     }),
     prisma.user.count({ where }),
   ]);
 
-  const result = customers.map((c: (typeof customers)[number]) => ({
+  const result = customers.map((c) => ({
     id: c.id,
     email: c.email,
     displayName: c.displayName,
+    role: c.role,
     firebaseUid: c.firebaseUid,
     phoneNumber: c.phoneNumber,
     discordUserId: c.discordUserId,
@@ -51,7 +71,15 @@ adminRouter.get('/admin/customers', async (req: AuthedRequest, res) => {
     bannedAt: c.bannedAt,
     banReason: c.banReason,
     createdAt: c.createdAt,
+    assignedAdminId: c.assignedAdminId,
+    assignedAdmin: c.assignedAdmin,
     orderCount: c._count.orders,
+    deploymentsCount: c._count.deployments,
+    vpsCount: c._count.vpsProvisions,
+    ticketsCount: c._count.tickets,
+    databasesCount: c._count.managedDatabases,
+    smtpCount: c._count.smtpAccounts,
+    servicesCount: c._count.vpsProvisions + c._count.deployments + c._count.managedDatabases + c._count.smtpAccounts,
     totalSpent: c.orders.reduce((sum: number, o: { total: number }) => sum + o.total, 0),
   }));
 
@@ -60,7 +88,7 @@ adminRouter.get('/admin/customers', async (req: AuthedRequest, res) => {
     total,
     take,
     skip,
-    isScoped: req.user!.role === 'admin',
+    isScoped: scoped && req.user!.role === 'admin',
   });
 });
 
@@ -116,6 +144,121 @@ adminRouter.get('/admin/customers/by-firebase-uid/:uid', async (req: AuthedReque
       email: user.email,
       displayName: user.displayName,
       firebaseUid: user.firebaseUid,
+    },
+  });
+});
+
+/**
+ * 360-degree customer details endpoint: returns full profile, complete order
+ * history, purchased plans & items, payment proofs, active VPS provisions,
+ * running app deployments, managed databases, SMTP mailboxes, and tickets.
+ */
+adminRouter.get('/admin/customers/:userId', async (req: AuthedRequest, res) => {
+  const customer = await prisma.user.findUnique({
+    where: { id: req.params.userId },
+    include: {
+      assignedAdmin: { select: { id: true, email: true, displayName: true } },
+      orders: {
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        include: {
+          items: {
+            include: {
+              plan: { include: { product: true } },
+              service: true,
+            },
+          },
+          payments: true,
+          invoice: true,
+        },
+      },
+      vpsProvisions: {
+        orderBy: { createdAt: 'desc' },
+        include: {
+          orderItem: {
+            include: {
+              plan: { include: { product: true } },
+            },
+          },
+        },
+      },
+      deployments: {
+        orderBy: { createdAt: 'desc' },
+        include: {
+          node: { select: { id: true, label: true, ip: true } },
+          orderItem: {
+            include: {
+              plan: { include: { product: true } },
+            },
+          },
+        },
+      },
+      managedDatabases: {
+        orderBy: { createdAt: 'desc' },
+        include: {
+          node: { select: { id: true, label: true, ip: true } },
+        },
+      },
+      smtpAccounts: {
+        orderBy: { createdAt: 'desc' },
+      },
+      subscriptions: {
+        orderBy: { createdAt: 'desc' },
+        include: {
+          orderItem: {
+            include: {
+              plan: { include: { product: true } },
+              service: true,
+            },
+          },
+        },
+      },
+      tickets: {
+        orderBy: { createdAt: 'desc' },
+        take: 15,
+        select: {
+          id: true,
+          subject: true,
+          status: true,
+          priority: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+    },
+  });
+
+  if (!customer) {
+    return res.status(404).json({ error: 'Customer not found' });
+  }
+
+  const paidOrders = customer.orders.filter((o) => o.status === 'paid');
+  const totalSpent = paidOrders.reduce((sum, o) => sum + o.total, 0);
+
+  res.json({
+    customer: {
+      id: customer.id,
+      email: customer.email,
+      displayName: customer.displayName,
+      role: customer.role,
+      avatarUrl: customer.avatarUrl,
+      phoneNumber: customer.phoneNumber,
+      discordUserId: customer.discordUserId,
+      isBanned: customer.isBanned,
+      bannedAt: customer.bannedAt,
+      banReason: customer.banReason,
+      createdAt: customer.createdAt,
+      assignedAdminId: customer.assignedAdminId,
+      assignedAdmin: customer.assignedAdmin,
+      totalSpent,
+      orderCount: customer.orders.length,
+      orders: customer.orders,
+      vpsProvisions: customer.vpsProvisions,
+      deployments: customer.deployments,
+      managedDatabases: customer.managedDatabases,
+      smtpAccounts: customer.smtpAccounts,
+      subscriptions: customer.subscriptions,
+      tickets: customer.tickets,
     },
   });
 });
@@ -210,7 +353,7 @@ const setRoleSchema = z.object({ role: z.enum(['customer', 'support', 'dev', 'ad
  *    admins from silently demoting the platform owner).
  *  - Only the 'dev' user can assign 'admin' or 'dev' roles.
  */
-adminRouter.patch('/admin/staff/:userId/role', async (req: AuthedRequest, res) => {
+adminRouter.patch(['/admin/staff/:userId/role', '/admin/customers/:userId/role'], async (req: AuthedRequest, res) => {
   const parsed = setRoleSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -223,10 +366,10 @@ adminRouter.patch('/admin/staff/:userId/role', async (req: AuthedRequest, res) =
   const target = await prisma.user.findUnique({ where: { id: req.params.userId } });
   if (!target) return res.status(404).json({ error: 'User not found' });
 
-  // Protect the dev role: no one can demote a dev user account.
-  if (target.role === 'dev' && parsed.data.role !== 'dev') {
+  // Protect the dev role: no one can alter or demote a dev user account.
+  if (target.role === 'dev') {
     return res.status(403).json({
-      error: 'Developer accounts cannot be demoted to a lower role.',
+      error: 'Developer superuser accounts are permanently locked and cannot be demoted or altered under any circumstances.',
     });
   }
 
@@ -303,25 +446,28 @@ adminRouter.get('/admin/audit-log', async (req: AuthedRequest, res) => {
  */
 const assignCustomerSchema = z.object({ adminId: z.string().nullable() });
 
-adminRouter.patch('/admin/customers/:userId/assign', requireDev, async (req: AuthedRequest, res) => {
+adminRouter.patch('/admin/customers/:userId/assign', async (req: AuthedRequest, res) => {
   const parsed = assignCustomerSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const customer = await prisma.user.findUnique({ where: { id: req.params.userId } });
-  if (!customer || customer.role !== 'customer') {
-    return res.status(404).json({ error: 'Customer not found' });
+  if (!customer) {
+    return res.status(404).json({ error: 'User not found' });
   }
 
   if (parsed.data.adminId) {
     const admin = await prisma.user.findUnique({ where: { id: parsed.data.adminId } });
-    if (!admin || admin.role !== 'admin') {
-      return res.status(400).json({ error: 'adminId must belong to a user with the admin role' });
+    if (!admin || (admin.role !== 'admin' && admin.role !== 'dev')) {
+      return res.status(400).json({ error: 'adminId must belong to a user with the admin or dev role' });
     }
   }
 
   const updated = await prisma.user.update({
     where: { id: customer.id },
     data: { assignedAdminId: parsed.data.adminId },
+    include: {
+      assignedAdmin: { select: { id: true, email: true, displayName: true } },
+    },
   });
 
   await prisma.auditLog.create({
@@ -332,7 +478,14 @@ adminRouter.patch('/admin/customers/:userId/assign', requireDev, async (req: Aut
     },
   });
 
-  res.json({ user: { id: updated.id, email: updated.email, assignedAdminId: updated.assignedAdminId } });
+  res.json({
+    user: {
+      id: updated.id,
+      email: updated.email,
+      assignedAdminId: updated.assignedAdminId,
+      assignedAdmin: updated.assignedAdmin,
+    },
+  });
 });
 
 /** Ban a user account and stop all their running deployments. */
@@ -352,8 +505,13 @@ adminRouter.post('/admin/users/:userId/ban', async (req: AuthedRequest, res) => 
     return res.status(404).json({ error: 'User not found' });
   }
 
-  if ((targetUser.role === 'dev' || targetUser.role === 'admin') && req.user!.role !== 'dev') {
-    return res.status(403).json({ error: 'Only the platform dev account can ban administrative staff.' });
+  // Dev superuser account is permanently immune to bans/suspensions
+  if (targetUser.role === 'dev') {
+    return res.status(403).json({ error: 'Developer superuser accounts cannot be banned or suspended under any circumstances.' });
+  }
+
+  if (targetUser.role === 'admin' && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'Only the platform dev account can ban administrators.' });
   }
 
   const result = await banUserAndTeardownResources({

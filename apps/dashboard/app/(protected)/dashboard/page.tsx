@@ -117,16 +117,18 @@ export default function DashboardPage() {
   if (userError) return <ErrorBanner message={userError} />;
 
   return (
-    <div className="space-y-8">
-      {/* Welcome Banner */}
-      <div className="relative rounded-2xl overflow-hidden glass p-6 border-white/[0.08]">
-        <div className="absolute inset-0 bg-brand-gradient opacity-[0.04] -z-10" />
-        <div className="absolute -right-16 -top-16 w-48 h-48 rounded-full bg-accent-violet/10 blur-3xl" />
-        <h1 className="text-2xl font-bold text-text-primary">
+    <div className="space-y-8 max-w-6xl mx-auto">
+      {/* Welcome Banner (Pure Black Hero) */}
+      <div className="relative rounded-3xl overflow-hidden p-6 md:p-8 bg-black border border-white/10 shadow-2xl space-y-2">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-neutral-300 mb-1">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>Platform Online & Monitored</span>
+        </div>
+        <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
           Welcome back, {user?.displayName ?? apiUser?.email?.split('@')[0]}
         </h1>
-        <p className="text-text-muted text-sm mt-1">
-          Everything is running smoothly. Your services are active and monitored in real time.
+        <p className="text-neutral-400 text-xs max-w-xl">
+          Everything is running smoothly. Your container deployments, managed databases, and custom domains are active and isolated.
         </p>
       </div>
 
@@ -134,7 +136,7 @@ export default function DashboardPage() {
       {loadingData ? (
         <div className="grid md:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="glass rounded-2xl h-24 animate-pulse bg-white/[0.02] border-white/[0.04]" />
+            <div key={i} className="rounded-2xl h-24 animate-pulse bg-[#0c0d12] border border-white/10" />
           ))}
         </div>
       ) : (
@@ -143,39 +145,46 @@ export default function DashboardPage() {
             label="Active Deployments"
             value={stats.deployments}
             icon={<DeploymentsIcon />}
-            color="violet"
+            color="accent"
+            className="bg-[#0c0d12] border-white/10"
           />
           <StatCard
             label="Subscriptions"
             value={stats.subscriptions}
             icon={<SubscriptionsIcon />}
-            color="teal"
+            color="accent"
+            className="bg-[#0c0d12] border-white/10"
           />
           <StatCard
             label="Total Invoices"
             value={stats.orders}
             icon={<InvoicesIcon />}
             color="green"
+            className="bg-[#0c0d12] border-white/10"
           />
           <StatCard
             label="Support Tickets"
             value={stats.tickets}
             icon={<TicketsIcon />}
             color="orange"
+            className="bg-[#0c0d12] border-white/10"
           />
         </div>
       )}
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">Quick Actions</h2>
+        <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-4">Quick Actions</h2>
         <div className="grid md:grid-cols-3 gap-4">
           {QUICK_ACTIONS.map((action) => (
             <Link key={action.href} href={action.href}>
-              <Card className="hover:bg-white/[0.06] hover:border-white/12 transition-all cursor-pointer h-full border border-white/[0.06]">
-                <h3 className="font-semibold text-text-primary mb-1 text-sm">{action.label}</h3>
-                <p className="text-text-muted text-xs leading-relaxed">{action.hint}</p>
-              </Card>
+              <div className="p-5 rounded-2xl bg-[#0c0d12] border border-white/10 hover:border-white/20 hover:bg-white/[0.04] transition-all cursor-pointer h-full space-y-1 group shadow-md">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-white text-xs group-hover:text-neutral-200 transition-colors">{action.label}</h3>
+                  <span className="text-neutral-500 group-hover:text-white transition-colors text-xs font-mono">→</span>
+                </div>
+                <p className="text-neutral-400 text-[11px] leading-relaxed">{action.hint}</p>
+              </div>
             </Link>
           ))}
         </div>
@@ -184,15 +193,15 @@ export default function DashboardPage() {
       {/* Tables Grid */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* Recent Deployments */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Recent Deployments</h2>
-            <Link href="/deployments" className="text-xs text-accent-teal-bright hover:underline">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Recent Deployments</h2>
+            <Link href="/deployments" className="text-xs text-white hover:underline font-semibold">
               View all
             </Link>
           </div>
           {loadingData ? (
-            <div className="glass rounded-2xl h-48 animate-pulse bg-white/[0.02]" />
+            <div className="rounded-2xl h-48 animate-pulse bg-[#0c0d12] border border-white/10" />
           ) : recentDeploys.length === 0 ? (
             <EmptyState
               message="No active container deployments found on your account."
@@ -202,8 +211,8 @@ export default function DashboardPage() {
             <Table headers={['Name', 'Type', 'Status']}>
               {recentDeploys.map((dep) => (
                 <Tr key={dep.id} onClick={() => router.push(`/deployments?id=${dep.id}`)}>
-                  <Td className="font-semibold text-xs">{dep.preferredName}</Td>
-                  <Td className="text-xs text-text-muted capitalize">{dep.serviceType}</Td>
+                  <Td className="font-semibold text-xs text-white">{dep.preferredName}</Td>
+                  <Td className="text-xs text-neutral-400 capitalize">{dep.serviceType}</Td>
                   <Td>
                     <Badge status={dep.status} dot />
                   </Td>
@@ -214,15 +223,15 @@ export default function DashboardPage() {
         </div>
 
         {/* Recent Orders */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Recent Orders</h2>
-            <Link href="/orders" className="text-xs text-accent-teal-bright hover:underline">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Recent Orders</h2>
+            <Link href="/orders" className="text-xs text-white hover:underline font-semibold">
               View all
             </Link>
           </div>
           {loadingData ? (
-            <div className="glass rounded-2xl h-48 animate-pulse bg-white/[0.02]" />
+            <div className="rounded-2xl h-48 animate-pulse bg-[#0c0d12] border border-white/10" />
           ) : recentOrders.length === 0 ? (
             <EmptyState
               message="No service orders placed yet — browse our hosting & service catalog."
@@ -232,8 +241,8 @@ export default function DashboardPage() {
             <Table headers={['Order ID', 'Total', 'Payment Status']}>
               {recentOrders.map((ord) => (
                 <Tr key={ord.id} onClick={() => router.push('/orders')}>
-                  <Td className="font-mono text-[10px] text-text-muted">#{ord.id.slice(0, 8)}</Td>
-                  <Td className="text-xs font-medium">LKR {(ord.total / 100).toFixed(2)}</Td>
+                  <Td className="font-mono text-[10px] text-neutral-400">#{ord.id.slice(0, 8)}</Td>
+                  <Td className="text-xs font-medium text-white">LKR {(ord.total / 100).toFixed(2)}</Td>
                   <Td>
                     <Badge status={ord.paymentStatus} />
                   </Td>

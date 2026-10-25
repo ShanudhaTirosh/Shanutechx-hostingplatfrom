@@ -142,34 +142,35 @@ export default async function ManagedDatabasesPage() {
               return (
                 <div
                   key={plan.id || idx}
-                  className="bg-[#080918] border border-white/10 hover:border-teal-500/40 rounded-3xl p-8 flex flex-col justify-between transition-all"
+                  className="bg-gradient-to-b from-zinc-900/90 via-zinc-950/95 to-black border border-white/10 hover:border-white/30 rounded-3xl p-8 flex flex-col justify-between transition-all duration-300 shadow-2xl hover:shadow-[0_0_35px_rgba(255,255,255,0.06)] relative overflow-hidden"
                 >
+                  <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent" />
                   <div className="space-y-4">
-                    <span className="text-[11px] font-mono uppercase text-teal-400 font-bold block mb-1">
+                    <span className="text-[11px] font-mono uppercase text-white/70 font-bold block mb-1">
                       {plan.productName}
                     </span>
                     <h3 className="text-xl font-extrabold text-white">{plan.name}</h3>
 
                     <div className="flex items-baseline gap-1 pt-2">
-                      <span className="text-4xl font-black text-white">{formattedPrice}</span>
-                      <span className="text-xs font-mono text-text-muted">/{plan.billingType.replace('_', ' ')}</span>
+                      <span className="text-4xl font-black text-white font-mono">{formattedPrice}</span>
+                      <span className="text-xs font-mono text-white/70">/{plan.billingType.replace('_', ' ')}</span>
                     </div>
 
-                    <ul className="space-y-3 pt-6 border-t border-white/[0.08] text-xs text-text-muted">
+                    <ul className="space-y-3 pt-6 border-t border-white/10 text-xs text-white">
                       <li className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-teal-400 shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-white shrink-0" />
                         <span>PostgreSQL / MySQL / Redis / MongoDB</span>
                       </li>
                       <li className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-teal-400 shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-white shrink-0" />
                         <span>Automated Daily Snapshot Backups</span>
                       </li>
                       <li className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-teal-400 shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-white shrink-0" />
                         <span>AES-256 Encrypted Connection Vault</span>
                       </li>
                       <li className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-teal-400 shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-white shrink-0" />
                         <span>Connection Pooling Enabled</span>
                       </li>
                     </ul>
@@ -178,9 +179,9 @@ export default async function ManagedDatabasesPage() {
                   <div className="pt-8">
                     <a
                       href={`${dashboardUrl}/services`}
-                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs shadow-glow-violet transition-all flex items-center justify-center gap-2"
+                      className="w-full py-3.5 rounded-xl bg-white text-black hover:bg-neutral-200 active:scale-[0.98] font-bold text-xs uppercase tracking-wider font-mono transition-all flex items-center justify-center gap-2 shadow-xl shadow-white/10 hover:shadow-white/20"
                     >
-                      Provision {plan.name} <ArrowRight className="h-4 w-4" />
+                      Provision {plan.name} <ArrowRight className="h-4 w-4 text-black" />
                     </a>
                   </div>
                 </div>

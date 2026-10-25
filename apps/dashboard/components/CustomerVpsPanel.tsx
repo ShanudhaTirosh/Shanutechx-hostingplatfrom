@@ -16,7 +16,6 @@ import {
   IconServer,
   IconTerminal,
   IconFolder,
-  IconStop,
   IconRestart,
   IconKey,
   IconRefresh,
@@ -114,11 +113,11 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
     }
   }, [showContainers]);
 
-  async function handlePowerAction(action: 'start' | 'reboot') {
+  async function handlePowerAction(action: 'reboot') {
     setBusyAction(action);
     try {
       await api.vps.power(p.id, action);
-      toast(`VPS ${action === 'reboot' ? 'restart' : action} initiated successfully over SSH.`, 'success');
+      toast('VPS restart initiated successfully over SSH.', 'success');
       setTimeout(fetchTelemetry, 3000);
       onRefresh?.();
     } catch (err: any) {
@@ -277,10 +276,10 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
       {isPending && (
         <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 text-xs animate-fade-in">
           <div className="flex items-center gap-2 text-amber-300 font-semibold">
-            <IconActivity size={16} /> VPS Setup Pending Manual Provisioning
+            <IconActivity size={16} /> VPS Provisioning In Progress
           </div>
           <p className="text-text-muted leading-relaxed">
-            Your Virtual Private Server is queued for manual setup by our engineering team. Server IP address, SSH root credentials, and downloadable SSH private key (.pem) will be delivered here automatically upon completion.
+            Your Virtual Private Server is queued for setup. VPS servers are delivered within <strong className="text-amber-300">24 to 72 hours</strong>. Server IP address, SSH root credentials, and your downloadable SSH private key (.pem) will appear here automatically upon delivery.
           </p>
         </div>
       )}
@@ -370,8 +369,9 @@ export function CustomerVpsPanel({ provision: p, onRefresh }: CustomerVpsPanelPr
               loading={busyAction === 'reboot'}
               onClick={() => handlePowerAction('reboot')}
               className="flex items-center gap-1.5"
+              title="Reboot operating system over SSH. Power Off / Stop is permanently disabled to prevent unrecoverable remote server halts."
             >
-              <IconRestart size={14} /> Restart
+              <IconRestart size={14} /> Restart (Safe Reboot)
             </Button>
 
             <Button

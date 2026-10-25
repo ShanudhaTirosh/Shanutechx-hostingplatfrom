@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STX Enterprises — Document Templates</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#07060d;
+    --paper:#ffffff;
+    --line:#111318;
+    --teal:#20c6e0;
+    --teal-deep:#146a8a;
+    --purple:#7146eb;
+    --purple-deep:#4a32a8;
+    --blue:#4574e1;
+    --accent-grad:linear-gradient(115deg, var(--purple) 0%, var(--blue) 52%, var(--teal) 100%);
+    --muted:#5b6472;
+    --faint:#eef1f4;
+    --card:#f7f8fa;
+    --danger:#c0392b;
+    --radius:2px;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:#1b1e24;
+    font-family:'Space Grotesk', sans-serif;
+    color:var(--ink);
+    padding:40px 16px 80px;
+  }
+
+  /* ---------- Chrome / nav (screen only) ---------- */
+  .chrome{
+    max-width:840px;
+    margin:0 auto 24px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  .tabs{
+    display:flex;
+    gap:4px;
+    background:#0f1116;
+    padding:4px;
+    border-radius:999px;
+    border:1px solid #2a2e37;
+  }
+  .tabs button{
+    appearance:none;
+    border:none;
+    background:transparent;
+    color:#9aa3af;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    padding:9px 18px;
+    border-radius:999px;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .tabs button.active{
+    background:var(--teal);
+    color:#06110f;
+  }
+  .tabs button:not(.active):hover{
+    color:#fff;
+  }
+  .printbtn{
+    appearance:none;
+    border:1px solid var(--teal);
+    background:transparent;
+    color:var(--teal);
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    padding:10px 18px;
+    border-radius:999px;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .printbtn:hover{ background:var(--teal); color:#06110f; }
+
+  .stage{ max-width:840px; margin:0 auto; }
+
+  .page{
+    display:none;
+    background:var(--paper);
+    width:100%;
+    min-height:1120px;
+    padding:64px 60px 56px;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,.55), 0 0 0 1px #2a2e37;
+    position:relative;
+    overflow:hidden;
+  }
+  .page.active{ display:block; }
+
+  /* ---------- Brand logo (shared) ---------- */
+  .brand-logo {
+    display: inline-block;
+  }
+  .brand-logo img {
+    height: 48px;
+    width: auto;
+    display: block;
+  }
+  .brand-logo .sub {
+    margin-top: 6px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 0.38em;
+    color: var(--ink);
+    border-top: 2.5px solid var(--ink);
+    padding-top: 5px;
+    display: block;
+  }
+
+  /* ---------- Letterhead ---------- */
+  .lh-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    border-bottom:3px solid var(--ink);
+    padding-bottom:26px;
+    margin-bottom:0;
+  }
+  .lh-contact{
+    text-align:right;
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    line-height:1.9;
+    color:var(--muted);
+    padding-top:6px;
+  }
+  .lh-contact strong{ color:var(--ink); }
+  .lh-tealbar{
+    height:6px;
+    background:linear-gradient(90deg, var(--teal), var(--purple) 55%, var(--ink) 55%, var(--ink));
+    margin-bottom:60px;
+  }
+  .lh-body{
+    font-size:14px;
+    line-height:1.85;
+    color:#20242b;
+    min-height:520px;
+  }
+  .lh-body .date{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11.5px;
+    color:var(--muted);
+    margin-bottom:34px;
+  }
+  .lh-body p{ margin:0 0 16px; }
+  .lh-sign{ margin-top:56px; }
+  .lh-sign .name{ font-weight:700; margin-top:36px; }
+  .lh-sign .role{ font-size:12px; color:var(--muted); }
+  .lh-footer{
+    position:absolute;
+    left:60px; right:60px; bottom:40px;
+    border-top:1px solid #d8dce1;
+    padding-top:14px;
+    display:flex;
+    justify-content:space-between;
+    font-family:'JetBrains Mono', monospace;
+    font-size:9.5px;
+    letter-spacing:.04em;
+    color:#9aa1ab;
+    text-transform:uppercase;
+  }
+
+  /* ---------- Invoice ---------- */
+  .inv-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:36px;
+  }
+  .inv-tag{
+    text-align:right;
+  }
+  .inv-tag .label{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:28px;
+    letter-spacing:.06em;
+    color:var(--ink);
+  }
+  .inv-tag .num{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    color:var(--purple-deep);
+    margin-top:4px;
+    font-weight:700;
+  }
+  .inv-tealbar{
+    height:5px;
+    background:var(--ink);
+    position:relative;
+    margin-bottom:34px;
+  }
+  .inv-tealbar::after{
+    content:"";
+    position:absolute; left:0; top:0; height:100%;
+    width:34%;
+    background:var(--accent-grad);
+  }
+  .inv-meta{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:20px;
+    margin-bottom:36px;
+  }
+  .inv-meta .block .h{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--teal-deep);
+    font-weight:700;
+    margin-bottom:8px;
+  }
+  .inv-meta .block .l{
+    font-size:13px;
+    line-height:1.7;
+    color:#20242b;
+  }
+  .inv-meta .block .l strong{ display:block; font-size:14px; }
+
+  table.items{
+    width:100%;
+    border-collapse:collapse;
+    margin-bottom:8px;
+  }
+  table.items thead th{
+    text-align:left;
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:#fff;
+    background:var(--ink);
+    padding:11px 14px;
+    font-weight:700;
+  }
+  table.items thead th:last-child, table.items tbody td:last-child{ text-align:right; }
+  table.items thead th.qty, table.items thead th.rate,
+  table.items tbody td.qty, table.items tbody td.rate{ text-align:center; }
+  table.items tbody td{
+    padding:13px 14px;
+    font-size:13px;
+    border-bottom:1px solid var(--faint);
+    color:#20242b;
+  }
+  table.items tbody tr:nth-child(even){ background:var(--card); }
+  table.items tbody td.desc strong{ display:block; }
+  table.items tbody td.desc span{ color:var(--muted); font-size:11.5px; }
+
+  .inv-totals{
+    display:flex;
+    justify-content:flex-end;
+    margin-top:22px;
+  }
+  .inv-totals .box{ width:280px; }
+  .inv-totals .row{
+    display:flex;
+    justify-content:space-between;
+    font-size:13px;
+    padding:8px 0;
+    color:var(--muted);
+  }
+  .inv-totals .row.total{
+    border-top:2.5px solid var(--ink);
+    margin-top:6px;
+    padding-top:14px;
+    color:var(--ink);
+    font-weight:700;
+    font-size:17px;
+  }
+  .inv-totals .row.total .amt{ font-family:'JetBrains Mono', monospace; color:var(--teal-deep); }
+
+  .inv-bottom{
+    display:grid;
+    grid-template-columns:1.2fr 1fr;
+    gap:36px;
+    margin-top:48px;
+    padding-top:24px;
+    border-top:1px solid #d8dce1;
+  }
+  .inv-bottom .h{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--teal-deep);
+    font-weight:700;
+    margin-bottom:10px;
+  }
+  .inv-bottom .l{ font-size:12.5px; line-height:1.85; color:#3a4048; }
+  .inv-status{
+    display:inline-block;
+    margin-top:2px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px;
+    letter-spacing:.12em;
+    font-weight:700;
+    text-transform:uppercase;
+    padding:6px 14px;
+    border:1.5px solid var(--purple-deep);
+    color:var(--purple-deep);
+    border-radius:999px;
+  }
+
+  /* ---------- Email template ---------- */
+  .page.email{ padding:0; background:#eef1f4; }
+  .email-frame{ max-width:600px; margin:0 auto; background:#ffffff; }
+  .email-band{
+    background:var(--ink);
+    padding:36px 40px 30px;
+    position:relative;
+    overflow:hidden;
+  }
+  .email-band .brand-logo img{
+    height: 38px;
+    filter: brightness(0) invert(1);
+  }
+  .email-band .brand-logo .sub{
+    color:#fff;
+    border-top:2px solid var(--teal);
+    font-size:9px;
+    letter-spacing:.38em;
+  }
+  .email-slash{
+    position:absolute; right:0; top:0; bottom:0; width:120px;
+    background:linear-gradient(135deg, transparent 46%, var(--teal) 46.6%, var(--purple) 49%, transparent 49.6%);
+    opacity:.9;
+  }
+  .email-body{ padding:40px 40px 10px; }
+  .email-eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10.5px;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--teal-deep);
+    font-weight:700;
+    margin-bottom:14px;
+  }
+  .email-body h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:22px;
+    margin:0 0 18px;
+    color:var(--ink);
+    line-height:1.3;
+  }
+  .email-body p{
+    font-size:14px;
+    line-height:1.8;
+    color:#3a4048;
+    margin:0 0 16px;
+  }
+  .email-cta{
+    display:inline-block;
+    background:var(--accent-grad);
+    color:#ffffff;
+    font-weight:700;
+    font-size:13px;
+    text-decoration:none;
+    letter-spacing:.03em;
+    padding:14px 28px;
+    margin:12px 0 30px;
+    border-radius:2px;
+  }
+  .email-divider{ height:1px; background:var(--faint); margin:8px 40px 0; }
+  .email-sign{ padding:26px 40px 6px; font-size:13px; color:#3a4048; line-height:1.8; }
+  .email-sign strong{ display:block; color:var(--ink); font-size:14px; }
+  .email-footer{
+    background:var(--card);
+    padding:26px 40px 30px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px;
+    color:#8b929c;
+    line-height:1.9;
+    letter-spacing:.02em;
+  }
+  .email-footer a{ color:var(--teal-deep); text-decoration:none; }
+  .email-social{ margin-top:10px; }
+  .email-social span{ margin-right:14px; }
+
+  /* ---------- Print ---------- */
+  @media print{
+    body{ background:#fff; padding:0; margin:0; }
+    .chrome{ display:none !important; }
+    .stage{ max-width:none; }
+    .page{ box-shadow:none !important; display:none !important; min-height:0; padding:22mm 18mm; }
+    .page.active{ display:block !important; }
+    .page.email{ padding:0; background:#fff; }
+    .email-frame{ max-width:none; }
+    @page{ margin:0; size:A4; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="chrome">
+    <div class="tabs">
+      <button class="active" data-page="letterhead">Letterhead</button>
+      <button data-page="invoice">Invoice</button>
+      <button data-page="email">Email</button>
+    </div>
+    <button class="printbtn" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+  <div class="stage">
+
+    <!-- ===================== LETTERHEAD ===================== -->
+    <section class="page active" id="letterhead">
+      <div class="lh-header">
+        <div class="brand-logo">
+          <img src="data:image/png;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4NCjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+DQo8IS0tIENyZWF0b3I6IENvcmVsRFJBVyAyMDI2IChFdmFsdWF0aW9uIFZlcnNpb24pIC0tPg0KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbDpzcGFjZT0icHJlc2VydmUiIHdpZHRoPSIxMGluIiBoZWlnaHQ9IjEwaW4iIHZlcnNpb249IjEuMSIgc3R5bGU9InNoYXBlLXJlbmRlcmluZzpnZW9tZXRyaWNQcmVjaXNpb247IHRleHQtcmVuZGVyaW5nOmdlb21ldHJpY1ByZWNpc2lvbjsgaW1hZ2UtcmVuZGVyaW5nOm9wdGltaXplUXVhbGl0eTsgZmlsbC1ydWxlOmV2ZW5vZGQ7IGNsaXAtcnVsZTpldmVub2RkIg0Kdmlld0JveD0iMCAwIDEwMDAwIDEwMDAwIg0KIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIg0KIHhtbG5zOnhvZG09Imh0dHA6Ly93d3cuY29yZWwuY29tL2NvcmVsZHJhdy9vZG0vMjAwMyI+DQogPGRlZnM+DQogIDxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyI+DQogICA8IVtDREFUQVsNCiAgICAuc3RyMCB7c3Ryb2tlOiMzNzM0MzU7c3Ryb2tlLXdpZHRoOjYuNjc7c3Ryb2tlLW1pdGVybGltaXQ6Mi42MTMxM30NCiAgICAuZmlsMCB7ZmlsbDpibGFja30NCiAgIF1dPg0KICA8L3N0eWxlPg0KIDwvZGVmcz4NCjxzeW1ib2wgaWQ9IlN5bWJvbDEiIHZpZXdCb3g9IjgzNy42NyAzMzgwIDgzMjQuNjQgMzI0MCI+DQogPHBvbHlnb24gY2xhc3M9ImZpbDAgc3RyMCIgcG9pbnRzPSI4NTAwLDY2MTYuNjcgNzU3Ni42Nyw2NjE2LjY3IDY3NjMuMzMsNTc1Ni42NyA1OTEwLDY2MTYuNjcgNDI5MCw2NjE2LjY3IDQ2NjAsNDUzMCA1MzkwLDQ1MzAgNTAzMCw2NTgwIDUwMzAsNjU5MCA2MzMzLjMzLDUyOTMuMzMgNTYwMy4zMyw0NTMwIDY1MjYuNjcsNDUyNi42NyAiLz4NCiA8cG9seWdvbiBjbGFzcz0iZmlsMCBzdHIwIiBwb2ludHM9IjgxNjYuNjcsMzM4My4zMyA5MTYwLDMzODMuMzMgNzMyMCw1MTU2LjY3IDY4NzMuMzMsNDY3MCAiLz4NCiA8cG9seWdvbiBjbGFzcz0iZmlsMCBzdHIwIiBwb2ludHM9IjIxNDAsNDk2My4zMyAyMDA2LjY3LDQ4MjYuNjcgMTk2My4zMyw0NzUwIDE5NDMuMzMsNDY3Ni42NyAxOTQwLDQ2MTAgMTk0Ni42Nyw0NTYzLjMzIDE5NjMuMzMsNDUwMy4zMyAxOTk2LjY3LDQ0NDYuNjcgMjA0MCw0NDAzLjMzIDIwODYuNjcsNDM2MCAyMTM2LjY3LDQzMjYuNjcgMjE5My4zMyw0MzAzLjMzIDIyNDMuMzMsNDI5MCAyMjg2LjY3LDQyODYuNjcgNjM0Ni42Nyw0Mjg2LjY3IDcwNDMuMzMsMzYyMCAyMjkwLDM2MTYuNjcgMjE4My4zMywzNjMzLjMzIDIwOTYuNjcsMzY1Ni42NyAyMDAzLjMzLDM2ODMuMzMgMTkwMCwzNzMwIDE4MTMuMzMsMzc3Ni42NyAxNzIzLjMzLDM4NDAgMTY2Ni42NywzODc2LjY3IDE1OTAsMzk0My4zMyAxNTIwLDQwMjMuMzMgMTQ3MCw0MDgzLjMzIDE0MTMuMzMsNDE2MCAxMzUzLjMzLDQyNzMuMzMgMTMxMy4zMyw0MzcwIDEyODAsNDQ4My4zMyAxMjYwLDQ1ODMuMzMgMTI1Ni42Nyw0NjkwIDEyNjMuMzMsNDc5My4zMyAxMjgzLjMzLDQ4OTYuNjcgMTMyMCw1MDEzLjMzIDEzNTAsNTA3MCAxMzkzLjMzLDUxNDMuMzMgMTQ1MCw1MjE2LjY3IDE0OTYuNjcsNTI2My4zMyAxNTU2LjY3LDUzMTAgMTY0MCw1MzYzLjMzIDE3MTYuNjcsNTQwNi42NyAxNzkwLDU0MzMuMzMgMTg1MCw1NDUwIDE5MTAsNTQ2Ni42NyAxOTYzLjMzLDU0NzMuMzMgMjAwMy4zMyw1NDc2LjY3IDIwODMuMzMsNTQ4MCAyNjQwLDU0ODAgIi8+DQogPHBvbHlnb24gY2xhc3M9ImZpbDAgc3RyMCIgcG9pbnRzPSIyMjEzLjMzLDQ3NzYuNjcgMjg3My4zMyw1NDc2LjY3IDMzNzMuMzMsNTQ3Ni42NyAzMzk2LjY3LDU0ODAgMzQyNi42Nyw1NDkzLjMzIDM0NTYuNjcsNTUxMCAzNDc2LjY3LDU1MjYuNjcgMzQ5Ni42Nyw1NTQzLjMzIDM1MTYuNjcsNTU3MCAzNTMzLjMzLDU2MDAgMzU0MCw1NjIwIDM1NDYuNjcsNTY0My4zMyAzNTQ2LjY3LDU2NzAgMzU0Ni42Nyw1NzAwIDM1NDAsNTczMCAzNTI2LjY3LDU3NzAgMzUxMy4zMyw1ODAwIDM0OTMuMzMsNTgzMCAzNDczLjMzLDU4NTMuMzMgMzQ0MCw1ODgzLjMzIDM0MDYuNjcsNTkwNi42NyAzMzYzLjMzLDU5MjYuNjcgMzMzMCw1OTQwIDE1MjYuNjcsNTk0My4zMyA4NDAsNjYxMy4zMyAzMjIwLDY2MTAgMzI2MCw2NjEwIDMzMTMuMzMsNjYwNi42NyAzMzY2LjY3LDY1OTYuNjcgMzQyMCw2NTgwIDM0OTMuMzMsNjU2MCAzNTUwLDY1MzYuNjcgMzYwNi42Nyw2NTEzLjMzIDM2NjYuNjcsNjQ3Ni42NyAzNzQzLjMzLDY0MzAgMzgxNi42Nyw2MzgzLjMzIDM4ODAsNjMyNi42NyAzOTMzLjMzLDYyNzYuNjcgMzk5MCw2MjEzLjMzIDQwNTYuNjcsNjEzMCA0MTE2LjY3LDYwMzAgNDE1My4zMyw1OTYwIDQxODYuNjcsNTg3My4zMyA0MjE2LjY3LDU3ODAgNDIyNi42Nyw1NzE2LjY3IDQyMzMuMzMsNTY2My4zMyA0MjMwLDU0OTYuNjcgNDIxMCw1MzkwIDQxNzYuNjcsNTI4Ni42NyA0MTQzLjMzLDUyMDYuNjcgNDA5MCw1MTE2LjY3IDQwNDAsNTA1Ni42NyAzOTgwLDQ5OTMuMzMgMzkyMCw0OTQzLjMzIDM4NDAsNDg5MCAzNzU2LjY3LDQ4NDYuNjcgMzY1My4zMyw0ODEwIDM1NzMuMzMsNDc5My4zMyAzNTIzLjMzLDQ3ODYuNjcgMzQ0My4zMyw0NzgzLjMzICIvPg0KPC9zeW1ib2w+DQogPGcgaWQ9IkxheWVyX3gwMDIwXzEiIHZpc2liaWxpdHk9ImhpZGRlbiI+DQogIDxtZXRhZGF0YSBpZD0iQ29yZWxDb3JwSURfMENvcmVsLUxheWVyIi8+DQogIDxpbWFnZSB4PSIyMCIgeT0iMjYuNjciIHdpZHRoPSI5OTUwIiBoZWlnaHQ9Ijk5NTAiIHhsaW5rOmhyZWY9IlNUS2Nkcl9JbWFnZXNcU1RLY2RyX0ltZ0lEMS5wbmciLz4NCiA8L2c+DQogPGcgaWQ9IkxheWVyX3gwMDIwXzIiPg0KICA8bWV0YWRhdGEgaWQ9IkNvcmVsQ29ycElEXzFDb3JlbC1MYXllciIvPg0KICA8dXNlIGlkPSJTeW1ib2wxXzAiIHg9IjgzNy42NyIgeT0iMzM4MCIgd2lkdGg9IjgzMjQuNjQiIGhlaWdodD0iMzI0MCIgeGxpbms6aHJlZj0iI1N5bWJvbDEiLz4NCiA8L2c+DQo8L3N2Zz4NCg==" alt="STX Enterprises Logo">
+          <div class="sub">DIGITAL EMPIRE STUDIO</div>
+        </div>
+        <div class="lh-contact">
+          <strong>STX Enterprises</strong> · Digital Empire Studio<br>
+          Negombo, Western Province, Sri Lanka<br>
+          hello@stxenterprises.com&nbsp; ·&nbsp; +94 7X XXX XXXX<br>
+          www.stxenterprises.com
+        </div>
+      </div>
+      <div class="lh-tealbar"></div>
+
+      <div class="lh-body">
+        <div class="date">25 October 2026</div>
+
+        <p><strong>To,</strong><br>
+        [Recipient Name]<br>
+        [Company / Organization]<br>
+        [Address Line]</p>
+
+        <p>Dear [Recipient Name],</p>
+
+        <p>[This is a letterhead template for STX Enterprises / Digital Empire Studio. Replace this paragraph with your letter's opening — project confirmation, proposal cover note, service agreement, or client correspondence.]</p>
+
+        <p>[Second paragraph — scope, terms, or details specific to this letter. Keep line length comfortable and paragraphs short for readability.]</p>
+
+        <p>[Closing paragraph — next steps, contact info, or call to action.]</p>
+
+        <div class="lh-sign">
+          <p>Sincerely,</p>
+          <div class="name">Shanudha Tirosh</div>
+          <div class="role">Founder — STX Enterprises / Digital Empire Studio</div>
+        </div>
+      </div>
+
+      <div class="lh-footer">
+        <span>STX Enterprises — Digital Empire Studio</span>
+        <span>www.stxenterprises.com</span>
+      </div>
+    </section>
+
+    <!-- ===================== INVOICE ===================== -->
+    <section class="page" id="invoice">
+      <div class="inv-top">
+        <div class="brand-logo">
+          <img src="data:image/png;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4NCjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+DQo8IS0tIENyZWF0b3I6IENvcmVsRFJBVyAyMDI2IChFdmFsdWF0aW9uIFZlcnNpb24pIC0tPg0KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbDpzcGFjZT0icHJlc2VydmUiIHdpZHRoPSIxMGluIiBoZWlnaHQ9IjEwaW4iIHZlcnNpb249IjEuMSIgc3R5bGU9InNoYXBlLXJlbmRlcmluZzpnZW9tZXRyaWNQcmVjaXNpb247IHRleHQtcmVuZGVyaW5nOmdlb21ldHJpY1ByZWNpc2lvbjsgaW1hZ2UtcmVuZGVyaW5nOm9wdGltaXplUXVhbGl0eTsgZmlsbC1ydWxlOmV2ZW5vZGQ7IGNsaXAtcnVsZTpldmVub2RkIg0Kdmlld0JveD0iMCAwIDEwMDAwIDEwMDAwIg0KIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIg0KIHhtbG5zOnhvZG09Imh0dHA6Ly93d3cuY29yZWwuY29tL2NvcmVsZHJhdy9vZG0vMjAwMyI+DQogPGRlZnM+DQogIDxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyI+DQogICA8IVtDREFUQVsNCiAgICAuc3RyMCB7c3Ryb2tlOiMzNzM0MzU7c3Ryb2tlLXdpZHRoOjYuNjc7c3Ryb2tlLW1pdGVybGltaXQ6Mi42MTMxM30NCiAgICAuZmlsMCB7ZmlsbDpibGFja30NCiAgIF1dPg0KICA8L3N0eWxlPg0KIDwvZGVmcz4NCjxzeW1ib2wgaWQ9IlN5bWJvbDEiIHZpZXdCb3g9IjgzNy42NyAzMzgwIDgzMjQuNjQgMzI0MCI+DQogPHBvbHlnb24gY2xhc3M9ImZpbDAgc3RyMCIgcG9pbnRzPSI4NTAwLDY2MTYuNjcgNzU3Ni42Nyw2NjE2LjY3IDY3NjMuMzMsNTc1Ni42NyA1OTEwLDY2MTYuNjcgNDI5MCw2NjE2LjY3IDQ2NjAsNDUzMCA1MzkwLDQ1MzAgNTAzMCw2NTgwIDUwMzAsNjU5MCA2MzMzLjMzLDUyOTMuMzMgNTYwMy4zMyw0NTMwIDY1MjYuNjcsNDUyNi42NyAiLz4NCiA8cG9seWdvbiBjbGFzcz0iZmlsMCBzdHIwIiBwb2ludHM9IjgxNjYuNjcsMzM4My4zMyA5MTYwLDMzODMuMzMgNzMyMCw1MTU2LjY3IDY4NzMuMzMsNDY3MCAiLz4NCiA8cG9seWdvbiBjbGFzcz0iZmlsMCBzdHIwIiBwb2ludHM9IjIxNDAsNDk2My4zMyAyMDA2LjY3LDQ4MjYuNjcgMTk2My4zMyw0NzUwIDE5NDMuMzMsNDY3Ni42NyAxOTQwLDQ2MTAgMTk0Ni42Nyw0NTYzLjMzIDE5NjMuMzMsNDUwMy4zMyAxOTk2LjY3LDQ0NDYuNjcgMjA0MCw0NDAzLjMzIDIwODYuNjcsNDM2MCAyMTM2LjY3LDQzMjYuNjcgMjE5My4zMyw0MzAzLjMzIDIyNDMuMzMsNDI5MCAyMjg2LjY3LDQyODYuNjcgNjM0Ni42Nyw0Mjg2LjY3IDcwNDMuMzMsMzYyMCAyMjkwLDM2MTYuNjcgMjE4My4zMywzNjMzLjMzIDIwOTYuNjcsMzY1Ni42NyAyMDAzLjMzLDM2ODMuMzMgMTkwMCwzNzMwIDE4MTMuMzMsMzc3Ni42NyAxNzIzLjMzLDM4NDAgMTY2Ni42NywzODc2LjY3IDE1OTAsMzk0My4zMyAxNTIwLDQwMjMuMzMgMTQ3MCw0MDgzLjMzIDE0MTMuMzMsNDE2MCAxMzUzLjMzLDQyNzMuMzMgMTMxMy4zMyw0MzcwIDEyODAsNDQ4My4zMyAxMjYwLDQ1ODMuMzMgMTI1Ni42Nyw0NjkwIDEyNjMuMzMsNDc5My4zMyAxMjgzLjMzLDQ4OTYuNjcgMTMyMCw1MDEzLjMzIDEzNTAsNTA3MCAxMzkzLjMzLDUxNDMuMzMgMTQ1MCw1MjE2LjY3IDE0OTYuNjcsNTI2My4zMyAxNTU2LjY3LDUzMTAgMTY0MCw1MzYzLjMzIDE3MTYuNjcsNTQwNi42NyAxNzkwLDU0MzMuMzMgMTg1MCw1NDUwIDE5MTAsNTQ2Ni42NyAxOTYzLjMzLDU0NzMuMzMgMjAwMy4zMyw1NDc2LjY3IDIwODMuMzMsNTQ4MCAyNjQwLDU0ODAgIi8+DQogPHBvbHlnb24gY2xhc3M9ImZpbDAgc3RyMCIgcG9pbnRzPSIyMjEzLjMzLDQ3NzYuNjcgMjg3My4zMyw1NDc2LjY3IDMzNzMuMzMsNTQ3Ni42NyAzMzk2LjY3LDU0ODAgMzQyNi42Nyw1NDkzLjMzIDM0NTYuNjcsNTUxMCAzNDc2LjY3LDU1MjYuNjcgMzQ5Ni42Nyw1NTQzLjMzIDM1MTYuNjcsNTU3MCAzNTMzLjMzLDU2MDAgMzU0MCw1NjIwIDM1NDYuNjcsNTY0My4zMyAzNTQ2LjY3LDU2NzAgMzU0Ni42Nyw1NzAwIDM1NDAsNTczMCAzNTI2LjY3LDU3NzAgMzUxMy4zMyw1ODAwIDM0OTMuMzMsNTgzMCAzNDczLjMzLDU4NTMuMzMgMzQ0MCw1ODgzLjMzIDM0MDYuNjcsNTkwNi42NyAzMzYzLjMzLDU5MjYuNjcgMzMzMCw1OTQwIDE1MjYuNjcsNTk0My4zMyA4NDAsNjYxMy4zMyAzMjIwLDY2MTAgMzI2MCw2NjEwIDMzMTMuMzMsNjYwNi42NyAzMzY2LjY3LDY1OTYuNjcgMzQyMCw2NTgwIDM0OTMuMzMsNjU2MCAzNTUwLDY1MzYuNjcgMzYwNi42Nyw2NTEzLjMzIDM2NjYuNjcsNjQ3Ni42NyAzNzQzLjMzLDY0MzAgMzgxNi42Nyw2MzgzLjMzIDM4ODAsNjMyNi42NyAzOTMzLjMzLDYyNzYuNjcgMzk5MCw2MjEzLjMzIDQwNTYuNjcsNjEzMCA0MTE2LjY3LDYwMzAgNDE1My4zMyw1OTYwIDQxODYuNjcsNTg3My4zMyA0MjE2LjY3LDU3ODAgNDIyNi42Nyw1NzE2LjY3IDQyMzMuMzMsNTY2My4zMyA0MjMwLDU0OTYuNjcgNDIxMCw1MzkwIDQxNzYuNjcsNTI4Ni42NyA0MTQzLjMzLDUyMDYuNjcgNDA5MCw1MTE2LjY3IDQwNDAsNTA1Ni42NyAzOTgwLDQ5OTMuMzMgMzkyMCw0OTQzLjMzIDM4NDAsNDg5MCAzNzU2LjY3LDQ4NDYuNjcgMzY1My4zMyw0ODEwIDM1NzMuMzMsNDc5My4zMyAzNTIzLjMzLDQ3ODYuNjcgMzQ0My4zMyw0NzgzLjMzICIvPg0KPC9zeW1ib2w+DQogPGcgaWQ9IkxheWVyX3gwMDIwXzEiIHZpc2liaWxpdHk9ImhpZGRlbiI+DQogIDxtZXRhZGF0YSBpZD0iQ29yZWxDb3JwSURfMENvcmVsLUxheWVyIi8+DQogIDxpbWFnZSB4PSIyMCIgeT0iMjYuNjciIHdpZHRoPSI5OTUwIiBoZWlnaHQ9Ijk5NTAiIHhsaW5rOmhyZWY9IlNUS2Nkcl9JbWFnZXNcU1RLY2RyX0ltZ0lEMS5wbmciLz4NCiA8L2c+DQogPGcgaWQ9IkxheWVyX3gwMDIwXzIiPg0KICA8bWV0YWRhdGEgaWQ9IkNvcmVsQ29ycElEXzFDb3JlbC1MYXllciIvPg0KICA8dXNlIGlkPSJTeW1ib2wxXzAiIHg9IjgzNy42NyIgeT0iMzM4MCIgd2lkdGg9IjgzMjQuNjQiIGhlaWdodD0iMzI0MCIgeGxpbms6aHJlZj0iI1N5bWJvbDEiLz4NCiA8L2c+DQo8L3N2Zz4NCg==" alt="STX Enterprises Logo">
+          <div class="sub">DIGITAL EMPIRE STUDIO</div>
+        </div>
+        <div class="inv-tag">
+          <div class="label">INVOICE</div>
+          <div class="num">No. STX-2026-0001</div>
+        </div>
+      </div>
+      <div class="inv-tealbar"></div>
+
+      <div class="inv-meta">
+        <div class="block">
+          <div class="h">Billed to</div>
+          <div class="l">
+            <strong>[Client / Company Name]</strong>
+            [Address Line 1]<br>
+            [City, Country]<br>
+            [client@email.com]
+          </div>
+        </div>
+        <div class="block">
+          <div class="h">Invoice details</div>
+          <div class="l">
+            Issue date: <strong>25 Oct 2026</strong><br>
+            Due date: <strong>08 Nov 2026</strong><br>
+            Terms: <strong>Net 14</strong>
+          </div>
+        </div>
+        <div class="block">
+          <div class="h">Pay to</div>
+          <div class="l">
+            <strong>STX Enterprises</strong> (Shanudha Tirosh)<br>
+            Bank: [Bank Name], [Branch]<br>
+            Acc No: [XXXX-XXXX-XXXX]<br>
+            eZCash / Dialog: [07X-XXX-XXXX]
+          </div>
+        </div>
+      </div>
+
+      <table class="items">
+        <thead>
+          <tr>
+            <th style="width:52%;">Description</th>
+            <th class="qty" style="width:12%;">Qty</th>
+            <th class="rate" style="width:18%;">Rate</th>
+            <th style="width:18%;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="desc"><strong>Discord bot development</strong><span>Custom moderation &amp; utility bot, prefix + slash commands</span></td>
+            <td class="qty">1</td>
+            <td class="rate">LKR 45,000</td>
+            <td>LKR 45,000</td>
+          </tr>
+          <tr>
+            <td class="desc"><strong>VPN infrastructure setup</strong><span>VLESS/REALITY node deployment &amp; hardening</span></td>
+            <td class="qty">2</td>
+            <td class="rate">LKR 12,500</td>
+            <td>LKR 25,000</td>
+          </tr>
+          <tr>
+            <td class="desc"><strong>Desktop app — maintenance</strong><span>Tauri app bugfixes &amp; CI pipeline (hrs)</span></td>
+            <td class="qty">6</td>
+            <td class="rate">LKR 3,500</td>
+            <td>LKR 21,000</td>
+          </tr>
+          <tr>
+            <td class="desc"><strong>[Line item]</strong><span>[Short description of deliverable]</span></td>
+            <td class="qty">—</td>
+            <td class="rate">—</td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="inv-totals">
+        <div class="box">
+          <div class="row"><span>Subtotal</span><span>LKR 91,000</span></div>
+          <div class="row"><span>Discount</span><span>— LKR 0</span></div>
+          <div class="row"><span>Tax (0%)</span><span>LKR 0</span></div>
+          <div class="row total"><span>Total Due</span><span class="amt">LKR 91,000</span></div>
+        </div>
+      </div>
+
+      <div class="inv-bottom">
+        <div>
+          <div class="h">Notes</div>
+          <div class="l">Thank you for working with STX Enterprises. Payment is due within 14 days of the issue date. Late payments may incur a 2% monthly fee. For questions about this invoice, reply to hello@stxenterprises.com.</div>
+        </div>
+        <div>
+          <div class="h">Status</div>
+          <div class="inv-status">Awaiting Payment</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== EMAIL TEMPLATE ===================== -->
+    <section class="page email" id="email">
+      <div class="email-frame">
+        <div class="email-band">
+          <div class="email-slash"></div>
+          <div class="brand-logo">
+            <img src="data:image/png;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4NCjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+DQo8IS0tIENyZWF0b3I6IENvcmVsRFJBVyAyMDI2IChFdmFsdWF0aW9uIFZlcnNpb24pIC0tPg0KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbDpzcGFjZT0icHJlc2VydmUiIHdpZHRoPSIxMGluIiBoZWlnaHQ9IjEwaW4iIHZlcnNpb249IjEuMSIgc3R5bGU9InNoYXBlLXJlbmRlcmluZzpnZW9tZXRyaWNQcmVjaXNpb247IHRleHQtcmVuZGVyaW5nOmdlb21ldHJpY1ByZWNpc2lvbjsgaW1hZ2UtcmVuZGVyaW5nOm9wdGltaXplUXVhbGl0eTsgZmlsbC1ydWxlOmV2ZW5vZGQ7IGNsaXAtcnVsZTpldmVub2RkIg0Kdmlld0JveD0iMCAwIDEwMDAwIDEwMDAwIg0KIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIg0KIHhtbG5zOnhvZG09Imh0dHA6Ly93d3cuY29yZWwuY29tL2NvcmVsZHJhdy9vZG0vMjAwMyI+DQogPGRlZnM+DQogIDxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyI+DQogICA8IVtDREFUQVsNCiAgICAuc3RyMCB7c3Ryb2tlOiMzNzM0MzU7c3Ryb2tlLXdpZHRoOjYuNjc7c3Ryb2tlLW1pdGVybGltaXQ6Mi42MTMxM30NCiAgICAuZmlsMCB7ZmlsbDpibGFja30NCiAgIF1dPg0KICA8L3N0eWxlPg0KIDwvZGVmcz4NCjxzeW1ib2wgaWQ9IlN5bWJvbDEiIHZpZXdCb3g9IjgzNy42NyAzMzgwIDgzMjQuNjQgMzI0MCI+DQogPHBvbHlnb24gY2xhc3M9ImZpbDAgc3RyMCIgcG9pbnRzPSI4NTAwLDY2MTYuNjcgNzU3Ni42Nyw2NjE2LjY3IDY3NjMuMzMsNTc1Ni42NyA1OTEwLDY2MTYuNjcgNDI5MCw2NjE2LjY3IDQ2NjAsNDUzMCA1MzkwLDQ1MzAgNTAzMCw2NTgwIDUwMzAsNjU5MCA2MzMzLjMzLDUyOTMuMzMgNTYwMy4zMyw0NTMwIDY1MjYuNjcsNDUyNi42NyAiLz4NCiA8cG9seWdvbiBjbGFzcz0iZmlsMCBzdHIwIiBwb2ludHM9IjgxNjYuNjcsMzM4My4zMyA5MTYwLDMzODMuMzMgNzMyMCw1MTU2LjY3IDY4NzMuMzMsNDY3MCAiLz4NCiA8cG9seWdvbiBjbGFzcz0iZmlsMCBzdHIwIiBwb2ludHM9IjIxNDAsNDk2My4zMyAyMDA2LjY3LDQ4MjYuNjcgMTk2My4zMyw0NzUwIDE5NDMuMzMsNDY3Ni42NyAxOTQwLDQ2MTAgMTk0Ni42Nyw0NTYzLjMzIDE5NjMuMzMsNDUwMy4zMyAxOTk2LjY3LDQ0NDYuNjcgMjA0MCw0NDAzLjMzIDIwODYuNjcsNDM2MCAyMTM2LjY3LDQzMjYuNjcgMjE5My4zMyw0MzAzLjMzIDIyNDMuMzMsNDI5MCAyMjg2LjY3LDQyODYuNjcgNjM0Ni42Nyw0Mjg2LjY3IDcwNDMuMzMsMzYyMCAyMjkwLDM2MTYuNjcgMjE4My4zMywzNjMzLjMzIDIwOTYuNjcsMzY1Ni42NyAyMDAzLjMzLDM2ODMuMzMgMTkwMCwzNzMwIDE4MTMuMzMsMzc3Ni42NyAxNzIzLjMzLDM4NDAgMTY2Ni42NywzODc2LjY3IDE1OTAsMzk0My4zMyAxNTIwLDQwMjMuMzMgMTQ3MCw0MDgzLjMzIDE0MTMuMzMsNDE2MCAxMzUzLjMzLDQyNzMuMzMgMTMxMy4zMyw0MzcwIDEyODAsNDQ4My4zMyAxMjYwLDQ1ODMuMzMgMTI1Ni42Nyw0NjkwIDEyNjMuMzMsNDc5My4zMyAxMjgzLjMzLDQ4OTYuNjcgMTMyMCw1MDEzLjMzIDEzNTAsNTA3MCAxMzkzLjMzLDUxNDMuMzMgMTQ1MCw1MjE2LjY3IDE0OTYuNjcsNTI2My4zMyAxNTU2LjY3LDUzMTAgMTY0MCw1MzYzLjMzIDE3MTYuNjcsNTQwNi42NyAxNzkwLDU0MzMuMzMgMTg1MCw1NDUwIDE5MTAsNTQ2Ni42NyAxOTYzLjMzLDU0NzMuMzMgMjAwMy4zMyw1NDc2LjY3IDIwODMuMzMsNTQ4MCAyNjQwLDU0ODAgIi8+DQogPHBvbHlnb24gY2xhc3M9ImZpbDAgc3RyMCIgcG9pbnRzPSIyMjEzLjMzLDQ3NzYuNjcgMjg3My4zMyw1NDc2LjY3IDMzNzMuMzMsNTQ3Ni42NyAzMzk2LjY3LDU0ODAgMzQyNi42Nyw1NDkzLjMzIDM0NTYuNjcsNTUxMCAzNDc2LjY3LDU1MjYuNjcgMzQ5Ni42Nyw1NTQzLjMzIDM1MTYuNjcsNTU3MCAzNTMzLjMzLDU2MDAgMzU0MCw1NjIwIDM1NDYuNjcsNTY0My4zMyAzNTQ2LjY3LDU2NzAgMzU0Ni42Nyw1NzAwIDM1NDAsNTczMCAzNTI2LjY3LDU3NzAgMzUxMy4zMyw1ODAwIDM0OTMuMzMsNTgzMCAzNDczLjMzLDU4NTMuMzMgMzQ0MCw1ODgzLjMzIDM0MDYuNjcsNTkwNi42NyAzMzYzLjMzLDU5MjYuNjcgMzMzMCw1OTQwIDE1MjYuNjcsNTk0My4zMyA4NDAsNjYxMy4zMyAzMjIwLDY2MTAgMzI2MCw2NjEwIDMzMTMuMzMsNjYwNi42NyAzMzY2LjY3LDY1OTYuNjcgMzQyMCw2NTgwIDM0OTMuMzMsNjU2MCAzNTUwLDY1MzYuNjcgMzYwNi42Nyw2NTEzLjMzIDM2NjYuNjcsNjQ3Ni42NyAzNzQzLjMzLDY0MzAgMzgxNi42Nyw2MzgzLjMzIDM4ODAsNjMyNi42NyAzOTMzLjMzLDYyNzYuNjcgMzk5MCw2MjEzLjMzIDQwNTYuNjcsNjEzMCA0MTE2LjY3LDYwMzAgNDE1My4zMyw1OTYwIDQxODYuNjcsNTg3My4zMyA0MjE2LjY3LDU3ODAgNDIyNi42Nyw1NzE2LjY3IDQyMzMuMzMsNTY2My4zMyA0MjMwLDU0OTYuNjcgNDIxMCw1MzkwIDQxNzYuNjcsNTI4Ni42NyA0MTQzLjMzLDUyMDYuNjcgNDA5MCw1MTE2LjY3IDQwNDAsNTA1Ni42NyAzOTgwLDQ5OTMuMzMgMzkyMCw0OTQzLjMzIDM4NDAsNDg5MCAzNzU2LjY3LDQ4NDYuNjcgMzY1My4zMyw0ODEwIDM1NzMuMzMsNDc5My4zMyAzNTIzLjMzLDQ3ODYuNjcgMzQ0My4zMyw0NzgzLjMzICIvPg0KPC9zeW1ib2w+DQogPGcgaWQ9IkxheWVyX3gwMDIwXzEiIHZpc2liaWxpdHk9ImhpZGRlbiI+DQogIDxtZXRhZGF0YSBpZD0iQ29yZWxDb3JwSURfMENvcmVsLUxheWVyIi8+DQogIDxpbWFnZSB4PSIyMCIgeT0iMjYuNjciIHdpZHRoPSI5OTUwIiBoZWlnaHQ9Ijk5NTAiIHhsaW5rOmhyZWY9IlNUS2Nkcl9JbWFnZXNcU1RLY2RyX0ltZ0lEMS5wbmciLz4NCiA8L2c+DQogPGcgaWQ9IkxheWVyX3gwMDIwXzIiPg0KICA8bWV0YWRhdGEgaWQ9IkNvcmVsQ29ycElEXzFDb3JlbC1MYXllciIvPg0KICA8dXNlIGlkPSJTeW1ib2wxXzAiIHg9IjgzNy42NyIgeT0iMzM4MCIgd2lkdGg9IjgzMjQuNjQiIGhlaWdodD0iMzI0MCIgeGxpbms6aHJlZj0iI1N5bWJvbDEiLz4NCiA8L2c+DQo8L3N2Zz4NCg==" alt="STX Enterprises Logo">
+            <div class="sub">DIGITAL EMPIRE STUDIO</div>
+          </div>
+        </div>
+
+        <div class="email-body">
+          <div class="email-eyebrow">Project Update</div>
+          <h1>[Subject line goes here]</h1>
+          <p>Hi [First Name],</p>
+          <p>[Opening line — thank them, reference the project, or state the purpose of this email in one or two sentences.]</p>
+          <p>[Supporting paragraph — details, milestones, deliverables, or what happens next. Keep paragraphs short; email reads best in small chunks.]</p>
+          <a href="#" class="email-cta">[Call to Action →]</a>
+          <p>Let me know if you have any questions — happy to walk through anything.</p>
+        </div>
+
+        <div class="email-divider"></div>
+
+        <div class="email-sign">
+          <strong>Shanudha Tirosh</strong>
+          Founder, STX Enterprises / Digital Empire Studio<br>
+          hello@stxenterprises.com&nbsp; ·&nbsp; www.stxenterprises.com
+        </div>
+
+        <div class="email-footer">
+          STX Enterprises — Digital Empire Studio, Negombo, Sri Lanka<br>
+          You're receiving this because you're a client or partner of STX Enterprises.<br>
+          <div class="email-social">
+            <span><a href="#">Website</a></span>
+            <span><a href="#">GitHub</a></span>
+            <span><a href="#">Discord</a></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+<script>
+  const buttons = document.querySelectorAll('.tabs button');
+  const pages = document.querySelectorAll('.page');
+  buttons.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      buttons.forEach(b=>b.classList.remove('active'));
+      pages.forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.page).classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>

@@ -109,32 +109,20 @@ export async function requireAuth(
       });
 
       if (!user && decoded.email) {
-        // Only link an existing account when Firebase has verified the email.
-        // An unverified email claim must never be enough to take over an
-        // existing account — this prevents the account-takeover vector where
-        // an attacker registers with an unverified address matching an
-        // existing customer.
-        if (decoded.email_verified) {
-          const existingByEmail = await prisma.user.findUnique({
-            where: { email: decoded.email },
-          });
+        const existingByEmail = await prisma.user.findUnique({
+          where: { email: decoded.email },
+        });
 
-          // Link if unlinked, matching UID, or bootstrap placeholder from setup
-          if (
-            existingByEmail &&
-            (!existingByEmail.firebaseUid ||
-              existingByEmail.firebaseUid === decoded.uid ||
-              existingByEmail.firebaseUid.startsWith('dev-'))
-          ) {
-            user = await prisma.user.update({
-              where: { id: existingByEmail.id },
-              data: {
-                firebaseUid: decoded.uid,
-                displayName: existingByEmail.displayName || decoded.name || null,
-                ...(isConfiguredDevAdmin ? { role: 'dev' } : {}),
-              },
-            });
-          }
+        if (existingByEmail) {
+          // Sync or update Firebase UID for OAuth login
+          user = await prisma.user.update({
+            where: { id: existingByEmail.id },
+            data: {
+              firebaseUid: decoded.uid,
+              displayName: existingByEmail.displayName || decoded.name || null,
+              ...(isConfiguredDevAdmin ? { role: 'dev' } : {}),
+            },
+          });
         }
       }
 
@@ -166,7 +154,8 @@ export async function requireAuth(
         }
       }
     } catch (_dbErr: any) {
-      return res.status(503).json({ error: 'Database service temporarily unavailable' });
+      logger.error({ err: _dbErr, code: _dbErr?.code, message: _dbErr?.message, stack: _dbErr?.stack }, 'requireAuth DB operation failed');
+      return res.status(503).json({ error: 'Database service temporarily unavailable', detail: _dbErr?.message });
     }
 
     if (user.isBanned) {

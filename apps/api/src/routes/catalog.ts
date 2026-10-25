@@ -232,6 +232,8 @@ const deploySchema = z
     configFiles: z.record(z.string()).optional(),
     configFileContent: z.string().optional(),
     configFileName: z.string().optional(),
+    cpuLimit: z.string().optional(),
+    memoryLimit: z.string().optional(),
   })
   .refine((data) => data.slug || data.templateSlug, {
     message: 'slug or templateSlug is required',
@@ -256,6 +258,8 @@ catalogRouter.post('/catalog/deploy', async (req: AuthedRequest, res) => {
     configFiles: customerConfigFiles = {},
     configFileContent,
     configFileName,
+    cpuLimit = '0.5',
+    memoryLimit = '1G',
   } = parsed.data;
   const userId = req.user!.id;
   const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
@@ -548,6 +552,8 @@ logging:
         configFiles,
         configFileContent,
         configFileName,
+        cpuLimit,
+        memoryLimit,
       }),
       signal: AbortSignal.timeout(120_000),
     });

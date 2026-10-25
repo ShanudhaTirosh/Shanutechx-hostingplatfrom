@@ -27,6 +27,7 @@ import {
 } from '@/components/ui';
 import { apiFetch } from '@/lib/useAuth';
 import InvoiceModal from '@/components/InvoiceModal';
+import PaymentProofModal from '@/components/PaymentProofModal';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 function CalendarIcon() {
@@ -116,12 +117,20 @@ function UnifiedOrdersPortalContent({ initialTab = 'subscriptions' }: { initialT
   const { toast } = useToast();
 
   const tabParam = searchParams.get('tab') as TabType | null;
-  const activeTab: TabType = tabParam && ['subscriptions', 'orders', 'cart'].includes(tabParam)
+  const initialActive = tabParam && ['subscriptions', 'orders', 'cart'].includes(tabParam)
     ? tabParam
     : initialTab;
+  const [activeTab, setActiveTabState] = useState<TabType>(initialActive);
+
+  useEffect(() => {
+    if (tabParam && ['subscriptions', 'orders', 'cart'].includes(tabParam)) {
+      setActiveTabState(tabParam);
+    }
+  }, [tabParam]);
 
   function setActiveTab(tab: TabType) {
-    const params = new URLSearchParams(searchParams.toString());
+    setActiveTabState(tab);
+    const params = new URLSearchParams(window.location.search);
     params.set('tab', tab);
     router.push(`/orders?${params.toString()}`);
   }
@@ -246,7 +255,7 @@ function UnifiedOrdersPortalContent({ initialTab = 'subscriptions' }: { initialT
       {error && <ErrorBanner message={error} />}
 
       {/* Top Tab Bar */}
-      <div className="flex border-b border-white/[0.08] gap-2 pb-px overflow-x-auto">
+      <div className="flex border-b border-white/10 gap-2.5 pb-2 overflow-x-auto">
         {[
           {
             key: 'subscriptions',
@@ -259,35 +268,38 @@ function UnifiedOrdersPortalContent({ initialTab = 'subscriptions' }: { initialT
             label: 'Orders & Invoices',
             icon: <ReceiptIcon />,
             badge: pendingOrdersCount > 0 ? `${pendingOrdersCount} Pending` : undefined,
-            badgeColor: pendingOrdersCount > 0 ? 'bg-orange-500/20 text-orange-300 border-orange-500/30' : undefined,
           },
           {
             key: 'cart',
             label: 'Shopping Cart',
             icon: <CartIcon />,
             badge: cartCount > 0 ? cartCount : undefined,
-            badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
           },
         ].map((t) => {
           const isActive = activeTab === t.key;
           return (
             <button
+              type="button"
               key={t.key}
               onClick={() => setActiveTab(t.key as TabType)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl transition-all border shrink-0 ${
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-mono font-bold rounded-xl transition-all border shrink-0 cursor-pointer ${
                 isActive
-                  ? 'bg-white/[0.1] text-text-primary border-white/20 shadow-sm'
-                  : 'text-text-muted hover:text-white border-transparent hover:bg-white/[0.04]'
+                  ? 'bg-white text-black border-white shadow-lg shadow-white/10'
+                  : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/25'
               }`}
             >
-              <span className={isActive ? 'text-accent-teal-bright' : 'text-text-faint'}>
+              <span className={isActive ? 'text-black' : 'text-white/80'}>
                 {t.icon}
               </span>
               <span>{t.label}</span>
               {t.badge !== undefined && (
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border font-bold ${
-                  t.badgeColor || 'bg-accent-violet/20 text-accent-violet-light border-accent-violet/30'
-                }`}>
+                <span
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold border ${
+                    isActive
+                      ? 'bg-black/15 text-black border-black/20'
+                      : 'bg-white/15 text-white border-white/20'
+                  }`}
+                >
                   {t.badge}
                 </span>
               )}
@@ -302,7 +314,7 @@ function UnifiedOrdersPortalContent({ initialTab = 'subscriptions' }: { initialT
           {subscriptions && subscriptions.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
-                { label: 'Active Services', value: activeSubsCount, color: 'text-emerald-400' },
+                { label: 'Active Services', value: activeSubsCount },
                 {
                   label: 'Monthly Spend',
                   value: formatMoney(
@@ -310,17 +322,15 @@ function UnifiedOrdersPortalContent({ initialTab = 'subscriptions' }: { initialT
                       .filter((s) => s.status === 'active')
                       .reduce((acc, s) => acc + (s.orderItem?.plan?.price ?? s.orderItem?.service?.price ?? 0), 0)
                   ),
-                  color: 'text-accent-violet-light',
                 },
                 {
                   label: 'Cancelled',
                   value: subscriptions.filter((s) => s.status === 'cancelled').length,
-                  color: 'text-text-muted',
                 },
               ].map((s) => (
-                <div key={s.label} className="glass rounded-2xl p-4 border border-white/[0.06]">
-                  <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1">{s.label}</p>
-                  <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                <div key={s.label} className="bg-gradient-to-b from-zinc-900/90 to-black/90 rounded-2xl p-4 border border-white/10">
+                  <p className="text-[10px] text-white/60 uppercase font-mono tracking-wider mb-1">{s.label}</p>
+                  <p className="text-xl font-bold font-mono text-white">{s.value}</p>
                 </div>
               ))}
             </div>
@@ -517,7 +527,7 @@ function UnifiedOrdersPortalContent({ initialTab = 'subscriptions' }: { initialT
                       <p className="text-xs text-text-muted">Total Due Now</p>
                       <p className="text-2xl font-bold text-text-primary">{formatMoney(cartTotal)}</p>
                       <p className="text-[10px] text-text-faint mt-0.5">
-                        Bank transfer / gateway confirmation required after placing order.
+                        Manual bank transfer slip upload required after placing order. No automated gateway.
                       </p>
                     </div>
                   </div>
@@ -527,14 +537,14 @@ function UnifiedOrdersPortalContent({ initialTab = 'subscriptions' }: { initialT
                     className="w-full justify-center"
                     size="lg"
                   >
-                    {checkingOut ? 'Placing Order...' : 'Place Order & Proceed to Payment'}
+                    {checkingOut ? 'Placing Order...' : 'Place Order & Upload Payment Proof'}
                   </Button>
                 </div>
               </Card>
 
               <Card className="border border-white/[0.04] bg-white/[0.01]">
                 <p className="text-xs text-text-muted leading-relaxed">
-                  <span className="text-text-primary font-medium">Automatic Provisioning:</span> Once payment proof is uploaded and confirmed, container instances and VPS nodes are immediately initialized and ready to deploy in your dashboard.
+                  <span className="text-text-primary font-medium">Notice:</span> VPS servers are delivered within <strong className="text-amber-300">24 to 72 hours</strong>.
                 </p>
               </Card>
             </>
@@ -591,39 +601,13 @@ function UnifiedOrdersPortalContent({ initialTab = 'subscriptions' }: { initialT
 
 // ── Single Order Card Component ─────────────────────────────────────────────
 function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showProofModal, setShowProofModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const latestPayment = order.payments?.[order.payments.length - 1];
-
-  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    setError(null);
-    const idempotencyKey = crypto.randomUUID();
-    try {
-      const { payment } = await api.orders.uploadProof(order.id, file, idempotencyKey);
-      if (payment.status === 'auto_approved') {
-        toast('Payment confirmed automatically', 'success');
-      } else if (payment.status === 'manual_review') {
-        toast('Submitted for review — support staff will verify shortly.', 'info');
-      } else {
-        toast('Could not verify proof. Please try uploading a clearer screenshot.', 'error');
-      }
-      onChanged();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  }
 
   async function handleDownloadInvoice() {
     setDownloading(true);
@@ -652,6 +636,16 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
         isOpen={showInvoiceModal}
         onClose={() => setShowInvoiceModal(false)}
         order={order}
+      />
+
+      <PaymentProofModal
+        isOpen={showProofModal}
+        onClose={() => setShowProofModal(false)}
+        order={order}
+        onSuccess={() => {
+          toast('Payment proof uploaded successfully and submitted for manual review!', 'success');
+          onChanged();
+        }}
       />
 
       <Card className="border border-white/[0.06] hover:border-white/10 transition-all">
@@ -697,7 +691,7 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
             </div>
             {latestPayment.status === 'manual_review' && (
               <p className="text-orange-300/90 text-[11px] leading-relaxed">
-                ⏳ Proof received — currently awaiting manual verification by staff. Your services will activate as soon as confirmed.
+                ⏳ Proof received — currently awaiting manual verification by staff. Services activate upon approval (VPS setups are delivered within 24 to 72 hours).
               </p>
             )}
             {latestPayment.status === 'rejected' && latestPayment.rejectionReason && (
@@ -710,23 +704,13 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
 
         <div className="flex flex-wrap gap-2.5 mt-4">
           {order.status === 'awaiting_payment' && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,application/pdf"
-                className="hidden"
-                onChange={handleFileSelected}
-              />
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                loading={uploading}
-                size="sm"
-              >
-                <UploadIcon />
-                {uploading ? 'Uploading...' : latestPayment?.status === 'manual_review' ? 'Re-upload Payment Proof' : 'Upload Payment Proof'}
-              </Button>
-            </>
+            <Button
+              onClick={() => setShowProofModal(true)}
+              size="sm"
+            >
+              <UploadIcon />
+              {latestPayment?.status === 'manual_review' ? 'Re-upload Payment Proof' : 'Upload Payment Proof'}
+            </Button>
           )}
 
           {order.status === 'paid' && (

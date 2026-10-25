@@ -17,6 +17,7 @@ const CATEGORIES = [
   'database',
   'app_catalog',
   'bot_hosting',
+  'app_deployment',
 ] as const;
 
 const BILLING_TYPES = ['one_time', 'monthly', 'quarterly', 'semiannual', 'yearly'] as const;
@@ -24,13 +25,19 @@ const BILLING_TYPES = ['one_time', 'monthly', 'quarterly', 'semiannual', 'yearly
 // ── Public read — no auth, customers need to browse before signing in ─────
 productsRouter.get('/products', async (req, res) => {
   const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+  const includeInactive = req.query.includeInactive === 'true' || req.query.all === 'true';
 
   const products = await prisma.product.findMany({
     where: {
-      isActive: true,
+      ...(includeInactive ? {} : { isActive: true }),
       ...(category ? { category: category as (typeof CATEGORIES)[number] } : {}),
     },
-    include: { plans: { where: { isActive: true }, orderBy: { price: 'asc' } } },
+    include: {
+      plans: {
+        where: includeInactive ? {} : { isActive: true },
+        orderBy: { price: 'asc' },
+      },
+    },
     orderBy: { createdAt: 'asc' },
   });
 
@@ -176,13 +183,34 @@ productsRouter.put('/plans/:id', requireAdminOrDev, async (req: AuthedRequest, r
   res.json({ plan });
 });
 
-productsRouter.delete('/plans/:id', requireAdminOrDev, async (req: AuthedRequest, res) => {
-  const plan = await prisma.plan
-    .update({ where: { id: req.params.id }, data: { isActive: false } })
-    .catch(() => null);
-  if (!plan) return res.status(404).json({ error: 'Plan not found' });
-  // Deactivate rather than hard-delete — historical OrderItems reference
-  // this Plan and must keep resolving for order history/invoices.
-  await prisma.auditLog.create({ data: { adminId: req.user!.id, action: 'plan.deactivate', target: plan.id } });
+productsRouter.patch('/plans/:id/toggle', requireAdminOrDev, async (req: AuthedRequest, res) => {
+  const existing = await prisma.plan.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: 'Plan not found' });
+
+  const nextActive = typeof req.body?.isActive === 'boolean' ? req.body.isActive : !existing.isActive;
+  const plan = await prisma.plan.update({
+    where: { id: req.params.id },
+    data: { isActive: nextActive },
+  });
+
+  await prisma.auditLog.create({
+    data: { adminId: req.user!.id, action: nextActive ? 'plan.activate' : 'plan.deactivate', target: plan.id },
+  });
   res.json({ ok: true, plan });
+});
+
+productsRouter.delete('/plans/:id', requireAdminOrDev, async (req: AuthedRequest, res) => {
+  const existing = await prisma.plan.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: 'Plan not found' });
+
+  const orderCount = await prisma.orderItem.count({ where: { planId: req.params.id } });
+  if (orderCount > 0) {
+    const plan = await prisma.plan.update({ where: { id: req.params.id }, data: { isActive: false } });
+    await prisma.auditLog.create({ data: { adminId: req.user!.id, action: 'plan.deactivate', target: plan.id } });
+    return res.json({ ok: true, deactivated: true, message: 'Plan has customer orders; deactivated and hidden from storefront.', plan });
+  }
+
+  await prisma.plan.delete({ where: { id: req.params.id } });
+  await prisma.auditLog.create({ data: { adminId: req.user!.id, action: 'plan.delete', target: req.params.id } });
+  res.json({ ok: true, deleted: true, message: 'Plan deleted permanently.' });
 });

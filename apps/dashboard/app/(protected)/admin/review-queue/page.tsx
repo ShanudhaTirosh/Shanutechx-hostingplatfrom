@@ -233,12 +233,14 @@ export default function ReviewQueuePage() {
               <div className="grid grid-cols-3 gap-3 text-xs mb-4">
                 <div className="glass rounded-xl p-3 border border-white/[0.04]">
                   <p className="text-text-muted mb-1">Method</p>
-                  <p className="font-medium capitalize">{payment.method.replace('_', ' ')}</p>
+                  <p className="font-semibold text-teal-300">
+                    {(payment.extractedJson as any)?.methodName || payment.method.replace('_', ' ')}
+                  </p>
                 </div>
                 <div className="glass rounded-xl p-3 border border-white/[0.04]">
-                  <p className="text-text-muted mb-1">AI Confidence</p>
-                  <p className={`font-semibold ${confidenceColor}`}>
-                    {confidence !== null ? `${confidence}%` : '—'}
+                  <p className="text-text-muted mb-1">Proof Format</p>
+                  <p className="font-mono text-slate-300">
+                    {(payment.extractedJson as any)?.format ? 'WebP (Processed)' : isPdf ? 'PDF' : 'Image'}
                   </p>
                 </div>
                 <div className="glass rounded-xl p-3 border border-white/[0.04]">
@@ -249,19 +251,22 @@ export default function ReviewQueuePage() {
                 </div>
               </div>
 
-              {/* Parsed SMS / OCR metadata if available */}
+              {/* Parsed / Submitted Transaction metadata if available */}
               {payment.extractedJson && typeof payment.extractedJson === 'object' && (
                 <div className="glass rounded-xl p-3 border border-white/[0.04] text-xs mb-4 space-y-1">
-                  <p className="text-[10px] uppercase tracking-wider text-text-faint font-medium">Extracted Transaction Data</p>
-                  <div className="flex gap-4 text-text-muted">
-                    {(payment.extractedJson as any).amount && (
-                      <p><span className="text-text-faint">Amount:</span> LKR {(payment.extractedJson as any).amount}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-text-faint font-medium">Customer Payment Details</p>
+                  <div className="flex flex-wrap gap-4 text-text-muted">
+                    {(payment.extractedJson as any).methodName && (
+                      <p><span className="text-text-faint">Channel:</span> <strong className="text-text-primary">{(payment.extractedJson as any).methodName}</strong></p>
                     )}
                     {(payment.extractedJson as any).reference && (
-                      <p><span className="text-text-faint font-mono">Ref:</span> {(payment.extractedJson as any).reference}</p>
+                      <p><span className="text-text-faint font-mono">Reference:</span> <code className="text-teal-300 font-bold">{(payment.extractedJson as any).reference}</code></p>
                     )}
-                    {(payment.extractedJson as any).source && (
-                      <p><span className="text-text-faint">Bank:</span> {(payment.extractedJson as any).source}</p>
+                    {(payment.extractedJson as any).notes && (
+                      <p><span className="text-text-faint">Note:</span> {(payment.extractedJson as any).notes}</p>
+                    )}
+                    {(payment.extractedJson as any).amount && (
+                      <p><span className="text-text-faint">Amount:</span> LKR {(payment.extractedJson as any).amount}</p>
                     )}
                   </div>
                 </div>

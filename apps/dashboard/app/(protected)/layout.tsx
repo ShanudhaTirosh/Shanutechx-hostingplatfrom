@@ -132,17 +132,18 @@ function GatedLayoutContent({
         return;
       }
     } else if (userRole === 'support') {
-      if (
-        pathname.startsWith('/admin') &&
-        !pathname.startsWith('/admin/tickets') &&
-        !pathname.startsWith('/admin/chat') &&
-        !pathname.startsWith('/admin/customers')
-      ) {
-        router.replace('/support');
+      // Direct support users to admin tickets, eliminating standalone support dashboard
+      if (pathname === '/support') {
+        router.replace('/admin/tickets');
         return;
       }
       if (pathname.startsWith('/dev') || pathname.startsWith('/settings') || pathname.startsWith('/projects')) {
-        router.replace('/support');
+        router.replace('/admin/tickets');
+        return;
+      }
+    } else if (userRole === 'admin') {
+      if (pathname.startsWith('/dev') || pathname.startsWith('/projects')) {
+        router.replace('/admin');
         return;
       }
     }

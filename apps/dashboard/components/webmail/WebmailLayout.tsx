@@ -80,7 +80,7 @@ function getInitials(name: string): string {
 }
 
 function getAvatarColor(email: string): string {
-  const colors = ['from-violet-500 to-purple-600', 'from-blue-500 to-cyan-500', 'from-emerald-500 to-teal-500',
+  const colors = ['from-neutral-800 to-black', 'from-blue-500 to-cyan-500', 'from-emerald-500 to-teal-500',
     'from-orange-500 to-amber-500', 'from-rose-500 to-pink-500', 'from-indigo-500 to-blue-500'];
   const idx = (email || '').charCodeAt(0) % colors.length;
   return colors[idx];
@@ -152,7 +152,7 @@ export function WebmailLayout({
       {/* ─── COL 1: Icon Rail (60px) ─── */}
       <aside className="flex flex-col items-center py-3 gap-1 w-[60px] shrink-0 bg-[#13131a] border-r border-white/5 z-20">
         {/* Logo */}
-        <div className="w-9 h-9 rounded-xl bg-white/10 p-1.5 flex items-center justify-center border border-white/10 shadow-lg shadow-violet-500/20 mb-2 shrink-0 backdrop-blur-sm">
+        <div className="w-9 h-9 rounded-xl bg-white/10 p-1.5 flex items-center justify-center border border-white/10 shadow-lg shadow-md mb-2 shrink-0 backdrop-blur-sm">
           <img
             src="/STX.png"
             alt="STX"
@@ -168,9 +168,9 @@ export function WebmailLayout({
               onClick={() => onChangeMainTab?.(id as any)}
               title={label}
               aria-label={label}
-              className={`w-full flex flex-col items-center py-2.5 px-1 rounded-xl text-[9px] font-semibold gap-1 transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 active:scale-[0.97] ${
+              className={`w-full flex flex-col items-center py-2.5 px-1 rounded-xl text-[9px] font-semibold gap-1 transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 active:scale-[0.97] ${
                 activeMainTab === id
-                  ? 'bg-violet-600/20 text-violet-300 ring-1 ring-violet-500/30'
+                  ? 'bg-white/10 text-neutral-300 ring-1 ring-white/20'
                   : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
               }`}
             >
@@ -204,7 +204,7 @@ export function WebmailLayout({
             onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
             title="Toggle Theme"
             aria-label="Toggle Theme"
-            className="w-full flex items-center justify-center py-2.5 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 active:scale-[0.97]"
+            className="w-full flex items-center justify-center py-2.5 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 active:scale-[0.97]"
           >
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
@@ -212,7 +212,7 @@ export function WebmailLayout({
             onClick={onOpenSettingsModal}
             title="Settings"
             aria-label="Settings"
-            className="w-full flex items-center justify-center py-2.5 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 active:scale-[0.97]"
+            className="w-full flex items-center justify-center py-2.5 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 active:scale-[0.97]"
           >
             <Settings className="h-4 w-4" />
           </button>
@@ -250,7 +250,7 @@ export function WebmailLayout({
                     <button
                       key={mb.id}
                       onClick={() => { onSelectMailbox?.(mb.id); setAccountMenuOpen(false); }}
-                      className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs transition-all ${mb.id === selectedMailboxId ? 'bg-violet-600/20 text-violet-300' : 'text-slate-300 hover:bg-white/5'}`}
+                      className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs transition-all ${mb.id === selectedMailboxId ? 'bg-white/10 text-neutral-300' : 'text-slate-300 hover:bg-white/5'}`}
                     >
                       <div className={`w-6 h-6 rounded-lg bg-gradient-to-tr ${getAvatarColor(mbEmail)} flex items-center justify-center text-white text-[10px] font-bold shrink-0`}>
                         {getInitials(mb.smtpUsername)}
@@ -265,7 +265,7 @@ export function WebmailLayout({
 
           {/* Search */}
           <div className="px-3 pb-2">
-            <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2 border border-white/5 focus-within:border-violet-500/50 focus-within:bg-violet-500/5 transition-all">
+            <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2 border border-white/5 focus-within:border-white/15 focus-within:bg-violet-500/5 transition-all">
               <Search className="h-3.5 w-3.5 text-slate-500 shrink-0" />
               <input
                 type="text"
@@ -281,7 +281,7 @@ export function WebmailLayout({
           <div className="px-3 pb-3">
             <button
               onClick={onOpenCompose}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-violet-600/20 transition-all active:scale-95"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-neutral-800 to-black hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-md transition-all active:scale-95"
             >
               <Plus className="h-3.5 w-3.5" />
               Compose
@@ -298,7 +298,7 @@ export function WebmailLayout({
                   key={cat}
                   onClick={() => onSelectCategory(cat)}
                   className={`text-[9px] font-bold px-2 py-1 rounded-lg capitalize transition-all ${
-                    activeCategory === cat ? 'bg-violet-600/30 text-violet-300' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                    activeCategory === cat ? 'bg-white text-black/30 text-neutral-300' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
                   }`}
                 >
                   {cat === 'primary' ? 'All' : cat.slice(0, 3)}
@@ -313,14 +313,14 @@ export function WebmailLayout({
                 onClick={() => onSelectFolder(id)}
                 className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-all group ${
                   activeFolder === id
-                    ? 'bg-violet-600/20 text-violet-300'
+                    ? 'bg-white/10 text-neutral-300'
                     : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
                 }`}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
                 <span className="flex-1 text-left">{label}</span>
                 {id === 'inbox' && unreadCounts.inbox > 0 && (
-                  <span className="text-[10px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  <span className="text-[10px] font-bold bg-white text-black text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                     {unreadCounts.inbox}
                   </span>
                 )}
@@ -339,7 +339,7 @@ export function WebmailLayout({
                   Folders
                   <button
                     onClick={(e) => { e.stopPropagation(); onOpenFoldersModal(); }}
-                    className="ml-auto text-slate-600 hover:text-violet-400"
+                    className="ml-auto text-slate-600 hover:text-white"
                   >
                     <Plus className="h-3 w-3" />
                   </button>
@@ -349,7 +349,7 @@ export function WebmailLayout({
                     key={f.id}
                     onClick={() => onSelectFolder(`custom:${f.id}`)}
                     className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs transition-all ${
-                      activeFolder === `custom:${f.id}` ? 'bg-violet-600/20 text-violet-300' : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
+                      activeFolder === `custom:${f.id}` ? 'bg-white/10 text-neutral-300' : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
                     }`}
                   >
                     <span style={{ color: f.color }} className="text-sm">●</span>
@@ -375,7 +375,7 @@ export function WebmailLayout({
                     key={l.id}
                     onClick={() => onSelectTag(l.name)}
                     className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs transition-all ${
-                      activeTag === l.name ? 'bg-violet-600/20 text-violet-300' : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
+                      activeTag === l.name ? 'bg-white/10 text-neutral-300' : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
                     }`}
                   >
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
@@ -389,21 +389,21 @@ export function WebmailLayout({
             <div className="pt-2 border-t border-white/5 mt-2 space-y-0.5">
               <button
                 onClick={onOpenRulesModal}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
               >
                 <Zap className="h-3.5 w-3.5" />
                 Filter Rules
               </button>
               <button
                 onClick={onOpenFoldersModal}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
               >
                 <FolderPlus className="h-3.5 w-3.5" />
                 Manage Folders
               </button>
               <button
                 onClick={() => onChangeDensity(listDensity === 'comfortable' ? 'compact' : 'comfortable')}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
               >
                 <Sliders className="h-3.5 w-3.5" />
                 {listDensity === 'compact' ? 'Comfortable View' : 'Compact View'}
@@ -411,7 +411,7 @@ export function WebmailLayout({
               {onToggleThreaded && (
                 <button
                   onClick={onToggleThreaded}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
                 >
                   <Hash className="h-3.5 w-3.5" />
                   {isThreaded ? 'Switch to Flat' : 'Switch to Threads'}

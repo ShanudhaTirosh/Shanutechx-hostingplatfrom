@@ -139,8 +139,8 @@ export default function AcceptTeamInvitePage() {
 
       {invite && (
         <Card className="border border-white/10 p-6 space-y-6 shadow-2xl bg-bg-card/80 backdrop-blur-xl">
-          <div className="flex items-center gap-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-4">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white font-bold flex items-center justify-center shrink-0 shadow-glow-violet">
+          <div className="flex items-center gap-4 bg-white/5 border border-white/15 rounded-2xl p-4">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-neutral-800 to-black text-white font-bold flex items-center justify-center shrink-0 shadow-md">
               <TeamIcon />
             </div>
             <div>
@@ -158,7 +158,7 @@ export default function AcceptTeamInvitePage() {
             </div>
             <div className="flex justify-between py-2 border-b border-white/[0.06]">
               <span className="text-text-muted">Assigned Team Role</span>
-              <span className="font-bold text-indigo-300 uppercase tracking-wider">{invite.role}</span>
+              <span className="font-bold text-neutral-300 uppercase tracking-wider">{invite.role}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-white/[0.06]">
               <span className="text-text-muted">Invitation Status</span>
@@ -215,7 +215,7 @@ export default function AcceptTeamInvitePage() {
                   placeholder="Email address"
                   value={email || invite.email || ''}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm placeholder:text-text-muted focus:outline-none focus:border-indigo-500 transition-colors"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm placeholder:text-text-muted focus:outline-none focus:border-white/30 transition-colors"
                 />
 
                 <input
@@ -224,7 +224,7 @@ export default function AcceptTeamInvitePage() {
                   placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm placeholder:text-text-muted focus:outline-none focus:border-indigo-500 transition-colors"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm placeholder:text-text-muted focus:outline-none focus:border-white/30 transition-colors"
                 />
 
                 <Button type="submit" className="w-full" loading={authBusy}>

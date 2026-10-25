@@ -115,7 +115,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
         <div className="px-8 pt-8 pb-4">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-violet-500/30">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-md">
                 <Icon className="h-5 w-5 text-white" />
               </div>
               <div>
@@ -143,7 +143,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
                   key={s.id}
                   onClick={() => i < step ? setStep(i) : undefined}
                   className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
-                    i === step ? 'text-violet-400' : i < step ? 'text-emerald-400 cursor-pointer' : 'text-slate-600'
+                    i === step ? 'text-white' : i < step ? 'text-emerald-400 cursor-pointer' : 'text-slate-600'
                   }`}
                 >
                   {i < step ? (
@@ -152,7 +152,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
                     </span>
                   ) : (
                     <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center text-[9px] ${
-                      i === step ? 'border-violet-500 text-violet-400' : 'border-slate-700 text-slate-600'
+                      i === step ? 'border-white/30 text-white' : 'border-slate-700 text-slate-600'
                     }`}>
                       {i + 1}
                     </span>
@@ -170,8 +170,8 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
           {/* Welcome */}
           {step === 0 && (
             <div className="text-center py-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-violet-600/20 to-indigo-600/20 border border-violet-500/20 flex items-center justify-center mx-auto mb-4">
-                <Mail className="h-8 w-8 text-violet-400" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-violet-600/20 to-indigo-600/20 border border-white/15 flex items-center justify-center mx-auto mb-4">
+                <Mail className="h-8 w-8 text-white" />
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Welcome to your mailbox!</h3>
               <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
@@ -179,7 +179,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-2">
                 {['Aliases', 'DNS Setup', 'Forwarding', 'AI Features', 'Signature'].map((f) => (
-                  <span key={f} className="flex items-center gap-1 text-xs bg-violet-600/10 text-violet-300 border border-violet-500/20 px-3 py-1.5 rounded-full">
+                  <span key={f} className="flex items-center gap-1 text-xs bg-white/5 text-neutral-300 border border-white/15 px-3 py-1.5 rounded-full">
                     <Check className="h-3 w-3" />
                     {f}
                   </span>
@@ -192,11 +192,11 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
           {step === 1 && (
             <div className="space-y-3">
               <p className="text-sm text-slate-400 mb-4">
-                Aliases are additional email addresses that deliver to this mailbox. For example, <span className="text-violet-300 font-mono">support@yourdomain.com</span>.
+                Aliases are additional email addresses that deliver to this mailbox. For example, <span className="text-neutral-300 font-mono">support@yourdomain.com</span>.
               </p>
               {aliases.map((alias, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <div className="flex-1 flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 focus-within:border-violet-500/50 transition-all">
+                  <div className="flex-1 flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 focus-within:border-white/15 transition-all">
                     <Mail className="h-4 w-4 text-slate-500 shrink-0" />
                     <input
                       type="email"
@@ -215,7 +215,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
               ))}
               <button
                 onClick={handleAddAlias}
-                className="flex items-center gap-2 text-xs text-violet-400 hover:text-violet-300 transition-all mt-2"
+                className="flex items-center gap-2 text-xs text-white hover:text-neutral-300 transition-all mt-2"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add another alias
@@ -240,7 +240,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                         rec.type === 'MX' ? 'bg-blue-500/20 text-blue-300' :
                         rec.type === 'TXT' ? 'bg-emerald-500/20 text-emerald-300' :
-                        'bg-purple-500/20 text-purple-300'
+                        'bg-purple-500/20 text-neutral-300'
                       }`}>
                         {rec.type}
                       </span>
@@ -251,7 +251,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
                     </div>
                     <div className="grid grid-cols-[auto_1fr] gap-2 text-xs">
                       <span className="text-slate-500 w-12">Name:</span>
-                      <code className="font-mono text-violet-300 bg-violet-500/10 px-2 py-0.5 rounded">{rec.name}</code>
+                      <code className="font-mono text-neutral-300 bg-white/5 px-2 py-0.5 rounded">{rec.name}</code>
                       <span className="text-slate-500 w-12">Value:</span>
                       <code className="font-mono text-slate-300 bg-white/5 px-2 py-0.5 rounded break-all">{rec.value}</code>
                     </div>
@@ -271,7 +271,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
               <label className="flex items-center gap-3 cursor-pointer">
                 <div
                   onClick={() => setForwardEnabled(!forwardEnabled)}
-                  className={`w-10 h-5.5 rounded-full transition-all relative ${forwardEnabled ? 'bg-violet-600' : 'bg-white/10'}`}
+                  className={`w-10 h-5.5 rounded-full transition-all relative ${forwardEnabled ? 'bg-white text-black' : 'bg-white/10'}`}
                 >
                   <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${forwardEnabled ? 'left-5.5' : 'left-0.5'}`} />
                 </div>
@@ -279,7 +279,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
               </label>
 
               {forwardEnabled && (
-                <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 focus-within:border-violet-500/50 transition-all">
+                <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 focus-within:border-white/15 transition-all">
                   <Zap className="h-4 w-4 text-slate-500 shrink-0" />
                   <input
                     type="email"
@@ -291,7 +291,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
                 </div>
               )}
 
-              <div className="p-3 bg-violet-500/10 border border-violet-500/20 rounded-xl text-xs text-violet-300">
+              <div className="p-3 bg-white/5 border border-white/15 rounded-xl text-xs text-neutral-300">
                 <strong>Tip:</strong> Advanced forwarding rules (by sender, subject, or label) can be configured in the Filter Rules section.
               </div>
             </div>
@@ -301,7 +301,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
           {step === 4 && (
             <div className="space-y-4">
               <p className="text-sm text-slate-400">Create a default signature that will be appended to your outgoing emails.</p>
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 focus-within:border-violet-500/50 transition-all">
+              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 focus-within:border-white/15 transition-all">
                 <input
                   type="text"
                   value={signatureName}
@@ -314,7 +314,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
                 value={signatureContent}
                 onChange={(e) => setSignatureContent(e.target.value)}
                 rows={5}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-300 placeholder-slate-600 outline-none resize-none focus:border-violet-500/50 transition-all font-mono"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-300 placeholder-slate-600 outline-none resize-none focus:border-white/15 transition-all font-mono"
                 placeholder="<p>Best regards,<br/><strong>Your Name</strong></p>"
               />
               <p className="text-xs text-slate-500">HTML formatting is supported. Use &lt;strong&gt;, &lt;em&gt;, &lt;a&gt;, etc.</p>
@@ -378,7 +378,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
           <button
             onClick={handleNext}
             disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-bold shadow-lg shadow-violet-600/20 disabled:opacity-50 transition-all"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-neutral-800 to-black hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-bold shadow-lg shadow-md disabled:opacity-50 transition-all"
           >
             {saving ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</>

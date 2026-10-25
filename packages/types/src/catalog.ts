@@ -37,8 +37,12 @@ export interface CatalogTemplate {
 }
 
 export interface CatalogDeployInput {
-  templateSlug: string;
+  templateSlug?: string;
+  slug?: string;
   nodeId: string;
   envVars: Record<string, string>;
   subdomain?: string;
+  projectName?: string;
+  cpuLimit?: string;
+  memoryLimit?: string;
 }

@@ -177,14 +177,14 @@ export function WebmailRichComposer({
         <button
           onClick={() => setMinimized(!minimized)}
           aria-label={minimized ? "Expand composer" : "Minimize composer"}
-          className="text-slate-400 hover:text-white transition-all p-1.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+          className="text-slate-400 hover:text-white transition-all p-1.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
         >
           <Minimize2 className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={() => setMaximized(!maximized)}
           aria-label={maximized ? "Restore composer size" : "Maximize composer"}
-          className="text-slate-400 hover:text-white transition-all p-1.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+          className="text-slate-400 hover:text-white transition-all p-1.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
         >
           <Maximize2 className="h-3.5 w-3.5" />
         </button>
@@ -206,9 +206,9 @@ export function WebmailRichComposer({
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pt-1 w-8 shrink-0">To</span>
               <div className="flex-1 flex flex-wrap gap-1 items-center">
                 {toChips.map((chip) => (
-                  <span key={chip} className="flex items-center gap-1 bg-violet-600/25 text-violet-200 text-[11px] px-2 py-0.5 rounded-full ring-1 ring-violet-500/30">
+                  <span key={chip} className="flex items-center gap-1 bg-white/10 text-neutral-200 text-[11px] px-2 py-0.5 rounded-full ring-1 ring-white/20">
                     {chip}
-                    <button onClick={() => removeToChip(chip)} aria-label={`Remove ${chip}`} className="text-violet-300 hover:text-white ml-0.5">
+                    <button onClick={() => removeToChip(chip)} aria-label={`Remove ${chip}`} className="text-neutral-300 hover:text-white ml-0.5">
                       <X className="h-2.5 w-2.5" />
                     </button>
                   </span>
@@ -230,10 +230,10 @@ export function WebmailRichComposer({
               </div>
               <div className="flex items-center gap-1.5 shrink-0 pt-1">
                 {!showCc && (
-                  <button onClick={() => setShowCc(true)} className="text-[10px] text-slate-400 hover:text-violet-300 font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/60">Cc</button>
+                  <button onClick={() => setShowCc(true)} className="text-[10px] text-slate-400 hover:text-neutral-300 font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20">Cc</button>
                 )}
                 {!showBcc && (
-                  <button onClick={() => setShowBcc(true)} className="text-[10px] text-slate-400 hover:text-violet-300 font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/60">Bcc</button>
+                  <button onClick={() => setShowBcc(true)} className="text-[10px] text-slate-400 hover:text-neutral-300 font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20">Bcc</button>
                 )}
               </div>
             </div>
@@ -299,7 +299,7 @@ export function WebmailRichComposer({
               <div className="relative">
                 <button
                   onClick={() => setShowTemplates(!showTemplates)}
-                  className="text-[10px] text-slate-500 hover:text-violet-300 flex items-center gap-1 transition-all"
+                  className="text-[10px] text-slate-500 hover:text-neutral-300 flex items-center gap-1 transition-all"
                 >
                   Templates <ChevronDown className="h-3 w-3" />
                 </button>
@@ -352,7 +352,7 @@ export function WebmailRichComposer({
           )}
 
           {undoCountdown !== null && (
-            <div className="mx-4 mb-2 p-2.5 rounded-xl bg-indigo-900/80 border border-indigo-500/40 text-xs text-white flex items-center justify-between animate-pulse">
+            <div className="mx-4 mb-2 p-2.5 rounded-xl bg-indigo-900/80 border border-white/15 text-xs text-white flex items-center justify-between animate-pulse">
               <span>Sending in {undoCountdown}s…</span>
               <button
                 onClick={cancelUndoSend}
@@ -368,7 +368,7 @@ export function WebmailRichComposer({
             <button
               onClick={handleSend}
               disabled={sending || undoCountdown !== null}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-violet-600/20 disabled:opacity-50 transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-neutral-800 to-black hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-md disabled:opacity-50 transition-all"
             >
               <Send className="h-3.5 w-3.5" />
               {sending ? (undoCountdown !== null ? `Sending in ${undoCountdown}s` : 'Sending…') : (scheduledAt ? 'Schedule Send' : 'Send')}

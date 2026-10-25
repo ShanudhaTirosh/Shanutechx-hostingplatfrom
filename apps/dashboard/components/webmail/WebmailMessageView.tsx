@@ -97,7 +97,7 @@ function MessageBubble({ msg, defaultExpanded = true, onReply, onToggleStar }: M
   };
 
   const AVATAR_GRADIENTS = [
-    'from-violet-500 to-purple-600',
+    'from-neutral-800 to-black',
     'from-blue-500 to-cyan-500',
     'from-emerald-500 to-teal-500',
     'from-orange-500 to-amber-400',
@@ -142,7 +142,7 @@ function MessageBubble({ msg, defaultExpanded = true, onReply, onToggleStar }: M
           <button
             onClick={() => onReply(msg, 'reply')}
             aria-label="Reply to message"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
           >
             <Reply className="h-3.5 w-3.5" />
           </button>
@@ -150,7 +150,7 @@ function MessageBubble({ msg, defaultExpanded = true, onReply, onToggleStar }: M
             <button
               onClick={() => setShowMore(!showMore)}
               aria-label="More message options"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
             >
               <MoreVertical className="h-3.5 w-3.5" />
             </button>
@@ -181,11 +181,11 @@ function MessageBubble({ msg, defaultExpanded = true, onReply, onToggleStar }: M
         <div className="px-6 pb-4">
           {/* AI Summary bar */}
           {(summarizing || aiSummary) && (
-            <div className="flex items-start gap-2 bg-violet-600/10 border border-violet-500/20 rounded-xl px-3 py-2.5 mb-4 text-xs text-violet-300">
-              <Wand2 className="h-3.5 w-3.5 shrink-0 mt-0.5 text-violet-400" />
+            <div className="flex items-start gap-2 bg-white/5 border border-white/15 rounded-xl px-3 py-2.5 mb-4 text-xs text-neutral-300">
+              <Wand2 className="h-3.5 w-3.5 shrink-0 mt-0.5 text-white" />
               {summarizing ? <span>Summarizing…</span> : <span>{aiSummary}</span>}
               {aiSummary && (
-                <button onClick={() => setAiSummary(null)} className="ml-auto text-violet-500 hover:text-violet-300">
+                <button onClick={() => setAiSummary(null)} className="ml-auto text-white hover:text-neutral-300">
                   <X className="h-3 w-3" />
                 </button>
               )}
@@ -254,7 +254,7 @@ function MessageBubble({ msg, defaultExpanded = true, onReply, onToggleStar }: M
                     <span className="text-slate-300 font-medium">{att.filename}</span>
                     <span className="text-slate-500">{att.sizeStr}</span>
                     {att.url && (
-                      <a href={att.url} target="_blank" rel="noreferrer" className="text-violet-400 hover:text-violet-300">
+                      <a href={att.url} target="_blank" rel="noreferrer" className="text-white hover:text-neutral-300">
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     )}
@@ -317,7 +317,7 @@ export function WebmailMessageView({
         </p>
         <button
           onClick={onOpenCompose}
-          className="mt-6 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-bold hover:from-violet-500 hover:to-indigo-500 transition-all shadow-lg shadow-violet-500/20"
+          className="mt-6 px-5 py-2.5 rounded-xl bg-gradient-to-r from-neutral-800 to-black text-white text-xs font-bold hover:from-violet-500 hover:to-indigo-500 transition-all shadow-lg shadow-md"
         >
           Compose New Email
         </button>

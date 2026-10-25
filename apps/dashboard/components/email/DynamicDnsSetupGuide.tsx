@@ -105,7 +105,7 @@ export default function DynamicDnsSetupGuide({
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-5 mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+          <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
@@ -113,10 +113,10 @@ export default function DynamicDnsSetupGuide({
           <div>
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
               <span>Dynamic DNS & Alias Guide for</span>
-              <span className="text-purple-400 font-mono underline decoration-purple-500/50">{domain}</span>
+              <span className="text-white font-mono underline decoration-purple-500/50">{domain}</span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Configured for <span className="text-white font-semibold capitalize">{planTier} Plan</span> • Max Aliases: <span className="text-purple-400 font-semibold">{planMaxAliases}</span>
+              Configured for <span className="text-white font-semibold capitalize">{planTier} Plan</span> • Max Aliases: <span className="text-white font-semibold">{planMaxAliases}</span>
             </p>
           </div>
         </div>
@@ -157,7 +157,7 @@ export default function DynamicDnsSetupGuide({
         <button
           onClick={verifyDnsRecords}
           disabled={verifying}
-          className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 text-xs font-medium rounded-xl transition-all flex items-center gap-2"
+          className="px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/15 text-neutral-300 text-xs font-medium rounded-xl transition-all flex items-center gap-2"
         >
           {verifying ? (
             <>
@@ -166,7 +166,7 @@ export default function DynamicDnsSetupGuide({
             </>
           ) : (
             <>
-              <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
               <span>Re-check DNS Records</span>
@@ -209,7 +209,7 @@ export default function DynamicDnsSetupGuide({
               <div key={`${rec.type}-${rec.name}`} className="p-4 hover:bg-slate-800/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1.5 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-purple-950 text-purple-300 border border-purple-800">
+                    <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-purple-950 text-neutral-300 border border-purple-800">
                       {rec.type}
                     </span>
                     <span className="text-xs text-slate-400">Host:</span>
@@ -252,13 +252,13 @@ export default function DynamicDnsSetupGuide({
       <div className="bg-slate-950/60 rounded-xl p-5 border border-slate-800/80">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
             </svg>
             <span>Configured Mailbox Aliases for {domain}</span>
           </h3>
           <span className="text-xs text-slate-400">
-            Primary Mailbox ID: <code className="text-purple-300 font-mono">{smtpUsername}@{domain}</code>
+            Primary Mailbox ID: <code className="text-neutral-300 font-mono">{smtpUsername}@{domain}</code>
           </span>
         </div>
 
@@ -270,7 +270,7 @@ export default function DynamicDnsSetupGuide({
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             {aliases.map((alias) => (
               <div key={alias} className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg flex items-center justify-between text-xs">
-                <span className="font-mono text-purple-300">{alias}</span>
+                <span className="font-mono text-neutral-300">{alias}</span>
                 <span className="text-[10px] text-slate-500 font-semibold uppercase">Alias</span>
               </div>
             ))}

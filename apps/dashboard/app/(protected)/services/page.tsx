@@ -28,6 +28,12 @@ import {
   ShoppingCart,
   CheckCircle2,
   GitBranch,
+  Server,
+  Clock,
+  ShieldAlert,
+  Database,
+  Bot,
+  Package,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -39,15 +45,17 @@ const CATEGORY_LABEL: Record<ProductCategory, string> = {
   database: 'Managed Databases',
   app_catalog: 'App Catalog',
   bot_hosting: 'Bot Hosting',
+  app_deployment: 'App Deployment',
 };
 
 const CATEGORY_COLOR: Record<ProductCategory, string> = {
-  vps: 'bg-orange-500/10 text-orange-300 border border-orange-500/20',
-  smtp: 'bg-teal-500/10 text-teal-300 border border-teal-500/20',
-  web_hosting: 'bg-accent-violet/10 text-accent-violet-light border border-accent-violet/20',
-  database: 'bg-sky-500/10 text-sky-400 border border-sky-500/20',
-  app_catalog: 'bg-rose-500/10 text-rose-300 border border-rose-500/20',
-  bot_hosting: 'bg-purple-500/10 text-purple-300 border border-purple-500/20',
+  vps: 'bg-white/10 text-white border border-white/20',
+  smtp: 'bg-white/10 text-white border border-white/20',
+  web_hosting: 'bg-white/10 text-white border border-white/20',
+  database: 'bg-white/10 text-white border border-white/20',
+  app_catalog: 'bg-white/10 text-white border border-white/20',
+  bot_hosting: 'bg-white/10 text-white border border-white/20',
+  app_deployment: 'bg-white/10 text-white border border-white/20',
 };
 
 const BILLING_LABEL: Record<string, string> = {
@@ -143,6 +151,17 @@ export default function ServicesPage() {
       <PageHeader
         title="Services & Hosting Storefront"
         description="Browse everything you can buy — web hosting, app runtimes, discord/whatsapp bots, VPS servers, mail hosting — and manage active instances."
+        action={
+          <Link href="/orders?tab=cart">
+            <button
+              type="button"
+              className="px-4 py-2 rounded-xl bg-white text-black hover:bg-neutral-200 font-bold text-xs font-mono transition-all flex items-center gap-2 shadow-md shadow-white/10 cursor-pointer"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              <span>View Shopping Cart</span>
+            </button>
+          </Link>
+        }
       />
 
       {error && <ErrorBanner message={error} />}
@@ -238,7 +257,12 @@ export default function ServicesPage() {
           </div>
           {(apiUser?.role === 'admin' || apiUser?.role === 'dev') && (
             <Link href="/admin/services">
-              <Button variant="secondary" size="sm">Manage Products & Plans</Button>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl bg-white text-black hover:bg-neutral-200 font-bold text-xs font-mono transition-all flex items-center gap-1.5 shadow-md shadow-white/10"
+              >
+                Manage Products &amp; Plans
+              </button>
             </Link>
           )}
         </div>
@@ -247,11 +271,12 @@ export default function ServicesPage() {
         {products && products.length > 0 && (
           <div className="flex gap-2 flex-wrap mb-6">
             <button
+              type="button"
               onClick={() => setFilter('all')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-mono transition-all cursor-pointer ${
                 filter === 'all'
-                  ? 'bg-accent-violet text-white shadow-glow-violet'
-                  : 'glass text-text-muted hover:text-text-primary hover:bg-white/[0.07]'
+                  ? 'bg-white text-black font-bold shadow-lg shadow-white/15'
+                  : 'bg-white/5 border border-white/15 text-white hover:bg-white/10 hover:border-white/30 font-medium'
               }`}
             >
               All Products ({products.reduce((sum, p) => sum + p.plans.length, 0)})
@@ -260,12 +285,13 @@ export default function ServicesPage() {
               const count = products.filter((p) => p.category === cat).reduce((sum, p) => sum + p.plans.length, 0);
               return (
                 <button
+                  type="button"
                   key={cat}
                   onClick={() => setFilter(cat)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  className={`px-4 py-2 rounded-xl text-xs font-mono transition-all cursor-pointer ${
                     filter === cat
-                      ? 'bg-accent-violet text-white shadow-glow-violet'
-                      : 'glass text-text-muted hover:text-text-primary hover:bg-white/[0.07]'
+                      ? 'bg-white text-black font-bold shadow-lg shadow-white/15'
+                      : 'bg-white/5 border border-white/15 text-white hover:bg-white/10 hover:border-white/30 font-medium'
                   }`}
                 >
                   {CATEGORY_LABEL[cat]} ({count})
@@ -301,6 +327,14 @@ export default function ServicesPage() {
           <EmptyState message="No products or plans available in this category." />
         )}
 
+        {/* VPS Delivery Notice */}
+        {(filter === 'vps' || filter === 'all') && (
+          <div className="p-3.5 bg-white/10 border border-white/20 rounded-2xl flex items-center gap-2.5 text-xs text-white">
+            <Clock className="h-4 w-4 text-white shrink-0" />
+            <span><strong>Notice:</strong> VPS servers are delivered within <strong>24 to 72 hours</strong>.</span>
+          </div>
+        )}
+
         {/* Flat Grid of Individual Product Plan Cards */}
         {products && planItems.length > 0 && (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -308,76 +342,89 @@ export default function ServicesPage() {
               const specs: any = plan.specsJson || {};
 
               return (
-                <Card
+                <div
                   key={plan.id}
-                  className="flex flex-col justify-between border border-white/[0.08] hover:border-accent-violet/50 bg-black/40 backdrop-blur-xl p-6 rounded-2xl shadow-xl hover:shadow-2xl hover:shadow-accent-violet/10 transition-all duration-200 group relative overflow-hidden"
+                  className="flex flex-col justify-between rounded-2xl p-6 bg-gradient-to-b from-zinc-900/90 via-zinc-950/95 to-black border border-white/10 hover:border-white/30 backdrop-blur-2xl shadow-2xl hover:shadow-[0_0_35px_rgba(255,255,255,0.07)] transition-all duration-300 relative group overflow-hidden"
                 >
+                  {/* Top subtle highlight shimmer line */}
+                  <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+
                   <div className="space-y-4">
                     {/* Top Category Badge & Billing Label */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ${CATEGORY_COLOR[product.category]}`}>
+                      <span className={`text-[10px] font-mono font-bold uppercase tracking-wider px-3 py-1 rounded-full ${CATEGORY_COLOR[product.category]}`}>
                         {CATEGORY_LABEL[product.category]}
                       </span>
-                      <span className="text-[10px] font-mono text-text-faint uppercase">
+                      <span className="text-[10px] font-mono text-white/70 uppercase tracking-wider bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
                         {BILLING_LABEL[plan.billingType] ?? plan.billingType}
                       </span>
                     </div>
 
                     {/* Product & Plan Header */}
                     <div>
-                      <p className="text-[11px] font-medium text-text-muted truncate mb-0.5">{product.name}</p>
-                      <h3 className="font-bold text-white text-lg group-hover:text-accent-cyan transition-colors">
+                      <p className="text-[11px] font-semibold text-white/60 tracking-wider uppercase truncate mb-1">
+                        {product.name}
+                      </p>
+                      <h3 className="font-extrabold text-white text-xl tracking-tight">
                         {plan.name}
                       </h3>
                       {product.description && (
-                        <p className="text-xs text-text-muted mt-1.5 line-clamp-2 leading-relaxed">
+                        <p className="text-xs text-white/70 mt-1.5 line-clamp-2 leading-relaxed">
                           {product.description}
                         </p>
                       )}
                     </div>
 
                     {/* Price Tag */}
-                    <div className="py-2.5 border-y border-white/[0.06] flex items-baseline gap-1.5">
-                      <span className="text-2xl font-bold font-mono text-white tracking-tight">
+                    <div className="py-3 my-1 border-y border-white/10 flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black font-mono text-white tracking-tight">
                         {formatMoney(plan.price)}
                       </span>
-                      <span className="text-xs text-text-muted font-sans font-normal">
+                      <span className="text-xs text-white/70 font-mono">
                         /{BILLING_LABEL[plan.billingType] ?? plan.billingType}
                       </span>
                     </div>
 
-                    {/* Specs Section with Clean SVG Icons */}
-                    <div className="space-y-2 font-mono text-xs pt-1">
+                    {/* Specs Section with Clean SVG Icons & Pure White Text */}
+                    <div className="space-y-2.5 font-mono text-xs pt-1">
                       {/* SMTP / Mail Hosting Specs */}
                       {product.category === 'smtp' && (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-slate-200">
-                            <Mail className="h-4 w-4 text-indigo-400 shrink-0" />
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Mail className="h-3.5 w-3.5 text-white" />
+                            </div>
                             <span>
                               {specs.mailboxesCount === -1 ? 'Unlimited' : (specs.mailboxesCount || 1)} Mailbox{(specs.mailboxesCount || 1) !== 1 ? 'es' : ''}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-emerald-300">
-                            <HardDrive className="h-4 w-4 text-emerald-400 shrink-0" />
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <HardDrive className="h-3.5 w-3.5 text-white" />
+                            </div>
                             <span>
                               {specs.storageLimitGb === -1 ? 'Unlimited Storage' : `${specs.storageLimitGb || 1} GB Storage`}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-purple-300">
-                            <Zap className="h-4 w-4 text-purple-400 shrink-0" />
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Zap className="h-3.5 w-3.5 text-white" />
+                            </div>
                             <span>
                               {specs.forwardingRules === -1 ? 'Unlimited' : (specs.forwardingRules || 1)} Forwarding Rule{(specs.forwardingRules || 1) !== 1 ? 's' : ''}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-cyan-300">
-                            <Globe className="h-4 w-4 text-cyan-400 shrink-0" />
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Globe className="h-3.5 w-3.5 text-white" />
+                            </div>
                             <span>
                               {specs.maxAliases === -1 || specs.emailAliases === -1 ? 'Unlimited' : (specs.maxAliases || specs.emailAliases || 2)} Email Aliases
                             </span>
                           </div>
                           <div className="pt-1">
-                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-300 font-mono bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
-                              <Lock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white font-mono bg-white/10 px-2.5 py-1 rounded-lg border border-white/20">
+                              <Lock className="h-3.5 w-3.5 text-white shrink-0" />
                               Minimum 3-Month Commitment Required
                             </span>
                           </div>
@@ -386,70 +433,190 @@ export default function ServicesPage() {
 
                       {/* VPS Specs */}
                       {product.category === 'vps' && (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-cyan-300">
-                            <Cpu className="h-4 w-4 text-cyan-400 shrink-0" />
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Cpu className="h-3.5 w-3.5 text-white" />
+                            </div>
                             <span>{specs.cpuCores || 2} vCPU Cores</span>
                           </div>
-                          <div className="flex items-center gap-2 text-purple-300">
-                            <Layers className="h-4 w-4 text-purple-400 shrink-0" />
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Layers className="h-3.5 w-3.5 text-white" />
+                            </div>
                             <span>{specs.ramGb || 4} GB RAM</span>
                           </div>
-                          <div className="flex items-center gap-2 text-emerald-300">
-                            <HardDrive className="h-4 w-4 text-emerald-400 shrink-0" />
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <HardDrive className="h-3.5 w-3.5 text-white" />
+                            </div>
                             <span>{specs.storageGb || 50} GB NVMe Storage</span>
                           </div>
-                          <div className="flex items-center gap-2 text-slate-300">
-                            <Zap className="h-4 w-4 text-amber-400 shrink-0" />
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Zap className="h-3.5 w-3.5 text-white" />
+                            </div>
                             <span>{specs.bandwidth || 'Unmetered'} Bandwidth</span>
+                          </div>
+                          <div className="pt-2 border-t border-white/10 text-[11px] font-mono">
+                            <div className="flex items-center gap-2 text-white bg-white/10 px-2.5 py-1.5 rounded-lg border border-white/20">
+                              <Clock className="h-3.5 w-3.5 text-white shrink-0" />
+                              <span>Delivered within 24 to 72 hours</span>
+                            </div>
                           </div>
                         </div>
                       )}
 
                       {/* Web Hosting Specs */}
                       {product.category === 'web_hosting' && (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-purple-300">
-                            <HardDrive className="h-4 w-4 text-purple-400 shrink-0" />
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <HardDrive className="h-3.5 w-3.5 text-white" />
+                            </div>
                             <span>{specs.storageGb || 5} GB NVMe SSD Storage</span>
                           </div>
-                          <div className="flex items-center gap-2 text-cyan-300">
-                            <Zap className="h-4 w-4 text-cyan-400 shrink-0" />
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Zap className="h-3.5 w-3.5 text-white" />
+                            </div>
                             <span>{specs.bandwidthGb ? `${specs.bandwidthGb} GB` : '100 GB'} Bandwidth</span>
                           </div>
-                          <div className="flex items-center gap-2 text-amber-300">
-                            <Globe className="h-4 w-4 text-amber-400 shrink-0" />
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Globe className="h-3.5 w-3.5 text-white" />
+                            </div>
                             <span>
                               {specs.domainsCount === -1 ? 'Unlimited Domains' : `${specs.domainsCount || 1} Custom Domain${(specs.domainsCount || 1) !== 1 ? 's' : ''}`}
                             </span>
                           </div>
                           {specs.gitAutoDeploy && (
-                            <div className="flex items-center gap-2 text-emerald-300 font-semibold">
-                              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                            <div className="flex items-center gap-2.5 text-white font-semibold">
+                              <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                              </div>
                               <span>GitHub Auto-Deploy Included</span>
                             </div>
                           )}
                         </div>
                       )}
 
-                      {/* App & Bot Hosting Specs */}
-                      {['app_catalog', 'bot_hosting'].includes(product.category) && (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-emerald-300">
-                            <Cpu className="h-4 w-4 text-emerald-400 shrink-0" />
-                            <span>{specs.cpuCores || 1} vCPU Dedicated</span>
+                      {/* Managed Databases Specs */}
+                      {product.category === 'database' && (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Database className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>PostgreSQL 16 · MySQL 8 · Redis 7 · MongoDB</span>
                           </div>
-                          <div className="flex items-center gap-2 text-purple-300">
-                            <Layers className="h-4 w-4 text-purple-400 shrink-0" />
-                            <span>{specs.ramMb || specs.memoryMb || 512} MB RAM</span>
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Layers className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>{specs.ramMb ? (specs.ramMb >= 1024 ? `${specs.ramMb / 1024} GB` : `${specs.ramMb} MB`) : '512 MB'} Dedicated RAM</span>
                           </div>
-                          <div className="flex items-center gap-2 text-cyan-300">
-                            <HardDrive className="h-4 w-4 text-cyan-400 shrink-0" />
-                            <span>{specs.storageGb || 5} GB NVMe Storage</span>
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <HardDrive className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>{specs.storageGb || 5} GB NVMe SSD Storage</span>
                           </div>
-                          <div className="flex items-center gap-2 text-amber-300">
-                            <GitBranch className="h-4 w-4 text-amber-400 shrink-0" />
-                            <span>Git Webhook & ZIP Archive Deployment</span>
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>PgBouncer Pooling & Daily Auto-Backups</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* App Deployment Specs (GitHub & Containers) */}
+                      {product.category === 'app_deployment' && (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <GitBranch className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>GitHub Auto-Deploy on Push & Webhooks</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Cpu className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>{specs.cpuCores || 0.5} vCPU Cores Dedicated</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Layers className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>{specs.ramMb ? (specs.ramMb >= 1024 ? `${specs.ramMb / 1024} GB` : `${specs.ramMb} MB`) : '512 MB'} RAM</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Globe className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>Automatic SSL Routing & Custom Subdomain</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* App Catalog Specs */}
+                      {product.category === 'app_catalog' && (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Package className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>15+ One-Click Docker Compose Stacks</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Cpu className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>{specs.cpuCores || 0.5} vCPU Cores</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Layers className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>{specs.ramMb ? (specs.ramMb >= 1024 ? `${specs.ramMb / 1024} GB` : `${specs.ramMb} MB`) : '512 MB'} RAM</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Zap className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>Direct Port Exposure & Cloudflare DNS</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Bot Hosting Specs */}
+                      {product.category === 'bot_hosting' && (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Bot className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>24/7 Process Runner & Auto-Crash Recovery</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Cpu className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>{specs.cpuCores || 0.5} vCPU Dedicated</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <Layers className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>{specs.ramMb ? (specs.ramMb >= 1024 ? `${specs.ramMb / 1024} GB` : `${specs.ramMb} MB`) : '512 MB'} RAM</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-white">
+                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+                              <HardDrive className="h-3.5 w-3.5 text-white" />
+                            </div>
+                            <span>Persistent Session Storage (WhatsApp / Discord)</span>
                           </div>
                         </div>
                       )}
@@ -457,23 +624,27 @@ export default function ServicesPage() {
                   </div>
 
                   {/* Action Footer */}
-                  <div className="pt-5 mt-5 border-t border-white/[0.06]">
-                    <Button
+                  <div className="pt-5 mt-6 border-t border-white/10">
+                    <button
+                      type="button"
                       onClick={() => handleAddToCart(plan.id, `${product.name} — ${plan.name}`)}
-                      loading={addingPlanId === plan.id}
-                      size="sm"
-                      className="w-full flex items-center justify-center gap-2 font-semibold shadow-lg"
+                      disabled={addingPlanId === plan.id}
+                      className="w-full py-3.5 px-4 rounded-xl bg-white text-black hover:bg-neutral-200 active:scale-[0.98] font-bold text-xs uppercase tracking-wider font-mono transition-all duration-200 flex items-center justify-center gap-2 shadow-xl shadow-white/10 hover:shadow-white/20 cursor-pointer disabled:opacity-50"
                     >
                       {addingPlanId === plan.id ? (
-                        'Adding to Cart...'
+                        <>
+                          <span className="h-3.5 w-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                          Adding to Cart...
+                        </>
                       ) : (
                         <>
-                          <ShoppingCart className="h-4 w-4" /> Add to Cart
+                          <ShoppingCart className="h-4 w-4 text-black" />
+                          Add to Cart
                         </>
                       )}
-                    </Button>
+                    </button>
                   </div>
-                </Card>
+                </div>
               );
             })}
           </div>

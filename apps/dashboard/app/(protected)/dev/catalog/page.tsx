@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { CatalogTemplate } from '@/lib/types';
+import { CatalogTemplate, Plan } from '@/lib/types';
 
 export default function DevCatalogPage() {
   const [templates, setTemplates] = useState<CatalogTemplate[]>([]);
+  const [catalogPlan, setCatalogPlan] = useState<Plan | null>(null);
   const [selectedSlug, setSelectedSlug] = useState<string>('');
   const [selectedYaml, setSelectedYaml] = useState<string>('');
   const [loadingYaml, setLoadingYaml] = useState(false);
@@ -16,6 +17,13 @@ export default function DevCatalogPage() {
   const [testLogs, setTestLogs] = useState<string[]>([]);
 
   useEffect(() => {
+    api.products.list('app_catalog')
+      .then((res) => {
+        const plan = res.products?.[0]?.plans?.[0] || null;
+        setCatalogPlan(plan);
+      })
+      .catch(() => {});
+
     api.catalog.list()
       .then((res) => {
         setTemplates(res.templates);
@@ -68,7 +76,7 @@ export default function DevCatalogPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-white/5 text-neutral-300 border border-white/15">
               Dev Portal
             </span>
             <span className="text-xs text-text-faint">• Live Database</span>
@@ -82,7 +90,7 @@ export default function DevCatalogPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/dev/deploy?tab=catalog"
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-xs font-bold text-white shadow-lg shadow-violet-500/25 transition-all"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-xs font-bold text-white shadow-lg shadow-md transition-all"
           >
             Launch in Deploy Hub
           </Link>
@@ -105,12 +113,26 @@ export default function DevCatalogPage() {
                 onClick={() => { setSelectedSlug(tmpl.slug); setTestLogs([]); }}
                 className={`w-full text-left p-3 rounded-xl border transition-all ${
                   selectedSlug === tmpl.slug
-                    ? 'bg-violet-500/20 border-violet-500/40 text-white shadow-sm'
+                    ? 'bg-violet-500/20 border-white/15 text-white shadow-sm'
                     : 'bg-white/[0.02] border-white/5 text-text-muted hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
-                <p className="text-xs font-bold text-white">{tmpl.name}</p>
-                <span className="text-[10px] text-violet-300 font-mono">{tmpl.category}</span>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-white">{tmpl.name}</p>
+                  {catalogPlan && (
+                    <span className="text-[10px] font-bold text-white font-mono">
+                      {catalogPlan.currency} {(catalogPlan.price / 100).toLocaleString()}/{catalogPlan.billingType === 'monthly' ? 'mo' : catalogPlan.billingType}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-neutral-400 mt-1 font-mono">
+                  <span>{tmpl.category}</span>
+                  <span className="text-emerald-400">
+                    {catalogPlan?.specsJson && typeof catalogPlan.specsJson === 'object' && (catalogPlan.specsJson as any).cpuCores
+                      ? `${(catalogPlan.specsJson as any).cpuCores} vCPU • ${((catalogPlan.specsJson as any).ramMb || 1024) >= 1024 ? `${((catalogPlan.specsJson as any).ramMb || 1024) / 1024}GB` : `${(catalogPlan.specsJson as any).ramMb}MB`}`
+                      : '0.5 vCPU • 1GB'}
+                  </span>
+                </div>
               </button>
             ))}
           </div>
@@ -120,14 +142,22 @@ export default function DevCatalogPage() {
             <div className="md:col-span-2 bg-[#0b0c16] border border-white/10 rounded-2xl p-6 space-y-5">
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div>
-                  <h2 className="text-base font-bold text-white">{selectedTmpl.name}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-white">{selectedTmpl.name}</h2>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      {catalogPlan ? `${catalogPlan.currency} ${(catalogPlan.price / 100).toLocaleString()} / ${catalogPlan.billingType === 'monthly' ? 'mo' : catalogPlan.billingType} • ` : ''}
+                      {catalogPlan?.specsJson && typeof catalogPlan.specsJson === 'object' && (catalogPlan.specsJson as any).cpuCores
+                        ? `${(catalogPlan.specsJson as any).cpuCores} vCPU • ${((catalogPlan.specsJson as any).ramMb || 1024) >= 1024 ? `${((catalogPlan.specsJson as any).ramMb || 1024) / 1024}GB` : `${(catalogPlan.specsJson as any).ramMb}MB`} RAM`
+                        : '0.5 vCPU • 1GB RAM'}
+                    </span>
+                  </div>
                   <p className="text-xs text-text-muted font-mono">{selectedTmpl.slug}</p>
                 </div>
 
                 <button
                   onClick={handleTestLaunch}
                   disabled={testLaunching}
-                  className="px-3.5 py-1.5 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 text-xs font-bold hover:bg-violet-500/30 transition-all disabled:opacity-50"
+                  className="px-3.5 py-1.5 rounded-xl bg-violet-500/20 text-neutral-300 border border-white/15 text-xs font-bold hover:bg-violet-500/30 transition-all disabled:opacity-50"
                 >
                   {testLaunching ? 'Testing Container...' : 'Run Sandbox Dry-Launch Test'}
                 </button>
@@ -140,7 +170,7 @@ export default function DevCatalogPage() {
                 {loadingYaml ? (
                   <div className="p-4 text-xs text-text-muted animate-pulse">Loading template YAML from database...</div>
                 ) : (
-                  <pre className="bg-black/90 border border-white/10 rounded-xl p-4 text-xs font-mono text-violet-300 overflow-x-auto max-h-96 scrollbar-thin">
+                  <pre className="bg-black/90 border border-white/10 rounded-xl p-4 text-xs font-mono text-neutral-300 overflow-x-auto max-h-96 scrollbar-thin">
                     {selectedYaml}
                   </pre>
                 )}

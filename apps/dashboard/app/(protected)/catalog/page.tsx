@@ -3,13 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { CatalogTemplate } from '@/lib/types';
+import { CatalogTemplate, Plan } from '@/lib/types';
 import { useAppUser } from '@/lib/AppUserContext';
-import { ResourceScopeSelector } from '@/components/ResourceScopeSelector';
 
 // ── Category colour mapping ───────────────────────────────────────────────────
 const CAT_COLOR: Record<string, string> = {
-  automation:  '#8b5cf6',
+  automation:  '#ffffff',
   cms:         '#06b6d4',
   database:    '#10b981',
   dev:         '#f59e0b',
@@ -20,7 +19,7 @@ const CAT_COLOR: Record<string, string> = {
   storage:     '#84cc16',
   security:    '#f97316',
   messaging:   '#14b8a6',
-  analytics:   '#a78bfa',
+  analytics:   '#e4e4e7',
   gaming:      '#fb923c',
   other:       '#6b7280',
 };
@@ -96,12 +95,14 @@ function TemplateCard({
   onEdit,
   onDelete,
   isAdminOrDev,
+  catalogPlan,
 }: {
   tpl: CatalogTemplate;
   onDeploy: (tpl: CatalogTemplate) => void;
   onEdit?: (tpl: CatalogTemplate) => void;
   onDelete?: (tpl: CatalogTemplate) => void;
   isAdminOrDev: boolean;
+  catalogPlan?: Plan | null;
 }) {
   const [hovered, setHovered] = useState(false);
   const color = catColor(tpl.category);
@@ -111,7 +112,7 @@ function TemplateCard({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{ '--accent': color } as React.CSSProperties}
-      className="relative flex flex-col rounded-2xl border border-white/[0.08] bg-surface-card overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-2xl hover:shadow-[var(--accent)]/10 hover:-translate-y-0.5 group"
+      className="relative flex flex-col rounded-2xl border border-white/[0.08] bg-[#0c0d12] overflow-hidden transition-all duration-200 hover:border-white/20 hover:shadow-2xl hover:shadow-[var(--accent)]/10 hover:-translate-y-0.5 group"
     >
       {/* gradient top bar */}
       <div
@@ -154,6 +155,34 @@ function TemplateCard({
             )}
           </div>
         )}
+
+        {/* Plan Pricing & Standard Specs */}
+        <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+          <div className="flex flex-col">
+            <span className="text-[10px] text-neutral-400 uppercase font-semibold tracking-wider">Plan & Pricing</span>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-sm font-extrabold text-white tracking-tight">
+                {catalogPlan
+                  ? `${catalogPlan.currency} ${(catalogPlan.price / 100).toLocaleString()}`
+                  : 'Standard'}
+              </span>
+              <span className="text-[10px] text-neutral-400">
+                /{catalogPlan?.billingType === 'monthly' ? 'mo' : (catalogPlan?.billingType || 'mo')}
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-semibold text-emerald-400 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              1 App Slot
+            </span>
+            <span className="text-[10px] text-neutral-400 font-mono mt-0.5">
+              {catalogPlan?.specsJson && typeof catalogPlan.specsJson === 'object' && (catalogPlan.specsJson as any).cpuCores
+                ? `${(catalogPlan.specsJson as any).cpuCores} vCPU • ${((catalogPlan.specsJson as any).ramMb || 1024) >= 1024 ? `${((catalogPlan.specsJson as any).ramMb || 1024) / 1024}GB` : `${(catalogPlan.specsJson as any).ramMb}MB`} RAM`
+                : '0.5 vCPU • 1GB RAM'}
+            </span>
+          </div>
+        </div>
 
         {/* actions */}
         <div className="flex items-center justify-between pt-2 border-t border-white/[0.06]">
@@ -273,9 +302,11 @@ function parseYamlEnvVars(yaml: string): Record<string, string> {
 function DeployModal({
   tpl,
   onClose,
+  catalogPlan,
 }: {
   tpl: CatalogTemplate;
   onClose: () => void;
+  catalogPlan?: Plan | null;
 }) {
   const router = useRouter();
   const { apiUser } = useAppUser();
@@ -288,6 +319,8 @@ function DeployModal({
   const [success, setSuccess] = useState<{ deploymentId: string; project: string; generatedSecrets?: Record<string, string> } | null>(null);
   
   const [envVars, setEnvVars] = useState<Record<string, string>>({});
+  const [cpuLimit, setCpuLimit] = useState<'0.5' | '1.0' | '2.0'>('0.5');
+  const [memoryLimit, setMemoryLimit] = useState<'512M' | '1G' | '2G'>('1G');
   const [maskedKeys, setMaskedKeys] = useState<Record<string, boolean>>({});
   const [customKey, setCustomKey] = useState('');
   const [customValue, setCustomValue] = useState('');
@@ -380,8 +413,9 @@ logging:
   const [showConfigEditor, setShowConfigEditor] = useState(initialShowEditor);
   const configFileRef = useRef<HTMLInputElement>(null);
 
-  const [selectedScope, setSelectedScope] = useState<string>('personal');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showPasteEnv, setShowPasteEnv] = useState(false);
+  const [pasteEnvText, setPasteEnvText] = useState('');
 
   const isAdminOrDev = apiUser?.role === 'admin' || apiUser?.role === 'dev';
 
@@ -431,6 +465,28 @@ logging:
     reader.readAsText(file);
   }
 
+  function handlePasteEnvApply() {
+    if (!pasteEnvText.trim()) return;
+    const lines = pasteEnvText.split(/\r?\n/);
+    const parsed: Record<string, string> = { ...envVars };
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const idx = trimmed.indexOf('=');
+      if (idx > 0) {
+        const k = trimmed.slice(0, idx).trim();
+        let v = trimmed.slice(idx + 1).trim();
+        if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+          v = v.slice(1, -1);
+        }
+        if (k) parsed[k] = v;
+      }
+    }
+    setEnvVars(parsed);
+    setPasteEnvText('');
+    setShowPasteEnv(false);
+  }
+
   function handleConfigFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -447,19 +503,21 @@ logging:
   }
 
   async function handleDeploy() {
-    if (!nodeId && isAdminOrDev) { setError('Select a target node'); return; }
     setLoading(true);
     setError('');
     try {
+      const targetNodeId = nodeId || (nodes.length > 0 ? nodes[0].id : 'default');
       const res = await api.catalog.deploy({
         slug: tpl.slug,
-        nodeId: nodeId || 'default',
-        projectName,
+        nodeId: targetNodeId,
+        projectName: projectName.trim() || `${tpl.slug}-${crypto.randomUUID().slice(0, 4)}`,
         envVars,
-        teamId: selectedScope === 'personal' ? null : selectedScope,
+        teamId: null,
         exposureMode: 'auto',
         configFileContent: configFileContent.trim() ? configFileContent : undefined,
         configFileName: configFileName.trim() ? configFileName : undefined,
+        cpuLimit,
+        memoryLimit,
       });
       setSuccess({
         deploymentId: res.deployment.id,
@@ -476,22 +534,21 @@ logging:
   const color = catColor(tpl.category);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in" onClick={onClose}>
       <div
-        className="relative z-10 w-full max-w-lg rounded-2xl border border-white/10 bg-surface-card shadow-2xl overflow-hidden"
+        className="relative z-10 w-full max-w-xl rounded-2xl border border-white/15 bg-[#0a0a0d] shadow-2xl shadow-black overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* top gradient strip */}
         <div className="h-1" style={{ background: `linear-gradient(90deg, ${color}, ${color}55)` }} />
 
-        <div className="p-6 space-y-5 max-h-[85vh] overflow-y-auto">
-          <div className="flex items-center justify-between">
+        <div className="p-6 space-y-5 max-h-[85vh] overflow-y-auto bg-[#0a0a0d] scrollbar-thin">
+          <div className="flex items-center justify-between pb-1 border-b border-white/[0.08]">
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">Deploy {tpl.name}</h2>
-              <p className="text-xs text-text-faint mt-0.5">{tpl.slogan}</p>
+              <h2 className="text-lg font-bold text-white tracking-tight">Deploy {tpl.name}</h2>
+              <p className="text-xs text-neutral-400 mt-0.5">{tpl.slogan}</p>
             </div>
-            <button onClick={onClose} className="text-text-faint hover:text-text-muted transition-colors">
+            <button onClick={onClose} className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M18 6L6 18M6 6l12 12" />
               </svg>
@@ -547,7 +604,7 @@ logging:
               <div className="flex items-center justify-center gap-2 pt-2">
                 <button
                   onClick={() => router.push(`/deployments/${success.deploymentId}`)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-black bg-white hover:bg-neutral-200 transition-colors flex items-center gap-1.5 shadow"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -556,7 +613,7 @@ logging:
                 </button>
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 rounded-xl text-xs text-text-muted border border-white/10 hover:bg-white/[0.04]"
+                  className="px-4 py-2 rounded-xl text-xs text-neutral-300 border border-white/15 bg-white/5 hover:bg-white/10"
                 >
                   Close
                 </button>
@@ -564,77 +621,166 @@ logging:
             </div>
           ) : (
             <>
-              {/* Ownership Scope Selector */}
-              <div>
-                <ResourceScopeSelector value={selectedScope} onChange={setSelectedScope} />
-              </div>
-
-              {/* Project Subdomain & Network Exposure */}
+              {/* Project Subdomain & Preconfigured Architecture */}
               <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-text-muted">Project Name & Platform Subdomain</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-white">Project Name</label>
                   <input
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    className="w-full px-3 py-2 rounded-lg bg-surface text-sm font-mono text-text-primary border border-white/10 focus:outline-none focus:border-accent-cyan placeholder:text-text-faint"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e1015] text-sm font-mono text-white border border-white/15 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/20 placeholder:text-neutral-500"
                     placeholder="my-app-instance"
                   />
+                  <p className="text-[11px] text-neutral-400">
+                    Live URL: <code className="text-white font-mono bg-white/10 px-1.5 py-0.5 rounded border border-white/10">https://{projectName || 'app'}.app.shanutechx.com</code>
+                  </p>
                 </div>
 
-                {/* Exposure Mode Info Card */}
-                {tpl.recommendedExposureMode === 'raw_tcp' || tpl.category === 'database' ? (
-                  <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-300">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
-                        </svg>
-                        <span>Direct Host TCP Port Access (Database / TCP Service)</span>
+                {/* Preconfigured Locked Isolation Settings Banner */}
+                <div className="p-3.5 rounded-xl border border-white/15 bg-[#0e1015] space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <div>
+                        <div className="text-xs font-semibold text-white">Infrastructure & Expose Mode: Preconfigured</div>
+                        <div className="text-[11px] text-neutral-400">
+                          Reverse Proxy with automated SSL • Internal container port routing (No host ports exposed)
+                        </div>
                       </div>
-                      <p className="text-[11px] text-text-muted">
-                        Binds directly to node host port for GUI client connections (Redis Insight, TablePlus, Compass).
+                    </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-white font-semibold border border-white/15">
+                      Locked
+                    </span>
+                  </div>
+
+                  {/* 3-Pillar Security & Isolation Badges */}
+                  <div className="pt-2 border-t border-white/[0.08] grid grid-cols-3 gap-2 text-[10px] text-neutral-300">
+                    <div className="flex items-center gap-1.5 bg-black/50 px-2 py-1.5 rounded-lg border border-white/5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                      <span className="truncate">Isolated Network</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-black/50 px-2 py-1.5 rounded-lg border border-white/5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-neutral-300 shrink-0" />
+                      <span className="truncate">Sandboxed Storage</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-black/50 px-2 py-1.5 rounded-lg border border-white/5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                      <span className="truncate">Internal Port Only</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resource Specifications (CPU Cores & RAM Limits) */}
+                <div className="p-4 rounded-xl border border-white/15 bg-[#0e1015] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-semibold text-white flex items-center gap-2">
+                        <span>Container Hardware Specs</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
+                          {catalogPlan
+                            ? `${catalogPlan.currency} ${(catalogPlan.price / 100).toLocaleString()} / ${catalogPlan.billingType === 'monthly' ? 'mo' : catalogPlan.billingType}`
+                            : 'Standard Pricing'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-neutral-400 mt-0.5">
+                        Build and deploy application with dedicated cgroups CPU and memory limits
                       </p>
                     </div>
                   </div>
-                ) : (
-                  <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-300">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h1.5a2.5 2.5 0 002.5-2.5V7" />
-                        </svg>
-                        <span>Automated Web URL & Free SSL Reverse Proxy</span>
-                      </div>
-                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded">Active Default</span>
+
+                  {/* CPU Limit Selector */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-neutral-300 font-medium">CPU Core Allocation:</span>
+                      <span className="font-mono text-emerald-400 font-bold">{cpuLimit} vCPU {cpuLimit === '0.5' ? '(Half Core)' : 'Cores'}</span>
                     </div>
-                    <p className="text-[11px] text-text-muted">
-                      Public Web Address: <code className="text-emerald-300 font-mono">https://{projectName || 'app'}.app.shanutechx.com</code>
-                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCpuLimit('0.5')}
+                        className={`px-3 py-2 rounded-xl text-xs font-medium border text-center transition-all cursor-pointer ${
+                          cpuLimit === '0.5'
+                            ? 'bg-white text-black font-bold border-white shadow-md'
+                            : 'bg-black/40 text-neutral-300 border-white/10 hover:border-white/25 hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="font-bold">0.5 vCPU</div>
+                        <div className={`text-[10px] ${cpuLimit === '0.5' ? 'text-neutral-700' : 'text-neutral-500'}`}>Standard (0.5 Core)</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCpuLimit('1.0')}
+                        className={`px-3 py-2 rounded-xl text-xs font-medium border text-center transition-all cursor-pointer ${
+                          cpuLimit === '1.0'
+                            ? 'bg-white text-black font-bold border-white shadow-md'
+                            : 'bg-black/40 text-neutral-300 border-white/10 hover:border-white/25 hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="font-bold">1.0 vCPU</div>
+                        <div className={`text-[10px] ${cpuLimit === '1.0' ? 'text-neutral-700' : 'text-neutral-500'}`}>Dedicated 1 Core</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCpuLimit('2.0')}
+                        className={`px-3 py-2 rounded-xl text-xs font-medium border text-center transition-all cursor-pointer ${
+                          cpuLimit === '2.0'
+                            ? 'bg-white text-black font-bold border-white shadow-md'
+                            : 'bg-black/40 text-neutral-300 border-white/10 hover:border-white/25 hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="font-bold">2.0 vCPU</div>
+                        <div className={`text-[10px] ${cpuLimit === '2.0' ? 'text-neutral-700' : 'text-neutral-500'}`}>Dual Core Boost</div>
+                      </button>
+                    </div>
                   </div>
-                )}
+
+                  {/* RAM Selector */}
+                  <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-neutral-300 font-medium">Memory (RAM) Limit:</span>
+                      <span className="font-mono text-emerald-400 font-bold">{memoryLimit === '512M' ? '512 MB' : memoryLimit === '1G' ? '1 GB' : '2 GB'}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMemoryLimit('512M')}
+                        className={`px-3 py-2 rounded-xl text-xs font-medium border text-center transition-all cursor-pointer ${
+                          memoryLimit === '512M'
+                            ? 'bg-white text-black font-bold border-white shadow-md'
+                            : 'bg-black/40 text-neutral-300 border-white/10 hover:border-white/25 hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="font-bold">512 MB</div>
+                        <div className={`text-[10px] ${memoryLimit === '512M' ? 'text-neutral-700' : 'text-neutral-500'}`}>Lightweight</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMemoryLimit('1G')}
+                        className={`px-3 py-2 rounded-xl text-xs font-medium border text-center transition-all cursor-pointer ${
+                          memoryLimit === '1G'
+                            ? 'bg-white text-black font-bold border-white shadow-md'
+                            : 'bg-black/40 text-neutral-300 border-white/10 hover:border-white/25 hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="font-bold">1 GB</div>
+                        <div className={`text-[10px] ${memoryLimit === '1G' ? 'text-neutral-700' : 'text-neutral-500'}`}>Standard (1024M)</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMemoryLimit('2G')}
+                        className={`px-3 py-2 rounded-xl text-xs font-medium border text-center transition-all cursor-pointer ${
+                          memoryLimit === '2G'
+                            ? 'bg-white text-black font-bold border-white shadow-md'
+                            : 'bg-black/40 text-neutral-300 border-white/10 hover:border-white/25 hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="font-bold">2 GB</div>
+                        <div className={`text-[10px] ${memoryLimit === '2G' ? 'text-neutral-700' : 'text-neutral-500'}`}>Extended (2048M)</div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-
-              {isAdminOrDev && (
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-text-muted">Target Compute Node</label>
-                  <select
-                    value={nodeId}
-                    onChange={(e) => setNodeId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-surface text-sm text-text-primary border border-white/10 focus:outline-none focus:border-white/25"
-                  >
-                    <option value="">Auto-Select Best Available Node…</option>
-                    {nodes.map((n) => (
-                      <option key={n.id} value={n.id}>{n.name} — {n.location}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {!isAdminOrDev && (
-                <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-xs text-blue-300">
-                  Your app will be deployed on the next available high-performance node. Node selection is handled automatically.
-                </div>
-              )}
 
               {/* Editable Env Vars list + File Upload */}
               {fetchingYaml ? (
@@ -645,40 +791,87 @@ logging:
                   Parsing template env vars…
                 </div>
               ) : (
-                <div className="space-y-2 border-t border-white/[0.06] pt-3">
+                <div className="space-y-3 border-t border-white/10 pt-4">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-text-muted">Environment Variables</label>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".env,.env.*,.txt,.config"
-                      className="hidden"
-                      onChange={handleFileUpload}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-2 py-1 rounded text-[11px] font-semibold bg-accent-violet/20 border border-accent-violet/40 text-accent-violet hover:bg-accent-violet/30 transition-all flex items-center gap-1"
-                    >
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
-                      </svg>
-                      Upload .env
-                    </button>
+                    <div>
+                      <label className="text-xs font-semibold text-white">Environment Variables</label>
+                      <p className="text-[11px] text-neutral-400">Configure secrets and runtime parameters</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".env,.env.*,.txt,.config"
+                        className="hidden"
+                        onChange={handleFileUpload}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/10 border border-white/15 text-white hover:bg-white/20 transition-all flex items-center gap-1.5"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+                        </svg>
+                        Upload .env
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowPasteEnv(!showPasteEnv)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+                          showPasteEnv
+                            ? 'bg-white text-black border-white'
+                            : 'bg-white/5 border-white/15 text-white hover:bg-white/10'
+                        }`}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        Paste .env
+                      </button>
+                    </div>
                   </div>
+
+                  {showPasteEnv && (
+                    <div className="p-3 rounded-xl bg-black/50 border border-white/15 space-y-2">
+                      <textarea
+                        value={pasteEnvText}
+                        onChange={(e) => setPasteEnvText(e.target.value)}
+                        placeholder="KEY=VALUE&#10;DATABASE_PASSWORD=...&#10;AUTH_SECRET=..."
+                        rows={4}
+                        className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs font-mono text-white focus:outline-none focus:border-white/30"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setShowPasteEnv(false); setPasteEnvText(''); }}
+                          className="px-2.5 py-1 rounded-lg text-xs text-neutral-400 hover:text-white"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handlePasteEnvApply}
+                          className="px-3 py-1 rounded-lg text-xs font-bold bg-white text-black hover:bg-neutral-200 transition-colors"
+                        >
+                          Apply Variables
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {Object.keys(envVars).length > 0 && (
-                    <div className="max-h-52 overflow-y-auto space-y-2.5 pr-1 scrollbar-thin">
+                    <div className="max-h-56 overflow-y-auto space-y-2.5 pr-1 scrollbar-thin">
                       {Object.entries(envVars).map(([key, val]) => {
                         const isSecretKey = /PASSWORD|SECRET|KEY|TOKEN|PASS/i.test(key);
                         const isMasked = maskedKeys[key] !== false;
                         return (
-                          <div key={key} className="flex flex-col gap-1 p-2 rounded-lg bg-black/30 border border-white/[0.06]">
+                          <div key={key} className="flex flex-col gap-1.5 p-3 rounded-xl bg-[#0e1015] border border-white/10 shadow-sm">
                             <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-mono font-semibold text-accent-cyan break-all flex items-center gap-1">
+                              <span className="text-xs font-mono font-semibold text-white break-all flex items-center gap-1.5">
                                 {key}
-                                {isSecretKey && <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-sans">Secret</span>}
+                                {isSecretKey && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-sans border border-amber-500/30">Secret</span>}
                               </span>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1.5">
                                 {isSecretKey && (
                                   <>
                                     <button
@@ -690,7 +883,7 @@ logging:
                                         const gen = Array.from(array, (b) => chars[b % chars.length]).join('');
                                         setEnvVars({ ...envVars, [key]: gen });
                                       }}
-                                      className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 hover:bg-white/20 text-white font-mono flex items-center gap-1"
+                                      className="px-2 py-1 rounded text-[10px] bg-white/10 hover:bg-white/20 text-white font-mono flex items-center gap-1 border border-white/10"
                                       title="Generate random secret password"
                                     >
                                       <svg className="w-3 h-3 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -701,12 +894,12 @@ logging:
                                     <button
                                       type="button"
                                       onClick={() => setMaskedKeys((prev) => ({ ...prev, [key]: !isMasked }))}
-                                      className="px-1.5 py-0.5 rounded text-[10px] text-text-muted hover:text-white flex items-center gap-1"
+                                      className="px-2 py-1 rounded text-[10px] text-neutral-400 hover:text-white flex items-center gap-1 bg-white/5 border border-white/10"
                                       title={isMasked ? 'Show password' : 'Hide password'}
                                     >
                                       {isMasked ? (
                                         <>
-                                          <svg className="w-3 h-3 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                          <svg className="w-3 h-3 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                           </svg>
@@ -714,7 +907,7 @@ logging:
                                         </>
                                       ) : (
                                         <>
-                                          <svg className="w-3 h-3 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                          <svg className="w-3 h-3 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858-5.908a10.025 10.025 0 0110.122 7c-.57 1.817-1.636 3.39-3.029 4.568m-4.568-4.568A3 3 0 1012 9a3 3 0 000 6z" />
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
                                           </svg>
@@ -731,7 +924,7 @@ logging:
                                     delete updated[key];
                                     setEnvVars(updated);
                                   }}
-                                  className="text-red-400 hover:text-red-300 p-0.5"
+                                  className="text-neutral-400 hover:text-red-400 p-1 rounded hover:bg-white/5 transition-colors"
                                   title="Delete variable"
                                 >
                                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -744,7 +937,7 @@ logging:
                               type={isSecretKey && isMasked ? 'password' : 'text'}
                               value={val}
                               onChange={(e) => setEnvVars({ ...envVars, [key]: e.target.value })}
-                              className="w-full px-2.5 py-1 rounded-md bg-surface text-xs text-text-primary border border-white/10 focus:outline-none focus:border-accent-cyan font-mono"
+                              className="w-full px-3 py-2 rounded-lg bg-[#0a0a0c] text-xs text-white border border-white/15 focus:outline-none focus:border-white/40 font-mono"
                             />
                           </div>
                         );
@@ -755,10 +948,10 @@ logging:
               )}
 
               {/* Application Config File (Upload or Edit Manually) */}
-              <div className="space-y-2 border-t border-white/[0.06] pt-3">
+              <div className="space-y-2 border-t border-white/[0.08] pt-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <label className="text-xs font-medium text-text-muted">Configuration File</label>
+                    <label className="text-xs font-semibold text-white">Configuration File</label>
                     {showConfigEditor && (
                       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                         {configFileName || 'custom.yaml'}
@@ -776,9 +969,9 @@ logging:
                     <button
                       type="button"
                       onClick={() => configFileRef.current?.click()}
-                      className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30 transition-all flex items-center gap-1"
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white/10 border border-white/15 text-white hover:bg-white/20 transition-all flex items-center gap-1.5"
                     >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
                       </svg>
                       Upload Config File
@@ -791,13 +984,13 @@ logging:
                           setConfigFileName(tpl.slug === 'livekit' ? 'livekit.yaml' : `${tpl.slug}.yaml`);
                         }
                       }}
-                      className={`px-2 py-1 rounded text-[11px] font-semibold border transition-all flex items-center gap-1 ${
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 ${
                         showConfigEditor
-                          ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
-                          : 'bg-white/5 border-white/10 text-text-muted hover:text-white hover:bg-white/10'
+                          ? 'bg-white text-black border-white'
+                          : 'bg-white/5 border-white/15 text-neutral-300 hover:text-white hover:bg-white/10'
                       }`}
                     >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                       </svg>
@@ -807,16 +1000,16 @@ logging:
                 </div>
 
                 {showConfigEditor && (
-                  <div className="space-y-2 p-3 rounded-xl bg-black/40 border border-white/10">
+                  <div className="space-y-2 p-3 rounded-xl bg-[#0e1015] border border-white/10">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 flex-1">
-                        <span className="text-[11px] text-text-faint font-mono">Filename:</span>
+                        <span className="text-[11px] text-neutral-400 font-mono">Filename:</span>
                         <input
                           type="text"
                           value={configFileName}
                           onChange={(e) => setConfigFileName(e.target.value)}
                           placeholder="e.g. livekit.yaml"
-                          className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs font-mono text-white focus:outline-none focus:border-cyan-500 flex-1 max-w-xs"
+                          className="px-2.5 py-1 rounded bg-[#0a0a0c] border border-white/15 text-xs font-mono text-white focus:outline-none focus:border-white/40 flex-1 max-w-xs"
                         />
                       </div>
                       {(tpl.slug === 'livekit' || tpl.slug === 'lavalink') && (
@@ -826,7 +1019,7 @@ logging:
                             if (tpl.slug === 'livekit') setConfigFileContent(defaultLiveKitYaml);
                             else if (tpl.slug === 'lavalink') setConfigFileContent(defaultLavalinkYaml);
                           }}
-                          className="text-[10px] text-text-faint hover:text-cyan-400 underline"
+                          className="text-[10px] text-neutral-400 hover:text-white underline"
                         >
                           Reset defaults
                         </button>
@@ -838,30 +1031,30 @@ logging:
                       onChange={(e) => setConfigFileContent(e.target.value)}
                       rows={6}
                       placeholder="# Type or paste configuration YAML/JSON here..."
-                      className="w-full px-3 py-2 rounded-lg bg-black/60 border border-white/10 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 leading-relaxed scrollbar-thin"
+                      className="w-full px-3 py-2 rounded-lg bg-[#0a0a0c] border border-white/15 text-xs font-mono text-white focus:outline-none focus:border-white/40 leading-relaxed scrollbar-thin"
                       spellCheck={false}
                     />
-                    <p className="text-[10px] text-text-faint">
+                    <p className="text-[10px] text-neutral-400">
                       Saved directly into the application project container and mounted during startup.
                     </p>
                   </div>
                 )}
               </div>
               {!fetchingYaml && (
-                <div className="space-y-2 border-t border-white/[0.06] pt-3">
-                  <label className="text-xs font-medium text-text-muted block">Add Environment Variable</label>
+                <div className="space-y-2 border-t border-white/[0.08] pt-3">
+                  <label className="text-xs font-semibold text-white block">Add Environment Variable</label>
                   <div className="flex gap-2">
                     <input
                       value={customKey}
                       onChange={(e) => setCustomKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ''))}
                       placeholder="KEY (e.g. API_KEY)"
-                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface text-xs text-text-primary border border-white/10 focus:outline-none font-mono"
+                      className="flex-1 px-3 py-2 rounded-xl bg-[#0e1015] text-xs text-white border border-white/15 focus:outline-none focus:border-white/40 font-mono placeholder:text-neutral-500"
                     />
                     <input
                       value={customValue}
                       onChange={(e) => setCustomValue(e.target.value)}
                       placeholder="VALUE"
-                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface text-xs text-text-primary border border-white/10 focus:outline-none font-mono"
+                      className="flex-1 px-3 py-2 rounded-xl bg-[#0e1015] text-xs text-white border border-white/15 focus:outline-none focus:border-white/40 font-mono placeholder:text-neutral-500"
                     />
                     <button
                       type="button"
@@ -872,7 +1065,7 @@ logging:
                           setCustomValue('');
                         }
                       }}
-                      className="px-3 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] active:scale-95 text-xs text-text-primary font-medium transition-all"
+                      className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-xs text-white font-semibold transition-all border border-white/15 cursor-pointer"
                     >
                       Add
                     </button>
@@ -881,37 +1074,38 @@ logging:
               )}
 
               {error && (
-                <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-300">
                   {error}
                 </div>
               )}
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-3 pt-3 border-t border-white/[0.08]">
                 <button
+                  type="button"
                   onClick={onClose}
-                  className="flex-1 px-4 py-2.5 rounded-xl text-sm text-text-muted border border-white/10 hover:bg-white/[0.04] transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-neutral-300 border border-white/15 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleDeploy}
                   disabled={loading || fetchingYaml}
-                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-50"
-                  style={{ background: `linear-gradient(135deg, ${color}dd, ${color}88)` }}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-black bg-white hover:bg-neutral-200 transition-all active:scale-[0.98] disabled:opacity-50 shadow-lg shadow-white/10 flex items-center justify-center cursor-pointer"
                 >
                   {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <span className="flex items-center justify-center gap-2 text-black">
+                      <svg className="animate-spin w-4 h-4 text-black" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                         <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
                       </svg>
                       Deploying…
                     </span>
                   ) : (
-                    <span className="flex items-center justify-center gap-1.5">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <span className="flex items-center justify-center gap-1.5 text-black">
+                      <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.58-5.84a14.927 14.927 0 015.84-2.58M6.3 17.7a2.25 2.25 0 103.18 3.18 2.25 2.25 0 00-3.18-3.18z" />
                       </svg>
-                      Deploy Now
+                      Build & Deploy ({cpuLimit} vCPU • {memoryLimit})
                     </span>
                   )}
                 </button>
@@ -929,6 +1123,7 @@ export default function CatalogPage() {
   const { apiUser } = useAppUser();
   const router = useRouter();
   const [templates, setTemplates] = useState<CatalogTemplate[]>([]);
+  const [catalogPlan, setCatalogPlan] = useState<Plan | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -939,6 +1134,15 @@ export default function CatalogPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isAdminOrDev = apiUser?.role === 'admin' || apiUser?.role === 'dev';
+
+  useEffect(() => {
+    api.products.list('app_catalog')
+      .then((res) => {
+        const plan = res.products?.[0]?.plans?.[0] || null;
+        setCatalogPlan(plan);
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchCatalog = useCallback(
     async (q: string, cat: string) => {
@@ -996,25 +1200,21 @@ export default function CatalogPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Hero header ── */}
-      <div className="relative overflow-hidden border-b border-white/[0.06] bg-gradient-to-b from-[#13101f] to-surface px-6 py-8">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-64 h-64 rounded-full bg-violet-600/10 blur-3xl" />
-          <div className="absolute top-0 right-1/3 w-40 h-40 rounded-full bg-cyan-500/8 blur-3xl" />
-        </div>
+      <div className="relative overflow-hidden border-b border-white/[0.08] bg-black px-6 py-8">
         <div className="relative max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-violet-500/20 border border-violet-500/30">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2">
+              <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/10 border border-white/15">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
                   <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
               </span>
-              <span className="text-xs font-medium text-violet-400 uppercase tracking-widest">App Catalog</span>
+              <span className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">App Catalog</span>
             </div>
             {isAdminOrDev && (
               <button
                 onClick={() => router.push('/catalog/new')}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 transition-all shadow-lg shadow-violet-500/25 active:scale-95"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-black bg-white hover:bg-neutral-200 transition-all shadow-md active:scale-95 cursor-pointer"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M12 5v14M5 12h14" />
@@ -1023,42 +1223,54 @@ export default function CatalogPage() {
               </button>
             )}
           </div>
-          <h1 className="text-2xl font-bold text-text-primary mb-1">One-Click App Deployments</h1>
-          <p className="text-sm text-text-muted mb-5">
+          <h1 className="text-2xl font-bold text-white mb-1">One-Click App Deployments</h1>
+          <p className="text-sm text-neutral-400 mb-3">
             {total} pre-configured apps ready to deploy — from automation to databases, CMS to monitoring.
           </p>
 
+          <div className="flex flex-wrap items-center gap-2.5 mb-5 text-xs">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-white font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              App Catalog Plan: <strong className="text-white">
+                {catalogPlan
+                  ? `${catalogPlan.currency} ${(catalogPlan.price / 100).toLocaleString()} / ${catalogPlan.billingType === 'monthly' ? 'mo' : catalogPlan.billingType}`
+                  : 'Standard Pricing'}
+              </strong> per slot
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-neutral-300">
+              ⚡ Hardware Specs: <strong className="text-emerald-400">0.5 vCPU • 1GB RAM</strong> standard
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-neutral-400">
+              🛡️ Dedicated Cgroup Resource Enforcement
+            </span>
+          </div>
+
           {/* Search */}
           <div className="relative max-w-lg">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-text-faint" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
             </svg>
             <input
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Search n8n, WordPress, Grafana…"
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-sm text-text-primary placeholder:text-text-faint focus:outline-none focus:border-white/25 focus:bg-white/[0.07] transition-all"
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-[#0e1015] border border-white/10 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:border-white/30 focus:bg-[#12141a] transition-all font-sans"
             />
           </div>
         </div>
       </div>
 
       {/* ── Category tabs ── */}
-      <div className="flex items-center gap-2 px-6 py-3 border-b border-white/[0.05] overflow-x-auto scrollbar-none shrink-0">
+      <div className="flex items-center gap-2 px-6 py-3 border-b border-white/[0.08] bg-black overflow-x-auto scrollbar-none shrink-0">
         {['all', ...categories].map((cat) => (
           <button
             key={cat}
             onClick={() => handleCategory(cat)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
               activeCategory === cat
-                ? 'bg-white/[0.12] text-text-primary'
-                : 'text-text-faint hover:text-text-muted hover:bg-white/[0.05]'
+                ? 'bg-white text-black shadow-sm'
+                : 'text-neutral-400 hover:text-white hover:bg-white/10 border border-transparent'
             }`}
-            style={activeCategory === cat && cat !== 'all' ? {
-              background: `${catColor(cat)}22`,
-              color: catColor(cat),
-              border: `1px solid ${catColor(cat)}44`,
-            } : {}}
           >
             {cat === 'all' ? `All (${total})` : cat}
           </button>
@@ -1090,6 +1302,7 @@ export default function CatalogPage() {
                 onEdit={isAdminOrDev ? handleEdit : undefined}
                 onDelete={isAdminOrDev ? handleDelete : undefined}
                 isAdminOrDev={isAdminOrDev}
+                catalogPlan={catalogPlan}
               />
             ))}
           </div>
@@ -1097,14 +1310,13 @@ export default function CatalogPage() {
       </div>
 
       {/* Deploy modal */}
-      {deploying && <DeployModal tpl={deploying} onClose={() => setDeploying(null)} />}
+      {deploying && <DeployModal tpl={deploying} onClose={() => setDeploying(null)} catalogPlan={catalogPlan} />}
 
       {/* Delete confirmation modal */}
       {deleting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setDeleting(null)}>
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in" onClick={() => setDeleting(null)}>
           <div
-            className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-surface-card shadow-2xl overflow-hidden"
+            className="relative z-10 w-full max-w-md rounded-2xl border border-white/15 bg-[#0a0a0d] shadow-2xl shadow-black overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="h-1 bg-gradient-to-r from-red-500 to-red-400" />

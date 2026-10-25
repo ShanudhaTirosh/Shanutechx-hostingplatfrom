@@ -37,7 +37,8 @@ export type ProductCategory =
   | 'web_hosting'
   | 'database'
   | 'app_catalog'
-  | 'bot_hosting';
+  | 'bot_hosting'
+  | 'app_deployment';
 
 export type PlanBillingType = 'one_time' | 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
 
@@ -248,12 +249,156 @@ export interface Customer {
   firebaseUid: string;
   phoneNumber: string | null;
   discordUserId: string | null;
+  role?: 'customer' | 'support' | 'admin' | 'dev';
   isBanned?: boolean;
   bannedAt?: string | null;
   banReason?: string | null;
   createdAt: string;
   orderCount: number;
   totalSpent: number;
+  assignedAdminId?: string | null;
+  assignedAdmin?: { id: string; email: string; displayName: string | null } | null;
+  servicesCount?: number;
+  deploymentsCount?: number;
+  vpsCount?: number;
+  ticketsCount?: number;
+  databasesCount?: number;
+  smtpCount?: number;
+}
+
+export interface CustomerOrderItem {
+  id: string;
+  quantity: number;
+  priceLkr?: number | null;
+  configJson?: any;
+  plan?: {
+    id: string;
+    name: string;
+    category?: string;
+    cpuCores?: number;
+    ramGb?: number;
+    storageGb?: number;
+    price?: number;
+    currency?: string;
+    product?: {
+      id: string;
+      name: string;
+      slug: string;
+    } | null;
+  } | null;
+  service?: {
+    id: string;
+    name: string;
+    description?: string | null;
+  } | null;
+}
+
+export interface CustomerOrderPayment {
+  id: string;
+  method: string;
+  amount: number;
+  status: string;
+  receiptUrl?: string | null;
+  transactionRef?: string | null;
+  createdAt: string;
+}
+
+export interface CustomerOrderInvoice {
+  id: string;
+  invoiceNumber: string;
+  pdfUrl?: string | null;
+}
+
+export interface CustomerOrder {
+  id: string;
+  status: string;
+  total: number;
+  currency: string;
+  totalLkr: number;
+  createdAt: string;
+  items: CustomerOrderItem[];
+  payments: CustomerOrderPayment[];
+  invoice?: CustomerOrderInvoice | null;
+}
+
+export interface CustomerVpsProvision {
+  id: string;
+  provider: string;
+  externalId?: string | null;
+  panelUrl?: string | null;
+  ip?: string | null;
+  sshPort: number;
+  username?: string | null;
+  status: string;
+  notes?: string | null;
+  createdAt: string;
+  provisionedAt?: string | null;
+  orderItem?: {
+    plan?: {
+      id: string;
+      name: string;
+      product?: { name: string } | null;
+    } | null;
+  } | null;
+}
+
+export interface CustomerDeployment {
+  id: string;
+  subdomain?: string | null;
+  runtime?: string | null;
+  status: string;
+  createdAt: string;
+  node?: {
+    id: string;
+    label: string;
+    ip: string;
+  } | null;
+  orderItem?: {
+    plan?: {
+      id: string;
+      name: string;
+      product?: { name: string } | null;
+    } | null;
+  } | null;
+}
+
+export interface CustomerManagedDatabase {
+  id: string;
+  name: string;
+  engine: string;
+  status: string;
+  port: number;
+  createdAt: string;
+  node?: {
+    id: string;
+    label: string;
+    ip: string;
+  } | null;
+}
+
+export interface CustomerSmtpAccount {
+  id: string;
+  email: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface CustomerDetails extends Customer {
+  avatarUrl?: string | null;
+  orders: CustomerOrder[];
+  vpsProvisions: CustomerVpsProvision[];
+  deployments: CustomerDeployment[];
+  managedDatabases: CustomerManagedDatabase[];
+  smtpAccounts: CustomerSmtpAccount[];
+  subscriptions: any[];
+  tickets: Array<{
+    id: string;
+    subject: string;
+    status: string;
+    priority: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
 }
 
 export type SubscriptionStatus = 'active' | 'past_due' | 'cancelled';

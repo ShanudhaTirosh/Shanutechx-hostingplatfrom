@@ -426,7 +426,7 @@ export default function DevWebmailControlCenterPage() {
                 {((telemetry?.totalUsedStorageMb ?? 0) / 1024).toFixed(1)} GB
               </h3>
             </div>
-            <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-400">
+            <div className="p-3 bg-white/5 rounded-xl text-white">
               <HardDrive className="w-6 h-6" />
             </div>
           </div>
@@ -444,7 +444,7 @@ export default function DevWebmailControlCenterPage() {
             </div>
             <p className="text-[11px] text-slate-400 mt-1.5 flex justify-between">
               <span>Used of {((telemetry?.totalStorageMb ?? 0) / 1024).toFixed(0)} GB quota</span>
-              <span className="font-semibold text-indigo-300">
+              <span className="font-semibold text-neutral-300">
                 {(((telemetry?.totalUsedStorageMb ?? 0) / Math.max(1, telemetry?.totalStorageMb ?? 1)) * 100).toFixed(0)}%
               </span>
             </p>
@@ -755,7 +755,7 @@ export default function DevWebmailControlCenterPage() {
                             <Mail className="w-4 h-4 text-sky-400" />
                             <span>{mb.email}</span>
                             {mb.isInternal && (
-                              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-semibold">
+                              <span className="text-[10px] bg-white/10 text-neutral-300 border border-white/15 px-2 py-0.5 rounded-full font-semibold">
                                 System / Permanent
                               </span>
                             )}

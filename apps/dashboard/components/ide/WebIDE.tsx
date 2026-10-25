@@ -283,7 +283,7 @@ export default function WebIDE({
             className="flex items-center gap-1.5 px-2 py-1 hover:bg-slate-800/60 rounded text-slate-300 cursor-pointer text-xs transition-colors"
           >
             {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            <Folder size={14} className="text-indigo-400" />
+            <Folder size={14} className="text-white" />
             <span className="truncate">{item.name}</span>
           </div>
           {isExpanded && (
@@ -302,11 +302,11 @@ export default function WebIDE({
         onClick={() => openFile(item.path, item.name)}
         className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer text-xs transition-colors ${
           isActive
-            ? 'bg-indigo-600/30 text-indigo-300 font-medium'
+            ? 'bg-white text-black/30 text-neutral-300 font-medium'
             : 'hover:bg-slate-800/60 text-slate-400 hover:text-slate-200'
         }`}
       >
-        <FileCode size={14} className={isActive ? 'text-indigo-400' : 'text-slate-500'} />
+        <FileCode size={14} className={isActive ? 'text-white' : 'text-slate-500'} />
         <span className="truncate">{item.name}</span>
       </div>
     );
@@ -341,7 +341,7 @@ export default function WebIDE({
           <button
             onClick={() => setShowCommitModal(true)}
             disabled={!activeTab || pushing}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-md font-medium shadow-sm transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-black hover:bg-neutral-200 disabled:opacity-50 text-white rounded-md font-medium shadow-sm transition-all"
           >
             {pushing ? <Loader2 size={13} className="animate-spin" /> : <GitCommit size={13} />}
             <span>Commit & Push</span>
@@ -389,7 +389,7 @@ export default function WebIDE({
                       : 'bg-slate-900 text-slate-400 hover:bg-slate-800/50'
                   }`}
                 >
-                  <File size={13} className={isActive ? 'text-indigo-400' : 'text-slate-500'} />
+                  <File size={13} className={isActive ? 'text-white' : 'text-slate-500'} />
                   <span>{tab.name}</span>
                   {tab.isDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>}
                   <button
@@ -454,7 +454,7 @@ export default function WebIDE({
           <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4 text-slate-100">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-base font-semibold flex items-center gap-2">
-                <GitCommit className="text-indigo-400" size={18} />
+                <GitCommit className="text-white" size={18} />
                 Commit & Push Changes
               </h3>
               <button onClick={() => setShowCommitModal(false)} className="text-slate-400 hover:text-slate-200">
@@ -464,7 +464,7 @@ export default function WebIDE({
 
             <div className="flex flex-col gap-2">
               <label className="text-xs text-slate-400">File to commit:</label>
-              <div className="p-2 bg-slate-950 rounded border border-slate-800 text-xs font-mono text-indigo-300">
+              <div className="p-2 bg-slate-950 rounded border border-slate-800 text-xs font-mono text-neutral-300">
                 {activeTab?.path}
               </div>
             </div>
@@ -475,7 +475,7 @@ export default function WebIDE({
                 value={commitMessage}
                 onChange={(e) => setCommitMessage(e.target.value)}
                 rows={3}
-                className="w-full bg-slate-950 border border-slate-800 rounded p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded p-2.5 text-xs text-slate-200 focus:outline-none focus:border-white/30"
               />
             </div>
 
@@ -489,7 +489,7 @@ export default function WebIDE({
               <button
                 onClick={commitAndPush}
                 disabled={pushing}
-                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium rounded-md flex items-center gap-1.5 shadow-sm"
+                className="px-4 py-1.5 bg-white text-black hover:bg-neutral-200 disabled:opacity-50 text-white text-xs font-medium rounded-md flex items-center gap-1.5 shadow-sm"
               >
                 {pushing ? <Loader2 size={13} className="animate-spin" /> : <GitCommit size={13} />}
                 <span>Push to Repository</span>

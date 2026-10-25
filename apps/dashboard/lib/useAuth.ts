@@ -85,12 +85,14 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
       ? path
       : `/api${path.startsWith('/') ? '' : '/'}${path}`;
 
+  const isAdminPath = normalizedPath.includes('/admin');
+
   return fetch(`${API_BASE}${normalizedPath}`, {
     ...init,
     headers: {
       ...init.headers,
       Authorization: `Bearer ${token}`,
-      ...(impersonatedUserId ? { 'X-Impersonate-User-Id': impersonatedUserId } : {}),
+      ...(impersonatedUserId && !isAdminPath ? { 'X-Impersonate-User-Id': impersonatedUserId } : {}),
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     },
   });

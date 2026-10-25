@@ -347,7 +347,7 @@ export default function SupabaseSettingsPage() {
                   <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06] space-y-2">
                     <div className="flex justify-between font-mono">
                       <span className="text-text-muted">Monthly Active Users (MAU)</span>
-                      <span className="text-violet-300 font-bold">142 / 10,000 (1%)</span>
+                      <span className="text-neutral-300 font-bold">142 / 10,000 (1%)</span>
                     </div>
                     <div className="h-2 w-full bg-black/60 rounded-full overflow-hidden">
                       <div className="h-full bg-violet-400 rounded-full w-[1.4%]" />

@@ -465,23 +465,33 @@ vpsRouter.post('/vps-provisions/:id/renew', async (req: AuthedRequest, res: Resp
   });
 });
 
-const powerSchema = z.object({ action: z.enum(['reboot', 'start', 'status']) });
+const powerSchema = z.object({
+  action: z.enum(['reboot', 'start', 'status', 'stop', 'poweroff', 'shutdown']),
+});
 
 /**
  * POST /api/vps-provisions/:id/power
  * SSH-based power management actions (reboot, status checks).
+ * NOTE: Power-off / stop is strictly prohibited to prevent unrecoverable remote server halts.
  */
 vpsRouter.post('/vps-provisions/:id/power', async (req: AuthedRequest, res: Response) => {
   const parsed = powerSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { action } = parsed.data;
+
+  // Power-off and stop are permanently forbidden because unmanaged VPS cannot be booted back over SSH
+  if (action === 'stop' || action === 'poweroff' || action === 'shutdown') {
+    return res.status(400).json({
+      error: 'Power Off / Stop is permanently disabled on VPS instances to prevent unrecoverable server halt. Only safe SSH reboot is supported.',
+    });
+  }
 
   const provision = await prisma.vpsProvision.findUnique({ where: { id: req.params.id } });
   if (!provision) return res.status(404).json({ error: 'VPS provision not found' });
   if (!(await canAccessResource(provision.userId, req, undefined, undefined, 'write'))) {
     return res.status(404).json({ error: 'Not found' });
   }
-
-  const { action } = parsed.data;
 
   try {
     if (action === 'reboot') {

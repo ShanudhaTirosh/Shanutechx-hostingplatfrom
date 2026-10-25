@@ -9,43 +9,76 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
+const STX_LOGO_URI = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='837.67 3380 8324.64 3240'><polygon fill='%23ffffff' points='8500,6616.67 7576.67,6616.67 6763.33,5756.67 5910,6616.67 4290,6616.67 4660,4530 5390,4530 5030,6580 5030,6590 6333.33,5293.33 5603.33,4530 6526.67,4526.67 '/><polygon fill='%23ffffff' points='8166.67,3383.33 9160,3383.33 7320,5156.67 6873.33,4670 '/><polygon fill='%23ffffff' points='2140,4963.33 2006.67,4826.67 1963.33,4750 1943.33,4676.67 1940,4610 1946.67,4563.33 1963.33,4503.33 1996.67,4446.67 2040,4403.33 2086.67,4360 2136.67,4326.67 2193.33,4303.33 2243.33,4290 2286.67,4286.67 6346.67,4286.67 7043.33,3620 2290,3616.67 2183.33,3633.33 2096.67,3656.67 2003.33,3683.33 1900,3730 1813.33,3776.67 1723.33,3840 1666.67,3876.67 1590,3943.33 1520,4023.33 1470,4083.33 1413.33,4160 1353.33,4273.33 1313.33,4370 1280,4483.33 1260,4583.33 1256.67,4690 1263.33,4793.33 1283.33,4896.67 1320,5013.33 1350,5070 1393.33,5143.33 1450,5216.67 1496.67,5263.33 1556.67,5310 1640,5363.33 1716.67,5406.67 1790,5433.33 1850,5450 1910,5466.67 1963.33,5473.33 2003.33,5476.67 2083.33,5480 2640,5480 '/><polygon fill='%23ffffff' points='2213.33,4776.67 2873.33,5476.67 3373.33,5476.67 3396.67,5480 3426.67,5493.33 3456.67,5510 3476.67,5526.67 3496.67,5543.33 3516.67,5570 3533.33,5600 3540,5620 3546.67,5643.33 3546.67,5670 3546.67,5700 3540,5730 3526.67,5770 3513.33,5800 3493.33,5830 3473.33,5853.33 3440,5883.33 3406.67,5906.67 3363.33,5926.67 3330,5940 1526.67,5943.33 840,6613.33 3220,6610 3260,6610 3313.33,6606.67 3366.67,6596.67 3420,6580 3493.33,6560 3550,6536.67 3606.67,6513.33 3666.67,6476.67 3743.33,6430 3816.67,6383.33 3880,6326.67 3933.33,6276.67 3990,6213.33 4056.67,6130 4116.67,6030 4153.33,5960 4186.67,5873.33 4216.67,5780 4226.67,5716.67 4233.33,5663.33 4230,5496.67 4210,5390 4176.67,5286.67 4143.33,5206.67 4090,5116.67 4040,5056.67 3980,4993.33 3920,4943.33 3840,4890 3756.67,4846.67 3653.33,4810 3573.33,4793.33 3523.33,4786.67 3443.33,4783.33 '/></svg>";
+
 function baseEmailLayout(title: string, contentHtml: string): string {
   const rootDomain = env.rootDomain || 'shanutechx.com';
   return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(title)}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    body { margin: 0; padding: 0; background-color: #0c0a0f; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; color: #f3f0f7; }
-    .container { max-width: 580px; margin: 0 auto; padding: 32px 20px; }
-    .card { background: #14101f; border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-    .logo-badge { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 12px; font-weight: 800; font-size: 22px; color: #ffffff; margin-bottom: 20px; }
-    h1 { font-size: 20px; font-weight: 700; color: #ffffff; margin: 0 0 16px 0; letter-spacing: -0.3px; }
-    p { font-size: 14px; line-height: 1.6; color: #94a3b8; margin: 0 0 16px 0; }
-    .status-badge { display: inline-block; padding: 6px 12px; border-radius: 99px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
-    .status-success { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
-    .status-danger { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
-    .status-info { background: rgba(124,58,237,0.15); color: #cfbcff; border: 1px solid rgba(124,58,237,0.3); }
-    .btn { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #7c3aed, #6366f1); color: #ffffff !important; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 600; margin-top: 16px; box-shadow: 0 4px 14px rgba(124,58,237,0.4); }
-    .footer { text-align: center; font-size: 12px; color: #64748b; margin-top: 24px; }
-    .table { width: 100%; border-collapse: collapse; margin: 16px 0; }
-    .table th { text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
-    .table td { padding: 10px 0; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #e2e8f0; }
-    .quote-box { background: rgba(255,255,255,0.03); border-left: 3px solid #7c3aed; padding: 14px; border-radius: 0 8px 8px 0; font-size: 13px; color: #cbd5e1; margin: 16px 0; }
+    body { margin: 0; padding: 0; background-color: #eef1f4; font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #20242b; }
+    .email-container { max-width: 600px; margin: 30px auto; background-color: #ffffff; border-radius: 4px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+    .email-band { background-color: #07060d; padding: 36px 40px 30px; position: relative; overflow: hidden; }
+    .email-slash { position: absolute; right: 0; top: 0; bottom: 0; width: 120px; background: linear-gradient(135deg, transparent 46%, #20c6e0 46.6%, #7146eb 49%, transparent 49.6%); opacity: 0.9; }
+    .brand-logo { display: inline-block; position: relative; z-index: 2; }
+    .brand-logo img { height: 38px; width: auto; display: block; }
+    .brand-logo .sub { color: #ffffff; border-top: 2px solid #20c6e0; font-family: 'Space Grotesk', sans-serif; font-size: 9px; font-weight: 700; letter-spacing: 0.38em; margin-top: 6px; padding-top: 4px; display: inline-block; }
+    .email-body { padding: 40px 40px 20px; font-size: 14px; line-height: 1.8; color: #3a4048; }
+    .email-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #146a8a; margin-bottom: 14px; }
+    h1 { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: #07060d; margin: 0 0 18px 0; line-height: 1.3; }
+    p { margin: 0 0 16px 0; }
+    .status-badge { display: inline-block; padding: 5px 14px; border-radius: 999px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 18px; font-family: 'JetBrains Mono', monospace; }
+    .status-success { background: #ecfdf5; color: #059669; border: 1.5px solid #10b981; }
+    .status-danger { background: #fef2f2; color: #dc2626; border: 1.5px solid #ef4444; }
+    .status-info { background: #f5f3ff; color: #6d28d9; border: 1.5px solid #8b5cf6; }
+    .btn { display: inline-block; padding: 14px 28px; background: linear-gradient(115deg, #7146eb 0%, #4574e1 52%, #20c6e0 100%); color: #ffffff !important; text-decoration: none; border-radius: 2px; font-size: 13px; font-weight: 700; margin: 12px 0 26px; letter-spacing: 0.03em; }
+    .table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px; }
+    .table th { text-align: left; font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #ffffff; background: #07060d; padding: 11px 14px; font-weight: 700; }
+    .table td { padding: 13px 14px; border-bottom: 1px solid #eef1f4; color: #20242b; }
+    .table tr:nth-child(even) { background-color: #f7f8fa; }
+    .quote-box { background: #f7f8fa; border-left: 3px solid #7146eb; padding: 14px 16px; font-size: 13px; color: #3a4048; margin: 16px 0; }
+    .email-divider { height: 1px; background-color: #eef1f4; margin: 8px 40px 0; }
+    .email-sign { padding: 26px 40px 10px; font-size: 13px; color: #3a4048; line-height: 1.8; }
+    .email-sign strong { display: block; color: #07060d; font-size: 14px; }
+    .email-footer { background: #f7f8fa; padding: 26px 40px 30px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #8b929c; line-height: 1.9; letter-spacing: 0.02em; border-top: 1px solid #eef1f4; }
+    .email-footer a { color: #146a8a; text-decoration: none; }
+    .email-social { margin-top: 10px; }
+    .email-social span { margin-right: 14px; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="card">
-      <div style="display: inline-block; width: 48px; height: 48px; background-color: #ffffff; border-radius: 12px; padding: 6px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(124,58,237,0.3); text-align: center; vertical-align: middle;">
-        <img src="https://${rootDomain}/STX.png" alt="ShanuTechX" width="36" height="36" style="display: block; margin: 0 auto; width: 36px; height: 36px; object-fit: contain;" />
+  <div class="email-container">
+    <div class="email-band">
+      <div class="email-slash"></div>
+      <div class="brand-logo">
+        <img src="${STX_LOGO_URI}" alt="STX Enterprises Logo">
+        <div class="sub">DIGITAL EMPIRE STUDIO</div>
       </div>
+    </div>
+    <div class="email-body">
+      <div class="email-eyebrow">Enterprise Notification</div>
       ${contentHtml}
     </div>
-    <div class="footer">
-      <p>© 2026 ShanuTechX Platform · <a href="https://${rootDomain}" style="color: #7c3aed; text-decoration: none;">https://${rootDomain}</a></p>
+    <div class="email-divider"></div>
+    <div class="email-sign">
+      <strong>Shanudha Tirosh</strong>
+      Founder — STX Enterprises / Digital Empire Studio<br>
+      hello@stxenterprises.com&nbsp; ·&nbsp; www.stxenterprises.com
+    </div>
+    <div class="email-footer">
+      STX Enterprises — Digital Empire Studio, Negombo, Sri Lanka<br>
+      Automated Enterprise Cloud &amp; Orchestration Infrastructure · <a href="https://${rootDomain}">https://${rootDomain}</a>
+      <div class="email-social">
+        <span><a href="https://${rootDomain}">Website</a></span>
+        <span><a href="https://github.com/ShanudhaTirosh">GitHub</a></span>
+        <span><a href="https://discord.gg/shanutechx">Discord</a></span>
+      </div>
     </div>
   </div>
 </body>
