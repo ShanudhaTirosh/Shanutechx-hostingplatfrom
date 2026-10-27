@@ -9,7 +9,11 @@ interface Node {
 }
 
 function agentUrl(node: Node, path: string) {
-  return `http://${node.ip}:${env.nodeAgentPort}${path}`;
+  const host =
+    node.ip === '127.0.0.1' || node.ip === 'localhost'
+      ? process.env.LOCAL_NODE_AGENT_HOST || 'node-agent'
+      : node.ip;
+  return `http://${host}:${env.nodeAgentPort}${path}`;
 }
 
 function agentHeaders(extra: Record<string, string> = {}) {

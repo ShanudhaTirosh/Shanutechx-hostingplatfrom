@@ -239,6 +239,26 @@ services:
       - traefik.http.routers.dashboard.tls.certresolver=le
       - traefik.http.services.dashboard.loadbalancer.server.port=3001
 
+  webmail:
+    build:
+      context: ../..
+      dockerfile: apps/webmail/Dockerfile
+      args:
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://api.${ROOT_DOMAIN}}
+        NEXT_PUBLIC_DASHBOARD_URL: https://app.${ROOT_DOMAIN}
+    restart: unless-stopped
+    networks: [shanutechx-public]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=control-plane_shanutechx-public
+      - traefik.http.routers.webmail.rule=Host(`webmail.${ROOT_DOMAIN}`)
+      - traefik.http.routers.webmail.entrypoints=websecure
+      - traefik.http.routers.webmail.tls.certresolver=le
+      - traefik.http.services.webmail.loadbalancer.server.port=3002
+
   whatsapp-bot:
     build:
       context: ../..
@@ -307,6 +327,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - shanutechx-workspaces:/var/lib/shanutechx/workspaces
       - livekit-config:/etc/livekit
+    ports:
+      - "5000:5000"
     networks: [shanutechx-internal, shanutechx-public]
     depends_on: [buildkit]
     healthcheck:

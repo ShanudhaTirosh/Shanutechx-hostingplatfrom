@@ -62,7 +62,7 @@ docker compose exec api npx prisma migrate deploy --schema ../../packages/db/pri
 
 Log into `https://mail-api.${ROOT_DOMAIN}` or manage mailboxes via Webmail Studio (`/webmail`) in the control panel.
 
-**What still needs real DNS before it'll work end-to-end:** point `A` records at this server's public IP for `${ROOT_DOMAIN}`, `api.${ROOT_DOMAIN}`, `app.${ROOT_DOMAIN}`, `supabase.${ROOT_DOMAIN}`, `studio.${ROOT_DOMAIN}`, and `mail-api.${ROOT_DOMAIN}` — Traefik's Let's Encrypt HTTP challenge needs each of those to actually resolve here first.
+**What still needs real DNS before it'll work end-to-end:** point `A` records at this server's public IP for `${ROOT_DOMAIN}`, `api.${ROOT_DOMAIN}`, `app.${ROOT_DOMAIN}`, `webmail.${ROOT_DOMAIN}`, `supabase.${ROOT_DOMAIN}`, `studio.${ROOT_DOMAIN}`, and `mail-api.${ROOT_DOMAIN}` — Traefik's Let's Encrypt HTTP challenge needs each of those to actually resolve here first.
 
 ### 3. Launching Observability Stack (Optional)
 

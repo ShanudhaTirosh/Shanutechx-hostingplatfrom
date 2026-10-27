@@ -21,10 +21,13 @@ SUPABASE_DB_PASSWORD="${SUPABASE_DB_PASSWORD:-$(openssl rand -hex 16 2>/dev/null
 MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-$(openssl rand -hex 16 2>/dev/null || echo "MinioRootPass2026!")}"
 NODE_AGENT_SECRET="${NODE_AGENT_SECRET:-$(openssl rand -hex 16 2>/dev/null || echo "NodeAgentSecret2026!")}"
 
+MAIN_NODE_IP="${MAIN_NODE_IP:-$(curl -s4 --max-time 3 https://ifconfig.me 2>/dev/null || curl -s4 --max-time 3 https://api.ipify.org 2>/dev/null || echo "127.0.0.1")}"
+
 echo "============================================================"
 echo "🚀 ShanuTechX Autonomous Linux VPS Platform Bootstrap Engine"
 echo "============================================================"
 echo "   Root Domain:         ${ROOT_DOMAIN}"
+echo "   Main Node Public IP: ${MAIN_NODE_IP}"
 echo "   Dev Admin Email:     ${DEV_ADMIN_EMAIL}"
 echo "   WildDuck API Key:    [REDACTED]"
 echo "============================================================"
@@ -62,6 +65,7 @@ MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
 NODE_AGENT_SECRET=${NODE_AGENT_SECRET}
 WILDDUCK_FROM_ADDRESS=no-reply@${ROOT_DOMAIN}
 NEXT_PUBLIC_API_BASE_URL=https://api.${ROOT_DOMAIN}
+MAIN_NODE_IP=${MAIN_NODE_IP}
 EOF
 
 chmod 0600 "${CONTROL_PLANE_DIR}/.env"

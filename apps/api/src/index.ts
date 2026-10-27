@@ -339,28 +339,36 @@ server.listen(env.port, () => {
 });
 
 async function ensureDefaultMasterNodeRegistered() {
-  if (process.env.NODE_ENV === 'production') {
-    return;
-  }
   try {
-    const existing = await prisma.node.findFirst({
-      where: { ip: '127.0.0.1', label: 'Local Master Compute Host' },
-    });
-    if (!existing) {
+    const activeNodes = await prisma.node.count({ where: { isActive: true } });
+    if (activeNodes === 0) {
+      const hostIp = process.env.MAIN_NODE_IP || process.env.NODE_IP || '127.0.0.1';
       await prisma.node.create({
         data: {
-          label: 'Local Master Compute Host',
-          ip: '127.0.0.1',
+          label: 'main-node',
+          ip: hostIp,
           sshKeyRef: 'vault:nodes:master-ssh-key',
           cpuCores: 8,
           ramMb: 32768,
           diskGb: 500,
-          roleTags: ['web-hosting', 'node-hosting', 'python-hosting', 'vps-master'],
+          roleTags: [
+            'main-node',
+            'global',
+            'web-hosting',
+            'node-hosting',
+            'python-hosting',
+            'database-hosting',
+            'supabase-hosting',
+            'mail-hosting',
+            'livekit',
+            'vps-master',
+          ],
           monthlyBandwidthGb: 30000,
           isActive: true,
+          lastSeenAt: new Date(),
         },
       });
-      logger.info('Auto-registered Host API Server as default Local Master Compute Node (30 TB VPS Quota active).');
+      logger.info({ hostIp }, 'Auto-registered Main Node as initial compute host with global hosting tags.');
     }
   } catch (err: any) {
     logger.warn({ err: err.message }, 'Master node auto-registration warning');
