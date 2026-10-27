@@ -39,6 +39,10 @@ import {
   Zap,
   UserCircle,
   Shield,
+  Eye,
+  EyeOff,
+  X,
+  Loader2,
 } from 'lucide-react';
 import { MailboxProfileModal, type MailboxProfileData } from '@/components/email/MailboxProfileModal';
 import { MailboxStaffAccessModal } from '@/components/email/MailboxStaffAccessModal';
@@ -124,7 +128,7 @@ interface MailHost {
 }
 
 export default function BusinessEmailManagementDashboard() {
-  const [activeTab, setActiveTab] = useState<'mailboxes' | 'inbox' | 'dns' | 'credentials' | 'aliases' | 'admin_hosts' | 'admin_bulk'>('mailboxes');
+  const [activeTab, setActiveTab] = useState<'mailboxes' | 'dns' | 'credentials' | 'aliases' | 'admin_hosts' | 'admin_bulk'>('mailboxes');
 
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [selectedMailboxId, setSelectedMailboxId] = useState<string>('');
@@ -136,11 +140,13 @@ export default function BusinessEmailManagementDashboard() {
   const [showPassword, setShowPassword] = useState(false);
   const [selectedCodeSnippet, setSelectedCodeSnippet] = useState<'node' | 'python' | 'curl'>('node');
 
-  // Live Inbox state
-  const [inboxMessages, setInboxMessages] = useState<any[]>([]);
-  const [inboxLoading, setInboxLoading] = useState(false);
-  const [selectedInboxMsg, setSelectedInboxMsg] = useState<any | null>(null);
-  const [inboxSearch, setInboxSearch] = useState('');
+  // Change Password Modal state
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordMailbox, setPasswordMailbox] = useState<Mailbox | null>(null);
+  const [newMailboxPassword, setNewMailboxPassword] = useState('');
+  const [confirmMailboxPassword, setConfirmMailboxPassword] = useState('');
+  const [showNewMailboxPassword, setShowNewMailboxPassword] = useState(false);
+  const [updatingMailboxPassword, setUpdatingMailboxPassword] = useState(false);
 
   // Plan Quotas state
   const [planQuotas, setPlanQuotas] = useState<EmailPlanQuotas | null>(null);
@@ -280,23 +286,42 @@ export default function BusinessEmailManagementDashboard() {
     window.open(webmailUrl, '_blank');
   };
 
-  const loadInboxMessages = async (mailboxId?: string, search = '') => {
-    setInboxLoading(true);
-    try {
-      const res = await api.webmail.listMessages('inbox', search, mailboxId || selectedMailboxId || undefined);
-      setInboxMessages(res.messages || []);
-    } catch {
-      setInboxMessages([]);
-    } finally {
-      setInboxLoading(false);
-    }
+  const handleOpenPasswordModal = (mb: Mailbox) => {
+    setPasswordMailbox(mb);
+    setNewMailboxPassword('');
+    setConfirmMailboxPassword('');
+    setShowPasswordModal(true);
   };
 
-  useEffect(() => {
-    if (activeTab === 'inbox') {
-      void loadInboxMessages(selectedMailboxId, inboxSearch);
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordMailbox) return;
+    if (newMailboxPassword.length < 8) {
+      toast('Password must be at least 8 characters long', 'error');
+      return;
     }
-  }, [activeTab, selectedMailboxId]);
+    if (newMailboxPassword !== confirmMailboxPassword) {
+      toast('Passwords do not match', 'error');
+      return;
+    }
+
+    setUpdatingMailboxPassword(true);
+    try {
+      const res = await api.email.changePassword(passwordMailbox.id, newMailboxPassword);
+      toast(res.message || 'Mailbox password updated and synchronized with mail server', 'success');
+      setShowPasswordModal(false);
+      setNewMailboxPassword('');
+      setConfirmMailboxPassword('');
+      if (activeMailbox?.id === passwordMailbox.id) {
+        setRevealedPassword(null);
+        setShowPassword(false);
+      }
+    } catch (err: any) {
+      toast(err.message || 'Failed to update mailbox password', 'error');
+    } finally {
+      setUpdatingMailboxPassword(false);
+    }
+  };
 
   const handleRevealPassword = async () => {
     if (!activeMailbox) return;
@@ -314,8 +339,8 @@ export default function BusinessEmailManagementDashboard() {
     if (!activeMailbox || !newAliasPrefix.trim()) return;
     setAddingAlias(true);
     try {
-      await api.smtp.addAlias(activeMailbox.id, newAliasPrefix.trim().toLowerCase());
-      toast('Alias created successfully!', 'success');
+      await api.email.addAlias(activeMailbox.id, newAliasPrefix.trim().toLowerCase());
+      toast('Alias created and registered on mail server!', 'success');
       setNewAliasPrefix('');
       fetchData();
     } catch (err: any) {
@@ -328,8 +353,8 @@ export default function BusinessEmailManagementDashboard() {
   const handleRemoveAlias = async (prefix: string) => {
     if (!activeMailbox) return;
     try {
-      await api.smtp.removeAlias(activeMailbox.id, prefix);
-      toast('Alias removed', 'info');
+      await api.email.removeAlias(activeMailbox.id, prefix);
+      toast('Alias deleted from mail server', 'info');
       fetchData();
     } catch (err: any) {
       toast(err.message || 'Failed to remove alias', 'error');
@@ -679,10 +704,9 @@ EOF`;
       {/* NAVIGATION TABS */}
       <div className="flex items-center gap-2 border-b border-white/10 pb-3 overflow-x-auto">
         {[
-          { id: 'mailboxes', label: 'Mailboxes & Aliases', icon: Mail },
-          { id: 'inbox', label: 'Inbox & Live Messages', icon: Inbox },
+          { id: 'mailboxes', label: 'Mailboxes & Storage Quotas', icon: Mail },
           { id: 'dns', label: 'Domain & DNS Checklist', icon: Globe },
-          { id: 'credentials', label: 'Developer Credentials', icon: KeyRound },
+          { id: 'credentials', label: 'Client Setup (IMAP / SMTP)', icon: KeyRound },
           { id: 'aliases', label: 'Alias Configuration', icon: Tag },
           ...(isAdminOrDev
             ? [
@@ -1074,6 +1098,15 @@ EOF`;
                           <Plug className="h-3.5 w-3.5 text-white" />
                           <span>Connect & API</span>
                         </button>
+
+                        <button
+                          onClick={() => handleOpenPasswordModal(mb)}
+                          className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-white font-bold text-xs transition-all flex items-center gap-1.5 border border-amber-500/20"
+                          title="Change Mailbox Password"
+                        >
+                          <Lock className="h-3.5 w-3.5 text-amber-400" />
+                          <span>Change Password</span>
+                        </button>
                       </div>
 
                       <div className="flex items-center gap-2 ml-auto">
@@ -1106,173 +1139,6 @@ EOF`;
         </div>
       )}
 
-      {/* TAB: INBOX & LIVE MESSAGES */}
-      {activeTab === 'inbox' && (
-        <div className="space-y-6">
-          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 md:p-8 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-              <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <Inbox className="h-5 w-5 text-white" />
-                  Live Mailbox Messages
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  View and manage inbound messages directly for your provisioned business email addresses.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => loadInboxMessages(selectedMailboxId, inboxSearch)}
-                  disabled={inboxLoading}
-                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${inboxLoading ? 'animate-spin' : ''}`} />
-                  <span>Refresh</span>
-                </button>
-                <button
-                  onClick={() => handleOpenWebmail()}
-                  className="px-3.5 py-2 rounded-xl bg-white text-black hover:bg-neutral-200 font-bold text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-sm transition-all"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  <span>Launch Full Webmail UI</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Filter bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Mailbox Account</label>
-                <select
-                  value={selectedMailboxId}
-                  onChange={(e) => {
-                    setSelectedMailboxId(e.target.value);
-                    setSelectedInboxMsg(null);
-                  }}
-                  className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white/30"
-                >
-                  {mailboxes.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="sm:col-span-2 space-y-1">
-                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Search Subject or Sender</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Search messages..."
-                    value={inboxSearch}
-                    onChange={(e) => setInboxSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') loadInboxMessages(selectedMailboxId, inboxSearch);
-                    }}
-                    className="flex-1 bg-[#0a0a0c] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-white/30 placeholder-slate-600"
-                  />
-                  <button
-                    onClick={() => loadInboxMessages(selectedMailboxId, inboxSearch)}
-                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200"
-                  >
-                    Search
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Master-Detail Messages View */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[420px]">
-              {/* Message List */}
-              <div className="lg:col-span-5 bg-[#0a0a0c] border border-white/10 rounded-2xl overflow-hidden flex flex-col">
-                <div className="p-3 border-b border-white/10 text-[11px] font-bold text-slate-400 uppercase tracking-wider flex justify-between items-center bg-slate-900/40">
-                  <span>Inbox ({inboxMessages.length})</span>
-                  {inboxLoading && <RefreshCw className="h-3 w-3 animate-spin text-white" />}
-                </div>
-
-                <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 max-h-[500px]">
-                  {inboxMessages.length === 0 ? (
-                    <div className="p-8 text-center text-slate-500 text-xs">
-                      {inboxLoading ? 'Loading messages…' : 'No messages found in inbox.'}
-                    </div>
-                  ) : (
-                    inboxMessages.map((msg) => {
-                      const isSelected = selectedInboxMsg?.id === msg.id;
-                      return (
-                        <div
-                          key={msg.id}
-                          onClick={() => setSelectedInboxMsg(msg)}
-                          className={`p-3.5 cursor-pointer transition-all ${
-                            isSelected
-                              ? 'bg-white/10 border-l-4 border-white'
-                              : 'hover:bg-white/5'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className={`text-xs truncate max-w-[180px] ${!msg.isRead ? 'font-bold text-white' : 'text-slate-300'}`}>
-                              {msg.senderName || msg.senderEmail || msg.from}
-                            </span>
-                            <span className="text-[10px] text-slate-500 font-mono">
-                              {msg.createdAt ? new Date(msg.createdAt).toLocaleDateString() : ''}
-                            </span>
-                          </div>
-                          <div className={`text-xs truncate ${!msg.isRead ? 'font-semibold text-white' : 'text-slate-400'}`}>
-                            {msg.subject || '(no subject)'}
-                          </div>
-                          <div className="text-[11px] text-slate-500 truncate mt-0.5">
-                            {msg.snippet || msg.textBody || ''}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* Message Detail / Preview */}
-              <div className="lg:col-span-7 bg-[#0a0a0c] border border-white/10 rounded-2xl p-5 flex flex-col">
-                {selectedInboxMsg ? (
-                  <div className="space-y-4 flex-1 flex flex-col">
-                    <div className="border-b border-white/10 pb-3 flex justify-between items-start gap-3">
-                      <div>
-                        <h3 className="text-sm font-bold text-white">{selectedInboxMsg.subject || '(no subject)'}</h3>
-                        <div className="text-xs text-slate-400 mt-1">
-                          From: <span className="text-slate-200 font-medium">{selectedInboxMsg.senderName ? `${selectedInboxMsg.senderName} <${selectedInboxMsg.senderEmail}>` : selectedInboxMsg.senderEmail || selectedInboxMsg.from}</span>
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          To: <span className="text-slate-300">{selectedInboxMsg.recipientEmail || activeMailbox?.email}</span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleOpenWebmail()}
-                        className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white border border-white/15 text-xs font-semibold flex items-center gap-1 shrink-0"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        Reply in Webmail
-                      </button>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto max-h-[420px] text-xs text-slate-200 leading-relaxed font-sans bg-slate-900/30 p-4 rounded-xl border border-white/10/80">
-                      {selectedInboxMsg.htmlBody ? (
-                        <div dangerouslySetInnerHTML={{ __html: selectedInboxMsg.htmlBody }} />
-                      ) : (
-                        <pre className="whitespace-pre-wrap font-sans text-xs">{selectedInboxMsg.textBody || selectedInboxMsg.snippet || '(empty message body)'}</pre>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500">
-                    <Mail className="h-10 w-10 text-slate-700 mb-3" />
-                    <p className="text-xs font-medium">Select a message from the list to view its contents.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* TAB 2: DOMAIN & DNS CHECKLIST */}
       {activeTab === 'dns' && (
@@ -2545,6 +2411,102 @@ EOF`;
             fetchData();
           }}
         />
+      )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && passwordMailbox && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-[#0a0a0c] border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button
+              onClick={() => setShowPasswordModal(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white">
+                <Key className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-white">Change Mailbox Password</h3>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">{passwordMailbox.email}</p>
+              </div>
+            </div>
+
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-slate-300">New Password</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const p = generateStrongPassword();
+                      setNewMailboxPassword(p);
+                      setConfirmMailboxPassword(p);
+                    }}
+                    className="text-[11px] text-white/80 hover:text-white flex items-center gap-1 transition-colors"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Generate Strong</span>
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showNewMailboxPassword ? 'text' : 'password'}
+                    required
+                    value={newMailboxPassword}
+                    onChange={(e) => setNewMailboxPassword(e.target.value)}
+                    placeholder="At least 8 characters"
+                    className="w-full bg-[#121216] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-white/30 font-mono pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewMailboxPassword(!showNewMailboxPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  >
+                    {showNewMailboxPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1.5">Confirm Password</label>
+                <input
+                  type={showNewMailboxPassword ? 'text' : 'password'}
+                  required
+                  value={confirmMailboxPassword}
+                  onChange={(e) => setConfirmMailboxPassword(e.target.value)}
+                  placeholder="Re-type new password"
+                  className="w-full bg-[#121216] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-white/30 font-mono"
+                />
+              </div>
+
+              <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-[11px] text-slate-400 flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <span>Password will be re-encrypted with AES-256 in the secure vault and immediately synchronized with the WildDuck mail server.</span>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updatingMailboxPassword}
+                  className="px-5 py-2 rounded-xl bg-white text-black hover:bg-neutral-200 text-xs font-semibold flex items-center gap-2 transition-colors disabled:opacity-50"
+                >
+                  {updatingMailboxPassword && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{updatingMailboxPassword ? 'Saving...' : 'Update Password'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

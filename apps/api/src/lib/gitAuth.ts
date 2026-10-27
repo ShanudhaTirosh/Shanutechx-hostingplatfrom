@@ -1,6 +1,7 @@
 import { env } from '../env';
 import { logger } from './logger';
 import { decryptSecret } from './secretsVault';
+import { prisma } from './prisma';
 
 /**
  * Git credentials for private repositories.
@@ -139,7 +140,6 @@ export async function resolveRepoUrlForBuild(deploymentId: string, repoUrl: stri
 
 const defaultDeps: GitAuthDeps = {
   async loadAuth(deploymentId) {
-    const { prisma } = await import('./prisma');
     const row = await prisma.deployment.findUnique({
       where: { id: deploymentId },
       select: { userId: true, gitAccountId: true, gitProvider: true, githubTokenEncrypted: true },

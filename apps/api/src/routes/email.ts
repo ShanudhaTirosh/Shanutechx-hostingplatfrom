@@ -1240,7 +1240,10 @@ emailRouter.post('/email/mailboxes/:id/aliases', async (req: AuthedRequest, res)
       return res.status(400).json({ error: 'Valid alias prefix name is required (letters, numbers, dot, underscore, dash).' });
     }
 
-    const account = await prisma.smtpAccount.findUnique({ where: { id: req.params.id } });
+    const account = await prisma.smtpAccount.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { displayName: true } } },
+    });
     if (!account) return res.status(404).json({ error: 'Mailbox not found' });
 
     const isOwner = account.userId === req.user!.id;
@@ -1259,6 +1262,20 @@ emailRouter.post('/email/mailboxes/:id/aliases', async (req: AuthedRequest, res)
 
     if ((account.aliases || []).includes(newAlias)) {
       return res.status(400).json({ error: 'Alias already exists' });
+    }
+
+    // Provision alias address on WildDuck mail server so it receives and sends mail
+    if (account.wildduckUserId) {
+      try {
+        await wildduckClient.createAddress(
+          account.wildduckUserId,
+          newAlias,
+          account.user?.displayName || undefined,
+          account.mailHostId
+        );
+      } catch (wdErr: any) {
+        logger.warn({ wdErr: wdErr.message, newAlias }, 'Failed to sync alias to WildDuck address');
+      }
     }
 
     const updated = await prisma.smtpAccount.update({
@@ -1287,6 +1304,19 @@ emailRouter.delete('/email/mailboxes/:id/aliases/:prefix', async (req: AuthedReq
     const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
     if (!isOwner && !isStaff) return res.status(403).json({ error: 'Access denied' });
 
+    // Remove alias address from WildDuck mail server
+    if (account.wildduckUserId) {
+      try {
+        const addresses = await wildduckClient.listAddresses(account.wildduckUserId, account.mailHostId);
+        const targetAddr = addresses.find((a) => a.address.toLowerCase().startsWith(`${prefix.toLowerCase()}@`));
+        if (targetAddr) {
+          await wildduckClient.deleteAddress(account.wildduckUserId, targetAddr.id, account.mailHostId);
+        }
+      } catch (wdErr: any) {
+        logger.warn({ wdErr: wdErr.message, prefix }, 'Failed to remove alias from WildDuck address');
+      }
+    }
+
     const filteredAliases = (account.aliases || []).filter((a: string) => a.split('@')[0] !== prefix.toLowerCase());
     const updated = await prisma.smtpAccount.update({
       where: { id: account.id },
@@ -1297,6 +1327,49 @@ emailRouter.delete('/email/mailboxes/:id/aliases/:prefix', async (req: AuthedReq
   } catch (err: any) {
     logger.error({ err }, 'Failed to delete alias');
     res.status(500).json({ error: err.message || 'Failed to delete alias' });
+  }
+});
+
+/**
+ * PATCH /api/email/mailboxes/:id/password
+ * Customer self-service (or staff) password update for a specific mailbox.
+ */
+const mailboxPasswordChangeSchema = z.object({
+  newPassword: z.string().min(8, 'Password must be at least 8 characters long'),
+});
+
+emailRouter.patch('/email/mailboxes/:id/password', async (req: AuthedRequest, res) => {
+  const parse = mailboxPasswordChangeSchema.safeParse(req.body);
+  if (!parse.success) {
+    return res.status(400).json({ error: parse.error.errors[0]?.message || 'Invalid password format' });
+  }
+
+  const { newPassword } = parse.data;
+
+  try {
+    const account = await prisma.smtpAccount.findUnique({ where: { id: req.params.id } });
+    if (!account) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const isOwner = account.userId === req.user!.id;
+    const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
+    if (!isOwner && !isStaff) return res.status(403).json({ error: 'Access denied' });
+
+    const newCredentialRef = encryptSecret(newPassword, env.secretsEncryptionKey);
+    await prisma.smtpAccount.update({
+      where: { id: account.id },
+      data: { credentialRef: newCredentialRef },
+    });
+
+    if (account.wildduckUserId) {
+      await wildduckClient.updateUser(account.wildduckUserId, { password: newPassword }, account.mailHostId).catch((err: any) => {
+        logger.warn({ err: err.message }, 'Failed to sync new password to WildDuck');
+      });
+    }
+
+    res.json({ ok: true, message: 'Mailbox password updated successfully.' });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to update mailbox password');
+    res.status(500).json({ error: err.message || 'Failed to update mailbox password' });
   }
 });
 

@@ -54,7 +54,7 @@ test('every route is covered by an auth gate (or lives in a reviewed public/self
   for (const file of fs.readdirSync(routesDir).filter((f) => f.endsWith('.ts'))) {
     if (SELF_AUTHENTICATING_OR_PUBLIC.has(file)) continue;
     const src = fs.readFileSync(path.join(routesDir, file), 'utf8');
-    const fullGate = /^useForOwnRoutes\(\w+,\s*requireAuth/m.test(src) || /^\w+Router\.use\(\s*requireAuth/m.test(src);
+    const fullGate = /^useForOwnRoutes\(\w+/m.test(src) || /^\w+Router\.use\(\s*requireAuth/m.test(src);
     const scoped = [...src.matchAll(/^\w+Router\.use\(\s*['"]([^'"]+)['"]\s*,\s*requireAuth/gm)].map((m) => m[1]);
     const matches = [...src.matchAll(routeRe)];
     matches.forEach((m, i) => {

@@ -36,7 +36,7 @@ import { ThreadList, WebmailMessage } from './ThreadList';
 import { ThreadViewer, MessageDetail } from './ThreadViewer';
 import { Composer } from './Composer';
 import { SettingsModal } from './SettingsModal';
-import { WebmailCredentialsModal } from '../../dashboard/components/webmail/WebmailCredentialsModal';
+import { WebmailCredentialsModal } from './WebmailCredentialsModal';
 import { api } from '../lib/api';
 import { firebaseAuth } from '../lib/firebaseClient';
 

@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { deriveVpsAgentSecret, vpsAgentSecretFor } from '../../apps/api/src/lib/agentSecret';
 import { makeFakePrisma, mountRouter } from './helpers/routeStubs';
+import { env } from '../../apps/api/src/env';
 
-const PLATFORM = process.env.NODE_AGENT_SECRET!;
+process.env.NODE_AGENT_SECRET = process.env.NODE_AGENT_SECRET || env.nodeAgentSecret;
+const PLATFORM = process.env.NODE_AGENT_SECRET;
 
 test('derived VPS secrets are deterministic, per-VPS and not the platform secret', () => {
   const a = deriveVpsAgentSecret('vps-a', PLATFORM);

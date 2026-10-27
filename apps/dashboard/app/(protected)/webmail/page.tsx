@@ -1,779 +1,565 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui';
-import { WebmailMessage, WebmailThread } from '@/lib/types';
 import {
-  WebmailLayout,
-  WebmailThreadList,
-  WebmailThreadViewer,
-  WebmailRichComposer,
-  WebmailContactsTab,
-  WebmailCalendarTab,
-  WebmailSettingsModal,
-  WebmailFoldersAndLabelsModal,
-  WebmailRulesModal,
-  WebmailOnboardingWizard,
-  WebmailAdminPanel,
-  WebmailKeyboardShortcutsModal,
-  WebmailDelegationModal,
-  WebmailCredentialsModal,
-  WebmailScheduledModal,
-  WebmailAnalyticsView,
-  WebmailMailMergeModal,
-  WebmailSecurityDrawer,
-  WebmailAuditLogModal,
-  WebmailActiveSessionsModal,
-} from '@/components/webmail';
-import { Mail, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+  Mail,
+  ExternalLink,
+  Key,
+  Shield,
+  HardDrive,
+  Copy,
+  Check,
+  RefreshCw,
+  Server,
+  Layers,
+  Settings,
+  ArrowRight,
+  Lock,
+  Globe,
+  Smartphone,
+  Laptop,
+  CheckCircle2,
+  AlertCircle,
+  Eye,
+  EyeOff,
+  UserCheck,
+  Loader2,
+} from 'lucide-react';
+import { WebmailCredentialsModal } from '@/components/webmail/WebmailCredentialsModal';
 
-export default function WebmailPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const ssoToken = searchParams.get('ssoToken');
+interface MailboxItem {
+  id: string;
+  email: string;
+  username: string;
+  domain: string;
+  smtpHost: string;
+  smtpPort: number;
+  sslPort: number;
+  storageUsedMb: number;
+  storageQuotaMb: number;
+  dailySendCount: number;
+  dailySendLimit: number;
+  status: string;
+  planName: string;
+  webmailUrl: string;
+  aliases?: string[];
+  maxAliases?: number;
+  isExpired: boolean;
+  isSuspended: boolean;
+}
+
+export default function WebmailLaunchpadPage() {
   const { toast } = useToast();
-
-  // ── Screen state ──────────────────────────────────────────────────────────
-  const [activeScreen, setActiveScreen] = useState<'login' | 'loading' | 'mail' | 'no_mailboxes'>('loading');
-
-  // ── Auth & mailbox state ──────────────────────────────────────────────────
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [mailboxes, setMailboxes] = useState<any[]>([]);
+  const [mailboxes, setMailboxes] = useState<MailboxItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedMailboxId, setSelectedMailboxId] = useState<string>('');
-  const [token, setToken] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<string>('customer');
+  const [launchingId, setLaunchingId] = useState<string | null>(null);
 
-  // ── Loading screen state ──────────────────────────────────────────────────
-  const [loadingProgress, setLoadingProgress] = useState(20);
-  const [loadingStatus, setLoadingStatus] = useState('Authenticating session...');
+  // Modals state
+  const [showCredsModal, setShowCredsModal] = useState(false);
+  const [credsMailboxId, setCredsMailboxId] = useState<string | undefined>();
 
-  // ── Workspace state ───────────────────────────────────────────────────────
-  const [mainTab, setMainTab] = useState<'mail' | 'calendar' | 'contacts' | 'tasks' | 'admin' | 'analytics'>('mail');
-  const [activeFolder, setActiveFolder] = useState<string>('inbox');
-  const [activeCategory, setActiveCategory] = useState<string>('primary');
-  const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isThreaded, setIsThreaded] = useState<boolean>(true);
-  const [listDensity, setListDensity] = useState<'comfortable' | 'compact' | 'spacious'>('comfortable');
+  // Change password modal state
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordMailbox, setPasswordMailbox] = useState<MailboxItem | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [updatingPassword, setUpdatingPassword] = useState(false);
 
-  // ── Mail data state ───────────────────────────────────────────────────────
-  const [messages, setMessages] = useState<WebmailMessage[]>([]);
-  const [threads, setThreads] = useState<WebmailThread[]>([]);
-  const [selectedMessage, setSelectedMessage] = useState<WebmailMessage | null>(null);
-  const [selectedThread, setSelectedThread] = useState<WebmailThread | null>(null);
-  const [threadMessages, setThreadMessages] = useState<WebmailMessage[]>([]);
-  const [fetchingThread, setFetchingThread] = useState(false);
+  // Quick clipboard copy state
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  // ── Compose state ─────────────────────────────────────────────────────────
-  const [composeOpen, setComposeOpen] = useState(false);
-  const [composeTo, setComposeTo] = useState('');
-  const [composeSubject, setComposeSubject] = useState('');
-  const [composeBody, setComposeBody] = useState('');
-  const [composeReplyMsgId, setComposeReplyMsgId] = useState<string | undefined>();
-  const [composeReplyThreadId, setComposeReplyThreadId] = useState<string | undefined>();
-
-  // ── Modals state ──────────────────────────────────────────────────────────
-  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
-  const [foldersModalOpen, setFoldersModalOpen] = useState(false);
-  const [rulesModalOpen, setRulesModalOpen] = useState(false);
-  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
-  const [delegationModalOpen, setDelegationModalOpen] = useState(false);
-  const [credentialsModalOpen, setCredentialsModalOpen] = useState(false);
-  const [scheduledModalOpen, setScheduledModalOpen] = useState(false);
-  const [mailMergeModalOpen, setMailMergeModalOpen] = useState(false);
-  const [securityDrawerOpen, setSecurityDrawerOpen] = useState(false);
-  const [auditLogsModalOpen, setAuditLogsModalOpen] = useState(false);
-  const [sessionsModalOpen, setSessionsModalOpen] = useState(false);
-
-  // ── Onboarding wizard ─────────────────────────────────────────────────────
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
-
-  // ── Global Keyboard Shortcuts Listener ──────────────────────────────────
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
-      if (e.key === '?') {
-        e.preventDefault();
-        setShortcutsModalOpen((prev) => !prev);
-      } else if (e.key === 'c' || e.key === 'C') {
-        e.preventDefault();
-        setComposeOpen(true);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Boot / SSO
-  // ──────────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    async function bootSession() {
-      // 1. SSO token from URL parameter
-      if (ssoToken) {
-        setActiveScreen('loading');
-        setLoadingStatus('Exchanging SSO security ticket…');
-        setLoadingProgress(40);
-        try {
-          const res = await fetch('/api/webmail/auth/sso-exchange', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ssoToken }),
-          });
-          const data = await res.json();
-          if (res.ok && data.ok) {
-            localStorage.setItem('webmail_token', data.token);
-            setToken(data.token);
-            const accounts = await loadMailboxes();
-            setLoadingProgress(100);
-            setTimeout(() => {
-              if (accounts.length === 0) {
-                setActiveScreen('no_mailboxes');
-              } else {
-                setActiveScreen('mail');
-              }
-            }, 300);
-            return;
-          }
-        } catch {
-          // fall through
-        }
-      }
-
-      // 2. Existing active token
-      const activeToken = localStorage.getItem('webmail_token');
-      if (activeToken) {
-        setToken(activeToken);
-        const accounts = await loadMailboxes();
-        if (accounts && accounts.length > 0) {
-          setActiveScreen('mail');
-          return;
-        }
-      }
-
-      // 3. Auto-SSO via dashboard session
-      try {
-        setActiveScreen('loading');
-        setLoadingStatus('Authenticating your mailbox SSO session…');
-        setLoadingProgress(50);
-        const ticketRes = await api.smtp.getSsoTicket().catch(() => null);
-        if (ticketRes?.ssoToken) {
-          setLoadingProgress(75);
-          const exchangeRes = await fetch('/api/webmail/auth/sso-exchange', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ssoToken: ticketRes.ssoToken }),
-          });
-          const data = await exchangeRes.json().catch(() => null);
-          if (exchangeRes.ok && data?.ok) {
-            localStorage.setItem('webmail_token', data.token);
-            setToken(data.token);
-            const accounts = await loadMailboxes();
-            setLoadingProgress(100);
-            setTimeout(() => {
-              if (accounts.length === 0) {
-                setActiveScreen('no_mailboxes');
-              } else {
-                setActiveScreen('mail');
-              }
-            }, 250);
-            return;
-          }
-        }
-      } catch (err) {
-        // Fallback
-      }
-
-      // 4. Check mailboxes to determine if user has mailboxes or needs to create one
-      const finalAccounts = await loadMailboxes();
-      if (!finalAccounts || finalAccounts.length === 0) {
-        setActiveScreen('no_mailboxes');
-      } else {
-        setActiveScreen('mail');
-      }
-    }
-    void bootSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ssoToken]);
-
-  const loadMailboxes = async (): Promise<any[]> => {
-    let accounts: any[] = [];
+  const loadMailboxes = async () => {
+    setLoading(true);
     try {
       const res = await api.email.mailboxes();
-      accounts = res.mailboxes || [];
-      setMailboxes(accounts);
-      if (accounts.length > 0) {
-        setSelectedMailboxId((prev) => prev || accounts[0].id);
+      const list = res.mailboxes || [];
+      setMailboxes(list);
+      if (list.length > 0 && !selectedMailboxId) {
+        setSelectedMailboxId(list[0].id);
       }
-    } catch {}
-
-    // Determine role from dashboard user context
-    try {
-      const me = await api.me();
-      if (me?.user?.role) setUserRole(me.user.role);
-    } catch {}
-
-    return accounts;
+    } catch (err: any) {
+      toast(err.message || 'Failed to load mail accounts', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Fetch mail data
-  // ──────────────────────────────────────────────────────────────────────────
-  const fetchMailData = useCallback(async () => {
+  useEffect(() => {
+    loadMailboxes();
+  }, []);
+
+  const copyText = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+    toast(`Copied ${key} to clipboard`, 'success');
+  };
+
+  const handleLaunchWebmail = async (mailboxId: string) => {
+    setLaunchingId(mailboxId);
     try {
-      if (isThreaded) {
-        const res = await api.webmail.listThreads(activeFolder);
-        setThreads(res.threads || []);
+      const res = await api.webmail.getSsoTicket(mailboxId);
+      if (res.ssoToken) {
+        // Build standalone webmail URL: port 3002 or relative
+        const webmailPort = window.location.hostname === 'localhost' ? 'http://localhost:3002' : '/webmail';
+        const targetUrl = `${webmailPort}?ssoToken=${encodeURIComponent(res.ssoToken)}`;
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+        toast('Standalone Webmail launched in new tab', 'success');
       } else {
-        const res = await api.webmail.listMessages(activeFolder, searchQuery, selectedMailboxId || undefined);
-        setMessages(res.messages || []);
+        toast('Failed to generate SSO ticket', 'error');
       }
-    } catch {}
-  }, [activeFolder, searchQuery, isThreaded, selectedMailboxId]);
-
-  useEffect(() => {
-    if (activeScreen === 'mail' && mainTab === 'mail') {
-      void fetchMailData();
+    } catch (err: any) {
+      toast(err.message || 'Failed to launch standalone webmail', 'error');
+    } finally {
+      setLaunchingId(null);
     }
-  }, [activeScreen, mainTab, activeFolder, searchQuery, isThreaded, selectedMailboxId, fetchMailData]);
+  };
 
-  // Fetch thread messages when a thread is selected
-  useEffect(() => {
-    if (!selectedThread?.threadId) return;
-    setFetchingThread(true);
-    api.webmail.getThread(selectedThread.threadId)
-      .then((res) => {
-        setThreadMessages(res.messages || []);
-      })
-      .catch(() => {
-        // Fall back to latestMessage
-        setThreadMessages(selectedThread.latestMessage ? [selectedThread.latestMessage] : []);
-      })
-      .finally(() => setFetchingThread(false));
-  }, [selectedThread?.threadId]);
+  const handleOpenPasswordModal = (mb: MailboxItem) => {
+    setPasswordMailbox(mb);
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowPasswordModal(true);
+  };
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Auth handlers
-  // ──────────────────────────────────────────────────────────────────────────
-  const handleLogin = async (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!loginEmail || !loginPassword) {
-      setLoginError('Please enter both email and password.');
+    if (!passwordMailbox) return;
+    if (newPassword.length < 8) {
+      toast('Password must be at least 8 characters long', 'error');
       return;
     }
-    setLoginLoading(true);
-    setLoginError(null);
+    if (newPassword !== confirmPassword) {
+      toast('Passwords do not match', 'error');
+      return;
+    }
+
+    setUpdatingPassword(true);
     try {
-      const res = await fetch('/api/webmail/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail.trim(), password: loginPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || 'Authentication failed');
-
-      localStorage.setItem('webmail_token', data.token);
-      setToken(data.token);
-
-      setActiveScreen('loading');
-      setLoadingStatus('Initializing mailbox workspace…');
-      setLoadingProgress(70);
-
-      await loadMailboxes();
-
-      // First login: open onboarding wizard
-      const isFirstLogin = !localStorage.getItem('webmail_onboarded');
-      if (isFirstLogin) {
-        localStorage.setItem('webmail_onboarded', '1');
-      }
-
-      setTimeout(() => {
-        setLoadingProgress(100);
-        setActiveScreen('mail');
-        if (isFirstLogin) {
-          setTimeout(() => setOnboardingOpen(true), 500);
-        }
-      }, 400);
+      const res = await api.email.changePassword(passwordMailbox.id, newPassword);
+      toast(res.message || 'Mailbox password updated successfully', 'success');
+      setShowPasswordModal(false);
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (err: any) {
-      setLoginError(err.message || 'Login failed');
+      toast(err.message || 'Failed to update mailbox password', 'error');
     } finally {
-      setLoginLoading(false);
+      setUpdatingPassword(false);
     }
   };
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Mail action handlers
-  // ──────────────────────────────────────────────────────────────────────────
-  const handleToggleStar = async (id: string) => {
-    // Optimistic toggle: find current starred state
-    const msg = messages.find((m) => m.id === id) || threadMessages.find((m) => m.id === id);
-    const currentStarred = msg?.isStarred ?? false;
-    try {
-      await api.webmail.updateMessage(id, { isStarred: !currentStarred });
-      void fetchMailData();
-    } catch {
-      toast('Failed to update star', 'error');
-    }
-  };
-
-  const handleDeleteMessage = async (id: string) => {
-    try {
-      await api.webmail.deleteMessage(id);
-      toast('Moved to Trash', 'info');
-      setSelectedMessage(null);
-      setSelectedThread(null);
-      setThreadMessages([]);
-      void fetchMailData();
-    } catch {
-      toast('Failed to delete', 'error');
-    }
-  };
-
-  const handleArchiveMessage = async (id: string) => {
-    try {
-      await api.webmail.updateMessage(id, { folder: 'archive' });
-      toast('Archived', 'info');
-      setSelectedMessage(null);
-      setSelectedThread(null);
-      void fetchMailData();
-    } catch {
-      toast('Failed to archive', 'error');
-    }
-  };
-
-  const handleBulkAction = async (action: string, ids: string[]) => {
-    try {
-      await api.webmail.bulkAction({ messageIds: ids, action });
-      toast(`Updated ${ids.length} items`, 'success');
-      void fetchMailData();
-    } catch {
-      toast('Bulk action failed', 'error');
-    }
-  };
-
-  /** Opens the rich composer pre-filled for reply/replyAll/forward */
-  const handleOpenReply = (msg: WebmailMessage, mode: 'reply' | 'replyAll' | 'forward') => {
-    if (mode === 'forward') {
-      setComposeTo('');
-      setComposeSubject(`Fwd: ${msg.subject || ''}`);
-      setComposeBody(
-        `\n\n---------- Forwarded message ----------\nFrom: ${msg.senderName || msg.senderEmail}\nSubject: ${msg.subject}\n\n${msg.textBody || msg.snippet || ''}`
-      );
-      setComposeReplyMsgId(undefined);
-      setComposeReplyThreadId(undefined);
-    } else {
-      setComposeTo(msg.senderEmail || msg.from || '');
-      setComposeSubject(`Re: ${msg.subject || ''}`);
-      setComposeBody(
-        `\n\n> On ${msg.createdAt || msg.timestamp}, ${msg.senderName || msg.senderEmail} wrote:\n> ${msg.snippet || ''}`
-      );
-      setComposeReplyMsgId(msg.id);
-      setComposeReplyThreadId(msg.threadId ?? undefined);
-    }
-    setComposeOpen(true);
-  };
-
-  /** Legacy handler used by WebmailThreadViewer's onReply/onForward callbacks */
-  const handleReplyLegacy = (msg: WebmailMessage) => handleOpenReply(msg, 'reply');
-  const handleForwardLegacy = (msg: WebmailMessage) => handleOpenReply(msg, 'forward');
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Determine which messages to pass to the thread viewer
-  // ──────────────────────────────────────────────────────────────────────────
-  const viewerMessages: WebmailMessage[] = isThreaded
-    ? threadMessages
-    : selectedMessage
-    ? [selectedMessage]
-    : [];
 
   return (
-    <div className="h-full w-full relative overflow-hidden flex flex-col bg-[#0f0f13] text-white webmail-root">
-
-      {/* ─── Screen 1: Login ─────────────────────────────────────────────── */}
-      {activeScreen === 'login' && (
-        <div className="flex-1 flex h-full w-full overflow-hidden">
-
-          {/* Left panel */}
-          <div className="flex-1 min-w-[320px] max-w-[520px] flex flex-col p-8 sm:p-14 overflow-y-auto bg-[#13131a] justify-between">
-            {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white font-extrabold text-xs shadow-lg shadow-md">
-                STX
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+      {/* Header section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/10">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-400">
+              <Mail className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold tracking-tight text-white">Business Webmail</h1>
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Standalone Architecture
+                </span>
               </div>
-              <span className="font-bold text-xl tracking-tight text-white">STX Mail</span>
+              <p className="text-sm text-gray-400 mt-1">
+                Access your mailbox via our dedicated high-performance webmail client or connect via desktop & mobile mail applications.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Link
+            href="/email"
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 transition-colors inline-flex items-center gap-2"
+          >
+            <Settings className="w-4 h-4 text-gray-400" />
+            Manage Accounts & DNS
+          </Link>
+          {mailboxes.length > 0 && (
+            <button
+              onClick={() => handleLaunchWebmail(selectedMailboxId || mailboxes[0].id)}
+              disabled={!!launchingId}
+              className="px-4 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-600/20 transition-all inline-flex items-center gap-2 disabled:opacity-50"
+            >
+              {launchingId ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+              Launch Webmail Client
+            </button>
+          )}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="py-24 flex flex-col items-center justify-center space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+          <p className="text-sm text-gray-400">Loading business mailboxes...</p>
+        </div>
+      ) : mailboxes.length === 0 ? (
+        <div className="p-12 text-center rounded-2xl bg-white/[0.02] border border-white/10 max-w-xl mx-auto space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+            <Mail className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-semibold text-white">No Mailboxes Provisioned Yet</h2>
+          <p className="text-sm text-gray-400">
+            You don't have any active business mailboxes. Provision custom domain email addresses under your subscription plan to get started.
+          </p>
+          <div className="pt-2">
+            <Link
+              href="/email"
+              className="px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm inline-flex items-center gap-2 transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+              Configure Mailboxes & DNS
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main 2 columns: Mailbox cards */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+                Active Business Mailboxes ({mailboxes.length})
+              </h2>
+              <button
+                onClick={loadMailboxes}
+                className="text-xs text-gray-400 hover:text-gray-200 inline-flex items-center gap-1 transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Refresh
+              </button>
             </div>
 
-            <div className="max-w-[420px] my-auto py-8">
-              <h1 className="font-bold text-3xl sm:text-4xl text-white tracking-tight mb-3">
-                Sign in to Webmail
-              </h1>
-              <p className="text-sm text-slate-400 mb-8 leading-relaxed">
-                Enterprise cloud webmail for ShanuTechX email accounts and custom domains.
+            <div className="space-y-4">
+              {mailboxes.map((mb) => {
+                const isSelected = mb.id === selectedMailboxId;
+                const storagePercent = Math.min(100, Math.round((mb.storageUsedMb / (mb.storageQuotaMb || 1024)) * 100));
+                const isStorageWarning = storagePercent >= 80;
+
+                return (
+                  <div
+                    key={mb.id}
+                    className={`p-6 rounded-2xl border transition-all ${
+                      isSelected
+                        ? 'bg-gradient-to-b from-white/[0.06] to-white/[0.02] border-indigo-500/40 shadow-xl shadow-indigo-500/5'
+                        : 'bg-white/[0.02] border-white/10 hover:border-white/20'
+                    }`}
+                    onClick={() => setSelectedMailboxId(mb.id)}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/30 to-purple-500/30 border border-indigo-500/30 flex items-center justify-center text-indigo-300 font-semibold text-lg flex-shrink-0">
+                          {mb.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold text-white text-base">{mb.email}</h3>
+                            <span
+                              className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                                mb.status === 'active'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              }`}
+                            >
+                              {mb.status.toUpperCase()}
+                            </span>
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-white/5 text-gray-400 border border-white/10">
+                              {mb.planName}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Domain: <span className="text-gray-300 font-mono">{mb.domain}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Primary SSO Launch Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLaunchWebmail(mb.id);
+                        }}
+                        disabled={launchingId === mb.id}
+                        className="px-4 py-2 rounded-lg bg-indigo-600/90 hover:bg-indigo-600 text-white font-medium text-xs inline-flex items-center gap-2 shadow-md transition-all disabled:opacity-50 flex-shrink-0"
+                      >
+                        {launchingId === mb.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                        Open Webmail
+                      </button>
+                    </div>
+
+                    {/* Storage usage meter */}
+                    <div className="mt-6 pt-5 border-t border-white/5 space-y-2">
+                      <div className="flex items-center justify-between text-xs text-gray-400">
+                        <span className="flex items-center gap-1.5">
+                          <HardDrive className="w-3.5 h-3.5 text-gray-500" />
+                          Storage Quota ({mb.storageUsedMb} MB / {mb.storageQuotaMb} MB)
+                        </span>
+                        <span className={`font-mono font-medium ${isStorageWarning ? 'text-amber-400' : 'text-gray-300'}`}>
+                          {storagePercent}% Used
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all rounded-full ${
+                            storagePercent >= 90
+                              ? 'bg-red-500'
+                              : storagePercent >= 75
+                              ? 'bg-amber-500'
+                              : 'bg-gradient-to-r from-indigo-500 to-purple-500'
+                          }`}
+                          style={{ width: `${storagePercent}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Aliases badge section */}
+                    {mb.aliases && mb.aliases.length > 0 && (
+                      <div className="mt-4 flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-gray-500">Aliases:</span>
+                        {mb.aliases.map((alias) => (
+                          <span
+                            key={alias}
+                            className="px-2 py-0.5 text-xs font-mono rounded bg-white/[0.04] border border-white/10 text-gray-300"
+                          >
+                            {alias}@{mb.domain}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Secondary Actions Bar */}
+                    <div className="mt-5 pt-4 border-t border-white/5 flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCredsMailboxId(mb.id);
+                            setShowCredsModal(true);
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white text-xs font-medium border border-white/10 transition-colors inline-flex items-center gap-1.5"
+                        >
+                          <Key className="w-3.5 h-3.5 text-indigo-400" />
+                          Client Setup & Credentials
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenPasswordModal(mb);
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white text-xs font-medium border border-white/10 transition-colors inline-flex items-center gap-1.5"
+                        >
+                          <Lock className="w-3.5 h-3.5 text-amber-400" />
+                          Change Password
+                        </button>
+                      </div>
+
+                      <Link
+                        href={`/email?mailboxId=${mb.id}`}
+                        className="text-xs text-gray-400 hover:text-indigo-400 inline-flex items-center gap-1 transition-colors"
+                      >
+                        Advanced Mailbox Settings <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right column: Connection details & guides */}
+          <div className="space-y-6">
+            {/* Third-Party Client Connection Card */}
+            <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 space-y-5">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-white/5">
+                <Server className="w-5 h-5 text-indigo-400" />
+                <h3 className="font-semibold text-white text-sm">Email Client Settings (IMAP / SMTP)</h3>
+              </div>
+
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Connect your business mailbox with Apple Mail, Outlook, Thunderbird, or mobile mail apps using these verified server endpoints:
               </p>
 
-              {loginError && (
-                <div className="mb-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-medium flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  {loginError}
-                </div>
-              )}
-
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                    Email Address or Alias
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="user@yourdomain.com"
-                    className="w-full px-4 py-3.5 rounded-xl border border-white/10 bg-white/5 text-white text-sm outline-none focus:border-white/30 focus:bg-violet-500/5 transition-all placeholder-slate-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="••••••••••••"
-                      className="w-full px-4 py-3.5 pr-12 rounded-xl border border-white/10 bg-white/5 text-white text-sm outline-none focus:border-white/30 focus:bg-violet-500/5 transition-all placeholder-slate-600"
-                    />
+              <div className="space-y-3 font-mono text-xs">
+                {/* Incoming IMAP */}
+                <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                  <div className="flex items-center justify-between text-gray-400 text-[11px] font-sans">
+                    <span>Incoming (IMAP / SSL)</span>
                     <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-200 transition-all"
+                      onClick={() => copyText('mail.shanutechx.com', 'IMAP Host')}
+                      className="text-gray-400 hover:text-white"
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {copiedKey === 'IMAP Host' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
+                  <div className="text-white font-medium">mail.shanutechx.com</div>
+                  <div className="text-gray-500 text-[11px]">Port: 993 &bull; Security: SSL/TLS</div>
                 </div>
 
+                {/* Outgoing SMTP */}
+                <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                  <div className="flex items-center justify-between text-gray-400 text-[11px] font-sans">
+                    <span>Outgoing (SMTP / SSL)</span>
+                    <button
+                      onClick={() => copyText('mail.shanutechx.com', 'SMTP Host')}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      {copiedKey === 'SMTP Host' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <div className="text-white font-medium">mail.shanutechx.com</div>
+                  <div className="text-gray-500 text-[11px]">Port: 465 (SSL) or 587 (STARTTLS)</div>
+                </div>
+
+                {/* Username */}
+                <div className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                  <div className="text-gray-400 text-[11px] font-sans">Authentication Username</div>
+                  <div className="text-indigo-300 font-medium truncate">Your full email address</div>
+                  <div className="text-gray-500 text-[11px]">Password: Your mailbox password</div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={() => {
+                    setCredsMailboxId(selectedMailboxId || mailboxes[0]?.id);
+                    setShowCredsModal(true);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold border border-white/10 transition-colors inline-flex items-center justify-center gap-2"
+                >
+                  <Key className="w-3.5 h-3.5 text-indigo-400" />
+                  View Decrypted Credentials & Code
+                </button>
+              </div>
+            </div>
+
+            {/* Standalone Client Highlights */}
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-indigo-950/20 via-purple-950/10 to-transparent border border-indigo-500/20 space-y-4">
+              <div className="flex items-center gap-2 text-indigo-400">
+                <Shield className="w-4 h-4" />
+                <h4 className="font-semibold text-xs uppercase tracking-wider">Enterprise Security</h4>
+              </div>
+              <ul className="text-xs text-gray-300 space-y-2.5">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <span>Single-use encrypted SSO tickets (60s TTL)</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <span>Isolated standalone browser tab architecture</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <span>Zero cross-origin credential exposure</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <span>WildDuck enterprise mail storage backend</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Webmail Credentials Modal */}
+      {showCredsModal && (
+        <WebmailCredentialsModal
+          isOpen={showCredsModal}
+          onClose={() => setShowCredsModal(false)}
+          selectedMailboxId={credsMailboxId}
+        />
+      )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && passwordMailbox && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-zinc-950 border border-white/15 p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white text-base">Change Mailbox Password</h3>
+                  <p className="text-xs text-gray-400 font-mono">{passwordMailbox.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPasswordModal(false)}
+                className="text-gray-400 hover:text-white text-lg font-bold p-1"
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1.5">New Password</label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    placeholder="Minimum 8 characters"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-indigo-500 transition-colors pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                  >
+                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1.5">Confirm New Password</label>
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  placeholder="Repeat new password"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300/90 leading-relaxed">
+                Updating this password will immediately update your IMAP, POP3, and SMTP authentication credentials and encrypt the secret in the platform vault.
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(false)}
+                  className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium transition-colors"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
-                  disabled={loginLoading}
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-neutral-800 to-black hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                  disabled={updatingPassword}
+                  className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
                 >
-                  {loginLoading ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Authenticating…</>
-                  ) : (
-                    'Sign In to Webmail'
-                  )}
-                </button>
-              </form>
-
-              <div className="mt-4">
-                <button
-                  onClick={async () => {
-                    setActiveScreen('loading');
-                    setLoadingStatus('Launching workspace…');
-                    setLoadingProgress(60);
-                    await loadMailboxes();
-                    setTimeout(() => {
-                      setLoadingProgress(100);
-                      setActiveScreen('mail');
-                    }, 400);
-                  }}
-                  className="w-full py-3.5 rounded-2xl border border-white/10 bg-white/5 text-slate-300 font-semibold text-xs hover:border-white/15 hover:text-white flex items-center justify-center gap-2 transition-all"
-                >
-                  <Mail className="h-4 w-4" />
-                  Launch Workspace Without Login
+                  {updatingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  Update Password
                 </button>
               </div>
-            </div>
-
-            <p className="text-xs text-slate-600">Powered by ShanuTechX Autonomous Cloud Platform</p>
-          </div>
-
-          {/* Right panel */}
-          <div className="flex-1 hidden md:flex relative overflow-hidden bg-gradient-to-br from-[#0f0f13] via-black to-[#0c0d12] items-center justify-center p-12">
-            <div className="absolute inset-0 overflow-hidden">
-              {/* Decorative orbs */}
-              <div className="absolute top-1/4 left-1/3 w-72 h-72 rounded-full bg-white/5 blur-3xl" />
-              <div className="absolute bottom-1/4 right-1/3 w-56 h-56 rounded-full bg-white/5 blur-3xl" />
-            </div>
-            <div className="relative z-10 text-center max-w-md">
-              <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-md border border-white/10">
-                <Mail className="h-12 w-12 text-white" />
-              </div>
-              <h2 className="text-2xl font-bold mb-3 tracking-tight text-white">Enterprise Cloud Webmail</h2>
-              <p className="text-sm text-slate-400 leading-relaxed mb-6">
-                Encrypted SMTP delivery, AI-powered drafts, threat detection, smart filters, and zero-config DNS routing.
-              </p>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                {[
-                  'AI Email Drafting', 'Threat Detection', 'DKIM/DMARC/SPF', 'Forwarding Rules',
-                  'Custom Aliases', 'Calendar Sync', 'Smart Filters', 'Canned Responses',
-                ].map((f) => (
-                  <div key={f} className="flex items-center gap-2 bg-white/5 border border-white/5 rounded-xl px-3 py-2.5 text-slate-300">
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
-                    {f}
-                  </div>
-                ))}
-              </div>
-            </div>
+            </form>
           </div>
         </div>
       )}
-
-      {/* ─── Screen 2: Loading ───────────────────────────────────────────── */}
-      {activeScreen === 'loading' && (
-        <div className="flex-1 flex flex-col items-center justify-center bg-[#0f0f13] text-white p-6 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xl shadow-xl shadow-md mb-6 animate-pulse">
-            STX
-          </div>
-          <h2 className="text-2xl font-bold mb-2 tracking-tight">STX Webmail</h2>
-          <p className="text-xs text-slate-400 mb-8">{loadingStatus}</p>
-          <div className="w-64 h-1.5 bg-white/5 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-violet-600 to-indigo-500 transition-all duration-300 rounded-full"
-              style={{ width: `${loadingProgress}%` }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* ─── Screen: No Mailboxes Provisioned ────────────────────────────── */}
-      {activeScreen === 'no_mailboxes' && (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-lg mx-auto">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white mb-6 shadow-xl shadow-md">
-            <Mail className="h-8 w-8" />
-          </div>
-          <h2 className="text-2xl font-bold tracking-tight text-white mb-2">No Mailboxes Provisioned Yet</h2>
-          <p className="text-sm text-slate-400 mb-6 leading-relaxed">
-            You don't have any business email mailboxes created yet. Provision your custom domain mailboxes (e.g. info@yourdomain.com) or configure DNS to begin sending and receiving emails.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 w-full">
-            <a
-              href="/email"
-              className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-neutral-800 to-black hover:from-violet-500 hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-md transition-all text-center"
-            >
-              Provision Mailbox &amp; DNS
-            </a>
-            <a
-              href="/webmail/manage"
-              className="flex-1 py-3 px-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-semibold text-sm transition-all text-center"
-            >
-              Domain Management Hub
-            </a>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Screen 3: Main Workspace ────────────────────────────────────── */}
-      {activeScreen === 'mail' && (
-        <WebmailLayout
-          mailboxes={mailboxes}
-          selectedMailboxId={selectedMailboxId}
-          onSelectMailbox={(id) => setSelectedMailboxId(id)}
-          activeFolder={activeFolder}
-          onSelectFolder={(folder) => {
-            setActiveFolder(folder);
-            setSelectedMessage(null);
-            setSelectedThread(null);
-            setThreadMessages([]);
-          }}
-          activeCategory={activeCategory}
-          onSelectCategory={(cat) => setActiveCategory(cat)}
-          activeTag={activeTag}
-          onSelectTag={(tag) => setActiveTag(tag)}
-          searchQuery={searchQuery}
-          onSearchChange={(q) => setSearchQuery(q)}
-          isThreaded={isThreaded}
-          onToggleThreaded={() => setIsThreaded((v) => !v)}
-          listDensity={listDensity}
-          onChangeDensity={(d) => setListDensity(d)}
-          onOpenCompose={() => {
-            setComposeTo('');
-            setComposeSubject('');
-            setComposeBody('');
-            setComposeReplyMsgId(undefined);
-            setComposeReplyThreadId(undefined);
-            setComposeOpen(true);
-          }}
-          onOpenFoldersModal={() => setFoldersModalOpen(true)}
-          onOpenRulesModal={() => setRulesModalOpen(true)}
-          onOpenSettingsModal={() => setSettingsModalOpen(true)}
-          onOpenShortcuts={() => setShortcutsModalOpen(true)}
-          onOpenDelegation={() => setDelegationModalOpen(true)}
-          onOpenCredentials={() => setCredentialsModalOpen(true)}
-          onOpenScheduled={() => setScheduledModalOpen(true)}
-          onOpenAnalytics={() => setMainTab('analytics')}
-          onOpenMailMerge={() => setMailMergeModalOpen(true)}
-          onOpenSecurityDrawer={() => setSecurityDrawerOpen(true)}
-          onOpenAuditLogs={() => setAuditLogsModalOpen(true)}
-          onOpenSessions={() => setSessionsModalOpen(true)}
-          activeMainTab={mainTab}
-          onChangeMainTab={(t) => setMainTab(t)}
-          userRole={userRole}
-        >
-          {/* ── Mail tab ─────────────────────────────────────────────────── */}
-          {mainTab === 'mail' && (
-            <div className="flex h-full w-full overflow-hidden">
-              {/* Thread/Message List */}
-              <div className="w-[360px] shrink-0 h-full border-r border-white/5">
-                <WebmailThreadList
-                  isThreaded={isThreaded}
-                  messages={messages}
-                  threads={threads}
-                  selectedMessageId={selectedMessage?.id || null}
-                  selectedThreadId={selectedThread?.threadId || null}
-                  onSelectMessage={(msg) => {
-                    setSelectedMessage(msg);
-                    setSelectedThread(null);
-                    setThreadMessages([msg]);
-                    // Mark as read
-                    if (!msg.isRead) {
-                      api.webmail.updateMessage(msg.id, { isRead: true }).catch(() => {});
-                    }
-                  }}
-                  onSelectThread={(t) => {
-                    setSelectedThread(t);
-                    setSelectedMessage(t.latestMessage || null);
-                    setThreadMessages(t.messages || (t.latestMessage ? [t.latestMessage] : []));
-                  }}
-                  onToggleStar={handleToggleStar}
-                  onDeleteMessage={handleDeleteMessage}
-                  onBulkAction={handleBulkAction}
-                  activeFolder={activeFolder}
-                  listDensity={listDensity}
-                  onOpenCompose={() => setComposeOpen(true)}
-                />
-              </div>
-
-              {/* Message/Thread Reader pane */}
-              <div className="flex-1 h-full overflow-hidden">
-                <WebmailThreadViewer
-                  messages={viewerMessages}
-                  selectedMessage={selectedMessage}
-                  onReply={handleReplyLegacy}
-                  onForward={handleForwardLegacy}
-                  onDelete={handleDeleteMessage}
-                  onStar={handleToggleStar}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* ── Calendar tab ─────────────────────────────────────────────── */}
-          {mainTab === 'calendar' && <WebmailCalendarTab />}
-
-          {/* ── Contacts tab ─────────────────────────────────────────────── */}
-          {mainTab === 'contacts' && (
-            <WebmailContactsTab
-              onComposeTo={(email) => {
-                setComposeTo(email);
-                setMainTab('mail');
-                setComposeOpen(true);
-              }}
-            />
-          )}
-
-          {/* ── Analytics tab ───────────────────────────────────────────── */}
-          {mainTab === 'analytics' && <WebmailAnalyticsView />}
-
-          {/* ── Admin/Dev tab ─────────────────────────────────────────────── */}
-          {mainTab === 'admin' && (
-            <WebmailAdminPanel />
-          )}
-        </WebmailLayout>
-      )}
-
-      {/* ─── Rich Email Composer ──────────────────────────────────────────── */}
-      <WebmailRichComposer
-        isOpen={composeOpen}
-        onClose={() => setComposeOpen(false)}
-        onSent={() => {
-          setComposeOpen(false);
-          toast('Email dispatched successfully!', 'success');
-          void fetchMailData();
-        }}
-        defaultTo={composeTo}
-        defaultSubject={composeSubject}
-        defaultBody={composeBody}
-        defaultSmtpAccountId={selectedMailboxId}
-        replyToMessageId={composeReplyMsgId}
-        replyToThreadId={composeReplyThreadId}
-      />
-
-      {/* ─── Onboarding Wizard ───────────────────────────────────────────── */}
-      <WebmailOnboardingWizard
-        isOpen={onboardingOpen}
-        smtpAccountId={selectedMailboxId}
-        onComplete={() => setOnboardingOpen(false)}
-      />
-
-      {/* ─── Settings Modal ──────────────────────────────────────────────── */}
-      <WebmailSettingsModal
-        isOpen={settingsModalOpen}
-        onClose={() => setSettingsModalOpen(false)}
-      />
-
-      {/* ─── Folders & Labels Modal ──────────────────────────────────────── */}
-      <WebmailFoldersAndLabelsModal
-        isOpen={foldersModalOpen}
-        onClose={() => setFoldersModalOpen(false)}
-      />
-
-      {/* ─── Automation Rules Modal ──────────────────────────────────────── */}
-      <WebmailRulesModal
-        isOpen={rulesModalOpen}
-        onClose={() => setRulesModalOpen(false)}
-      />
-
-      {/* ─── Enterprise Feature Modals ────────────────────────────────────── */}
-      <WebmailKeyboardShortcutsModal
-        isOpen={shortcutsModalOpen}
-        onClose={() => setShortcutsModalOpen(false)}
-      />
-
-      <WebmailDelegationModal
-        isOpen={delegationModalOpen}
-        onClose={() => setDelegationModalOpen(false)}
-      />
-
-      <WebmailCredentialsModal
-        isOpen={credentialsModalOpen}
-        onClose={() => setCredentialsModalOpen(false)}
-      />
-
-      <WebmailScheduledModal
-        isOpen={scheduledModalOpen}
-        onClose={() => setScheduledModalOpen(false)}
-      />
-
-      <WebmailMailMergeModal
-        isOpen={mailMergeModalOpen}
-        onClose={() => setMailMergeModalOpen(false)}
-      />
-
-      <WebmailSecurityDrawer
-        isOpen={securityDrawerOpen}
-        onClose={() => setSecurityDrawerOpen(false)}
-      />
-
-      <WebmailAuditLogModal
-        isOpen={auditLogsModalOpen}
-        onClose={() => setAuditLogsModalOpen(false)}
-      />
-
-      <WebmailActiveSessionsModal
-        isOpen={sessionsModalOpen}
-        onClose={() => setSessionsModalOpen(false)}
-      />
     </div>
   );
 }

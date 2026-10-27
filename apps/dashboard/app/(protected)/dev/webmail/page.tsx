@@ -117,8 +117,10 @@ export default function DevWebmailControlCenterPage() {
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [smtpResult, setSmtpResult] = useState<any>(null);
 
-  // Password Reveal State
+  // Password Reveal & SSO State
   const [revealedPasswords, setRevealedPasswords] = useState<Record<string, string>>({});
+  const [launchingSsoId, setLaunchingSsoId] = useState<string | null>(null);
+  const [copiedPasswordId, setCopiedPasswordId] = useState<string | null>(null);
 
   // Mail Provisioning Modal State
   const [showProvisionModal, setShowProvisionModal] = useState(false);
@@ -251,6 +253,22 @@ export default function DevWebmailControlCenterPage() {
       }
     } catch (err: any) {
       toast(err.message || 'Failed to decrypt credentials', 'error');
+    }
+  }
+
+  async function handleLaunchSso(id: string) {
+    setLaunchingSsoId(id);
+    try {
+      const res = await api.smtp.getSsoTicket(id);
+      if (res.webmailUrl) {
+        window.open(res.webmailUrl, '_blank');
+      } else {
+        window.open('http://localhost:3002', '_blank');
+      }
+    } catch (err: any) {
+      toast(err.message || 'Failed to generate SSO ticket', 'error');
+    } finally {
+      setLaunchingSsoId(null);
     }
   }
 
@@ -760,6 +778,25 @@ export default function DevWebmailControlCenterPage() {
                               </span>
                             )}
                           </div>
+                          {revealedPasswords[mb.id] && (
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              <span className="font-mono text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                                {revealedPasswords[mb.id]}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(revealedPasswords[mb.id]);
+                                  setCopiedPasswordId(mb.id);
+                                  setTimeout(() => setCopiedPasswordId(null), 2000);
+                                }}
+                                className="text-[10px] text-slate-400 hover:text-white underline font-mono"
+                                title="Copy Password"
+                              >
+                                {copiedPasswordId === mb.id ? 'Copied!' : 'Copy'}
+                              </button>
+                            </div>
+                          )}
                         </td>
                         <td className="p-3.5">
                           <span className="block text-slate-200">{mb.userEmail}</span>
@@ -795,14 +832,20 @@ export default function DevWebmailControlCenterPage() {
                           >
                             <Key className="w-3.5 h-3.5 text-amber-400" />
                           </Button>
-                          <a
-                            href={mb.webmailUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs bg-sky-600/20 text-sky-300 hover:bg-sky-600/30 px-2.5 py-1 rounded-lg border border-sky-500/30 font-semibold"
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleLaunchSso(mb.id)}
+                            disabled={launchingSsoId === mb.id}
+                            title="Launch Standalone Webmail SSO"
                           >
-                            <ExternalLink className="w-3 h-3" /> SSO
-                          </a>
+                            {launchingSsoId === mb.id ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
+                            )}
+                            <span className="ml-1 text-xs">SSO</span>
+                          </Button>
                           <Button
                             size="sm"
                             variant="danger"

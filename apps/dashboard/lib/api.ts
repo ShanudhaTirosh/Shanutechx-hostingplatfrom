@@ -334,6 +334,22 @@ export const api = {
       ),
     updateQuota: (id: string, storageQuotaMb: number) =>
       apiFetch(`/api/email/mailboxes/${id}/quota`, { method: 'PATCH', body: JSON.stringify({ storageQuotaMb }) }).then((r) => asJson<any>(r)),
+    changePassword: (id: string, password: string) =>
+      apiFetch(`/api/email/mailboxes/${id}/password`, {
+        method: 'PATCH',
+        body: JSON.stringify({ password }),
+      }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
+    addAlias: (id: string, aliasPrefix: string) =>
+      apiFetch(`/api/email/mailboxes/${id}/aliases`, {
+        method: 'POST',
+        body: JSON.stringify({ aliasPrefix }),
+      }).then((r) => asJson<{ ok: boolean; aliases: string[] }>(r)),
+    removeAlias: (id: string, prefix: string) =>
+      apiFetch(`/api/email/mailboxes/${id}/aliases/${encodeURIComponent(prefix)}`, {
+        method: 'DELETE',
+      }).then((r) => asJson<{ ok: boolean; aliases: string[] }>(r)),
+    dnsRecords: (domain?: string) =>
+      apiFetch(`/api/email/dns-records${domain ? `?domain=${encodeURIComponent(domain)}` : ''}`).then((r) => asJson<any>(r)),
     sendTransactional: (data: any) =>
       apiFetch('/api/v1/emails', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<any>(r)),
     renew: (id: string) =>
@@ -430,6 +446,11 @@ export const api = {
   },
 
   webmail: {
+    getSsoTicket: (accountId: string) =>
+      apiFetch('/api/webmail/auth/sso-ticket', {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+      }).then((r) => asJson<{ ssoToken: string; webmailUrl: string }>(r)),
     // Messages & Threads
     listMessages: (folder = 'inbox', search = '', smtpAccountId?: string) => {
       const params = new URLSearchParams({ folder });
@@ -585,8 +606,10 @@ export const api = {
       apiFetch('/api/webmail/account/delegation', { method: 'POST', body: JSON.stringify(data) }).then((r) => asJson<{ ok: boolean; delegation: any }>(r)),
     revokeAccountDelegate: (id: string) =>
       apiFetch(`/api/webmail/account/delegation/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
-    getCredentials: () =>
-      apiFetch('/api/webmail/account/credentials').then((r) => asJson<{ credentials: any }>(r)),
+    getCredentials: (id?: string) =>
+      id
+        ? apiFetch(`/api/email/mailboxes/${id}/credentials`).then((r) => asJson<{ credentials?: any; [k: string]: any }>(r))
+        : apiFetch('/api/webmail/account/credentials').then((r) => asJson<{ credentials: any }>(r)),
 
     // Security & Audit
     reportThreat: (data: { messageId: string; threatType?: string; comment?: string }) =>
@@ -1235,7 +1258,7 @@ export const api = {
         }>(r)
       ),
     getSsoTicket: (smtpAccountId?: string) =>
-      apiFetch('/api/webmail/auth/sso-ticket', { method: 'POST', body: JSON.stringify({ smtpAccountId }) }).then((r) =>
+      apiFetch('/api/webmail/auth/sso-ticket', { method: 'POST', body: JSON.stringify({ accountId: smtpAccountId, smtpAccountId }) }).then((r) =>
         asJson<{ ssoToken: string; webmailUrl: string }>(r)
       ),
   },
