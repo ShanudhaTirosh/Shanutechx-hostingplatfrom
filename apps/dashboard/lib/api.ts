@@ -32,6 +32,9 @@ import {
   ManagedDatabase,
   ManagedDatabaseUser,
   SupabaseClientProject,
+  NixpacksConfig,
+  WebHostingDeployInput,
+  BotHostingDeployInput,
 } from './types';
 
 import { getSettingsUnlockToken } from './settingsUnlockToken';
@@ -978,6 +981,11 @@ export const api = {
         frameworkPreset?: string;
         publishedPort?: number;
         teamId?: string | null;
+        nodeId?: string;
+        orderItemId?: string;
+        builder?: string;
+        rootDir?: string;
+        nixpacksConfig?: NixpacksConfig;
         envVars?: Record<string, string>;
       },
       onEvent?: (event: BuildEvent) => void
@@ -1004,6 +1012,116 @@ export const api = {
         }
       }
     },
+
+    deployWebHosting: async (
+      data: WebHostingDeployInput,
+      onEvent?: (event: BuildEvent) => void
+    ): Promise<{ deployment?: Deployment; orderItemId?: string }> => {
+      const res = await apiFetch('/api/deployments/web-hosting', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}: ${res.statusText}` }));
+        throw new Error(errData.error || errData.message || `HTTP ${res.status}`);
+      }
+      const contentType = res.headers.get('content-type');
+      if (contentType?.includes('application/x-ndjson') && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffered = '';
+        let lastEvent: any = null;
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffered += decoder.decode(value, { stream: true });
+          const lines = buffered.split('\n');
+          buffered = lines.pop() ?? '';
+          for (const line of lines) {
+            if (line.trim()) {
+              const parsed = JSON.parse(line);
+              lastEvent = parsed;
+              if (onEvent) onEvent(parsed);
+            }
+          }
+        }
+        return { deployment: lastEvent?.deployment };
+      }
+      return res.json();
+    },
+
+    deployBotHosting: (data: BotHostingDeployInput) =>
+      apiFetch('/api/deployments/bot-hosting', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) => asJson<{ deployment: Deployment; message: string; port: number }>(r)),
+
+    deployFromRepo: async (
+      data: {
+        repoUrl: string;
+        preferredName: string;
+        branch?: string;
+        builder?: 'AUTO' | 'RAILWAYPACK' | 'NIXPACKS' | 'DOCKERFILE';
+        rootDir?: string;
+        startCommand?: string;
+        entryFile?: string;
+        internalPort?: number;
+        exposureMode?: string;
+        envVars?: Record<string, string>;
+        nixpacksConfig?: NixpacksConfig;
+        teamId?: string | null;
+        nodeId?: string;
+        orderItemId?: string;
+      },
+      onEvent?: (event: BuildEvent) => void
+    ): Promise<void> => {
+      return api.deployments.create(
+        {
+          serviceType: 'repo',
+          repoUrl: data.repoUrl,
+          preferredName: data.preferredName,
+          branch: data.branch,
+          internalPort: data.internalPort || 3000,
+          startCommand: data.startCommand,
+          entryFile: data.entryFile,
+          exposureMode: data.exposureMode,
+          envVars: data.envVars,
+          builder: data.builder,
+          rootDir: data.rootDir,
+          nixpacksConfig: data.nixpacksConfig,
+          teamId: data.teamId,
+          nodeId: data.nodeId,
+          orderItemId: data.orderItemId,
+        },
+        onEvent
+      );
+    },
+
+    getNixpacksConfig: (id: string) =>
+      apiFetch(`/api/deployments/${id}/nixpacks`).then((r) =>
+        asJson<{
+          deploymentId: string;
+          builder: string;
+          rootDir: string | null;
+          nixpacksConfig: NixpacksConfig;
+          effectiveToml: string;
+        }>(r)
+      ),
+
+    updateNixpacksConfig: (id: string, config: NixpacksConfig) =>
+      apiFetch(`/api/deployments/${id}/nixpacks`, {
+        method: 'PUT',
+        body: JSON.stringify(config),
+      }).then((r) =>
+        asJson<{
+          deploymentId: string;
+          builder: string;
+          nixpacksConfig: NixpacksConfig;
+          effectiveToml: string;
+        }>(r)
+      ),
+
     updateGitSettings: (id: string, data: { gitToken?: string; autoDeploy?: boolean }) =>
       apiFetch(`/api/deployments/${id}/git-settings`, {
         method: 'PATCH',
@@ -1932,9 +2050,10 @@ export const api = {
       ),
     deploy: (body: {
       slug: string;
-      nodeId: string;
+      nodeId?: string;
       envVars?: Record<string, string>;
       projectName?: string;
+      preferredName?: string;
       teamId?: string | null;
       orderItemId?: string;
       exposureMode?: string;
@@ -1943,6 +2062,7 @@ export const api = {
       configFileName?: string;
       cpuLimit?: string;
       memoryLimit?: string;
+      builder?: string;
     }) =>
       apiFetch('/api/catalog/deploy', { method: 'POST', body: JSON.stringify(body) }).then((r) =>
         asJson<{ deployment: Deployment; agent: Record<string, unknown>; generatedSecrets?: Record<string, string>; configFiles?: string[] }>(r)

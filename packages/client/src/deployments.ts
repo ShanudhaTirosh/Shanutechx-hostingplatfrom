@@ -4,6 +4,12 @@ import type {
   DeploymentStatus,
   ResourceUsage,
   WebhookInfo,
+  WebHostingDeployInput,
+  BotHostingDeployInput,
+  BotDeploymentResponse,
+  RepoDeployInput,
+  NixpacksConfig,
+  NixpacksConfigResponse,
 } from '@shanutechx/types';
 import { BaseClient } from './base.js';
 
@@ -123,4 +129,91 @@ export class DeploymentsResource extends BaseClient {
   async updateSubdomain(id: string, subdomain: string): Promise<{ ok: boolean; subdomain: string; url: string }> {
     return this.httpPatch<{ ok: boolean; subdomain: string; url: string }>(`/api/deployments/${id}/subdomain`, { subdomain });
   }
+
+  /**
+   * Deploy web hosting application (PHP, HTML, Node.js, Next.js, Vite, Python)
+   * with automatic subdomain provisioning and SSL certificate.
+   */
+  async deployWebHosting(input: WebHostingDeployInput): Promise<Deployment> {
+    const res = await this.httpPost<{ ok: boolean; deployment?: Deployment; error?: any }>(
+      '/api/deployments/web-hosting',
+      input,
+    );
+    return res.deployment ?? (res as unknown as Deployment);
+  }
+
+  /** Alias for deployWebHosting */
+  async deployWeb(input: WebHostingDeployInput): Promise<Deployment> {
+    return this.deployWebHosting(input);
+  }
+
+  /**
+   * Guided bot hosting deployment supporting continuous 24/7 runners for
+   * Discord (Python/Node.js), WhatsApp (Baileys QR), and Lavalink audio nodes.
+   */
+  async deployBotHosting(input: BotHostingDeployInput): Promise<BotDeploymentResponse> {
+    return this.httpPost<BotDeploymentResponse>('/api/deployments/bot-hosting', input);
+  }
+
+  /** Alias for deployBotHosting */
+  async deployBot(input: BotHostingDeployInput): Promise<BotDeploymentResponse> {
+    return this.deployBotHosting(input);
+  }
+
+  /**
+   * Deploy application from Git repository (Public/Private GitHub/GitLab/Custom)
+   * using Nixpacks, Railwaypacks (Railpack), or Dockerfile engine.
+   */
+  async deployRepo(input: RepoDeployInput): Promise<Deployment> {
+    const payload = {
+      serviceType: input.serviceType ?? 'web_hosting',
+      repoUrl: input.repoUrl,
+      preferredName: input.preferredName,
+      branch: input.branch ?? 'main',
+      customSubdomain: input.customSubdomain,
+      internalPort: input.internalPort ?? 3000,
+      envVars: input.envVars,
+      builder: input.builder ?? input.nixpacksConfig?.builder ?? 'AUTO',
+      rootDir: input.rootDir ?? input.nixpacksConfig?.rootDir ?? null,
+      watchPaths: input.watchPaths ?? input.nixpacksConfig?.watchPaths ?? [],
+      nixpacksConfig: input.nixpacksConfig,
+      gitProvider: input.gitProvider,
+      gitAccountId: input.gitAccountId,
+      gitToken: input.gitToken,
+      startCommand: input.startCommand,
+      entryFile: input.entryFile,
+      frameworkPreset: input.frameworkPreset ?? 'auto',
+      exposureMode: input.exposureMode ?? 'ssl_with_proxy',
+      publishedPort: input.publishedPort,
+      cpuLimit: input.cpuLimit,
+      memoryLimit: input.memoryLimit,
+      storageLimit: input.storageLimit,
+      orderItemId: input.orderItemId,
+      isPendingConfig: input.isPendingConfig,
+    };
+
+    const res = await this.httpPost<{ ok: boolean; deployment?: Deployment } | Deployment>(
+      '/api/deployments',
+      payload,
+    );
+    if ('deployment' in res && res.deployment) {
+      return res.deployment;
+    }
+    return res as Deployment;
+  }
+
+  /**
+   * Retrieve Nixpacks and Monorepo build configuration for a deployment.
+   */
+  async getNixpacksConfig(id: string): Promise<NixpacksConfigResponse> {
+    return this.httpGet<NixpacksConfigResponse>(`/api/deployments/${id}/nixpacks`);
+  }
+
+  /**
+   * Update Nixpacks / Railwaypack phases, packages, and build settings for a deployment.
+   */
+  async updateNixpacksConfig(id: string, config: NixpacksConfig): Promise<NixpacksConfigResponse> {
+    return this.httpPut<NixpacksConfigResponse>(`/api/deployments/${id}/nixpacks`, config);
+  }
 }
+

@@ -148,6 +148,62 @@ export interface Deployment {
   gitCommitMessage?: string | null;
   autoDeploy?: boolean;
   hasGitToken?: boolean;
+  builder?: string | null;
+  rootDir?: string | null;
+  watchPaths?: string[] | null;
+  nixpacksConfig?: any;
+  webHostingType?: string | null;
+}
+
+export interface NixpacksConfig {
+  providers?: string[];
+  buildImage?: string;
+  variables?: Record<string, string>;
+  phases?: Record<string, {
+    dependsOn?: string[];
+    nixPkgs?: string[];
+    aptPkgs?: string[];
+    cmds?: string[];
+    onlyIncludeFiles?: string[];
+  }>;
+  start?: {
+    cmd?: string;
+    runImage?: string;
+    onlyIncludeFiles?: string[];
+  };
+  staticEnv?: Record<string, string>;
+}
+
+export interface WebHostingDeployInput {
+  repoUrl: string;
+  branch?: string;
+  preferredName: string;
+  customSubdomain?: string;
+  webHostingType?: 'static' | 'nodejs' | 'nextjs' | 'vite' | 'php' | 'auto';
+  frameworkPreset?: string;
+  builder?: 'AUTO' | 'RAILWAYPACK' | 'NIXPACKS' | 'DOCKERFILE';
+  nodeId?: string;
+  orderItemId?: string;
+  customDomain?: string;
+  envVars?: Record<string, string>;
+  rootDir?: string;
+  nixpacksConfig?: NixpacksConfig;
+}
+
+export interface BotHostingDeployInput {
+  name: string;
+  repoUrl: string;
+  branch?: string;
+  language: 'python' | 'nodejs' | 'whatsapp' | 'java';
+  botType?: 'discord_python' | 'discord_node' | 'whatsapp_baileys' | 'lavalink' | 'custom_bot';
+  startCommand?: string;
+  entryFile?: string;
+  builder?: 'AUTO' | 'RAILWAYPACK' | 'NIXPACKS' | 'DOCKERFILE';
+  envVars?: Record<string, string>;
+  nodeId?: string;
+  orderItemId?: string;
+  rootDir?: string;
+  nixpacksConfig?: NixpacksConfig;
 }
 
 export interface Node {

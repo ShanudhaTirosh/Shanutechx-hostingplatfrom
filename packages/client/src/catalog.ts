@@ -17,8 +17,46 @@ export class CatalogResource extends BaseClient {
       slug: (input as any).slug ?? input.templateSlug,
       nodeId: input.nodeId,
       envVars: input.envVars,
-      projectName: input.subdomain,
+      projectName: input.projectName ?? input.subdomain ?? input.preferredName,
+      subdomain: input.subdomain,
+      preferredName: input.preferredName ?? input.projectName,
+      cpuLimit: input.cpuLimit,
+      memoryLimit: input.memoryLimit,
+      storageLimit: input.storageLimit,
+      exposureMode: input.exposureMode,
+      orderItemId: input.orderItemId,
+      builder: input.builder,
     };
-    return this.httpPost<Deployment>('/api/catalog/deploy', payload);
+    const res = await this.httpPost<{ ok: boolean; deployment?: Deployment } | Deployment>(
+      '/api/catalog/deploy',
+      payload,
+    );
+    if ('deployment' in res && res.deployment) {
+      return res.deployment;
+    }
+    return res as Deployment;
+  }
+
+  async listCategories(): Promise<string[]> {
+    const templates = await this.list();
+    return Array.from(new Set(templates.map((t) => t.category).filter(Boolean)));
+  }
+
+  async getByCategory(category: string): Promise<CatalogTemplate[]> {
+    const templates = await this.list();
+    return templates.filter((t) => t.category.toLowerCase() === category.toLowerCase());
+  }
+
+  async search(query: string): Promise<CatalogTemplate[]> {
+    const q = query.toLowerCase().trim();
+    if (!q) return this.list();
+    const templates = await this.list();
+    return templates.filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) ||
+        t.slug.toLowerCase().includes(q) ||
+        t.description?.toLowerCase().includes(q) ||
+        t.tags?.some((tag) => tag.toLowerCase().includes(q))
+    );
   }
 }

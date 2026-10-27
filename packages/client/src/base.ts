@@ -2,7 +2,9 @@ import { ApiError, AuthError, NetworkError, type ApiErrorResponse } from '@shanu
 
 export interface ShanuTechXClientConfig {
   /** Base URL of the ShanuTechX API, e.g. https://api.shanutechx.com */
-  apiUrl: string;
+  apiUrl?: string;
+  /** Alias for apiUrl */
+  baseUrl?: string;
   /** Bearer token. Can also be set later via setToken() */
   token?: string;
   /** Request timeout in milliseconds (default: 30000) */
@@ -18,7 +20,8 @@ export class BaseClient {
   protected _fetch: typeof fetch;
 
   constructor(config: ShanuTechXClientConfig) {
-    this.apiUrl = config.apiUrl.replace(/\/$/, '');
+    const rawUrl = config.apiUrl || config.baseUrl || 'https://api.shanutechx.com';
+    this.apiUrl = rawUrl.replace(/\/$/, '');
     this.token = config.token;
     this.timeout = config.timeout ?? 30_000;
     this._fetch = config.fetch ?? globalThis.fetch;

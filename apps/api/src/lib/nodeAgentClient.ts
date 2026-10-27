@@ -56,6 +56,9 @@ export interface BuildAndRunParams {
   frameworkPreset?: string;
   exposureMode?: string;  // ssl_with_proxy | ssl_direct | no_ssl
   publishedPort?: number;
+  builder?: string;       // NIXPACKS | RAILWAYPACK | DOCKERFILE | AUTO
+  rootDir?: string | null;
+  nixpacksConfig?: any;
 }
 
 export interface BuildEvent {

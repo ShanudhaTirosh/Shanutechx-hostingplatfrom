@@ -39,10 +39,23 @@ export interface CatalogTemplate {
 export interface CatalogDeployInput {
   templateSlug?: string;
   slug?: string;
-  nodeId: string;
-  envVars: Record<string, string>;
+  nodeId?: string;
+  envVars?: Record<string, string>;
   subdomain?: string;
   projectName?: string;
-  cpuLimit?: string;
-  memoryLimit?: string;
+  preferredName?: string;
+  cpuLimit?: string | number;
+  memoryLimit?: string | number;
+  storageLimit?: string | number;
+  exposureMode?: string;
+  orderItemId?: string;
+  builder?: string;
+}
+
+export interface CatalogDeployResponse {
+  ok: boolean;
+  deploymentId: string;
+  subdomain: string;
+  serviceName: string;
+  status: string;
 }

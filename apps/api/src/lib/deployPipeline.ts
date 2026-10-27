@@ -46,6 +46,11 @@ interface DeployParams {
   frameworkPreset?: string;
   exposureMode?: string;
   publishedPort?: number;
+  builder?: string;
+  rootDir?: string | null;
+  watchPaths?: string[];
+  nixpacksConfig?: any;
+  webHostingType?: string;
   /** Connected Git account the credential is minted from at build time (see lib/gitAuth.ts). */
   gitAccountId?: string;
   gitProvider?: string;
@@ -89,6 +94,11 @@ export async function deployService(params: DeployParams) {
     frameworkPreset,
     exposureMode,
     publishedPort,
+    builder,
+    rootDir,
+    watchPaths,
+    nixpacksConfig,
+    webHostingType,
     onEvent,
   } = params;
 
@@ -146,6 +156,8 @@ export async function deployService(params: DeployParams) {
     finalOrderItemId = slot.orderItemId;
   }
 
+  const effectiveNixpacksConfig = nixpacksConfig ?? (builder ? { builder, rootDir: rootDir || null } : undefined);
+
   const deployment = await prisma.deployment.create({
     data: {
       userId,
@@ -173,6 +185,10 @@ export async function deployService(params: DeployParams) {
       frameworkPreset: frameworkPreset ?? 'auto',
       exposureMode: exposureMode ?? 'ssl_with_proxy',
       publishedPort: publishedPort ?? null,
+      rootDir: rootDir ?? null,
+      watchPaths: watchPaths ?? [],
+      nixpacksConfig: effectiveNixpacksConfig as any,
+      webHostingType: webHostingType ?? serviceType,
     },
   });
 
@@ -199,6 +215,9 @@ export async function deployService(params: DeployParams) {
         frameworkPreset,
         exposureMode,
         publishedPort,
+        builder: builder ?? (effectiveNixpacksConfig as any)?.builder,
+        rootDir: rootDir ?? (effectiveNixpacksConfig as any)?.rootDir,
+        nixpacksConfig: effectiveNixpacksConfig,
       },
       (event) => onEvent?.(event)
     );

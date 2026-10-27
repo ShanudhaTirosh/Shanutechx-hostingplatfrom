@@ -496,6 +496,9 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
     entryFile,
     frameworkPreset,
     publishedPort,
+    builder,
+    rootDir,
+    nixpacksConfig,
   } = req.body || {};
 
   if (!repoUrl || !internalPort) {
@@ -507,9 +510,18 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
   const emit = (event) => res.write(JSON.stringify(event) + '\n');
 
   try {
-    logger.info({ deploymentId, repoUrl, startCommand, exposureMode }, 'Starting build');
+    logger.info({ deploymentId, repoUrl, startCommand, exposureMode, builder, rootDir }, 'Starting build');
     emit({ phase: 'fetch', message: 'Fetching repository...' });
-    const workspaceDir = await prepareWorkspace(deploymentId, repoUrl, branch || 'main', backupRepoUrl);
+    const baseWorkspaceDir = await prepareWorkspace(deploymentId, repoUrl, branch || 'main', backupRepoUrl);
+
+    let workspaceDir = baseWorkspaceDir;
+    if (rootDir && typeof rootDir === 'string') {
+      const sanitizedRootDir = path.normalize(rootDir).replace(/^(\.\.(\/|\\|$))+/, '');
+      const candidateDir = path.resolve(baseWorkspaceDir, sanitizedRootDir);
+      if (candidateDir.startsWith(path.resolve(baseWorkspaceDir))) {
+        workspaceDir = candidateDir;
+      }
+    }
 
     emit({ phase: 'build', message: 'Building container image...' });
     const imageTag = `shanutechx/${deploymentId}:latest`;
@@ -520,6 +532,8 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
       startCommand,
       entryFile,
       frameworkPreset,
+      builder,
+      nixpacksConfig,
       onData: (chunk) => emit({ phase: 'build', log: chunk.toString() }),
     });
 

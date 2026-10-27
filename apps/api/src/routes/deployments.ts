@@ -84,6 +84,8 @@ const createDeploymentSchema = z.object({
   status: z.enum(['pending', 'pending_configuration']).optional(),
   rootDir: z.string().max(255).optional().nullable(),
   watchPaths: z.array(z.string()).optional().default([]),
+  builder: z.enum(['NIXPACKS', 'RAILWAYPACK', 'DOCKERFILE', 'AUTO']).optional(),
+  nixpacksConfig: z.any().optional(),
 }).refine((data) => data.templateId || data.isPendingConfig || (data.repoUrl && data.internalPort), {
   message: 'Either templateId, isPendingConfig, or both repoUrl and internalPort are required',
 });
@@ -254,6 +256,9 @@ deploymentsRouter.post('/deployments', deploymentCreateLimiter, async (req: Auth
         memoryLimit: data.memoryLimit || null,
         storageLimit: data.storageLimit || null,
         envVarsEncrypted: envVarsEncrypted || null,
+        rootDir: data.rootDir || null,
+        watchPaths: data.watchPaths,
+        nixpacksConfig: (data.nixpacksConfig || (data.builder ? { builder: data.builder, rootDir: data.rootDir || null, watchPaths: data.watchPaths } : undefined)) as any,
         webHostingType: data.serviceType,
       },
     });
@@ -294,6 +299,10 @@ deploymentsRouter.post('/deployments', deploymentCreateLimiter, async (req: Auth
       frameworkPreset: data.frameworkPreset,
       exposureMode: data.exposureMode,
       publishedPort: data.publishedPort,
+      builder: data.builder,
+      rootDir: data.rootDir,
+      watchPaths: data.watchPaths,
+      nixpacksConfig: data.nixpacksConfig,
       gitAccountId,
       gitProvider,
       gitTokenEncrypted,
@@ -1576,27 +1585,52 @@ deploymentsRouter.patch('/deployments/:id/git-settings', async (req: AuthedReque
   });
 });
 
-const botHostingSchema = z.object({
-  language: z.enum(['python', 'nodejs']),
-  preferredName: z.string().min(1),
-  orderItemId: z.string().optional(),
-  repoUrl: z.string().url().optional(),
-  branch: z.string().optional().default('main'),
-  entryFile: z.string().optional(),
-  startCommand: z.string().optional(),
-  envVars: z.record(z.string()).optional(),
-  isPendingConfig: z.boolean().optional(),
-});
+const botHostingSchema = z
+  .object({
+    language: z.enum(['python', 'nodejs', 'whatsapp', 'java']).optional(),
+    botType: z
+      .enum(['discord_python', 'discord_node', 'whatsapp_baileys', 'lavalink', 'custom_bot'])
+      .optional(),
+    preferredName: z.string().min(1),
+    orderItemId: z.string().optional(),
+    repoUrl: z.string().url().optional(),
+    branch: z.string().optional().default('main'),
+    entryFile: z.string().optional(),
+    startCommand: z.string().optional(),
+    envVars: z.record(z.string()).optional(),
+    isPendingConfig: z.boolean().optional(),
+    exposureMode: z.enum(['no_ssl', 'ssl_with_proxy', 'ssl_direct', 'raw_tcp']).optional(),
+    publishedPort: z.number().int().min(1).max(65535).optional(),
+    internalPort: z.number().int().positive().optional(),
+  })
+  .refine((data) => data.language || data.botType, {
+    message: 'Either language or botType must be provided',
+  });
 
 /**
  * POST /api/deployments/bot-hosting
- * Guided bot hosting endpoint with first-class language selector (Python vs Node.js).
+ * Guided bot hosting endpoint supporting Discord bots (Python vs Node.js),
+ * WhatsApp automation bots (Baileys), and Lavalink audio nodes.
  */
 deploymentsRouter.post('/deployments/bot-hosting', async (req: AuthedRequest, res) => {
   const parsed = botHostingSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const { language, preferredName, repoUrl, branch, entryFile, startCommand, envVars, isPendingConfig, orderItemId } = parsed.data;
+  const {
+    language,
+    botType,
+    preferredName,
+    repoUrl,
+    branch,
+    entryFile,
+    startCommand,
+    envVars,
+    isPendingConfig,
+    orderItemId,
+    exposureMode,
+    publishedPort,
+    internalPort,
+  } = parsed.data;
 
   const callerIsAdminOrDev = req.user!.role === 'admin' || req.user!.role === 'dev';
   let claimedOrderItemId: string | null = null;
@@ -1610,10 +1644,42 @@ deploymentsRouter.post('/deployments/bot-hosting', async (req: AuthedRequest, re
     return res.status(slotErr.statusCode || 403).json({ error: slotErr.message });
   }
 
-  const serviceType = language === 'python' ? 'discordbot_python' : 'discordbot_node';
-  const frameworkPreset = language === 'python' ? 'python_bot' : 'nodejs_bot';
-  const defaultEntry = entryFile || (language === 'python' ? 'bot.py' : 'index.js');
-  const defaultStart = startCommand || (language === 'python' ? `python ${defaultEntry}` : `node ${defaultEntry}`);
+  const resolvedType =
+    botType ||
+    (language === 'python'
+      ? 'discord_python'
+      : language === 'whatsapp'
+      ? 'whatsapp_baileys'
+      : language === 'java'
+      ? 'lavalink'
+      : 'discord_node');
+
+  let serviceType = 'discordbot_node';
+  let frameworkPreset = 'nodejs_bot';
+  let defaultEntry = entryFile || 'index.js';
+  let defaultStart = startCommand || `node ${defaultEntry}`;
+  let defaultInternalPort = internalPort || 3000;
+  let defaultExposure = exposureMode || 'no_ssl';
+  let defaultPublishedPort = publishedPort ?? null;
+
+  if (resolvedType === 'discord_python' || language === 'python') {
+    serviceType = 'discordbot_python';
+    frameworkPreset = 'python_bot';
+    defaultEntry = entryFile || 'bot.py';
+    defaultStart = startCommand || `python ${defaultEntry}`;
+  } else if (resolvedType === 'whatsapp_baileys' || language === 'whatsapp') {
+    serviceType = 'whatsapp_baileys';
+    frameworkPreset = 'whatsapp_baileys';
+    defaultEntry = entryFile || 'index.js';
+    defaultStart = startCommand || `node ${defaultEntry}`;
+  } else if (resolvedType === 'lavalink' || language === 'java') {
+    serviceType = 'lavalink';
+    frameworkPreset = 'lavalink_java';
+    defaultEntry = entryFile || 'application.yml';
+    defaultStart = startCommand || 'java -jar Lavalink.jar';
+    defaultInternalPort = internalPort || 2333;
+    defaultPublishedPort = publishedPort || 2333;
+  }
 
   let node;
   try {
@@ -1639,12 +1705,13 @@ deploymentsRouter.post('/deployments/bot-hosting', async (req: AuthedRequest, re
       githubTokenEncrypted: repoUrl ? sanitizeRepoUrlForStorage(repoUrl, (t) => encryptSecret(t, env.secretsEncryptionKey)).githubTokenEncrypted ?? null : null,
       branch,
       subdomain: null, // Bots do not consume public subdomains
-      internalPort: 3000,
+      internalPort: defaultInternalPort,
+      publishedPort: defaultPublishedPort,
       status: isPendingConfig ? 'pending_configuration' : 'pending',
       startCommand: defaultStart,
       entryFile: defaultEntry,
       frameworkPreset,
-      exposureMode: 'no_ssl',
+      exposureMode: defaultExposure,
       envVarsEncrypted: envVarsEncrypted || null,
       webHostingType: serviceType,
     },
@@ -1653,10 +1720,179 @@ deploymentsRouter.post('/deployments/bot-hosting', async (req: AuthedRequest, re
   res.status(201).json({
     ok: true,
     botDeployment: { ...dep, repoUrl: redactRepoUrl(dep.repoUrl) },
-    language,
+    language: language || resolvedType,
+    botType: resolvedType,
     entryFile: defaultEntry,
     startCommand: defaultStart,
   });
+});
+
+const webHostingSchema = z.object({
+  preferredName: z.string().min(1),
+  repoUrl: z.string().url(),
+  branch: z.string().regex(/^[a-zA-Z0-9_\-\/\.]+$/).max(100).optional().default('main'),
+  customSubdomain: z.string().min(2).max(63).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
+  internalPort: z.number().int().positive().optional().default(3000),
+  frameworkPreset: z.enum(['auto', 'nextjs', 'react_vite', 'static_html', 'custom']).optional().default('auto'),
+  builder: z.enum(['NIXPACKS', 'RAILWAYPACK', 'DOCKERFILE', 'AUTO']).optional().default('AUTO'),
+  rootDir: z.string().max(255).optional().nullable(),
+  watchPaths: z.array(z.string()).optional().default([]),
+  nixpacksConfig: z.any().optional(),
+  envVars: z.record(z.string()).optional(),
+  orderItemId: z.string().optional(),
+  isPendingConfig: z.boolean().optional(),
+  startCommand: z.string().max(500).optional(),
+  entryFile: z.string().max(255).optional(),
+  customDomain: z.string().optional(),
+});
+
+/**
+ * POST /api/deployments/web-hosting
+ * Dedicated web hosting deployment endpoint supporting automatic slot claim,
+ * subdomain reservation, Nixpacks / Railwaypack configuration, and SSL provisioning.
+ */
+deploymentsRouter.post('/deployments/web-hosting', async (req: AuthedRequest, res) => {
+  const parsed = webHostingSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const data = parsed.data;
+  const callerIsAdminOrDev = req.user!.role === 'admin' || req.user!.role === 'dev';
+
+  let claimedOrderItemId: string | null = null;
+  try {
+    const slot = await claimDeploymentSlot(req.user!.id, {
+      preferredOrderItemId: data.orderItemId,
+      isAdminOrDev: callerIsAdminOrDev,
+    });
+    claimedOrderItemId = slot.orderItemId;
+  } catch (slotErr: any) {
+    return res.status(slotErr.statusCode || 403).json({ error: slotErr.message });
+  }
+
+  let node;
+  try {
+    node = await selectNodeForDeployment({
+      requiredTag: 'web-hosting',
+      isAdminDeployment: false,
+    });
+  } catch {
+    try {
+      node = await selectNodeForDeployment({
+        requiredTag: 'node-hosting',
+        isAdminDeployment: false,
+      });
+    } catch (err: any) {
+      return res.status(409).json({ error: err.message || 'No available compute node for web hosting deployment' });
+    }
+  }
+
+  const subPrefix = data.preferredName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 20);
+  const subUnique = (await import('crypto')).randomBytes(3).toString('hex');
+  const subdomain = data.customSubdomain || `${subPrefix}-${subUnique}`;
+
+  let envVarsEncrypted: string | undefined;
+  if (data.envVars) {
+    envVarsEncrypted = encryptSecret(JSON.stringify(data.envVars), env.secretsEncryptionKey);
+  }
+
+  const effectiveNixpacksConfig = data.nixpacksConfig || (data.builder ? { builder: data.builder, rootDir: data.rootDir || null, watchPaths: data.watchPaths } : undefined);
+
+  if (data.isPendingConfig) {
+    const dep = await prisma.deployment.create({
+      data: {
+        userId: req.user!.id,
+        orderItemId: claimedOrderItemId,
+        nodeId: node.id,
+        repoUrl: sanitizeRepoUrlForStorage(data.repoUrl, (t) => encryptSecret(t, env.secretsEncryptionKey)).repoUrl,
+        githubTokenEncrypted: sanitizeRepoUrlForStorage(data.repoUrl, (t) => encryptSecret(t, env.secretsEncryptionKey)).githubTokenEncrypted ?? null,
+        branch: data.branch,
+        subdomain,
+        internalPort: data.internalPort,
+        status: 'pending_configuration',
+        startCommand: data.startCommand || null,
+        entryFile: data.entryFile || null,
+        frameworkPreset: data.frameworkPreset,
+        exposureMode: 'ssl_with_proxy',
+        envVarsEncrypted: envVarsEncrypted || null,
+        rootDir: data.rootDir || null,
+        watchPaths: data.watchPaths,
+        nixpacksConfig: effectiveNixpacksConfig as any,
+        webHostingType: 'web_hosting',
+      },
+    });
+
+    return res.status(201).json({
+      ok: true,
+      deployment: { ...dep, repoUrl: redactRepoUrl(dep.repoUrl) },
+      subdomain,
+      url: `https://${subdomain}.${env.rootDomain}`,
+    });
+  }
+
+  // If streaming is requested
+  if (req.headers.accept?.includes('application/x-ndjson')) {
+    res.setHeader('Content-Type', 'application/x-ndjson');
+    try {
+      const { deployment } = await deployService({
+        userId: req.user!.id,
+        orderItemId: claimedOrderItemId,
+        serviceType: 'web_hosting',
+        repoUrl: data.repoUrl,
+        branch: data.branch,
+        preferredName: data.preferredName,
+        customSubdomain: subdomain,
+        internalPort: data.internalPort,
+        envVars: data.envVars,
+        frameworkPreset: data.frameworkPreset,
+        builder: data.builder,
+        rootDir: data.rootDir,
+        watchPaths: data.watchPaths,
+        nixpacksConfig: effectiveNixpacksConfig,
+        startCommand: data.startCommand,
+        entryFile: data.entryFile,
+        exposureMode: 'ssl_with_proxy',
+        onEvent: (event) => res.write(JSON.stringify(event) + '\n'),
+      });
+
+      res.write(JSON.stringify({ phase: 'complete', deploymentId: deployment.id, subdomain }) + '\n');
+      return res.end();
+    } catch (err: any) {
+      res.write(JSON.stringify({ phase: 'error', message: err.message || 'Web hosting deployment failed' }) + '\n');
+      return res.end();
+    }
+  }
+
+  // Standard JSON response
+  try {
+    const { deployment } = await deployService({
+      userId: req.user!.id,
+      orderItemId: claimedOrderItemId,
+      serviceType: 'web_hosting',
+      repoUrl: data.repoUrl,
+      branch: data.branch,
+      preferredName: data.preferredName,
+      customSubdomain: subdomain,
+      internalPort: data.internalPort,
+      envVars: data.envVars,
+      frameworkPreset: data.frameworkPreset,
+      builder: data.builder,
+      rootDir: data.rootDir,
+      watchPaths: data.watchPaths,
+      nixpacksConfig: effectiveNixpacksConfig,
+      startCommand: data.startCommand,
+      entryFile: data.entryFile,
+      exposureMode: 'ssl_with_proxy',
+    });
+
+    return res.status(201).json({
+      ok: true,
+      deployment: { ...deployment, repoUrl: redactRepoUrl(deployment.repoUrl) },
+      subdomain,
+      url: `https://${subdomain}.${env.rootDomain}`,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Web hosting deployment failed' });
+  }
 });
 
 // ─── CAS (CONTENT-ADDRESSED STORAGE) FILE DEDUPLICATION API ───────────────

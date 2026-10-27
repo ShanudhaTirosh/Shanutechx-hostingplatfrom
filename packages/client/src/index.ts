@@ -154,6 +154,25 @@ export { DatabasesResource } from './databases.js';
 export { GitResource } from './git.js';
 export { MonitoringResource } from './monitoring.js';
 export { BaseClient } from './base.js';
+export { ShanuTechXClient as ShanutechxClient };
 export type { FileItem, FileListResponse } from './filesystem.js';
 export type { ListDeploymentsParams, DeploymentListResponse, EnvVarsResponse } from './deployments.js';
 export type { Monitor, MonitorCreateInput } from './monitoring.js';
+export type {
+  WebHostingDeployInput,
+  BotHostingDeployInput,
+  BotDeploymentResponse,
+  BotHostingLanguage,
+  BotHostingType,
+  RepoDeployInput,
+  NixpacksBuilder,
+  NixpacksConfig,
+  NixpacksPhases,
+  NixpacksConfigResponse,
+  CatalogDeployInput,
+  CatalogDeployResponse,
+  CatalogTemplate,
+  Deployment,
+  DeploymentCreateInput,
+  DeploymentStatus,
+} from '@shanutechx/types';
