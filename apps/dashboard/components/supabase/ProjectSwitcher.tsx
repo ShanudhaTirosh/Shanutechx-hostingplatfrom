@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Play, Square, RotateCcw, RefreshCw, Trash2, Plus, ExternalLink, AlertCircle, Loader2 } from 'lucide-react';
 import { supabaseAdmin, ClientSupabaseProject } from '@/lib/supabaseAdmin';
 import { ProjectConfigModal } from './ProjectConfigModal';
@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui';
 
 interface ProjectSwitcherProps {
   activeProject: ClientSupabaseProject | null;
-  onSelectProject: (proj: ClientSupabaseProject) => void;
+  onSelectProject: (proj: ClientSupabaseProject | null) => void;
 }
 
 type LifecycleAction = 'start' | 'stop' | 'restart' | 'retry' | 'delete';
@@ -34,7 +34,8 @@ function StatusBadge({ status }: { status: string }) {
 export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitcherProps) {
   const [projects, setProjects] = useState<ClientSupabaseProject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null); // projectId of in-progress action
+  // Track which specific "projectId:action" is in-flight, not just the project ID
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<ClientSupabaseProject | null>(null);
@@ -46,38 +47,62 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
 
   const { toast } = useToast();
 
-  const loadProjects = useCallback(() => {
-    supabaseAdmin.projects
+  // Use refs to avoid stale closures in the poll interval without re-creating the effect
+  const activeProjectRef = useRef(activeProject);
+  const onSelectProjectRef = useRef(onSelectProject);
+  activeProjectRef.current = activeProject;
+  onSelectProjectRef.current = onSelectProject;
+
+  // Stable fetch — does not depend on activeProject/onSelectProject directly to avoid
+  // infinite re-creation cycles. Uses refs instead.
+  const fetchProjects = () => {
+    return supabaseAdmin.projects
       .list()
       .then((res) => {
         setProjects(res.projects);
-        if (res.projects.length > 0 && !activeProject) {
-          onSelectProject(res.projects[0]);
-        } else if (activeProject) {
-          // Refresh the active project data in case status changed
-          const updated = res.projects.find((p) => p.id === activeProject.id);
-          if (updated) onSelectProject(updated);
+        const currentActive = activeProjectRef.current;
+        if (!currentActive && res.projects.length > 0) {
+          onSelectProjectRef.current(res.projects[0]);
+        } else if (currentActive) {
+          // Refresh the active project record so status/ports are up-to-date
+          const refreshed = res.projects.find((p) => p.id === currentActive.id);
+          if (refreshed) onSelectProjectRef.current(refreshed);
         }
-      })
-      .catch((err) => toast(err.message, 'error'))
-      .finally(() => setLoading(false));
-  }, [activeProject, onSelectProject, toast]);
+      });
+  };
 
+  // Single mount effect — loads data once, then polls every 8 s only while PROVISIONING
   useEffect(() => {
-    loadProjects();
-    // Poll every 8 seconds if any project is PROVISIONING
-    const interval = setInterval(() => {
-      if (projects.some((p) => p.status === 'PROVISIONING')) {
-        loadProjects();
-      }
-    }, 8000);
-    return () => clearInterval(interval);
-  }, [projects.some((p) => p.status === 'PROVISIONING')]); // eslint-disable-line react-hooks/exhaustive-deps
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-  // Initial load only
-  useEffect(() => {
-    loadProjects();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const load = () => {
+      fetchProjects()
+        .catch((err) => toast(err.message, 'error'))
+        .finally(() => setLoading(false));
+    };
+
+    load();
+
+    // Start/stop poll based on whether any project is PROVISIONING
+    const setupPoll = () => {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(() => {
+        setProjects((current) => {
+          if (current.some((p) => p.status === 'PROVISIONING')) {
+            fetchProjects().catch(() => {});
+          }
+          return current; // don't change state here; fetchProjects calls setProjects internally
+        });
+      }, 8000);
+    };
+
+    setupPoll();
+
+    return () => {
+      if (pollTimer) clearInterval(pollTimer);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCreateProject = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,7 +128,9 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
       return;
     }
 
-    setActionLoading(`${project.id}:${action}`);
+    // Key format: "projectId::action" — double colon prevents prefix collision
+    const key = `${project.id}::${action}`;
+    setActionLoading(key);
     try {
       let updated: ClientSupabaseProject;
       if (action === 'start') {
@@ -137,14 +164,18 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
     if (!confirmDelete) return;
     const target = confirmDelete;
     setConfirmDelete(null);
-    setActionLoading(`${target.id}:delete`);
+    const key = `${target.id}::delete`;
+    setActionLoading(key);
     try {
       await supabaseAdmin.projects.delete(target.id);
-      const remaining = projects.filter((p) => p.id !== target.id);
-      setProjects(remaining);
-      if (activeProject?.id === target.id) {
-        onSelectProject(remaining[0] || null as any);
-      }
+      setProjects((prev) => {
+        const remaining = prev.filter((p) => p.id !== target.id);
+        if (activeProject?.id === target.id) {
+          // Select the first remaining project, or null if empty
+          onSelectProjectRef.current(remaining[0] ?? null);
+        }
+        return remaining;
+      });
       toast(`Project "${target.name}" deleted`, 'success');
     } catch (err: any) {
       toast(err.message || 'Delete failed', 'error');
@@ -153,7 +184,12 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
     }
   };
 
-  const isActing = (id: string) => actionLoading?.startsWith(id) ?? false;
+  // Exact key-match — no prefix collision possible with double-colon separator
+  const isActing = (id: string, action?: LifecycleAction) => {
+    if (!actionLoading) return false;
+    if (action) return actionLoading === `${id}::${action}`;
+    return actionLoading.startsWith(`${id}::`);
+  };
 
   return (
     <>
@@ -195,7 +231,7 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
           </div>
 
           <div className="flex items-center gap-1.5">
-            {/* Open Studio URL */}
+            {/* Open Studio URL — only when ACTIVE and we have a real URL */}
             {activeProject?.studioUrl && activeProject.status === 'ACTIVE' && (
               <a
                 href={activeProject.studioUrl}
@@ -218,7 +254,9 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
                     title="Start project"
                     className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all disabled:opacity-50"
                   >
-                    {isActing(activeProject.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                    {isActing(activeProject.id, 'start')
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Play className="w-3.5 h-3.5" />}
                   </button>
                 )}
                 {activeProject.status === 'ACTIVE' && (
@@ -229,7 +267,9 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
                       title="Restart project"
                       className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 transition-all disabled:opacity-50"
                     >
-                      {isActing(activeProject.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                      {isActing(activeProject.id, 'restart')
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <RotateCcw className="w-3.5 h-3.5" />}
                     </button>
                     <button
                       onClick={() => handleLifecycleAction(activeProject, 'stop')}
@@ -237,7 +277,9 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
                       title="Stop project"
                       className="p-1.5 rounded-lg bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 border border-slate-500/20 transition-all disabled:opacity-50"
                     >
-                      {isActing(activeProject.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Square className="w-3.5 h-3.5" />}
+                      {isActing(activeProject.id, 'stop')
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <Square className="w-3.5 h-3.5" />}
                     </button>
                   </>
                 )}
@@ -248,11 +290,13 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
                     title="Retry provisioning"
                     className="p-1.5 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 border border-violet-500/20 transition-all disabled:opacity-50"
                   >
-                    {isActing(activeProject.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    {isActing(activeProject.id, 'retry')
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <RefreshCw className="w-3.5 h-3.5" />}
                   </button>
                 )}
 
-                {/* Config modal */}
+                {/* Config / keys modal */}
                 <button
                   onClick={() => setShowConfigModal(true)}
                   className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 text-xs font-semibold transition-all flex items-center gap-1.5"
@@ -271,7 +315,9 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
                   title="Delete project"
                   className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-all disabled:opacity-50"
                 >
-                  {isActing(activeProject.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  {isActing(activeProject.id, 'delete')
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Trash2 className="w-3.5 h-3.5" />}
                 </button>
               </>
             )}
@@ -295,7 +341,7 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
           </div>
         )}
 
-        {/* Compact project info strip when ACTIVE */}
+        {/* Compact info strip when ACTIVE */}
         {activeProject && activeProject.status === 'ACTIVE' && (
           <div className="px-3 py-2 bg-black/20 border-t border-white/[0.03] flex items-center gap-4 overflow-x-auto">
             <span className="text-[10px] text-text-faint font-mono whitespace-nowrap">
@@ -399,7 +445,7 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in p-4">
           <div className="glass rounded-2xl p-6 border border-red-500/30 max-w-sm w-full space-y-4">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center shrink-0">
                 <Trash2 className="w-5 h-5 text-red-400" />
               </div>
               <div>

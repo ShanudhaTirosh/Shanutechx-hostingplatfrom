@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { PageHeader, Card, Button, Badge, useToast } from '@/components/ui';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { supabaseAdmin, getCentralStudioUrl } from '@/lib/supabaseAdmin';
+import { useSupabaseProject } from '@/lib/SupabaseProjectContext';
+import { ProjectSwitcher } from '@/components/supabase/ProjectSwitcher';
+import { ExternalLink } from 'lucide-react';
 
 interface RealtimeEvent {
   id: string;
@@ -14,6 +17,7 @@ interface RealtimeEvent {
 }
 
 export default function SupabaseRealtimePage() {
+  const { activeProject, setActiveProject } = useSupabaseProject();
   const [connected, setConnected] = useState(true);
   const [activeChannel, setActiveChannel] = useState('db-changes:public:*');
   const [events, setEvents] = useState<RealtimeEvent[]>([
@@ -78,16 +82,32 @@ export default function SupabaseRealtimePage() {
         title="Supabase Realtime & WebSockets Studio"
         description="Listen to PostgreSQL CDC database change broadcasts, Presence, and WebSockets channels in real time."
         action={
-          <Button size="sm" variant={connected ? 'secondary' : 'primary'} onClick={() => setConnected(!connected)}>
-            <span className="flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071a9.9 9.9 0 0114.142 0M2.828 9.9a14.85 14.85 0 0121.214 0" />
-              </svg>
-              {connected ? 'Pause Listener' : 'Reconnect WebSockets'}
-            </span>
-          </Button>
+          <div className="flex items-center gap-2">
+            {activeProject && (
+              <a
+                href={getCentralStudioUrl(activeProject, '/realtime/inspector')}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-all shadow-sm"
+                title="Open Realtime Inspector in official Supabase Studio"
+              >
+                <span>Studio Realtime</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+            <Button size="sm" variant={connected ? 'secondary' : 'primary'} onClick={() => setConnected(!connected)}>
+              <span className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071a9.9 9.9 0 0114.142 0M2.828 9.9a14.85 14.85 0 0121.214 0" />
+                </svg>
+                {connected ? 'Pause Listener' : 'Reconnect WebSockets'}
+              </span>
+            </Button>
+          </div>
         }
       />
+
+      <ProjectSwitcher activeProject={activeProject} onSelectProject={setActiveProject} />
 
       {/* WebSockets Connection Banner */}
       <div className={`p-4 border rounded-2xl flex items-center justify-between gap-4 flex-wrap ${

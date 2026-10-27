@@ -2,30 +2,37 @@
 
 import React, { useEffect, useState } from 'react';
 import { PageHeader, Card, Spinner, ErrorBanner, Button, useToast } from '@/components/ui';
-import { supabaseAdmin, SupabaseStorageBucket } from '@/lib/supabaseAdmin';
+import { supabaseAdmin, SupabaseStorageBucket, getCentralStudioUrl } from '@/lib/supabaseAdmin';
 import { BucketFileBrowser } from '@/components/supabase/BucketFileBrowser';
+import { useSupabaseProject } from '@/lib/SupabaseProjectContext';
+import { ProjectSwitcher } from '@/components/supabase/ProjectSwitcher';
+import { ExternalLink } from 'lucide-react';
 
 export default function SupabaseStoragePage() {
+  const { activeProject, setActiveProject } = useSupabaseProject();
   const [buckets, setBuckets] = useState<SupabaseStorageBucket[]>([]);
   const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-
   // New Bucket Form
   const [newBucketName, setNewBucketName] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [creating, setCreating] = useState(false);
 
-  const loadBuckets = () => {
+  const loadBuckets = (targetId?: string) => {
+    const projId = targetId || activeProject?.id;
     setLoading(true);
     supabaseAdmin.storage
-      .buckets()
+      .buckets(projId)
       .then((res) => {
-        setBuckets(res.buckets);
-        if (res.buckets.length > 0 && !selectedBucket) {
-          setSelectedBucket(res.buckets[0].name);
+        setBuckets(res.buckets || []);
+        if (res.buckets && res.buckets.length > 0) {
+          const chosen = selectedBucket && res.buckets.some((b) => b.name === selectedBucket) ? selectedBucket : res.buckets[0].name;
+          setSelectedBucket(chosen);
+        } else {
+          setSelectedBucket(null);
         }
       })
       .catch((err) => setError(err.message))
@@ -33,33 +40,49 @@ export default function SupabaseStoragePage() {
   };
 
   useEffect(() => {
-    loadBuckets();
-  }, []);
+    loadBuckets(activeProject?.id);
+  }, [activeProject?.id]);
 
   const handleCreateBucket = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBucketName) return;
     setCreating(true);
     supabaseAdmin.storage
-      .createBucket({ id: newBucketName.toLowerCase().replace(/\s+/g, '-'), name: newBucketName, isPublic })
+      .createBucket(
+        { id: newBucketName.toLowerCase().replace(/\s+/g, '-'), name: newBucketName, isPublic },
+        activeProject?.id
+      )
       .then(() => {
         toast(`Storage bucket "${newBucketName}" created!`, 'success');
         setNewBucketName('');
-        loadBuckets();
+        loadBuckets(activeProject?.id);
       })
       .catch((err) => toast(err.message || 'Failed to create bucket', 'error'))
       .finally(() => setCreating(false));
   };
-
-
-  if (loading) return <Spinner label="Loading Storage API..." />;
 
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Storage Buckets &amp; Files"
         description="Public/Private object storage buckets, file explorer, public URLs, and S3 protocol access."
+        action={
+          activeProject ? (
+            <a
+              href={getCentralStudioUrl(activeProject, '/storage/buckets')}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-all shadow-sm"
+              title="Open Storage in official Supabase Studio"
+            >
+              <span>Studio Storage</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          ) : undefined
+        }
       />
+
+      <ProjectSwitcher activeProject={activeProject} onSelectProject={setActiveProject} />
 
       {error && <ErrorBanner message={error} />}
 

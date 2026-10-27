@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { supabaseAdmin, getCentralStudioUrl } from '@/lib/supabaseAdmin';
 import { PageHeader, Card, Spinner, ErrorBanner, Button, Badge, useToast, ConfirmDialog } from '@/components/ui';
-
+import { useSupabaseProject } from '@/lib/SupabaseProjectContext';
+import { ProjectSwitcher } from '@/components/supabase/ProjectSwitcher';
+import { ExternalLink } from 'lucide-react';
 
 interface AuthUser {
   id: string;
@@ -17,6 +19,7 @@ interface AuthUser {
 }
 
 export default function SupabaseAuthPage() {
+  const { activeProject, setActiveProject } = useSupabaseProject();
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,10 +34,11 @@ export default function SupabaseAuthPage() {
   const [deleteTarget, setDeleteTarget] = useState<AuthUser | null>(null);
   const { toast } = useToast();
 
-  async function loadUsers() {
+  async function loadUsers(targetId?: string) {
+    const projId = targetId || activeProject?.id;
     setLoading(true);
     try {
-      const data = await supabaseAdmin.auth.users();
+      const data = await supabaseAdmin.auth.users(projId);
       setUsers(
         (data.users || []).map((u: any) => ({
           id: u.id,
@@ -55,20 +59,20 @@ export default function SupabaseAuthPage() {
   }
 
   useEffect(() => {
-    loadUsers();
-  }, []);
+    loadUsers(activeProject?.id);
+  }, [activeProject?.id]);
 
   async function handleCreateUser(e: React.FormEvent) {
     e.preventDefault();
     setCreating(true);
     try {
-      await supabaseAdmin.auth.createUser({ email, password, user_metadata: { role } });
+      await supabaseAdmin.auth.createUser({ email, password, user_metadata: { role } }, activeProject?.id);
       toast(`Created auth user for ${email} with role "${role}"`, 'success');
 
       setShowAddUserModal(false);
       setEmail('');
       setPassword('');
-      loadUsers();
+      loadUsers(activeProject?.id);
     } catch (err: any) {
       toast(err.message || 'Failed to create user', 'error');
     } finally {
@@ -79,7 +83,7 @@ export default function SupabaseAuthPage() {
 
   async function handleSendResetPassword(user: AuthUser) {
     try {
-      const res = await supabaseAdmin.auth.sendResetPassword(user.id, user.email);
+      const res = await supabaseAdmin.auth.sendResetPassword(user.id, user.email, activeProject?.id);
       toast(res.message || `Password reset link dispatched to ${user.email}`, 'info');
     } catch (err: any) {
       toast(err.message || 'Failed to send reset link', 'error');
@@ -89,7 +93,7 @@ export default function SupabaseAuthPage() {
   async function handleToggleBan(user: AuthUser) {
     try {
       const nextBannedState = !user.banned;
-      await supabaseAdmin.auth.updateUser(user.id, { banned: nextBannedState });
+      await supabaseAdmin.auth.updateUser(user.id, { banned: nextBannedState }, activeProject?.id);
       toast(nextBannedState ? `Banned user ${user.email}` : `Unbanned user ${user.email}`, 'info');
       setUsers((prev) =>
         prev.map((u) => (u.id === user.id ? { ...u, banned: nextBannedState } : u))
@@ -104,8 +108,26 @@ export default function SupabaseAuthPage() {
       <PageHeader
         title="Supabase Auth & Identity Studio"
         description="Manage user authentication, OAuth providers, JWT tokens, RBAC roles, and user sessions."
-        action={<Button onClick={() => setShowAddUserModal(true)}>+ Add User</Button>}
+        action={
+          <div className="flex items-center gap-2">
+            {activeProject && (
+              <a
+                href={getCentralStudioUrl(activeProject, '/auth/users')}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-all shadow-sm"
+                title="Open Auth Users in official Supabase Studio"
+              >
+                <span>Studio Auth</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+            <Button onClick={() => setShowAddUserModal(true)}>+ Add User</Button>
+          </div>
+        }
       />
+
+      <ProjectSwitcher activeProject={activeProject} onSelectProject={setActiveProject} />
 
       {error && <ErrorBanner message={error} />}
 

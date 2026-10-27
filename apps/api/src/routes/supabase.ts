@@ -68,7 +68,9 @@ function serializeProject(p: any, liveStats?: { cpuPct: number; ramMb: number; d
   const isLocalHost = !p.nodeIp || p.nodeIp === '127.0.0.1' || p.nodeIp === 'localhost';
 
   // Secure HTTPS URLs routed through Cloudflare SSL proxy / Traefik
-  const studioUrl = isLocalHost ? `http://localhost:${studioPort}` : `https://${studioSubdomain}`;
+  // Unified Cloud-style Studio URL — points to the central Studio instance with the project ref
+  const centralStudioBase = isLocalHost ? `http://localhost:${studioPort}` : `https://studio.${rootDomain}`;
+  const studioUrl = `${centralStudioBase}/project/${p.id}`;
   const apiUrl = isLocalHost ? `http://localhost:${apiPort}` : `https://${hostSubdomain}`;
   const metaUrl = isLocalHost ? `http://localhost:${metaPort}` : `http://${hostSubdomain}:${metaPort}`;
   const dbUrl = `postgresql://postgres:postgres@${isLocalHost ? '127.0.0.1' : `supabase-${cleanSlug}-db.${rootDomain}`}:${dbPort}/${p.dbName || 'postgres'}`;
@@ -361,7 +363,7 @@ async function selectOptimalNode(preferredNodeId?: string): Promise<{ node: any 
   return { node: nodesWithLoad[0].node, isOptimalAuto: true };
 }
 
-function buildKongConfigYaml(anonKey: string, serviceKey: string): string {
+export function buildKongConfigYaml(anonKey: string, serviceKey: string): string {
   return `_format_version: "2.1"
 _transform: true
 
@@ -394,10 +396,17 @@ services:
         strip_path: true
         paths:
           - /realtime/v1/
+  - name: meta-v1
+    url: http://supabase-meta:8080
+    routes:
+      - name: meta-v1-all
+        strip_path: true
+        paths:
+          - /pg/
 `;
 }
 
-function buildSupabaseComposeYaml(params: {
+export function buildSupabaseComposeYaml(params: {
   cleanSlug: string;
   projectName: string;
   dbPassword: string;
@@ -409,6 +418,7 @@ function buildSupabaseComposeYaml(params: {
   apiUrl?: string;
   anonKey: string;
   serviceKey: string;
+  enableLegacyStudio?: boolean;
 }): string {
   const jwtSecret = params.jwtSecret || 'super-secret-jwt-token-with-at-least-32-characters-long';
   const apiPort = params.apiPort || 8001;
@@ -542,7 +552,8 @@ services:
       - supabase-rest
       - supabase-storage
       - supabase-realtime
-
+      - supabase-meta
+${params.enableLegacyStudio ? `
   supabase-studio:
     image: supabase/studio:20241202-7634f10
     container_name: supa-${params.cleanSlug}-studio
@@ -570,6 +581,8 @@ services:
         limits:
           cpus: '1.0'
           memory: 512M
+` : `  # Note: Per-project studio container omitted in favor of Central Platform Studio
+`}
 `;
 }
 
@@ -1281,6 +1294,7 @@ supabaseRouter.delete('/supabase/projects/:id', requireAuth, requireDev, async (
 supabaseRouter.patch('/supabase/projects/:id/config', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   const {
+    name,
     dbPassword,
     jwtSecret,
     studioPort,
@@ -1296,6 +1310,7 @@ supabaseRouter.patch('/supabase/projects/:id/config', requireAuth, requireDev, a
   if (!existing) return res.status(404).json({ error: 'Project not found' });
 
   const dataToUpdate: any = {};
+  if (name && typeof name === 'string' && name.trim()) dataToUpdate.name = name.trim();
   if (dbPassword) dataToUpdate.dbPasswordEnc = encryptSecret(dbPassword, env.secretsEncryptionKey);
   if (jwtSecret) dataToUpdate.jwtSecretEnc = encryptSecret(jwtSecret, env.secretsEncryptionKey);
   if (studioPort) dataToUpdate.studioPort = Number(studioPort);

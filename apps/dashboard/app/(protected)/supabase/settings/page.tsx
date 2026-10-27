@@ -2,11 +2,15 @@
 
 import React, { useEffect, useState } from 'react';
 import { PageHeader, Card, Button, Spinner, ErrorBanner, useToast } from '@/components/ui';
-import { supabaseAdmin, SupabaseSmtpConfig, ClientSupabaseProject } from '@/lib/supabaseAdmin';
+import { supabaseAdmin, SupabaseSmtpConfig, ClientSupabaseProject, getCentralStudioUrl } from '@/lib/supabaseAdmin';
 import { useAuth } from '@/lib/useAuth';
+import { useSupabaseProject } from '@/lib/SupabaseProjectContext';
+import { ProjectSwitcher } from '@/components/supabase/ProjectSwitcher';
+import { ExternalLink } from 'lucide-react';
 
 export default function SupabaseSettingsPage() {
   const { user } = useAuth();
+  const { activeProject, setActiveProject, refreshProjects } = useSupabaseProject();
   const [activeTab, setActiveTab] = useState<
     | 'general'
     | 'infrastructure'
@@ -21,7 +25,7 @@ export default function SupabaseSettingsPage() {
     | 'usage'
   >('general');
 
-  const [project, setProject] = useState<ClientSupabaseProject | null>(null);
+  const [project, setProject] = useState<ClientSupabaseProject | null>(activeProject || null);
   const [config, setConfig] = useState<any>(null);
   const [smtp, setSmtp] = useState<SupabaseSmtpConfig>({
     host: 'mail.shanutechx.com',
@@ -35,23 +39,17 @@ export default function SupabaseSettingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [savingProject, setSavingProject] = useState(false);
-  const [projectName, setProjectName] = useState('');
+  const [projectName, setProjectName] = useState(activeProject?.name || '');
   const [error, setError] = useState<string | null>(null);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     Promise.allSettled([
-      supabaseAdmin.projects.list(),
       supabaseAdmin.config(),
       supabaseAdmin.smtp.getConfig(),
     ])
-      .then(([projRes, configRes, smtpRes]) => {
-        if (projRes.status === 'fulfilled' && projRes.value.projects.length > 0) {
-          const currentProj = projRes.value.projects[0];
-          setProject(currentProj);
-          setProjectName(currentProj.name);
-        }
+      .then(([configRes, smtpRes]) => {
         if (configRes.status === 'fulfilled') setConfig(configRes.value);
         if (smtpRes.status === 'fulfilled') setSmtp(smtpRes.value.smtpConfig);
       })
@@ -59,23 +57,36 @@ export default function SupabaseSettingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (activeProject) {
+      setProject(activeProject);
+      setProjectName(activeProject.name);
+    }
+  }, [activeProject]);
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast(`Copied ${label} to clipboard!`, 'success');
   };
 
-  const handleSaveProjectName = (e: React.FormEvent) => {
+  const handleSaveProjectName = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectName.trim() || !project) return;
     setSavingProject(true);
-    setTimeout(() => {
-      setProject({ ...project, name: projectName });
-      setSavingProject(false);
+    try {
+      const res = await supabaseAdmin.projects.updateConfig(project.id, { name: projectName });
+      setProject(res.project);
+      setActiveProject(res.project);
+      refreshProjects();
       toast(`Project name updated to "${projectName}"!`, 'success');
-    }, 400);
+    } catch (err: any) {
+      toast(err.message || 'Failed to update project name', 'error');
+    } finally {
+      setSavingProject(false);
+    }
   };
 
-  if (loading) return <Spinner label="Loading Project Settings..." />;
+  if (loading && !activeProject) return <Spinner label="Loading Project Settings..." />;
 
   const projectId = project?.id || 'wmlwaevdzojetkiqsvya';
   const region = project?.region || 'ap-southeast-1';
@@ -112,12 +123,26 @@ export default function SupabaseSettingsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-text-primary">Project Settings</h1>
-          <p className="text-xs text-text-muted mt-0.5">General configuration, domains, ownership, and lifecycle</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Project Settings"
+        description="General configuration, domains, ownership, and lifecycle"
+        action={
+          activeProject ? (
+            <a
+              href={getCentralStudioUrl(activeProject, '/settings/general')}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-all shadow-sm"
+              title="Open Settings in official Supabase Studio"
+            >
+              <span>Studio Settings</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          ) : undefined
+        }
+      />
+
+      <ProjectSwitcher activeProject={activeProject} onSelectProject={setActiveProject} />
 
       {error && <ErrorBanner message={error} />}
 

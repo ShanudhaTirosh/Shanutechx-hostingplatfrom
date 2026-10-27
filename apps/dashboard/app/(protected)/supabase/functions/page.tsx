@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { PageHeader, Card, Button, Spinner, useToast } from '@/components/ui';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
-
+import { supabaseAdmin, getCentralStudioUrl } from '@/lib/supabaseAdmin';
+import { useSupabaseProject } from '@/lib/SupabaseProjectContext';
+import { ProjectSwitcher } from '@/components/supabase/ProjectSwitcher';
+import { ExternalLink } from 'lucide-react';
 
 interface EdgeFunction {
   id: string;
@@ -57,6 +59,7 @@ serve(async (req) => {
 ];
 
 export default function SupabaseFunctionsPage() {
+  const { activeProject, setActiveProject } = useSupabaseProject();
   const [functions, setFunctions] = useState<EdgeFunction[]>(SEEDED_FUNCTIONS);
   const [selectedFunc, setSelectedFunc] = useState<EdgeFunction>(SEEDED_FUNCTIONS[0]);
   const [code, setCode] = useState(SEEDED_FUNCTIONS[0].code);
@@ -167,8 +170,26 @@ export default function SupabaseFunctionsPage() {
       <PageHeader
         title="Supabase Edge Functions (Deno / TypeScript)"
         description="Serverless TypeScript & Deno functions deployed globally at the edge with zero cold starts."
-        action={<Button onClick={() => setShowCreateModal(true)}>+ New Edge Function</Button>}
+        action={
+          <div className="flex items-center gap-2">
+            {activeProject && (
+              <a
+                href={getCentralStudioUrl(activeProject, '/functions')}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-all shadow-sm"
+                title="Open Edge Functions in official Supabase Studio"
+              >
+                <span>Studio Functions</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+            <Button onClick={() => setShowCreateModal(true)}>+ New Edge Function</Button>
+          </div>
+        }
       />
+
+      <ProjectSwitcher activeProject={activeProject} onSelectProject={setActiveProject} />
 
       <div className="grid md:grid-cols-4 gap-6">
         {/* Functions Selector Sidebar */}

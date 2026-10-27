@@ -134,6 +134,23 @@ export interface ProjectStats {
   dbSizeMb: number;
 }
 
+export function getCentralStudioUrl(project?: ClientSupabaseProject | null, subpath?: string): string {
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'shanutechx.com';
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const base = isLocal ? 'http://localhost:8000' : `https://studio.${rootDomain}`;
+
+  if (project?.studioUrl) {
+    const projectUrl = project.studioUrl;
+    if (!subpath) return projectUrl;
+    const cleanSubpath = subpath.startsWith('/') ? subpath : `/${subpath}`;
+    return `${projectUrl.replace(/\/+$/, '')}${cleanSubpath}`;
+  }
+
+  if (!project) return base;
+  const cleanSubpath = subpath ? (subpath.startsWith('/') ? subpath : `/${subpath}`) : '';
+  return `${base}/project/${project.id}${cleanSubpath}`;
+}
+
 export const supabaseAdmin = {
   health: () => apiFetch('/api/supabase/health').then((r) => asJson<SupabaseHealth>(r)),
 
@@ -182,6 +199,12 @@ export const supabaseAdmin = {
       apiFetch(`/api/supabase/projects/${id}/stats`).then((r) =>
         asJson<{ ok: boolean; stats: ProjectStats }>(r)
       ),
+
+    updateConfig: (id: string, config: Record<string, any>) =>
+      apiFetch(`/api/supabase/projects/${id}/config`, {
+        method: 'PATCH',
+        body: JSON.stringify(config),
+      }).then((r) => asJson<{ ok: boolean; project: ClientSupabaseProject }>(r)),
   },
 
   smtp: {
@@ -218,54 +241,80 @@ export const supabaseAdmin = {
   },
 
   auth: {
-    users: () =>
-      apiFetch('/api/supabase/auth/users').then((r) =>
+    users: (projectId?: string) => {
+      const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+      return apiFetch(`/api/supabase/auth/users${q}`).then((r) =>
         asJson<{ users: SupabaseAuthUser[]; total: number }>(r)
-      ),
-    createUser: (data: { email: string; password: string; user_metadata?: Record<string, any> }) =>
-      apiFetch('/api/supabase/auth/users', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+      );
+    },
+    createUser: (
+      data: { email: string; password: string; user_metadata?: Record<string, any>; projectId?: string },
+      projectId?: string
+    ) => {
+      const payload = { ...data, projectId: projectId || data.projectId };
+      return apiFetch('/api/supabase/auth/users', { method: 'POST', body: JSON.stringify(payload) }).then((r) =>
         asJson<SupabaseAuthUser>(r)
-      ),
-    sendResetPassword: (id: string, email?: string) =>
+      );
+    },
+    sendResetPassword: (id: string, email?: string, projectId?: string) =>
       apiFetch(`/api/supabase/auth/users/${id}/reset-password`, {
         method: 'POST',
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, projectId }),
       }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
-    updateUser: (id: string, data: { banned?: boolean; role?: string; user_metadata?: Record<string, any> }) =>
-      apiFetch(`/api/supabase/auth/users/${id}`, {
+    updateUser: (
+      id: string,
+      data: { banned?: boolean; role?: string; user_metadata?: Record<string, any>; projectId?: string },
+      projectId?: string
+    ) => {
+      const payload = { ...data, projectId: projectId || data.projectId };
+      return apiFetch(`/api/supabase/auth/users/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify(data),
-      }).then((r) => asJson<{ ok: boolean; user?: SupabaseAuthUser }>(r)),
-    deleteUser: (id: string) =>
-      apiFetch(`/api/supabase/auth/users/${id}`, { method: 'DELETE' }).then((r) =>
+        body: JSON.stringify(payload),
+      }).then((r) => asJson<{ ok: boolean; user?: SupabaseAuthUser }>(r));
+    },
+    deleteUser: (id: string, projectId?: string) => {
+      const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+      return apiFetch(`/api/supabase/auth/users/${id}${q}`, { method: 'DELETE' }).then((r) =>
         asJson<{ ok: boolean; deletedId: string }>(r)
-      ),
+      );
+    },
   },
 
   db: {
-    schemas: () =>
-      apiFetch('/api/supabase/db/schemas').then((r) =>
+    schemas: (projectId?: string) => {
+      const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+      return apiFetch(`/api/supabase/db/schemas${q}`).then((r) =>
         asJson<{ schemas: Array<{ name: string; owner: string }> }>(r)
-      ),
-    tables: () =>
-      apiFetch('/api/supabase/db/tables').then((r) =>
+      );
+    },
+    tables: (projectId?: string) => {
+      const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+      return apiFetch(`/api/supabase/db/tables${q}`).then((r) =>
         asJson<{ tables: SupabaseDbTable[] }>(r)
-      ),
-    query: (sql: string) =>
-      apiFetch('/api/supabase/db/query', { method: 'POST', body: JSON.stringify({ sql }) }).then((r) =>
+      );
+    },
+    query: (sql: string, projectId?: string) =>
+      apiFetch('/api/supabase/db/query', { method: 'POST', body: JSON.stringify({ sql, projectId }) }).then((r) =>
         asJson<{ rows: Record<string, any>[]; rowCount: number }>(r)
       ),
   },
 
   storage: {
-    buckets: () =>
-      apiFetch('/api/supabase/storage/buckets').then((r) =>
+    buckets: (projectId?: string) => {
+      const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+      return apiFetch(`/api/supabase/storage/buckets${q}`).then((r) =>
         asJson<{ buckets: SupabaseStorageBucket[] }>(r)
-      ),
-    createBucket: (data: { id: string; name: string; isPublic: boolean }) =>
-      apiFetch('/api/supabase/storage/buckets', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+      );
+    },
+    createBucket: (
+      data: { id: string; name: string; isPublic: boolean; projectId?: string },
+      projectId?: string
+    ) => {
+      const payload = { ...data, projectId: projectId || data.projectId };
+      return apiFetch('/api/supabase/storage/buckets', { method: 'POST', body: JSON.stringify(payload) }).then((r) =>
         asJson<SupabaseStorageBucket>(r)
-      ),
+      );
+    },
   },
 
   functions: {

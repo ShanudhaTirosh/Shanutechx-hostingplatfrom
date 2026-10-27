@@ -1,171 +1,405 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { PageHeader, Card, StatCard, Spinner, ErrorBanner, Button } from '@/components/ui';
-import { supabaseAdmin, SupabaseHealth, ClientSupabaseProject } from '@/lib/supabaseAdmin';
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  ExternalLink,
+  RefreshCw,
+  Maximize2,
+  Minimize2,
+  Copy,
+  Check,
+  Play,
+  RotateCcw,
+  AlertTriangle,
+  Loader2,
+  Table,
+  Terminal,
+  Database,
+  Users,
+  HardDrive,
+  Cpu,
+  Activity,
+  Layers,
+  Settings,
+  Shield,
+  Zap,
+} from 'lucide-react';
+import { PageHeader, Card, Spinner, ErrorBanner, useToast } from '@/components/ui';
+import {
+  supabaseAdmin,
+  SupabaseHealth,
+  ClientSupabaseProject,
+  getCentralStudioUrl,
+  ProjectStats,
+} from '@/lib/supabaseAdmin';
 import { ServiceHealthBar } from '@/components/supabase/ServiceHealthBar';
 import { ProjectSwitcher } from '@/components/supabase/ProjectSwitcher';
 
+type StudioSubView =
+  | 'overview'
+  | 'editor'
+  | 'sql'
+  | 'database'
+  | 'auth'
+  | 'storage'
+  | 'functions'
+  | 'realtime'
+  | 'settings'
+  | 'api'
+  | 'telemetry';
+
+const SUBVIEW_PATHS: Record<StudioSubView, string> = {
+  overview: '',
+  editor: '/editor',
+  sql: '/sql',
+  database: '/database/tables',
+  auth: '/auth/users',
+  storage: '/storage/buckets',
+  functions: '/functions',
+  realtime: '/realtime/inspector',
+  settings: '/settings/general',
+  api: '/api',
+  telemetry: '',
+};
+
+import { useSearchParams } from 'next/navigation';
+import { useSupabaseProject } from '@/lib/SupabaseProjectContext';
+
 export default function SupabaseOverviewPage() {
+  const searchParams = useSearchParams();
+  const { activeProject, setActiveProject } = useSupabaseProject();
+  const viewParam = searchParams.get('view') as StudioSubView | null;
   const [health, setHealth] = useState<SupabaseHealth | null>(null);
-  const [config, setConfig] = useState<any>(null);
-  const [activeProject, setActiveProject] = useState<ClientSupabaseProject | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [activeSubView, setActiveSubView] = useState<StudioSubView>('overview');
 
   useEffect(() => {
-    Promise.allSettled([supabaseAdmin.health(), supabaseAdmin.config()])
-      .then(([healthRes, configRes]) => {
-        if (healthRes.status === 'fulfilled') setHealth(healthRes.value);
-        if (configRes.status === 'fulfilled') setConfig(configRes.value);
-      })
+    if (viewParam && SUBVIEW_PATHS[viewParam] !== undefined) {
+      setActiveSubView(viewParam);
+    }
+  }, [viewParam]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [iframeKey, setIframeKey] = useState(0);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const [stats, setStats] = useState<ProjectStats | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    supabaseAdmin.health()
+      .then((h) => setHealth(h))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Spinner label="Connecting to Supabase stack..." />;
+  // Fetch telemetry whenever active project changes
+  useEffect(() => {
+    if (activeProject && activeProject.status === 'ACTIVE') {
+      supabaseAdmin.projects
+        .getStats(activeProject.id)
+        .then((res) => {
+          if (res.ok && res.stats) setStats(res.stats);
+        })
+        .catch(() => {});
+    } else {
+      setStats(null);
+    }
+  }, [activeProject?.id, activeProject?.status]);
+
+  const currentStudioUrl = activeProject
+    ? getCentralStudioUrl(activeProject, SUBVIEW_PATHS[activeSubView])
+    : getCentralStudioUrl(null);
+
+  const handleCopyUrl = () => {
+    if (!currentStudioUrl) return;
+    navigator.clipboard.writeText(currentStudioUrl);
+    setCopiedUrl(true);
+    toast('Studio URL copied to clipboard', 'success');
+    setTimeout(() => setCopiedUrl(false), 2000);
+  };
+
+  const handleReloadFrame = () => {
+    setIframeKey((prev) => prev + 1);
+    toast('Reloading Supabase Studio frame...', 'info');
+  };
+
+  const handleStartProject = async () => {
+    if (!activeProject) return;
+    setActionLoading(true);
+    try {
+      const res = await supabaseAdmin.projects.start(activeProject.id);
+      setActiveProject(res.project);
+      toast(`Project "${activeProject.name}" started successfully!`, 'success');
+    } catch (err: any) {
+      toast(err.message || 'Failed to start project', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRetryProject = async () => {
+    if (!activeProject) return;
+    setActionLoading(true);
+    try {
+      const res = await supabaseAdmin.projects.retry(activeProject.id);
+      setActiveProject(res.project);
+      toast(`Retrying provisioning for "${activeProject.name}"...`, 'info');
+    } catch (err: any) {
+      toast(err.message || 'Failed to retry provisioning', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  if (loading) return <Spinner label="Connecting to Supabase Platform Control Plane..." />;
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <PageHeader
-        title="Supabase Management Center"
-        description="Self-hosted Multi-Project backend suite — Database, Auth, Storage, Edge Functions, and Realtime WebSockets."
-      />
+    <div className={`space-y-4 animate-fade-in ${isFullScreen ? 'fixed inset-0 z-50 bg-[#0a0a0f] p-4 flex flex-col' : ''}`}>
+      {!isFullScreen && (
+        <>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <PageHeader
+              title="Supabase Cloud Studio"
+              description="Unified multi-project control dashboard for PostgreSQL, GoTrue Auth, Realtime, S3 Storage, and Edge Functions."
+            />
 
-      {error && <ErrorBanner message={error} />}
-
-      {/* Multi-Project Switcher Header */}
-      <ProjectSwitcher activeProject={activeProject} onSelectProject={setActiveProject} />
-
-      {/* Service Health Overview Bar */}
-      {health && (
-        <Card className="border border-white/[0.06]">
-          <div className="flex items-center justify-between mb-3 border-b border-white/[0.06] pb-3">
-            <div>
-              <h2 className="text-sm font-semibold text-text-primary">System Health Status ({activeProject?.name || 'Default'})</h2>
-              <p className="text-xs text-text-muted">Live pulse check across all self-hosted container services</p>
-            </div>
-            <a
-              href={config?.studioUrl || 'http://localhost:8000'}
-              target="_blank"
-              rel="noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all flex items-center gap-1.5"
-            >
-              <span>Open Studio UI</span> ↗
-            </a>
+            {activeProject && (
+              <div className="flex items-center gap-2">
+                <a
+                  href={currentStudioUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-500/20 flex items-center gap-2 transition-all shrink-0"
+                >
+                  <span>Launch Studio in New Window</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            )}
           </div>
-          <ServiceHealthBar services={health.services} />
-        </Card>
+
+          {error && <ErrorBanner message={error} />}
+
+          {/* Unified Multi-Project Switcher Bar */}
+          <ProjectSwitcher activeProject={activeProject} onSelectProject={setActiveProject} />
+        </>
       )}
 
-      {/* Quick Stats Grid */}
-      <div className="grid md:grid-cols-4 gap-4">
-        <StatCard label="Auth Service" value="Active (GoTrue)" color="violet" />
-        <StatCard label="Database Name" value={activeProject?.dbName || 'postgres'} color="teal" />
-        <StatCard label="Storage Engine" value="Active (S3 / R2)" color="green" />
-        <StatCard label="Edge Functions" value="Active (Deno)" color="orange" />
-      </div>
+      {/* Main Studio Frame Container */}
+      <div className={`glass rounded-2xl border border-white/[0.08] overflow-hidden flex flex-col ${isFullScreen ? 'flex-1' : 'shadow-2xl'}`}>
+        {/* Studio Sub-Navigation & Frame Controller Bar */}
+        <div className="bg-[#0b0c16] border-b border-white/[0.06] p-2.5 flex flex-wrap items-center justify-between gap-2 shrink-0">
+          {/* Sub-view Navigation Tabs */}
+          <div className="flex items-center gap-1 overflow-x-auto py-0.5 max-w-full">
+            {[
+              { id: 'overview', label: 'Studio Home', icon: <Layers className="w-3.5 h-3.5" /> },
+              { id: 'editor', label: 'Table Editor', icon: <Table className="w-3.5 h-3.5" /> },
+              { id: 'sql', label: 'SQL Editor', icon: <Terminal className="w-3.5 h-3.5" /> },
+              { id: 'database', label: 'Database', icon: <Database className="w-3.5 h-3.5" /> },
+              { id: 'auth', label: 'Authentication', icon: <Users className="w-3.5 h-3.5" /> },
+              { id: 'storage', label: 'Storage', icon: <HardDrive className="w-3.5 h-3.5" /> },
+              { id: 'functions', label: 'Functions', icon: <Zap className="w-3.5 h-3.5" /> },
+              { id: 'realtime', label: 'Realtime', icon: <Activity className="w-3.5 h-3.5" /> },
+              { id: 'settings', label: 'Settings', icon: <Settings className="w-3.5 h-3.5" /> },
+              { id: 'api', label: 'API Keys', icon: <Shield className="w-3.5 h-3.5" /> },
+              { id: 'telemetry', label: 'Metrics', icon: <Cpu className="w-3.5 h-3.5" /> },
+            ].map((tab) => {
+              const isActive = activeSubView === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveSubView(tab.id as StudioSubView)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                    isActive
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm'
+                      : 'text-text-muted hover:text-text-primary hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <span className={isActive ? 'text-emerald-400' : 'text-text-muted'}>{tab.icon}</span>
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
 
-      {/* Management Navigation Grid */}
-      <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Suite Components</h2>
-      <div className="grid md:grid-cols-3 gap-4">
-        <Link href="/supabase/auth">
-          <Card className="h-full border border-white/[0.06] hover:border-white/12 hover:bg-white/[0.04] transition-all cursor-pointer group">
-            <div className="h-10 w-10 rounded-xl bg-white/5 text-neutral-300 flex items-center justify-center mb-3">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
+          {/* Frame Utility Controls */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Direct Studio URL badge */}
+            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/40 border border-white/[0.06] text-[11px] font-mono text-text-muted max-w-[280px] truncate">
+              <span className="truncate">{currentStudioUrl}</span>
             </div>
-            <h3 className="font-semibold text-sm text-text-primary mb-1 group-hover:text-white transition-colors">
-              Authentication
-            </h3>
-            <p className="text-text-muted text-xs leading-relaxed">
-              Manage users, JWT tokens, OAuth providers (Google, GitHub, Discord), and MFA settings.
-            </p>
-          </Card>
-        </Link>
 
-        <Link href="/supabase/database">
-          <Card className="h-full border border-white/[0.06] hover:border-white/12 hover:bg-white/[0.04] transition-all cursor-pointer group">
-            <div className="h-10 w-10 rounded-xl bg-teal-500/10 text-teal-300 flex items-center justify-center mb-3">
-              <svg className="w-5 h-5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s-8 1.79 8-4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-              </svg>
-            </div>
-            <h3 className="font-semibold text-sm text-text-primary mb-1 group-hover:text-white transition-colors">
-              Database Studio
-            </h3>
-            <p className="text-text-muted text-xs leading-relaxed">
-              Table editor, raw SQL runner, schema viewer, and PostgreSQL 17 configuration.
-            </p>
-          </Card>
-        </Link>
+            <button
+              onClick={handleCopyUrl}
+              title="Copy Studio URL"
+              className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-text-muted hover:text-text-primary border border-white/[0.06] transition-all"
+            >
+              {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
 
-        <Link href="/supabase/storage">
-          <Card className="h-full border border-white/[0.06] hover:border-white/12 hover:bg-white/[0.04] transition-all cursor-pointer group">
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-300 flex items-center justify-center mb-3">
-              <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 01-2 2M5 8v10a2 2 0 002 2h14a2 2 0 002-2V8m-9 4h4" />
-              </svg>
-            </div>
-            <h3 className="font-semibold text-sm text-text-primary mb-1 group-hover:text-white transition-colors">
-              Storage Buckets
-            </h3>
-            <p className="text-text-muted text-xs leading-relaxed">
-              File manager, object bucket policies, image previews, and S3 protocol endpoints.
-            </p>
-          </Card>
-        </Link>
+            <button
+              onClick={handleReloadFrame}
+              title="Reload Frame"
+              className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-text-muted hover:text-text-primary border border-white/[0.06] transition-all"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
 
-        <Link href="/supabase/functions">
-          <Card className="h-full border border-white/[0.06] hover:border-white/12 hover:bg-white/[0.04] transition-all cursor-pointer group">
-            <div className="h-10 w-10 rounded-xl bg-amber-500/10 text-amber-300 flex items-center justify-center mb-3">
-              <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <h3 className="font-semibold text-sm text-text-primary mb-1 group-hover:text-white transition-colors">
-              Edge Functions
-            </h3>
-            <p className="text-text-muted text-xs leading-relaxed">
-              Inspect Deno edge runtime functions, trigger invocations, and review execution logs.
-            </p>
-          </Card>
-        </Link>
+            <button
+              onClick={() => setIsFullScreen(!isFullScreen)}
+              title={isFullScreen ? 'Exit Full Screen' : 'Full Screen'}
+              className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-text-muted hover:text-text-primary border border-white/[0.06] transition-all"
+            >
+              {isFullScreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            </button>
 
-        <Link href="/supabase/realtime">
-          <Card className="h-full border border-white/[0.06] hover:border-white/12 hover:bg-white/[0.04] transition-all cursor-pointer group">
-            <div className="h-10 w-10 rounded-xl bg-sky-500/10 text-sky-300 flex items-center justify-center mb-3">
-              <svg className="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071a9.9 9.9 0 0114.142 0M2.828 9.9a14.85 14.85 0 0121.214 0" />
-              </svg>
-            </div>
-            <h3 className="font-semibold text-sm text-text-primary mb-1 group-hover:text-white transition-colors">
-              Realtime WebSockets
-            </h3>
-            <p className="text-text-muted text-xs leading-relaxed">
-              Live channels monitor, presence status, broadcast message testing, and cluster config.
-            </p>
-          </Card>
-        </Link>
+            <a
+              href={currentStudioUrl}
+              target="_blank"
+              rel="noreferrer"
+              title="Open current view in new window"
+              className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
 
-        <Link href="/supabase/settings">
-          <Card className="h-full border border-white/[0.06] hover:border-white/12 hover:bg-white/[0.04] transition-all cursor-pointer group">
-            <div className="h-10 w-10 rounded-xl bg-fuchsia-500/10 text-fuchsia-300 flex items-center justify-center mb-3">
-              <svg className="w-5 h-5 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+        {/* Studio Content Body */}
+        <div className={`relative w-full bg-[#05060a] ${isFullScreen ? 'flex-1' : 'h-[820px]'}`}>
+          {/* Active Subview: Metrics & Telemetry Tab */}
+          {activeSubView === 'telemetry' ? (
+            <div className="p-6 space-y-6 overflow-y-auto h-full">
+              <div>
+                <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-emerald-400" />
+                  <span>Compute &amp; Resource Telemetry ({activeProject?.name || 'Default'})</span>
+                </h3>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Real-time CPU, RAM, Disk, and Database statistics reported directly from host node container agents.
+                </p>
+              </div>
+
+              {/* Resource Metrics Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-1">
+                  <p className="text-[10px] uppercase font-mono text-text-muted">CPU Utilization</p>
+                  <p className="text-xl font-bold font-mono text-emerald-400">{stats?.cpuPct ?? 0}%</p>
+                  <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-emerald-400 h-full rounded-full transition-all" style={{ width: `${Math.min(stats?.cpuPct ?? 0, 100)}%` }} />
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-1">
+                  <p className="text-[10px] uppercase font-mono text-text-muted">Memory Usage</p>
+                  <p className="text-xl font-bold font-mono text-teal-300">{stats?.ramMb ?? 0} MB</p>
+                  <p className="text-[10px] text-text-faint">Allocated Limit: 1024 MB</p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-1">
+                  <p className="text-[10px] uppercase font-mono text-text-muted">Disk Storage</p>
+                  <p className="text-xl font-bold font-mono text-amber-300">{stats?.diskMb ?? 0} MB</p>
+                  <p className="text-[10px] text-text-faint">Limit: {activeProject?.storageLimitMb ?? 10240} MB</p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-1">
+                  <p className="text-[10px] uppercase font-mono text-text-muted">Postgres DB Size</p>
+                  <p className="text-xl font-bold font-mono text-violet-300">{stats?.dbSizeMb ?? 0} MB</p>
+                  <p className="text-[10px] text-text-faint">Catalog: {activeProject?.dbName || 'postgres'}</p>
+                </div>
+              </div>
+
+              {/* Service Health Pulse */}
+              {health && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Service Container Pulse</h4>
+                  <ServiceHealthBar services={health.services} />
+                </div>
+              )}
             </div>
-            <h3 className="font-semibold text-sm text-text-primary mb-1 group-hover:text-white transition-colors">
-              SMTP &amp; API Config
-            </h3>
-            <p className="text-text-muted text-xs leading-relaxed">
-              Configure SMTP Mailer server, send test emails, view ANON &amp; SERVICE keys.
-            </p>
-          </Card>
-        </Link>
+          ) : !activeProject ? (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-3">
+              <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <Layers className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-text-primary">No Supabase Project Selected</h3>
+              <p className="text-xs text-text-muted max-w-sm">
+                Select an existing project using the project switcher above, or provision a new project stack on your VPS compute nodes.
+              </p>
+            </div>
+          ) : activeProject.status === 'PROVISIONING' ? (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
+              <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center animate-pulse">
+                <Loader2 className="w-7 h-7 animate-spin" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-amber-300">Project Provisioning In Progress</h3>
+                <p className="text-xs text-text-muted mt-1 max-w-md">
+                  Setting up isolated PostgreSQL, GoTrue Auth, PostgREST, Storage, Realtime, and Kong Gateway containers for{' '}
+                  <span className="text-text-primary font-bold">{activeProject.name}</span>.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] font-mono text-text-faint bg-white/[0.04] px-3 py-1.5 rounded-lg border border-white/[0.06]">
+                <Activity className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                <span>Auto-refreshing state every 8 seconds...</span>
+              </div>
+            </div>
+          ) : activeProject.status === 'STOPPED' || activeProject.status === 'SUSPENDED' ? (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
+              <div className="h-14 w-14 rounded-2xl bg-slate-500/10 border border-slate-500/20 text-slate-400 flex items-center justify-center">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-200">Project Stack is Stopped</h3>
+                <p className="text-xs text-text-muted mt-1 max-w-sm">
+                  The container stack for <span className="text-text-primary font-bold">{activeProject.name}</span> is paused to conserve VPS resources.
+                </p>
+              </div>
+              <button
+                onClick={handleStartProject}
+                disabled={actionLoading}
+                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shadow-md shadow-emerald-500/20 flex items-center gap-2 transition-all disabled:opacity-50"
+              >
+                {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                <span>Start Project Stack</span>
+              </button>
+            </div>
+          ) : activeProject.status === 'FAILED' ? (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
+              <div className="h-14 w-14 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-red-300">Provisioning Encountered an Error</h3>
+                <p className="text-xs text-red-400/80 mt-1 max-w-md font-mono bg-red-500/10 p-2 rounded-lg border border-red-500/20">
+                  {activeProject.errorMessage || 'Unknown provisioning failure'}
+                </p>
+              </div>
+              <button
+                onClick={handleRetryProject}
+                disabled={actionLoading}
+                className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs shadow-md shadow-violet-500/20 flex items-center gap-2 transition-all disabled:opacity-50"
+              >
+                {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                <span>Retry Provisioning</span>
+              </button>
+            </div>
+          ) : (
+            /* ACTIVE: Interactive Supabase Studio Iframe */
+            <iframe
+              key={iframeKey}
+              ref={iframeRef}
+              src={currentStudioUrl}
+              title={`Supabase Studio - ${activeProject.name}`}
+              className="w-full h-full border-0 bg-[#05060a]"
+              allow="clipboard-read; clipboard-write; fullscreen"
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-downloads"
+            />
+          )}
+        </div>
       </div>
     </div>
   );

@@ -3,14 +3,15 @@
 import React, { useEffect, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { PageHeader, Card, Spinner, ErrorBanner, Button, useToast, ConfirmDialog } from '@/components/ui';
-import { supabaseAdmin, SupabaseDbTable, ClientSupabaseProject } from '@/lib/supabaseAdmin';
+import { supabaseAdmin, SupabaseDbTable, ClientSupabaseProject, getCentralStudioUrl } from '@/lib/supabaseAdmin';
 import { DataGrid } from '@/components/supabase/DataGrid';
 import { CreateTablePanel } from '@/components/CreateTablePanel';
 import { ProjectSwitcher } from '@/components/supabase/ProjectSwitcher';
-
+import { useSupabaseProject } from '@/lib/SupabaseProjectContext';
+import { ExternalLink } from 'lucide-react';
 
 export default function SupabaseDatabasePage() {
-  const [activeProject, setActiveProject] = useState<ClientSupabaseProject | null>(null);
+  const { activeProject, setActiveProject } = useSupabaseProject();
   const [tables, setTables] = useState<SupabaseDbTable[]>([]);
 
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -29,14 +30,20 @@ export default function SupabaseDatabasePage() {
 
   const { toast } = useToast();
 
-  function loadTables() {
+  function loadTables(targetId?: string) {
+    const projId = targetId || activeProject?.id;
     supabaseAdmin.db
-      .tables()
+      .tables(projId)
       .then((res) => {
         setTables(res.tables || []);
-        if (res.tables && res.tables.length > 0 && !selectedTable) {
-          setSelectedTable(res.tables[0].name);
-          handleRunQuery(`SELECT * FROM public.${res.tables[0].name} LIMIT 20;`);
+        if (res.tables && res.tables.length > 0) {
+          const chosen = selectedTable && res.tables.some((t) => t.name === selectedTable) ? selectedTable : res.tables[0].name;
+          setSelectedTable(chosen);
+          handleRunQuery(`SELECT * FROM public."${chosen}" LIMIT 20;`, projId);
+        } else {
+          setSelectedTable(null);
+          setQueryColumns([]);
+          setQueryRows([]);
         }
       })
       .catch((err) => setError(err.message))
@@ -44,15 +51,16 @@ export default function SupabaseDatabasePage() {
   }
 
   useEffect(() => {
-    loadTables();
-  }, []);
+    loadTables(activeProject?.id);
+  }, [activeProject?.id]);
 
-  const handleRunQuery = (queryToRun?: string) => {
+  const handleRunQuery = (queryToRun?: string, targetId?: string) => {
     const q = queryToRun || sqlQuery;
+    const projId = targetId || activeProject?.id;
     setExecuting(true);
     setError(null);
     supabaseAdmin.db
-      .query(q)
+      .query(q, projId)
       .then((res) => {
         if (res.rows && res.rows.length > 0) {
           setQueryColumns(Object.keys(res.rows[0]));
@@ -108,6 +116,18 @@ export default function SupabaseDatabasePage() {
         description="Explore public schemas, edit rows, run raw SQL queries, and manage database structures."
         action={
           <div className="flex items-center gap-2">
+            {activeProject && (
+              <a
+                href={getCentralStudioUrl(activeProject, '/editor')}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-all shadow-sm"
+                title="Open this project's Table Editor in official Supabase Studio"
+              >
+                <span>Studio Table Editor</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
             <Button size="sm" variant="secondary" onClick={() => setShowCreateTable(!showCreateTable)}>
               {showCreateTable ? 'Close Table Creator' : '+ New Table'}
             </Button>
@@ -145,7 +165,7 @@ export default function SupabaseDatabasePage() {
             <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
               Tables ({tables.length})
             </h3>
-            <button type="button" onClick={loadTables} className="text-xs text-text-muted hover:text-white">↺ Refresh</button>
+            <button type="button" onClick={() => loadTables()} className="text-xs text-text-muted hover:text-white">↺ Refresh</button>
           </div>
           <div className="glass rounded-xl p-2 border border-white/[0.06] space-y-1 max-h-[520px] overflow-y-auto">
             {tables.map((t) => (

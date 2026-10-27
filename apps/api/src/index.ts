@@ -227,6 +227,7 @@ app.use('/api', pushTokensRouter);
 app.use('/api', supabaseRouter);
 app.use('/api/platform', studioPlatformRouter);
 app.use('/api/supabase/platform', studioPlatformRouter);
+app.use('/platform', studioPlatformRouter);
 app.use('/api', secretsRouter);
 app.use('/api', openapiRouter);
 app.use('/api', prWebhooksRouter);
