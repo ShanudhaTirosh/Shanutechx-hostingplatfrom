@@ -52,7 +52,7 @@ export async function createOrGetShadowRepo(deploymentId: string): Promise<Shado
 
     if (checkRes.ok) {
       const data: any = await checkRes.json();
-      const authenticatedUrl = `https://${token}@github.com/${data.full_name}.git`;
+      const authenticatedUrl = `https://x-access-token:${token}@github.com/${data.full_name}.git`;
       return {
         repoFullName: data.full_name,
         cloneUrl: authenticatedUrl,
@@ -89,7 +89,7 @@ export async function createOrGetShadowRepo(deploymentId: string): Promise<Shado
     }
 
     const newRepo: any = await createRes.json();
-    const authenticatedUrl = `https://${token}@github.com/${newRepo.full_name}.git`;
+    const authenticatedUrl = `https://x-access-token:${token}@github.com/${newRepo.full_name}.git`;
 
     logger.info({ deploymentId, repoFullName: newRepo.full_name }, 'Successfully created platform shadow backup repository on GitHub');
 
