@@ -500,7 +500,7 @@ export default function DevVpsFleetPage() {
                 <IconServer className="text-accent-teal" size={18} />
                 {selectedProvision ? `Setup Customer VPS (${selectedProvision.user?.email || selectedProvision.id})` : 'Deliver New VPS to Customer'}
               </h3>
-              <button onClick={() => setAddModal(false)} className="text-text-muted hover:text-white text-sm">✕</button>
+              <button onClick={() => setAddModal(false)} className="text-text-muted hover:text-white text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
 
             <div className="space-y-4 text-xs">
@@ -778,7 +778,7 @@ export default function DevVpsFleetPage() {
                 <IconRefresh className="text-emerald-400" size={18} />
                 Renew & Extend VPS ({renewTargetItem.user?.email || renewTargetItem.ip || renewTargetItem.id.slice(0, 8)})
               </h3>
-              <button onClick={() => setRenewModalOpen(false)} className="text-text-muted hover:text-white text-sm">✕</button>
+              <button onClick={() => setRenewModalOpen(false)} className="text-text-muted hover:text-white text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
 
             <p className="text-xs text-text-muted leading-relaxed">

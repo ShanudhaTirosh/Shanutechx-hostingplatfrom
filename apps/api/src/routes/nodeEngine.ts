@@ -12,6 +12,13 @@ export const nodeEngineRouter = Router();
 
 useForOwnRoutes(nodeEngineRouter, requireAuth);
 
+const AGENT_TIMEOUT_MS = Number(process.env.NODE_AGENT_FETCH_TIMEOUT_MS) || 30_000;
+function fetchWithTimeout(url: string, opts: RequestInit = {}, timeoutMs = AGENT_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...opts, signal: controller.signal }).finally(() => clearTimeout(id));
+}
+
 /**
  * Helper to resolve node or VPS provision IP and check access permissions.
  *
@@ -29,9 +36,10 @@ async function resolveNodeAccess(req: AuthedRequest, nodeId: string) {
   });
 
   if (node) {
-    // Cluster nodes are ONLY accessible by admin and dev staff
-    if (req.user!.role === 'admin' || req.user!.role === 'dev') return node;
-    return null;
+    // Cluster compute nodes (system VPS) are core platform infrastructure:
+    // Strictly restricted to DEV superusers only. No customer, support, or admin staff can manage system VPS.
+    if (req.user!.role !== 'dev') return null;
+    return node;
   }
 
   // 2. Try finding a customer VPS provision
@@ -95,7 +103,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/monitoring', async (req: AuthedReque
   const limitGb = (node as any).monthlyBandwidthGb || 30000;
 
   try {
-    const r = await fetch(agentUrl(node.ip, `/agent/engine/monitoring?monthlyLimitGb=${limitGb}`), { headers: agentHeaders(node) });
+    const r = await fetchWithTimeout(agentUrl(node.ip, `/agent/engine/monitoring?monthlyLimitGb=${limitGb}`), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -125,7 +133,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/packages/install', async (req: Auth
   }
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/packages/install'), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/packages/install'), {
       method: 'POST',
       headers: agentHeaders(node),
       body: JSON.stringify({ packageName: cleanPackage }),
@@ -149,7 +157,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/packages/upgrade', async (req: Auth
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/packages/upgrade'), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/packages/upgrade'), {
       method: 'POST',
       headers: agentHeaders(node),
     });
@@ -174,7 +182,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/ports', async (req: AuthedRequest, r
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/ports'), { headers: agentHeaders(node) });
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/ports'), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -189,7 +197,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/services', async (req: AuthedRequest
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/services'), { headers: agentHeaders(node) });
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/services'), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -221,7 +229,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/services/action', async (req: Authe
   }
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/services/action'), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/services/action'), {
       method: 'POST',
       headers: agentHeaders(node),
       body: JSON.stringify({ action: cleanAction, serviceName: cleanService }),
@@ -252,7 +260,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/services/logs', async (req: AuthedRe
   const path = `/agent/engine/services/logs?serviceName=${encodeURIComponent(String(serviceName ?? ''))}&lines=${encodeURIComponent(String(lines ?? 100))}`;
 
   try {
-    const r = await fetch(agentUrl(node.ip, path), { headers: agentHeaders(node) });
+    const r = await fetchWithTimeout(agentUrl(node.ip, path), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -267,7 +275,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/users', async (req: AuthedRequest, r
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/users'), { headers: agentHeaders(node) });
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/users'), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -282,7 +290,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/users', async (req: AuthedRequest, 
   const { username, password } = req.body || {};
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/users'), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/users'), {
       method: 'POST',
       headers: agentHeaders(node),
       body: JSON.stringify({ username, password }),
@@ -308,7 +316,7 @@ nodeEngineRouter.delete('/nodes/:nodeId/engine/users/:username', async (req: Aut
   const removeHome = req.query.removeHome ?? 'true';
 
   try {
-    const r = await fetch(agentUrl(node.ip, `/agent/engine/users/${encodeURIComponent(req.params.username)}?removeHome=${removeHome}`), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, `/agent/engine/users/${encodeURIComponent(req.params.username)}?removeHome=${removeHome}`), {
       method: 'DELETE',
       headers: agentHeaders(node),
     });
@@ -333,7 +341,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/users/:username/password', async (r
   const { password } = req.body || {};
 
   try {
-    const r = await fetch(agentUrl(node.ip, `/agent/engine/users/${encodeURIComponent(req.params.username)}/password`), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, `/agent/engine/users/${encodeURIComponent(req.params.username)}/password`), {
       method: 'POST',
       headers: agentHeaders(node),
       body: JSON.stringify({ password }),
@@ -359,7 +367,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/users/:username/groups', async (req
   const { group, action } = req.body || {};
 
   try {
-    const r = await fetch(agentUrl(node.ip, `/agent/engine/users/${encodeURIComponent(req.params.username)}/groups`), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, `/agent/engine/users/${encodeURIComponent(req.params.username)}/groups`), {
       method: 'POST',
       headers: agentHeaders(node),
       body: JSON.stringify({ group, action }),
@@ -385,7 +393,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/docker/containers', async (req: Auth
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/containers'), { headers: agentHeaders(node) });
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/docker/containers'), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -418,7 +426,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/docker/containers', async (req: Aut
   }
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/containers'), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/docker/containers'), {
       method: 'POST',
       headers: agentHeaders(node),
       body: JSON.stringify(req.body || {}),
@@ -444,7 +452,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/docker/containers/:containerId/acti
   const { action } = req.body || {};
 
   try {
-    const r = await fetch(agentUrl(node.ip, `/agent/engine/docker/containers/${encodeURIComponent(req.params.containerId)}/action`), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, `/agent/engine/docker/containers/${encodeURIComponent(req.params.containerId)}/action`), {
       method: 'POST',
       headers: agentHeaders(node),
       body: JSON.stringify({ action }),
@@ -470,7 +478,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/docker/containers/:containerId/logs'
   const tail = req.query.tail ? String(req.query.tail) : '200';
 
   try {
-    const r = await fetch(agentUrl(node.ip, `/agent/engine/docker/containers/${encodeURIComponent(req.params.containerId)}/logs?tail=${tail}`), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, `/agent/engine/docker/containers/${encodeURIComponent(req.params.containerId)}/logs?tail=${tail}`), {
       headers: agentHeaders(node),
     });
     const data = await r.json();
@@ -480,12 +488,179 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/docker/containers/:containerId/logs'
   }
 });
 
+nodeEngineRouter.get('/nodes/:nodeId/engine/docker/containers/:containerId/inspect', async (req: AuthedRequest, res) => {
+  const node = await resolveNodeAccess(req, req.params.nodeId);
+  if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
+
+  try {
+    const r = await fetchWithTimeout(agentUrl(node.ip, `/agent/engine/docker/containers/${encodeURIComponent(req.params.containerId)}/inspect`), {
+      headers: agentHeaders(node),
+    });
+    const data = await r.json();
+    res.status(r.ok ? 200 : r.status).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to inspect container' });
+  }
+});
+
+nodeEngineRouter.get('/nodes/:nodeId/engine/docker/containers/:containerId/stats', async (req: AuthedRequest, res) => {
+  const node = await resolveNodeAccess(req, req.params.nodeId);
+  if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
+
+  try {
+    const r = await fetchWithTimeout(agentUrl(node.ip, `/agent/engine/docker/containers/${encodeURIComponent(req.params.containerId)}/stats`), {
+      headers: agentHeaders(node),
+    });
+    const data = await r.json();
+    res.status(r.ok ? 200 : r.status).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to fetch container stats' });
+  }
+});
+
+// ── Docker Images ─────────────────────────────────────────────────────────
+
+nodeEngineRouter.get('/nodes/:nodeId/engine/docker/images', async (req: AuthedRequest, res) => {
+  const node = await resolveNodeAccess(req, req.params.nodeId);
+  if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
+
+  try {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/docker/images'), { headers: agentHeaders(node) });
+    const data = await r.json();
+    res.status(r.ok ? 200 : r.status).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to list Docker images' });
+  }
+});
+
+nodeEngineRouter.post('/nodes/:nodeId/engine/docker/images/pull', async (req: AuthedRequest, res) => {
+  const node = await resolveNodeAccess(req, req.params.nodeId);
+  if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
+
+  const { imageName } = req.body || {};
+  if (!imageName || typeof imageName !== 'string') {
+    return res.status(400).json({ error: 'imageName is required' });
+  }
+
+  try {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/docker/images/pull'), {
+      method: 'POST',
+      headers: agentHeaders(node),
+      body: JSON.stringify({ imageName }),
+    }, 120_000);
+    const data = await r.json();
+
+    if (r.ok) {
+      await prisma.auditLog.create({
+        data: { adminId: req.user!.id, action: 'nodeEngine.image_pull', target: `${node.id}:${imageName}` },
+      });
+    }
+
+    res.status(r.ok ? 200 : r.status).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to pull image' });
+  }
+});
+
+nodeEngineRouter.delete('/nodes/:nodeId/engine/docker/images/:imageId', async (req: AuthedRequest, res) => {
+  const node = await resolveNodeAccess(req, req.params.nodeId);
+  if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
+
+  const force = req.query.force === 'true';
+
+  try {
+    const r = await fetchWithTimeout(agentUrl(node.ip, `/agent/engine/docker/images/${encodeURIComponent(req.params.imageId)}?force=${force}`), {
+      method: 'DELETE',
+      headers: agentHeaders(node),
+    });
+    const data = await r.json();
+
+    if (r.ok) {
+      await prisma.auditLog.create({
+        data: { adminId: req.user!.id, action: 'nodeEngine.image_remove', target: `${node.id}:${req.params.imageId}` },
+      });
+    }
+
+    res.status(r.ok ? 200 : r.status).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to remove image' });
+  }
+});
+
+// ── Docker Volumes ────────────────────────────────────────────────────────
+
+nodeEngineRouter.get('/nodes/:nodeId/engine/docker/volumes', async (req: AuthedRequest, res) => {
+  const node = await resolveNodeAccess(req, req.params.nodeId);
+  if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
+
+  try {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/docker/volumes'), { headers: agentHeaders(node) });
+    const data = await r.json();
+    res.status(r.ok ? 200 : r.status).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to list Docker volumes' });
+  }
+});
+
+nodeEngineRouter.post('/nodes/:nodeId/engine/docker/volumes', async (req: AuthedRequest, res) => {
+  const node = await resolveNodeAccess(req, req.params.nodeId);
+  if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
+
+  const { name, driver, labels } = req.body || {};
+
+  try {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/docker/volumes'), {
+      method: 'POST',
+      headers: agentHeaders(node),
+      body: JSON.stringify({ name, driver, labels }),
+    });
+    const data = await r.json();
+
+    if (r.ok) {
+      await prisma.auditLog.create({
+        data: { adminId: req.user!.id, action: 'nodeEngine.volume_create', target: `${node.id}:${name}` },
+      });
+    }
+
+    res.status(r.ok ? 201 : r.status).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to create volume' });
+  }
+});
+
+nodeEngineRouter.delete('/nodes/:nodeId/engine/docker/volumes/:name', async (req: AuthedRequest, res) => {
+  const node = await resolveNodeAccess(req, req.params.nodeId);
+  if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
+
+  const force = req.query.force === 'true';
+
+  try {
+    const r = await fetchWithTimeout(agentUrl(node.ip, `/agent/engine/docker/volumes/${encodeURIComponent(req.params.name)}?force=${force}`), {
+      method: 'DELETE',
+      headers: agentHeaders(node),
+    });
+    const data = await r.json();
+
+    if (r.ok) {
+      await prisma.auditLog.create({
+        data: { adminId: req.user!.id, action: 'nodeEngine.volume_remove', target: `${node.id}:${req.params.name}` },
+      });
+    }
+
+    res.status(r.ok ? 200 : r.status).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to remove volume' });
+  }
+});
+
+// ── Docker Networks ───────────────────────────────────────────────────────
+
 nodeEngineRouter.get('/nodes/:nodeId/engine/docker/networks', async (req: AuthedRequest, res) => {
   const node = await resolveNodeAccess(req, req.params.nodeId);
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/networks'), { headers: agentHeaders(node) });
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/docker/networks'), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -500,7 +675,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/docker/networks', async (req: Authe
   const { name, driver } = req.body || {};
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/networks'), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/docker/networks'), {
       method: 'POST',
       headers: agentHeaders(node),
       body: JSON.stringify({ name, driver }),
@@ -516,6 +691,35 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/docker/networks', async (req: Authe
     res.status(r.ok ? 201 : r.status).json(data);
   } catch (err: any) {
     res.status(502).json({ error: err.message || 'Failed to create Docker network' });
+  }
+});
+
+nodeEngineRouter.delete('/nodes/:nodeId/engine/docker/networks/:networkId', async (req: AuthedRequest, res) => {
+  const node = await resolveNodeAccess(req, req.params.nodeId);
+  if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
+
+  // Protect Docker's built-in networks — removing them breaks all container networking
+  const PROTECTED_NETWORKS = ['bridge', 'host', 'none'];
+  if (PROTECTED_NETWORKS.includes(req.params.networkId.toLowerCase())) {
+    return res.status(403).json({ error: 'Cannot remove Docker internal networks (bridge, host, none)' });
+  }
+
+  try {
+    const r = await fetchWithTimeout(agentUrl(node.ip, `/agent/engine/docker/networks/${encodeURIComponent(req.params.networkId)}`), {
+      method: 'DELETE',
+      headers: agentHeaders(node),
+    });
+    const data = await r.json();
+
+    if (r.ok) {
+      await prisma.auditLog.create({
+        data: { adminId: req.user!.id, action: 'nodeEngine.network_remove', target: `${node.id}:${req.params.networkId}` },
+      });
+    }
+
+    res.status(r.ok ? 200 : r.status).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to remove Docker network' });
   }
 });
 
@@ -550,7 +754,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/docker/compose', async (req: Authed
   }
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/compose'), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/docker/compose'), {
       method: 'POST',
       headers: agentHeaders(node),
       body: JSON.stringify({ yamlContent, projectName }),
@@ -574,7 +778,7 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/docker/prune', async (req: AuthedRe
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/docker/prune'), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/docker/prune'), {
       method: 'POST',
       headers: agentHeaders(node),
     });
@@ -599,7 +803,7 @@ nodeEngineRouter.get('/nodes/:nodeId/engine/firewall', async (req: AuthedRequest
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/firewall'), { headers: agentHeaders(node) });
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/firewall'), { headers: agentHeaders(node) });
     const data = await r.json();
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
@@ -611,13 +815,18 @@ nodeEngineRouter.post('/nodes/:nodeId/engine/firewall/rules', async (req: Authed
   const node = await resolveNodeAccess(req, req.params.nodeId);
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
-  const { port, protocol, action } = req.body || {};
+  // If system compute node, strictly require dev superuser
+  if (!(node as any).vpsProvisionId && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'System compute node firewall can strictly only be modified by dev superuser' });
+  }
+
+  const { port, protocol, action, sourceIp } = req.body || {};
 
   try {
-    const r = await fetch(agentUrl(node.ip, '/agent/engine/firewall/rules'), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/firewall/rules'), {
       method: 'POST',
       headers: agentHeaders(node),
-      body: JSON.stringify({ port, protocol, action }),
+      body: JSON.stringify({ port, protocol, action, sourceIp }),
     });
     const data = await r.json();
 
@@ -637,10 +846,19 @@ nodeEngineRouter.delete('/nodes/:nodeId/engine/firewall/rules', async (req: Auth
   const node = await resolveNodeAccess(req, req.params.nodeId);
   if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
 
-  const { port, protocol } = req.query;
+  // If system compute node, strictly require dev superuser
+  if (!(node as any).vpsProvisionId && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'System compute node firewall can strictly only be modified by dev superuser' });
+  }
+
+  const { port, protocol, ruleIndex } = req.query;
+  const queryParams = new URLSearchParams();
+  if (port) queryParams.set('port', String(port));
+  if (protocol) queryParams.set('protocol', String(protocol));
+  if (ruleIndex !== undefined && ruleIndex !== null) queryParams.set('ruleIndex', String(ruleIndex));
 
   try {
-    const r = await fetch(agentUrl(node.ip, `/agent/engine/firewall/rules?port=${encodeURIComponent(String(port ?? ''))}&protocol=${encodeURIComponent(String(protocol ?? 'tcp'))}`), {
+    const r = await fetchWithTimeout(agentUrl(node.ip, `/agent/engine/firewall/rules?${queryParams.toString()}`), {
       method: 'DELETE',
       headers: agentHeaders(node),
     });
@@ -648,13 +866,101 @@ nodeEngineRouter.delete('/nodes/:nodeId/engine/firewall/rules', async (req: Auth
 
     if (r.ok) {
       await prisma.auditLog.create({
-        data: { adminId: req.user!.id, action: 'nodeEngine.firewall_rule_delete', target: `${node.id}:${port}/${protocol}` },
+        data: { adminId: req.user!.id, action: 'nodeEngine.firewall_rule_delete', target: `${node.id}:${ruleIndex ?? `${port}/${protocol}`}` },
       });
     }
 
     res.status(r.ok ? 200 : r.status).json(data);
   } catch (err: any) {
     res.status(502).json({ error: err.message || 'Failed to delete firewall rule' });
+  }
+});
+
+nodeEngineRouter.post('/nodes/:nodeId/engine/firewall/enable', async (req: AuthedRequest, res) => {
+  const node = await resolveNodeAccess(req, req.params.nodeId);
+  if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
+
+  // If system compute node, strictly require dev superuser
+  if (!(node as any).vpsProvisionId && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'System compute node firewall can strictly only be enabled by dev superuser' });
+  }
+
+  try {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/firewall/enable'), {
+      method: 'POST',
+      headers: agentHeaders(node),
+    });
+    const data = await r.json();
+
+    if (r.ok) {
+      await prisma.auditLog.create({
+        data: { adminId: req.user!.id, action: 'nodeEngine.firewall_enable', target: node.id },
+      });
+    }
+
+    res.status(r.ok ? 200 : r.status).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to enable UFW' });
+  }
+});
+
+nodeEngineRouter.post('/nodes/:nodeId/engine/firewall/disable', async (req: AuthedRequest, res) => {
+  const node = await resolveNodeAccess(req, req.params.nodeId);
+  if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
+
+  // Only dev superusers can disable system firewall
+  if (!(node as any).vpsProvisionId && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'System compute node firewall can strictly only be disabled by dev superuser' });
+  } else if (!['dev', 'admin'].includes(req.user?.role || '')) {
+    return res.status(403).json({ error: 'Only platform staff can disable the node firewall' });
+  }
+
+  try {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/firewall/disable'), {
+      method: 'POST',
+      headers: agentHeaders(node),
+    });
+    const data = await r.json();
+
+    if (r.ok) {
+      await prisma.auditLog.create({
+        data: { adminId: req.user!.id, action: 'nodeEngine.firewall_disable', target: node.id },
+      });
+    }
+
+    res.status(r.ok ? 200 : r.status).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to disable UFW' });
+  }
+});
+
+nodeEngineRouter.post('/nodes/:nodeId/engine/firewall/reset', async (req: AuthedRequest, res) => {
+  const node = await resolveNodeAccess(req, req.params.nodeId);
+  if (!node) return res.status(404).json({ error: 'Node or VPS not found' });
+
+  // Only dev superuser can do a full system firewall reset
+  if (!(node as any).vpsProvisionId && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'System compute node firewall can strictly only be reset by dev superuser' });
+  } else if (!['dev', 'admin'].includes(req.user?.role || '')) {
+    return res.status(403).json({ error: 'Only platform staff can reset the node firewall' });
+  }
+
+  try {
+    const r = await fetchWithTimeout(agentUrl(node.ip, '/agent/engine/firewall/reset'), {
+      method: 'POST',
+      headers: agentHeaders(node),
+    });
+    const data = await r.json();
+
+    if (r.ok) {
+      await prisma.auditLog.create({
+        data: { adminId: req.user!.id, action: 'nodeEngine.firewall_reset', target: node.id },
+      });
+    }
+
+    res.status(r.ok ? 200 : r.status).json(data);
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to reset UFW' });
   }
 });
 

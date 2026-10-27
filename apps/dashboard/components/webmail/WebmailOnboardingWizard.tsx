@@ -336,7 +336,7 @@ export function WebmailOnboardingWizard({ isOpen, smtpAccountId, onComplete }: W
               <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/10">
                 <Check className="h-8 w-8 text-emerald-400" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">You're all set! 🎉</h3>
+              <h3 className="text-xl font-bold text-white mb-2">You're all set!</h3>
               <p className="text-sm text-slate-400 max-w-sm mx-auto leading-relaxed">
                 Your mailbox is configured and ready to use. You can always update settings, add more aliases, or configure advanced rules from the Settings panel.
               </p>

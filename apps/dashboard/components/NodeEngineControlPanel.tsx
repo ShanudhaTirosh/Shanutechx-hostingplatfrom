@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Button, Input, Modal, useToast } from './ui';
 import { api } from '@/lib/api';
@@ -19,6 +20,7 @@ interface NodeEngineControlPanelProps {
 }
 
 export function NodeEngineControlPanel({ nodeId, nodeLabel, ipAddress }: NodeEngineControlPanelProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'terminal' | 'system' | 'ports' | 'docker' | 'users'>('overview');
   const [monitoringData, setMonitoringData] = useState<any>(null);
   const [services, setServices] = useState<any[]>([]);
@@ -191,13 +193,62 @@ export function NodeEngineControlPanel({ nodeId, nodeLabel, ipAddress }: NodeEng
     }
   }
 
-  async function handleDeleteRule(port: string, protocol: string) {
+  async function handleDeleteRule(rule: any) {
     try {
-      await api.nodeEngine.deleteFirewallRule(nodeId, port, protocol);
-      toast(`Rule deleted: ${port}/${protocol}`, 'success');
+      await api.nodeEngine.deleteFirewallRule(nodeId, {
+        ruleIndex: rule.index,
+        port: rule.port || rule.to?.split('/')[0],
+        protocol: rule.protocol || rule.to?.split('/')[1]?.split(' ')[0] || 'tcp',
+      });
+      toast(`Firewall rule deleted successfully`, 'success');
       fetchPortsAndFirewall();
     } catch (err: any) {
       toast(err.message || 'Failed to delete rule', 'error');
+    }
+  }
+
+  async function handleToggleUfw(action: 'enable' | 'disable' | 'reset') {
+    if (action === 'reset' && !confirm('Are you sure you want to reset all UFW firewall rules to defaults? Custom rules will be wiped.')) return;
+    try {
+      if (action === 'enable') await api.nodeEngine.enableFirewall(nodeId);
+      else if (action === 'disable') await api.nodeEngine.disableFirewall(nodeId);
+      else await api.nodeEngine.resetFirewall(nodeId);
+      toast(`UFW firewall ${action}d successfully`, 'success');
+      fetchPortsAndFirewall();
+    } catch (err: any) {
+      toast(err.message || `Failed to ${action} UFW`, 'error');
+    }
+  }
+
+  async function viewContainerInspect(containerId: string, name: string) {
+    try {
+      const res = await api.nodeEngine.containerInspect(nodeId, containerId);
+      setSelectedLogs({ title: `Container Inspect: ${name}`, content: JSON.stringify(res, null, 2) });
+    } catch (err: any) {
+      toast(err.message || 'Failed to inspect container', 'error');
+    }
+  }
+
+  async function viewContainerStats(containerId: string, name: string) {
+    try {
+      const res = await api.nodeEngine.containerStats(nodeId, containerId);
+      setSelectedLogs({ title: `Live Container Stats: ${name}`, content: JSON.stringify(res, null, 2) });
+    } catch (err: any) {
+      toast(err.message || 'Failed to fetch container stats', 'error');
+    }
+  }
+
+  async function handleDeleteNetwork(networkId: string, name: string) {
+    if (['bridge', 'host', 'none'].includes(name.toLowerCase())) {
+      return toast('Default system networks (bridge, host, none) cannot be deleted', 'error');
+    }
+    if (!confirm(`Are you sure you want to delete network "${name}"?`)) return;
+    try {
+      await api.nodeEngine.deleteNetwork(nodeId, networkId);
+      toast(`Docker network "${name}" deleted`, 'success');
+      fetchDockerData();
+    } catch (err: any) {
+      toast(err.message || 'Failed to delete network', 'error');
     }
   }
 
@@ -650,12 +701,36 @@ export function NodeEngineControlPanel({ nodeId, nodeLabel, ipAddress }: NodeEng
 
           {/* Firewall UFW Rules */}
           <div className="glass rounded-2xl p-5 border border-white/[0.08] space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap justify-between items-center gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-text-primary">UFW Network Firewall Rules</h3>
-                <p className="text-xs text-text-muted">Status: {firewall?.active ? 'Active' : 'Inactive'}</p>
+                <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-emerald-400" />
+                  UFW Network Firewall Rules
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
+                    firewall?.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                  }`}>
+                    {firewall?.active ? 'Active (Protected)' : 'Inactive (Unprotected)'}
+                  </span>
+                </h3>
+                <p className="text-xs text-text-muted">Uncomplicated Firewall packet filtering and port rules</p>
               </div>
-              <Button size="sm" variant="primary" onClick={() => setShowAddRuleModal(true)}>+ Add Firewall Rule</Button>
+              <div className="flex flex-wrap items-center gap-2">
+                {firewall?.active ? (
+                  <Button size="sm" variant="secondary" onClick={() => handleToggleUfw('disable')}>
+                    Disable UFW
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="primary" onClick={() => handleToggleUfw('enable')}>
+                    Enable UFW
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" onClick={() => handleToggleUfw('reset')} className="text-red-400 hover:text-red-300">
+                  Reset Rules
+                </Button>
+                <Button size="sm" variant="primary" onClick={() => setShowAddRuleModal(true)}>
+                  + Add Firewall Rule
+                </Button>
+              </div>
             </div>
             {tabLoading ? (
               <div className="py-8 text-center text-text-muted text-xs animate-pulse">Loading firewall rules...</div>
@@ -684,7 +759,7 @@ export function NodeEngineControlPanel({ nodeId, nodeLabel, ipAddress }: NodeEng
                         <td className="p-3 font-mono text-text-muted">{r.from}</td>
                         <td className="p-3 text-right">
                           <button
-                            onClick={() => handleDeleteRule(r.to.split('/')[0], r.to.split('/')[1] || 'tcp')}
+                            onClick={() => handleDeleteRule(r)}
                             className="text-red-400 hover:underline"
                           >
                             Delete
@@ -703,6 +778,30 @@ export function NodeEngineControlPanel({ nodeId, nodeLabel, ipAddress }: NodeEng
       {/* TAB 5: DOCKER CONTAINER ENGINE & DOCKER COMPOSE */}
       {activeTab === 'docker' && (
         <div className="space-y-6">
+          {/* Quick link banner to Unified Docker Hub */}
+          <div className="glass p-4 rounded-2xl border border-accent-violet/30 bg-accent-violet/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <h4 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <Box className="w-4 h-4 text-accent-violet-light" />
+                Unified Docker &amp; Container Orchestrator
+              </h4>
+              <p className="text-xs text-text-muted mt-0.5">
+                Manage all Docker containers, full stack compose, image registries, volumes, and networks from the dedicated Docker Hub.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="primary" onClick={() => router.push(`/dev/containers?nodeId=${nodeId}`)}>
+                Open Containers Hub →
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => router.push(`/dev/images?nodeId=${nodeId}`)}>
+                Images Hub
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => router.push(`/dev/volumes?nodeId=${nodeId}`)}>
+                Volumes Hub
+              </Button>
+            </div>
+          </div>
+
           {/* Actions Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-3 glass p-4 rounded-2xl border border-white/[0.08]">
             <div className="flex flex-wrap gap-2">
@@ -755,6 +854,8 @@ export function NodeEngineControlPanel({ nodeId, nodeLabel, ipAddress }: NodeEng
                         <td className="p-3 font-mono text-text-muted truncate max-w-xs">{c.image}</td>
                         <td className="p-3 text-right space-x-2">
                           <button onClick={() => viewContainerLogs(c.id, c.names[0])} className="text-white hover:underline">Logs</button>
+                          <button onClick={() => viewContainerStats(c.id, c.names[0])} className="text-cyan-400 hover:underline">Stats</button>
+                          <button onClick={() => viewContainerInspect(c.id, c.names[0])} className="text-purple-400 hover:underline">Inspect</button>
                           <button onClick={() => handleContainerAction(c.id, 'restart')} className="text-amber-400 hover:underline">Restart</button>
                           {c.state === 'running' ? (
                             <button onClick={() => handleContainerAction(c.id, 'stop')} className="text-red-400 hover:underline">Stop</button>
@@ -782,6 +883,7 @@ export function NodeEngineControlPanel({ nodeId, nodeLabel, ipAddress }: NodeEng
                     <th className="p-3">Driver</th>
                     <th className="p-3">Scope</th>
                     <th className="p-3">Network ID</th>
+                    <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
@@ -791,6 +893,15 @@ export function NodeEngineControlPanel({ nodeId, nodeLabel, ipAddress }: NodeEng
                       <td className="p-3 font-mono text-cyan-400">{n.driver}</td>
                       <td className="p-3 font-mono text-text-muted">{n.scope}</td>
                       <td className="p-3 font-mono text-text-faint">{n.id?.slice(0, 12)}</td>
+                      <td className="p-3 text-right">
+                        {!['bridge', 'host', 'none'].includes(n.name.toLowerCase()) ? (
+                          <button onClick={() => handleDeleteNetwork(n.id, n.name)} className="text-red-400 hover:underline">
+                            Delete
+                          </button>
+                        ) : (
+                          <span className="text-text-faint text-[10px]">Built-in</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

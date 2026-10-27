@@ -465,7 +465,7 @@ export default function ManagedDatabasesPage() {
       {actionNotice && (
         <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs font-semibold text-emerald-300 flex items-center justify-between">
           <span>{actionNotice}</span>
-          <button onClick={() => setActionNotice(null)} className="text-white hover:text-red-400">✕</button>
+          <button onClick={() => setActionNotice(null)} className="text-white hover:text-red-400"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>
       )}
 
@@ -575,13 +575,13 @@ export default function ManagedDatabasesPage() {
                 {/* Tab Switcher */}
                 <div className="flex items-center gap-1 overflow-x-auto border-b border-white/10 pb-2">
                   {[
-                    { id: 'overview', label: '📊 Overview & Pricing' },
-                    { id: 'query', label: '💻 Query Console' },
-                    { id: 'scaling', label: '⚡ Scaling & Cost' },
-                    { id: 'backups', label: '💾 Backups ($2/dump)' },
-                    { id: 'migration', label: isDevUser ? '🚀 Node Migration' : '🔒 Node Migration (Dev Only)' },
-                    { id: 'security', label: '👥 Access & Security' },
-                    { id: 'connection', label: '🔑 Connections' },
+                    { id: 'overview', label: 'Overview & Pricing' },
+                    { id: 'query', label: 'Query Console' },
+                    { id: 'scaling', label: 'Scaling & Cost' },
+                    { id: 'backups', label: 'Backups ($2/dump)' },
+                    { id: 'migration', label: isDevUser ? 'Node Migration' : 'Node Migration (Dev Only)' },
+                    { id: 'security', label: 'Access & Security' },
+                    { id: 'connection', label: 'Connections' },
                   ].map((tab) => (
                     <button
                       key={tab.id}
@@ -929,7 +929,7 @@ export default function ManagedDatabasesPage() {
 
                     {!isDevUser ? (
                       <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-xl text-center space-y-2">
-                        <p className="text-xs font-bold text-red-300">🔒 Node Migration Restricted</p>
+                        <p className="text-xs font-bold text-red-300 flex items-center gap-1"><IconLock size={11} className="inline" /> Node Migration Restricted</p>
                         <p className="text-xs text-text-muted max-w-md mx-auto">
                           As per platform security policy, database container node migration is restricted exclusively to dev superusers (`role: dev`). Regular customers and standard admin roles cannot initiate database node relocations.
                         </p>
@@ -1099,7 +1099,7 @@ export default function ManagedDatabasesPage() {
           <div className="bg-[#0b0c16] border border-white/15 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-base font-bold text-white">Provision Managed Database Cluster</h3>
-              <button onClick={() => setShowProvisionModal(false)} className="text-text-muted hover:text-white">✕</button>
+              <button onClick={() => setShowProvisionModal(false)} className="text-text-muted hover:text-white"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
 
             <form onSubmit={handleProvisionSubmit} className="space-y-4">
@@ -1180,7 +1180,7 @@ export default function ManagedDatabasesPage() {
           <div className="bg-[#0b0c16] border border-white/15 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-base font-bold text-white">Add User Account to {selectedDb.dbName}</h3>
-              <button onClick={() => setShowAddUserModal(false)} className="text-text-muted hover:text-white">✕</button>
+              <button onClick={() => setShowAddUserModal(false)} className="text-text-muted hover:text-white"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
 
             <form onSubmit={handleAddUser} className="space-y-4">
@@ -1235,7 +1235,7 @@ export default function ManagedDatabasesPage() {
           <div className="bg-[#0b0c16] border border-white/15 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-base font-bold text-white">Rotate Master Password</h3>
-              <button onClick={() => setShowRotatePassModal(false)} className="text-text-muted hover:text-white">✕</button>
+              <button onClick={() => setShowRotatePassModal(false)} className="text-text-muted hover:text-white"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
 
             <form onSubmit={handleRotateMasterPassword} className="space-y-4">

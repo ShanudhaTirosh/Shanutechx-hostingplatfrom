@@ -1107,6 +1107,8 @@ export const api = {
       apiFetch(`/api/nodes/${nodeId}/failover`, { method: 'POST' }).then((r) => asJson<{ success: boolean; message: string; result: any }>(r)),
     getFailoverStatus: (nodeId: string) =>
       apiFetch(`/api/nodes/${nodeId}/failover-status`).then((r) => asJson<{ logs: any[] }>(r)),
+    update: (nodeId: string, data: { isActive?: boolean; isDraining?: boolean; label?: string; roleTags?: string[]; monthlyBandwidthGb?: number }) =>
+      apiFetch(`/api/nodes/${nodeId}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) => asJson<{ node: Node }>(r)),
   },
 
   containers: {
@@ -1696,17 +1698,64 @@ export const api = {
       apiFetch(`/api/nodes/${nodeId}/engine/docker/prune`, {
         method: 'POST',
       }).then((r) => asJson<{ ok: boolean; containersPruned: number; imagesPruned: number }>(r)),
+    containerInspect: (nodeId: string, containerId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/containers/${encodeURIComponent(containerId)}/inspect`).then((r) => asJson<any>(r)),
+    containerStats: (nodeId: string, containerId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/containers/${encodeURIComponent(containerId)}/stats`).then((r) => asJson<any>(r)),
+    images: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/images`).then((r) => asJson<{ images: any[] }>(r)),
+    pullImage: (nodeId: string, imageName: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/images/pull`, {
+        method: 'POST',
+        body: JSON.stringify({ imageName }),
+      }).then((r) => asJson<any>(r)),
+    deleteImage: (nodeId: string, imageId: string, force = false) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/images/${encodeURIComponent(imageId)}?force=${force}`, {
+        method: 'DELETE',
+      }).then((r) => asJson<any>(r)),
+    volumes: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/volumes`).then((r) => asJson<{ volumes: any[] }>(r)),
+    createVolume: (nodeId: string, data: { name: string; driver?: string; labels?: Record<string, string> }) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/volumes`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) => asJson<any>(r)),
+    deleteVolume: (nodeId: string, name: string, force = false) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/volumes/${encodeURIComponent(name)}?force=${force}`, {
+        method: 'DELETE',
+      }).then((r) => asJson<any>(r)),
+    deleteNetwork: (nodeId: string, networkId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/docker/networks/${encodeURIComponent(networkId)}`, {
+        method: 'DELETE',
+      }).then((r) => asJson<any>(r)),
     firewallStatus: (nodeId: string) =>
       apiFetch(`/api/nodes/${nodeId}/engine/firewall`).then((r) => asJson<any>(r)),
-    addFirewallRule: (nodeId: string, rule: { port: number; protocol: string; action: string }) =>
+    enableFirewall: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/firewall/enable`, { method: 'POST' }).then((r) => asJson<any>(r)),
+    disableFirewall: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/firewall/disable`, { method: 'POST' }).then((r) => asJson<any>(r)),
+    resetFirewall: (nodeId: string) =>
+      apiFetch(`/api/nodes/${nodeId}/engine/firewall/reset`, { method: 'POST' }).then((r) => asJson<any>(r)),
+    addFirewallRule: (nodeId: string, rule: { port: number | string; protocol: string; action: string; sourceIp?: string }) =>
       apiFetch(`/api/nodes/${nodeId}/engine/firewall/rules`, {
         method: 'POST',
         body: JSON.stringify(rule),
       }).then((r) => asJson<any>(r)),
-    deleteFirewallRule: (nodeId: string, port: string, protocol: string) =>
-      apiFetch(`/api/nodes/${nodeId}/engine/firewall/rules?port=${encodeURIComponent(port)}&protocol=${encodeURIComponent(protocol)}`, {
+    deleteFirewallRule: (nodeId: string, portOrParams: string | { port?: string | number; protocol?: string; ruleIndex?: number }, protocol?: string) => {
+      let q = '';
+      if (typeof portOrParams === 'object') {
+        const params = new URLSearchParams();
+        if (portOrParams.port) params.set('port', String(portOrParams.port));
+        if (portOrParams.protocol) params.set('protocol', String(portOrParams.protocol));
+        if (portOrParams.ruleIndex !== undefined) params.set('ruleIndex', String(portOrParams.ruleIndex));
+        q = params.toString();
+      } else {
+        q = `port=${encodeURIComponent(portOrParams)}&protocol=${encodeURIComponent(protocol || 'tcp')}`;
+      }
+      return apiFetch(`/api/nodes/${nodeId}/engine/firewall/rules?${q}`, {
         method: 'DELETE',
-      }).then((r) => asJson<any>(r)),
+      }).then((r) => asJson<any>(r));
+    },
     /** Mint a short-lived SSH ticket for the Node Engine terminal */
     sshTicket: (nodeId: string) =>
       apiFetch(`/api/nodes/${nodeId}/engine/ssh-ticket`, { method: 'POST' }).then(

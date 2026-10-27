@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError, PortIssueUi, PortsOverview } from '@/lib/api';
 import { Button, Card, ConfirmDialog, Spinner, useToast } from '@/components/ui';
+import { UnifiedConnectorsHub } from '@/components/UnifiedConnectorsHub';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,7 @@ function IssueList({ issues }: { issues: PortIssueUi[] }) {
 
 export default function DevPortsPage() {
   const { toast } = useToast();
+  const [viewMode, setViewMode] = useState<'exposures' | 'ufw'>('exposures');
   const [data, setData] = useState<PortsOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,18 +75,51 @@ export default function DevPortsPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
-      <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+      {/* Top Header & View Mode Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Exposed ports</h1>
-          <p className="text-sm text-text-muted">What is reachable on each node, how, and what is wrong with it. Change a deployment&apos;s exposure from its Routing tab.</p>
+          <h1 className="text-2xl font-bold text-white">Ports &amp; Firewall Management</h1>
+          <p className="text-sm text-text-muted">
+            Configure Cloudflare public subdomain routing exposures or manage Linux kernel UFW host firewall rules.
+          </p>
         </div>
-        <Button size="sm" variant="secondary" onClick={() => void load()} loading={loading}>
-          Refresh
-        </Button>
+
+        <div className="flex gap-1.5 p-1 glass rounded-2xl border border-white/[0.08] shadow-sm">
+          <button
+            onClick={() => setViewMode('exposures')}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              viewMode === 'exposures'
+                ? 'bg-white text-black shadow-sm font-semibold'
+                : 'text-text-muted hover:text-white hover:bg-white/[0.06]'
+            }`}
+          >
+            Cloudflare Domain Exposures
+          </button>
+          <button
+            onClick={() => setViewMode('ufw')}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              viewMode === 'ufw'
+                ? 'bg-white text-black shadow-sm font-semibold'
+                : 'text-text-muted hover:text-white hover:bg-white/[0.06]'
+            }`}
+          >
+            VPS Host Firewall (UFW)
+          </button>
+        </div>
       </div>
 
-      {error && <p className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{error}</p>}
-      {loading && !data && <Spinner label="Loading ports..." />}
+      {viewMode === 'ufw' ? (
+        <UnifiedConnectorsHub defaultTab="ports" />
+      ) : (
+        <>
+          <div className="flex justify-end">
+            <Button size="sm" variant="secondary" onClick={() => void load()} loading={loading}>
+              Refresh
+            </Button>
+          </div>
+
+          {error && <p className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{error}</p>}
+          {loading && !data && <Spinner label="Loading ports..." />}
 
       {data && (
         <>
@@ -189,6 +224,8 @@ export default function DevPortsPage() {
           ))}
         </>
       )}
+    </>
+  )}
 
       <ConfirmDialog
         open={closing !== null}

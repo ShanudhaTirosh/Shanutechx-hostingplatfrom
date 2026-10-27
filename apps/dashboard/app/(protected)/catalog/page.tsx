@@ -1238,10 +1238,10 @@ export default function CatalogPage() {
               </strong> per slot
             </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-neutral-300">
-              ⚡ Hardware Specs: <strong className="text-emerald-400">0.5 vCPU • 1GB RAM</strong> standard
+              Hardware Specs: <strong className="text-emerald-400">0.5 vCPU • 1GB RAM</strong> standard
             </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-neutral-400">
-              🛡️ Dedicated Cgroup Resource Enforcement
+              Dedicated Cgroup Resource Enforcement
             </span>
           </div>
 

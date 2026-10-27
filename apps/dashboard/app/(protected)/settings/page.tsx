@@ -16,6 +16,20 @@ import {
   Tabs,
 } from '@/components/ui';
 import { api } from '@/lib/api';
+import {
+  IconPackage,
+  IconCloud,
+  IconMail,
+  IconZap,
+  IconMessageSquare,
+  IconSave,
+  IconBuilding,
+  IconSmartphone,
+  IconCoins,
+  IconAlert,
+  IconCheckCircle,
+  IconGlobe2,
+} from '@/components/Icons';
 
 export const dynamic = 'force-dynamic';
 
@@ -297,10 +311,10 @@ function DatabaseBackupsTab() {
         </div>
         <div className="flex items-center gap-2.5">
           <Button variant="secondary" onClick={handleExportZip} loading={exportingZip} size="sm">
-            📦 Export Full Backup as ZIP
+            <IconPackage size={13} className="mr-1.5 inline" /> Export Full Backup as ZIP
           </Button>
           <Button onClick={handleRunNow} loading={running} size="sm">
-            ☁️ Run R2 Backup Now
+            <IconCloud size={13} className="mr-1.5 inline" /> Run R2 Backup Now
           </Button>
         </div>
       </div>
@@ -498,8 +512,8 @@ function ApiConfigsTab() {
           <Card className="border border-white/10 p-6 bg-[#0a0a0f] shadow-xl space-y-5">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold">
-                  ✉️
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <IconMail size={15} />
                 </div>
                 <div>
                   <h4 className="font-bold text-sm text-text-primary">Global SMTP / Mail Server Credentials</h4>
@@ -599,7 +613,7 @@ function ApiConfigsTab() {
                   loading={testingSmtp}
                   disabled={!smtpHost.trim() || !smtpUser.trim()}
                 >
-                  ⚡ Test SMTP Handshake
+                  <IconZap size={13} className="mr-1.5 inline" /> Test SMTP Handshake
                 </Button>
 
                 <Button type="submit" size="sm" loading={savingSmtp}>
@@ -615,7 +629,8 @@ function ApiConfigsTab() {
           <Card className="border border-white/10 p-5 bg-[#0a0a0f] space-y-2">
             <div className="flex items-center justify-between">
               <h4 className="font-semibold text-sm text-text-primary flex items-center gap-2">
-                <span>☁️ Cloudflare R2 Storage</span>
+                <IconCloud size={14} className="text-amber-400" />
+                <span>Cloudflare R2 Storage</span>
               </h4>
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${configs?.r2Storage?.configured ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-text-muted'}`}>
                 {configs?.r2Storage?.configured ? 'Active' : 'Unconfigured'}
@@ -629,7 +644,8 @@ function ApiConfigsTab() {
           <Card className="border border-white/10 p-5 bg-[#0a0a0f] space-y-2">
             <div className="flex items-center justify-between">
               <h4 className="font-semibold text-sm text-text-primary flex items-center gap-2">
-                <span>💬 Discord Notifications</span>
+                <IconMessageSquare size={14} className="text-indigo-400" />
+                <span>Discord Notifications</span>
               </h4>
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${configs?.discordWebhooks?.configured ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-text-muted'}`}>
                 {configs?.discordWebhooks?.configured ? `${configs.discordWebhooks.count} Webhooks` : 'Unconfigured'}
@@ -947,7 +963,7 @@ function PaymentInfoTab() {
           variant="primary"
           size="sm"
         >
-          💾 Save All Payment Methods
+          <IconSave size={13} className="mr-1.5 inline" /> Save All Payment Methods
         </Button>
       </div>
 
@@ -972,11 +988,11 @@ function PaymentInfoTab() {
               >
                 <div className="flex items-start justify-between gap-3 pb-3 border-b border-white/[0.06]">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-sm font-bold">
-                      {isBank && '🏦'}
-                      {isHelaPay && '🇱🇰'}
-                      {isEzCash && '📱'}
-                      {isCrypto && '🪙'}
+                    <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+                      {isBank && <IconBuilding size={15} className="text-slate-300" />}
+                      {isHelaPay && <IconGlobe2 size={15} className="text-orange-400" />}
+                      {isEzCash && <IconSmartphone size={15} className="text-green-400" />}
+                      {isCrypto && <IconCoins size={15} className="text-amber-400" />}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -1016,7 +1032,9 @@ function PaymentInfoTab() {
                     }`}
                   >
                     <div className="flex items-center gap-1.5 font-bold">
-                      {phoneMissing ? '⚠️ Phone Number Required' : '✅ Phone Number Configured'}
+                      {phoneMissing
+                        ? <><IconAlert size={13} className="inline text-amber-400" /> Phone Number Required</>
+                        : <><IconCheckCircle size={13} className="inline text-emerald-400" /> Phone Number Configured</>}
                     </div>
                     <p className="text-[11px] text-text-muted mt-0.5">
                       {phoneMissing
@@ -1156,7 +1174,7 @@ function PaymentInfoTab() {
 
         <div className="flex justify-end pt-2">
           <Button type="submit" variant="primary" loading={saving} size="sm">
-            💾 Save All Payment Methods
+            <IconSave size={13} className="mr-1.5 inline" /> Save All Payment Methods
           </Button>
         </div>
       </form>

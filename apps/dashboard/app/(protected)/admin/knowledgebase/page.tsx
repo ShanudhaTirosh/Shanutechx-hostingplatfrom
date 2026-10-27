@@ -191,7 +191,7 @@ export default function AdminKnowledgeBasePage() {
                       </span>
                     </td>
                     <td className="p-3 text-neutral-400">{art.views}</td>
-                    <td className="p-3 text-emerald-400">👍 {art.helpfulCount}</td>
+                    <td className="p-3 text-emerald-400 flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg> {art.helpfulCount}</td>
                     <td className="p-3 text-neutral-500">{new Date(art.updatedAt).toLocaleDateString()}</td>
                     <td className="p-3 text-right space-x-2">
                       <Button size="sm" variant="secondary" onClick={() => openEditModal(art)}>Edit</Button>

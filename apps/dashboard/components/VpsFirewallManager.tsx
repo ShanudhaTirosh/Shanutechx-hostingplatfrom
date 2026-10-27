@@ -218,6 +218,36 @@ export function VpsFirewallManager({ provisionId, sshPort = 22 }: VpsFirewallMan
         >
           + Allow Postgres (5432/tcp)
         </button>
+        <button
+          onClick={() => applyPreset('Node / Next.js', '3000', 'tcp')}
+          className="px-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-white font-mono text-[11px] transition-all"
+        >
+          + Allow Node (3000/tcp)
+        </button>
+        <button
+          onClick={() => applyPreset('Vite Dev Server', '5173', 'tcp')}
+          className="px-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-white font-mono text-[11px] transition-all"
+        >
+          + Allow Vite (5173/tcp)
+        </button>
+        <button
+          onClick={() => applyPreset('Backend API', '4000', 'tcp')}
+          className="px-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-white font-mono text-[11px] transition-all"
+        >
+          + Allow API (4000/tcp)
+        </button>
+        <button
+          onClick={() => applyPreset('Redis Cache', '6379', 'tcp')}
+          className="px-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-white font-mono text-[11px] transition-all"
+        >
+          + Allow Redis (6379/tcp)
+        </button>
+        <button
+          onClick={() => applyPreset('MongoDB', '27017', 'tcp')}
+          className="px-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-white font-mono text-[11px] transition-all"
+        >
+          + Allow Mongo (27017/tcp)
+        </button>
       </div>
 
       {/* Firewall Rules List Table */}

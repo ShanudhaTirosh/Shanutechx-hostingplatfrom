@@ -18,6 +18,18 @@ import {
   useToast,
   Badge,
 } from '@/components/ui';
+import {
+  IconSettings,
+  IconUser,
+  IconEdit,
+  IconShield,
+  IconClose,
+  IconShoppingBag,
+  IconMonitor,
+  IconTicket,
+  IconMask,
+  IconThumbsUp,
+} from '@/components/Icons';
 
 export const dynamic = 'force-dynamic';
 
@@ -390,9 +402,9 @@ export default function AdminCustomersPage() {
                       <button
                         onClick={() => openRoleModal(cust)}
                         title="Change role"
-                        className="text-[10px] text-text-muted hover:text-white p-1 rounded hover:bg-white/5 transition-colors"
+                        className="text-text-muted hover:text-white p-1 rounded hover:bg-white/5 transition-colors"
                       >
-                        ⚙️
+                        <IconSettings size={13} />
                       </button>
                     </div>
                   </Td>
@@ -402,7 +414,7 @@ export default function AdminCustomersPage() {
                     {cust.assignedAdmin ? (
                       <div className="flex items-center gap-1.5">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-white/5 border border-white/10 text-text-primary">
-                          <span className="text-[10px] text-text-muted">👤</span>
+                          <IconUser size={11} className="text-text-muted" />
                           <span className="truncate max-w-[120px]">
                             {cust.assignedAdmin.displayName || cust.assignedAdmin.email}
                           </span>
@@ -410,9 +422,9 @@ export default function AdminCustomersPage() {
                         <button
                           onClick={() => openAssignModal(cust)}
                           title="Reassign admin"
-                          className="text-[10px] text-text-muted hover:text-white p-1 rounded hover:bg-white/5"
+                          className="text-text-muted hover:text-white p-1 rounded hover:bg-white/5"
                         >
-                          ✏️
+                          <IconEdit size={12} />
                         </button>
                       </div>
                     ) : (
@@ -507,8 +519,8 @@ export default function AdminCustomersPage() {
                       </Button>
 
                       {cust.role === 'dev' ? (
-                        <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                          🛡️ Dev Immune
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                          <IconShield size={12} /> Dev Immune
                         </span>
                       ) : cust.isBanned ? (
                         <button
@@ -580,9 +592,9 @@ export default function AdminCustomersPage() {
                   setSelectedCustomerId(null);
                   setCustomerDetails(null);
                 }}
-                className="text-text-muted hover:text-white transition-colors text-xl p-1"
+                className="text-text-muted hover:text-white transition-colors p-1 rounded hover:bg-white/5"
               >
-                ✕
+                <IconClose size={16} />
               </button>
             </div>
 
@@ -630,43 +642,43 @@ export default function AdminCustomersPage() {
                 <div className="flex items-center gap-2 px-5 pt-3 border-b border-white/10 bg-white/[0.01]">
                   <button
                     onClick={() => setDetailsTab('purchases')}
-                    className={`pb-2.5 text-xs font-semibold border-b-2 transition-all ${
+                    className={`pb-2.5 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5 ${
                       detailsTab === 'purchases'
                         ? 'border-accent-teal text-white'
                         : 'border-transparent text-text-muted hover:text-text-primary'
                     }`}
                   >
-                    🛍️ Purchases &amp; Orders ({customerDetails.orders.length})
+                    <IconShoppingBag size={12} /> Purchases &amp; Orders ({customerDetails.orders.length})
                   </button>
                   <button
                     onClick={() => setDetailsTab('infrastructure')}
-                    className={`pb-2.5 text-xs font-semibold border-b-2 transition-all ${
+                    className={`pb-2.5 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5 ${
                       detailsTab === 'infrastructure'
                         ? 'border-accent-teal text-white'
                         : 'border-transparent text-text-muted hover:text-text-primary'
                     }`}
                   >
-                    🖥️ Infrastructure ({customerDetails.vpsProvisions.length + customerDetails.deployments.length + customerDetails.managedDatabases.length})
+                    <IconMonitor size={12} /> Infrastructure ({customerDetails.vpsProvisions.length + customerDetails.deployments.length + customerDetails.managedDatabases.length})
                   </button>
                   <button
                     onClick={() => setDetailsTab('tickets')}
-                    className={`pb-2.5 text-xs font-semibold border-b-2 transition-all ${
+                    className={`pb-2.5 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5 ${
                       detailsTab === 'tickets'
                         ? 'border-accent-teal text-white'
                         : 'border-transparent text-text-muted hover:text-text-primary'
                     }`}
                   >
-                    🎫 Tickets ({customerDetails.tickets.length})
+                    <IconTicket size={12} /> Tickets ({customerDetails.tickets.length})
                   </button>
                   <button
                     onClick={() => setDetailsTab('actions')}
-                    className={`pb-2.5 text-xs font-semibold border-b-2 transition-all ${
+                    className={`pb-2.5 text-xs font-semibold border-b-2 transition-all flex items-center gap-1.5 ${
                       detailsTab === 'actions'
                         ? 'border-accent-teal text-white'
                         : 'border-transparent text-text-muted hover:text-text-primary'
                     }`}
                   >
-                    ⚙️ Admin Actions
+                    <IconSettings size={12} /> Admin Actions
                   </button>
                 </div>
 
@@ -955,7 +967,7 @@ export default function AdminCustomersPage() {
                               openAssignModal(customerDetails);
                             }}
                           >
-                            👤 Assign Managing Admin
+                            <IconUser size={13} className="mr-1 inline" /> Assign Managing Admin
                           </Button>
                           <Button
                             variant="secondary"
@@ -963,13 +975,13 @@ export default function AdminCustomersPage() {
                               openRoleModal(customerDetails);
                             }}
                           >
-                            🛡️ Change Account Role
+                            <IconShield size={13} className="mr-1 inline" /> Change Account Role
                           </Button>
                           <Button
                             variant="secondary"
                             onClick={() => handleImpersonate(customerDetails.id, customerDetails.email)}
                           >
-                            🎭 Impersonate User
+                            <IconMask size={13} className="mr-1 inline" /> Impersonate User
                           </Button>
                         </div>
                       </div>
@@ -998,7 +1010,7 @@ export default function AdminCustomersPage() {
                       {customerDetails.role === 'dev' ? (
                         <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-1">
                           <div className="flex items-center gap-2 text-sm font-semibold text-amber-300">
-                            <span>🛡️ Protected Developer Superuser</span>
+                            <IconShield size={14} /> Protected Developer Superuser
                           </div>
                           <p className="text-xs text-text-muted">
                             This account is the platform developer and superuser. It is permanently immune to bans, demotions, suspensions, and restrictions.
@@ -1046,14 +1058,14 @@ export default function AdminCustomersPage() {
           <div className="w-full max-w-md rounded-2xl border border-white/15 bg-[#0e1017] p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-                <span>👤</span>
+                <IconUser size={14} />
                 <span>Assign Managing Admin</span>
               </h3>
               <button
                 onClick={() => setAssignModalUser(null)}
-                className="text-text-muted hover:text-white transition-colors text-lg"
+                className="text-text-muted hover:text-white transition-colors p-0.5 rounded hover:bg-white/5"
               >
-                ✕
+                <IconClose size={15} />
               </button>
             </div>
 
@@ -1101,21 +1113,21 @@ export default function AdminCustomersPage() {
           <div className="w-full max-w-md rounded-2xl border border-white/15 bg-[#0e1017] p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-                <span>🛡️</span>
+                <IconShield size={14} />
                 <span>Change User Role</span>
               </h3>
               <button
                 onClick={() => setRoleModalUser(null)}
-                className="text-text-muted hover:text-white transition-colors text-lg"
+                className="text-text-muted hover:text-white transition-colors p-0.5 rounded hover:bg-white/5"
               >
-                ✕
+                <IconClose size={15} />
               </button>
             </div>
 
             {roleModalUser.role === 'dev' ? (
               <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-2">
                 <div className="flex items-center gap-2 text-sm font-semibold text-amber-300">
-                  <span>🛡️ Developer Superuser Locked</span>
+                  <IconShield size={14} /> Developer Superuser Locked
                 </div>
                 <p className="text-xs text-text-muted">
                   Developer superuser accounts are permanently locked and cannot be demoted or altered under any circumstances.
@@ -1177,7 +1189,7 @@ export default function AdminCustomersPage() {
                 onClick={() => setBanModalUser(null)}
                 className="text-text-muted hover:text-white transition-colors text-lg"
               >
-                ✕
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
 

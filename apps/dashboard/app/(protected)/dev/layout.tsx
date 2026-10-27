@@ -1,5 +1,5 @@
-import RequireAdminOrDev from '@/components/RequireAdminOrDev';
+import RequireDev from '@/components/RequireDev';
 
 export default function DevLayout({ children }: { children: React.ReactNode }) {
-  return <RequireAdminOrDev>{children}</RequireAdminOrDev>;
+  return <RequireDev>{children}</RequireDev>;
 }

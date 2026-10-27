@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Node } from '@/lib/types';
 import { streamAuthedEvents, logLineFromEvent, StreamHandle } from '@/lib/sse';
+import dynamic from 'next/dynamic';
 import {
   Card,
   Button,
@@ -22,7 +23,12 @@ import {
 } from '@/components/ui';
 import { NodeEngineControlPanel } from '@/components/NodeEngineControlPanel';
 
-export type ConnectorTab = 'nodes' | 'containers' | 'images' | 'volumes' | 'networks' | 'system';
+const SshTerminal = dynamic(
+  () => import('@/components/SshTerminal').then((m) => m.SshTerminal),
+  { ssr: false, loading: () => <div className="h-64 flex items-center justify-center text-text-muted text-sm animate-pulse">Loading Web SSH terminal...</div> }
+);
+
+export type ConnectorTab = 'nodes' | 'containers' | 'images' | 'volumes' | 'networks' | 'ports' | 'system' | 'terminal';
 
 interface NodeContainer {
   id: string;
@@ -164,6 +170,14 @@ function TerminalIcon() {
   );
 }
 
+function ShieldIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+  );
+}
+
 interface UnifiedConnectorsHubProps {
   defaultTab?: ConnectorTab;
 }
@@ -218,11 +232,13 @@ function UnifiedConnectorsHubContent({ defaultTab = 'containers' }: UnifiedConne
       <div className="flex gap-1.5 flex-wrap items-center glass p-2 rounded-2xl border border-white/[0.08] shadow-lg">
         {[
           { id: 'nodes', label: 'Compute Nodes & Onboarding', icon: ServerIcon },
-          { id: 'containers', label: 'Containers', icon: ContainerIcon },
+          { id: 'containers', label: 'Containers & Stacks', icon: ContainerIcon },
           { id: 'images', label: 'Docker Images', icon: ImageIcon },
           { id: 'volumes', label: 'Docker Volumes', icon: VolumeIcon },
           { id: 'networks', label: 'Docker Networks', icon: NetworkIcon },
-          { id: 'system', label: 'System & Disk Usage', icon: SystemIcon },
+          { id: 'ports', label: 'VPS Ports & Firewall', icon: ShieldIcon },
+          { id: 'system', label: 'System & Diagnostics', icon: SystemIcon },
+          { id: 'terminal', label: 'Web SSH Terminal', icon: TerminalIcon },
         ].map((t) => {
           const IconComp = t.icon;
           const isActive = activeTab === t.id;
@@ -243,7 +259,7 @@ function UnifiedConnectorsHubContent({ defaultTab = 'containers' }: UnifiedConne
         })}
       </div>
 
-      {/* Node Selector (For container, image, volume, network, system tabs) */}
+      {/* Node Selector (For container, image, volume, network, ports, system, terminal tabs) */}
       {activeTab !== 'nodes' && nodes && nodes.length > 0 && (
         <div className="flex gap-2 flex-wrap items-center glass p-2.5 rounded-2xl border border-white/[0.06]">
           <span className="text-xs font-semibold text-text-muted px-2 uppercase tracking-wider flex items-center gap-1.5">
@@ -270,12 +286,28 @@ function UnifiedConnectorsHubContent({ defaultTab = 'containers' }: UnifiedConne
       )}
 
       {/* Tab Content Views */}
-      {activeTab === 'nodes' && <NodesTabView nodes={nodes} loadNodes={loadNodes} />}
+      {activeTab === 'nodes' && (
+        <NodesTabView
+          nodes={nodes}
+          loadNodes={loadNodes}
+          onSelectTab={(nId, tab) => {
+            setSelectedNodeId(nId);
+            setActiveTab(tab);
+          }}
+        />
+      )}
       {activeTab === 'containers' && <ContainersTabView nodeId={selectedNodeId} />}
       {activeTab === 'images' && <ImagesTabView nodeId={selectedNodeId} />}
       {activeTab === 'volumes' && <VolumesTabView nodeId={selectedNodeId} />}
       {activeTab === 'networks' && <NetworksTabView nodeId={selectedNodeId} />}
+      {activeTab === 'ports' && <PortsTabView nodeId={selectedNodeId} />}
       {activeTab === 'system' && <SystemTabView nodeId={selectedNodeId} />}
+      {activeTab === 'terminal' && (
+        <TerminalTabView
+          nodeId={selectedNodeId}
+          nodeLabel={nodes?.find((n) => n.id === selectedNodeId)?.label}
+        />
+      )}
     </div>
   );
 }
@@ -291,7 +323,15 @@ export function UnifiedConnectorsHub(props: UnifiedConnectorsHubProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB 1: COMPUTE NODES & SSH ONBOARDING
 // ─────────────────────────────────────────────────────────────────────────────
-function NodesTabView({ nodes, loadNodes }: { nodes: Node[] | null; loadNodes: () => void }) {
+function NodesTabView({
+  nodes,
+  loadNodes,
+  onSelectTab,
+}: {
+  nodes: Node[] | null;
+  loadNodes: () => void;
+  onSelectTab: (nodeId: string, tab: ConnectorTab) => void;
+}) {
   return (
     <div className="space-y-6">
       <NodeOnboardingSection onCreated={loadNodes} />
@@ -306,7 +346,7 @@ function NodesTabView({ nodes, loadNodes }: { nodes: Node[] | null; loadNodes: (
 
         <div className="grid md:grid-cols-2 gap-4">
           {nodes?.map((node) => (
-            <NodeCard key={node.id} node={node} />
+            <NodeCard key={node.id} node={node} onSelectTab={onSelectTab} />
           ))}
         </div>
       </div>
@@ -314,7 +354,13 @@ function NodesTabView({ nodes, loadNodes }: { nodes: Node[] | null; loadNodes: (
   );
 }
 
-function NodeCard({ node }: { node: Node }) {
+function NodeCard({
+  node,
+  onSelectTab,
+}: {
+  node: Node;
+  onSelectTab: (nodeId: string, tab: ConnectorTab) => void;
+}) {
   const stale = !node.lastSeenAt || Date.now() - new Date(node.lastSeenAt).getTime() > 5 * 60 * 1000;
   const [showNodeEngine, setShowNodeEngine] = useState(false);
   const [failoverBusy, setFailoverBusy] = useState(false);
@@ -373,24 +419,45 @@ function NodeCard({ node }: { node: Node }) {
         </div>
       </div>
 
-      <div className="pt-2 border-t border-white/[0.04] flex flex-wrap gap-2 justify-between items-center">
-        <Button size="sm" variant={showNodeEngine ? 'secondary' : 'primary'} onClick={() => setShowNodeEngine(!showNodeEngine)}>
-          <span className="flex items-center gap-1.5">
-            <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            {showNodeEngine ? 'Hide Control Panel' : 'Host Control Panel'}
-          </span>
-        </Button>
+      {/* Quick Access Action Bar to Unified Hub */}
+      <div className="space-y-2 pt-2 border-t border-white/[0.04]">
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <Button size="xs" variant="secondary" onClick={() => onSelectTab(node.id, 'containers')}>
+            <span className="flex items-center gap-1 text-[11px]">
+              <ContainerIcon /> Containers
+            </span>
+          </Button>
+          <Button size="xs" variant="secondary" onClick={() => onSelectTab(node.id, 'images')}>
+            <span className="flex items-center gap-1 text-[11px]">
+              <ImageIcon /> Images
+            </span>
+          </Button>
+          <Button size="xs" variant="secondary" onClick={() => onSelectTab(node.id, 'ports')}>
+            <span className="flex items-center gap-1 text-[11px]">
+              <ShieldIcon /> Ports &amp; UFW
+            </span>
+          </Button>
+          <Button size="xs" variant="secondary" onClick={() => onSelectTab(node.id, 'terminal')}>
+            <span className="flex items-center gap-1 text-[11px]">
+              <TerminalIcon /> Web SSH
+            </span>
+          </Button>
+          <Button size="xs" variant="ghost" onClick={() => setShowNodeEngine(!showNodeEngine)} className="text-cyan-400 text-[11px]">
+            {showNodeEngine ? 'Hide Cockpit' : 'Host Cockpit'}
+          </Button>
+        </div>
 
-        <Button size="sm" variant="secondary" loading={failoverBusy} onClick={handleFailover} className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10">
-          <span className="flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            Evacuate &amp; Failover
-          </span>
-        </Button>
+        <div className="flex justify-between items-center pt-1">
+          <span className="text-[10px] text-text-faint font-mono">ID: {node.id.slice(0, 8)}...</span>
+          <Button size="xs" variant="secondary" loading={failoverBusy} onClick={handleFailover} className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10 text-[11px]">
+            <span className="flex items-center gap-1">
+              <svg className="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Evacuate
+            </span>
+          </Button>
+        </div>
       </div>
 
       {showNodeEngine && (
@@ -2129,6 +2196,611 @@ function SystemTabView({ nodeId }: { nodeId: string | null }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB 6: VPS PORTS & FIREWALL (UFW ORCHESTRATION)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PORT_PRESETS = [
+  { label: 'HTTP', port: '80', protocol: 'tcp', desc: 'Standard Web' },
+  { label: 'HTTPS', port: '443', protocol: 'tcp', desc: 'Secure Web' },
+  { label: 'SSH', port: '22', protocol: 'tcp', desc: 'Remote Access' },
+  { label: 'Dev Web', port: '3000', protocol: 'tcp', desc: 'Node / Next.js' },
+  { label: 'Vite / React', port: '5173', protocol: 'tcp', desc: 'Vite Server' },
+  { label: 'Backend API', port: '4000', protocol: 'tcp', desc: 'Express API' },
+  { label: 'Alt Web', port: '8080', protocol: 'tcp', desc: 'Alt HTTP / Proxy' },
+  { label: 'MySQL', port: '3306', protocol: 'tcp', desc: 'MySQL DB' },
+  { label: 'PostgreSQL', port: '5432', protocol: 'tcp', desc: 'Postgres DB' },
+  { label: 'Redis', port: '6379', protocol: 'tcp', desc: 'Key-Value Cache' },
+  { label: 'MongoDB', port: '27017', protocol: 'tcp', desc: 'Doc Database' },
+];
+
+function PortsTabView({ nodeId }: { nodeId: string | null }) {
+  const [status, setStatus] = useState<{ enabled: boolean; status: string; rules: any[] } | null>(null);
+  const [listening, setListening] = useState<Array<{ protocol: string; port: number; address: string; process: string }> | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [openModalOpen, setOpenModalOpen] = useState(false);
+  const [newPort, setNewPort] = useState('');
+  const [newProtocol, setNewProtocol] = useState<'tcp' | 'udp' | 'any'>('tcp');
+  const [newAction, setNewAction] = useState<'allow' | 'deny'>('allow');
+  const [newSourceIp, setNewSourceIp] = useState('');
+  const [ruleToDelete, setRuleToDelete] = useState<any | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'enable' | 'disable' | 'reset'; title: string; message: string } | null>(null);
+
+  const { toast } = useToast();
+
+  async function loadData() {
+    if (!nodeId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [fwRes, portsRes] = await Promise.allSettled([
+        api.nodeEngine.firewallStatus(nodeId),
+        api.nodeEngine.listeningPorts(nodeId),
+      ]);
+      if (fwRes.status === 'fulfilled') {
+        setStatus(fwRes.value);
+      } else {
+        setError(fwRes.reason?.message || 'Failed to load firewall status');
+      }
+      if (portsRes.status === 'fulfilled') {
+        setListening(portsRes.value?.ports || []);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to communicate with node agent');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadData();
+  }, [nodeId]);
+
+  async function handleOpenPort() {
+    if (!nodeId || !newPort.trim()) return;
+    setActionLoading(true);
+    try {
+      await api.nodeEngine.addFirewallRule(nodeId, {
+        port: newPort.trim(),
+        protocol: newProtocol,
+        action: newAction,
+        sourceIp: newSourceIp.trim() || undefined,
+      });
+      toast(`Port ${newPort} (${newProtocol.toUpperCase()}) ${newAction.toUpperCase()} rule applied`, 'success');
+      setOpenModalOpen(false);
+      setNewPort('');
+      setNewSourceIp('');
+      loadData();
+    } catch (err: any) {
+      toast(err.message || 'Failed to add firewall rule', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleQuickOpen(preset: { port: string; protocol: string; label: string }) {
+    if (!nodeId) return;
+    setActionLoading(true);
+    try {
+      await api.nodeEngine.addFirewallRule(nodeId, {
+        port: preset.port,
+        protocol: preset.protocol,
+        action: 'allow',
+      });
+      toast(`Allowed ${preset.label} (${preset.port}/${preset.protocol}) in UFW`, 'success');
+      loadData();
+    } catch (err: any) {
+      toast(err.message || `Failed to open ${preset.label}`, 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function confirmDeleteRule() {
+    if (!nodeId || !ruleToDelete) return;
+    setActionLoading(true);
+    try {
+      await api.nodeEngine.deleteFirewallRule(nodeId, {
+        ruleIndex: ruleToDelete.index,
+        port: ruleToDelete.port,
+        protocol: ruleToDelete.protocol,
+      });
+      toast('Firewall rule deleted successfully', 'success');
+      setRuleToDelete(null);
+      loadData();
+    } catch (err: any) {
+      toast(err.message || 'Failed to delete firewall rule', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function executeConfirmAction() {
+    if (!nodeId || !confirmAction) return;
+    setActionLoading(true);
+    try {
+      if (confirmAction.type === 'enable') {
+        await api.nodeEngine.enableFirewall(nodeId);
+        toast('UFW Firewall enabled successfully', 'success');
+      } else if (confirmAction.type === 'disable') {
+        await api.nodeEngine.disableFirewall(nodeId);
+        toast('UFW Firewall disabled', 'warning');
+      } else if (confirmAction.type === 'reset') {
+        await api.nodeEngine.resetFirewall(nodeId);
+        toast('UFW Firewall rules reset to defaults', 'info');
+      }
+      setConfirmAction(null);
+      loadData();
+    } catch (err: any) {
+      toast(err.message || `Failed to ${confirmAction.type} firewall`, 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  if (!nodeId) {
+    return (
+      <EmptyState
+        title="No Compute Node Selected"
+        message="Select a compute node from the top selector or Onboarding tab to view and orchestrate its ports and UFW firewall."
+      />
+    );
+  }
+
+  const isFwActive = status?.enabled || status?.status?.toLowerCase().includes('active');
+
+  return (
+    <div className="space-y-6">
+      {error && <ErrorBanner message={error} />}
+
+      {/* Top Firewall Control Bar */}
+      <Card>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`p-3 rounded-2xl ${isFwActive ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+              <ShieldIcon />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-text-primary">UFW Host Firewall</h3>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${isFwActive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+                  {isFwActive ? 'ACTIVE / SHIELD ON' : 'INACTIVE'}
+                </span>
+                {loading && <Spinner label="Loading..." />}
+              </div>
+              <p className="text-xs text-text-muted mt-0.5">
+                Linux kernel Netfilter / UFW firewall engine on this VPS compute node. Dev role privileged.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={loadData}
+              disabled={loading || actionLoading}
+            >
+              Refresh
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setOpenModalOpen(true)}
+              disabled={actionLoading}
+            >
+              + Open Port / Range
+            </Button>
+            {isFwActive ? (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() =>
+                  setConfirmAction({
+                    type: 'disable',
+                    title: 'Disable UFW Firewall?',
+                    message: 'Disabling UFW will turn off packet filtering on this compute node. All listening ports will become exposed to the public internet.',
+                  })
+                }
+                disabled={actionLoading}
+              >
+                Disable Firewall
+              </Button>
+            ) : (
+              <Button
+                variant="success"
+                size="sm"
+                onClick={() =>
+                  setConfirmAction({
+                    type: 'enable',
+                    title: 'Enable UFW Firewall?',
+                    message: 'Enabling UFW will actively filter network packets according to active rules. Ensure port 22/tcp (SSH) is allowed to avoid getting locked out.',
+                  })
+                }
+                disabled={actionLoading}
+              >
+                Enable Firewall
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setConfirmAction({
+                  type: 'reset',
+                  title: 'Reset All UFW Rules?',
+                  message: 'This will reset UFW rules to default policy (deny incoming, allow outgoing). You will need to re-open SSH and service ports.',
+                })
+              }
+              disabled={actionLoading}
+            >
+              Reset Rules
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {/* Quick Presets Section */}
+      <Card title="Quick Allow Presets">
+        <p className="text-xs text-text-muted mb-3">
+          1-click open common developer, web server, and database ports in UFW:
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+          {PORT_PRESETS.map((p) => {
+            const isAlreadyOpen = status?.rules?.some((r: any) => {
+              const rulePort = String(r.port || r.to || '');
+              return rulePort.includes(p.port) && (r.action || '').toUpperCase().includes('ALLOW');
+            });
+
+            return (
+              <div
+                key={p.port + p.protocol}
+                className="glass p-3 rounded-xl border border-white/[0.06] hover:border-white/20 transition-all flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-text-primary">{p.label}</span>
+                    <span className="text-[10px] font-mono text-cyan-400 font-bold">{p.port}/{p.protocol}</span>
+                  </div>
+                  <p className="text-[10px] text-text-muted mt-1 truncate">{p.desc}</p>
+                </div>
+                <div className="mt-3">
+                  {isAlreadyOpen ? (
+                    <span className="w-full text-center py-1 block text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg">
+                      Open
+                    </span>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full text-[11px] py-1"
+                      onClick={() => handleQuickOpen(p)}
+                      disabled={actionLoading}
+                    >
+                      Allow Port
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Active Firewall Rules Table */}
+      <Card
+        title={`Active UFW Rules (${status?.rules?.length || 0})`}
+        action={
+          <span className="text-xs text-text-muted font-mono">
+            {status?.status || 'Active numbered rules'}
+          </span>
+        }
+      >
+        {status?.rules && status.rules.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead>
+                <tr className="border-b border-white/10 text-text-muted">
+                  <th className="p-3">#</th>
+                  <th className="p-3">To / Port</th>
+                  <th className="p-3">Action</th>
+                  <th className="p-3">From / Source</th>
+                  <th className="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {status.rules.map((rule: any, idx: number) => {
+                  const ruleIndex = rule.index || idx + 1;
+                  const isAllow = (rule.action || '').toUpperCase().includes('ALLOW');
+                  return (
+                    <tr key={idx} className="hover:bg-white/[0.02]">
+                      <td className="p-3 text-text-muted">[{ruleIndex}]</td>
+                      <td className="p-3 font-bold text-text-primary">{rule.to || `${rule.port}/${rule.protocol}`}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${isAllow ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+                          {rule.action}
+                        </span>
+                      </td>
+                      <td className="p-3 text-text-muted">{rule.from || 'Anywhere'}</td>
+                      <td className="p-3 text-right">
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => setRuleToDelete(rule)}
+                          disabled={actionLoading}
+                          className="text-[11px] py-1 px-2.5"
+                        >
+                          Close Port
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-text-muted text-xs">
+            {loading ? <Spinner label="Fetching UFW rules..." /> : 'No custom rules found. Default policy is active.'}
+          </div>
+        )}
+      </Card>
+
+      {/* Active Listening Ports on VPS (from ss -tuln) */}
+      <Card
+        title={`VPS Host Listening Ports (${listening?.length || 0})`}
+        action={
+          <span className="text-xs text-text-muted font-mono">
+            Real-time kernel sockets (ss -tuln)
+          </span>
+        }
+      >
+        {listening && listening.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead>
+                <tr className="border-b border-white/10 text-text-muted">
+                  <th className="p-3">Proto</th>
+                  <th className="p-3">Port</th>
+                  <th className="p-3">Bind Address</th>
+                  <th className="p-3">Process / Service</th>
+                  <th className="p-3 text-right">Firewall Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {listening.map((sock, idx) => {
+                  const isPortAllowed = status?.rules?.some((r: any) => {
+                    const rulePort = String(r.port || r.to || '');
+                    return rulePort.includes(String(sock.port)) && (r.action || '').toUpperCase().includes('ALLOW');
+                  });
+
+                  return (
+                    <tr key={idx} className="hover:bg-white/[0.02]">
+                      <td className="p-3 uppercase text-cyan-400 font-bold">{sock.protocol}</td>
+                      <td className="p-3 font-bold text-text-primary">{sock.port}</td>
+                      <td className="p-3 text-text-muted">{sock.address}</td>
+                      <td className="p-3 text-accent-violet-light font-semibold">{sock.process || 'kernel/daemon'}</td>
+                      <td className="p-3 text-right">
+                        {isPortAllowed ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Open in UFW</span>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() =>
+                              handleQuickOpen({
+                                port: String(sock.port),
+                                protocol: sock.protocol.toLowerCase(),
+                                label: sock.process || `Port ${sock.port}`,
+                              })
+                            }
+                            disabled={actionLoading}
+                            className="text-[11px] py-1 px-2.5"
+                          >
+                            Allow in UFW
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-6 text-text-muted text-xs">
+            {loading ? <Spinner label="Scanning listening sockets..." /> : 'No listening sockets discovered.'}
+          </div>
+        )}
+      </Card>
+
+      {/* Modal: Open Port / Range */}
+      {openModalOpen && (
+        <Modal
+          open={openModalOpen}
+          onClose={() => setOpenModalOpen(false)}
+          title="Open Port / Port Range in UFW"
+        >
+          <div className="space-y-4">
+            <p className="text-xs text-text-muted">
+              Add a packet filtering rule to UFW. This allows or denies inbound traffic to specific ports or port ranges.
+            </p>
+
+            <div>
+              <label className="block text-xs font-semibold text-text-primary mb-1">
+                Port or Range (e.g. 8080, or 3000:3010)
+              </label>
+              <Input
+                placeholder="e.g. 8080 or 8000:8010"
+                value={newPort}
+                onChange={(e) => setNewPort(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-text-primary mb-1">
+                  Protocol
+                </label>
+                <select
+                  value={newProtocol}
+                  onChange={(e) => setNewProtocol(e.target.value as any)}
+                  className="w-full glass bg-[#12121a] border border-white/10 rounded-xl px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-white/30"
+                >
+                  <option value="tcp">TCP</option>
+                  <option value="udp">UDP</option>
+                  <option value="any">TCP & UDP (Any)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-text-primary mb-1">
+                  Action
+                </label>
+                <select
+                  value={newAction}
+                  onChange={(e) => setNewAction(e.target.value as any)}
+                  className="w-full glass bg-[#12121a] border border-white/10 rounded-xl px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-white/30"
+                >
+                  <option value="allow">ALLOW</option>
+                  <option value="deny">DENY</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-text-primary mb-1">
+                Source IP / Subnet (Optional)
+              </label>
+              <Input
+                placeholder="Leave blank for Anywhere, or e.g. 192.168.1.100/32"
+                value={newSourceIp}
+                onChange={(e) => setNewSourceIp(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setOpenModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleOpenPort}
+                disabled={!newPort.trim() || actionLoading}
+              >
+                {actionLoading ? <Spinner label="Applying..." /> : 'Apply UFW Rule'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete Rule Confirmation Dialog */}
+      {ruleToDelete && (
+        <ConfirmDialog
+          open={!!ruleToDelete}
+          title="Close Port / Delete Firewall Rule"
+          message={`Are you sure you want to delete rule [${ruleToDelete.index || ruleToDelete.port || ''}] (${ruleToDelete.to || ruleToDelete.port} ${ruleToDelete.action})? Incoming traffic to this port will revert to default policy.`}
+          confirmLabel="Delete Rule"
+          danger
+          onConfirm={confirmDeleteRule}
+          onClose={() => setRuleToDelete(null)}
+        />
+      )}
+
+      {/* Firewall Master Action Confirmation Dialog */}
+      {confirmAction && (
+        <ConfirmDialog
+          open={!!confirmAction}
+          title={confirmAction.title}
+          message={confirmAction.message}
+          confirmLabel={confirmAction.type === 'enable' ? 'Enable UFW' : confirmAction.type === 'disable' ? 'Disable UFW' : 'Reset Rules'}
+          danger={confirmAction.type === 'disable' || confirmAction.type === 'reset'}
+          onConfirm={executeConfirmAction}
+          onClose={() => setConfirmAction(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB 8: WEB SSH TERMINAL (DIRECT INTERACTIVE SHELL)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function TerminalTabView({
+  nodeId,
+  nodeLabel,
+}: {
+  nodeId: string | null;
+  nodeLabel?: string;
+}) {
+  const [reconnectKey, setReconnectKey] = useState(1);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  if (!nodeId) {
+    return (
+      <EmptyState
+        title="No Compute Node Selected"
+        message="Select a compute node from the top selector or Onboarding tab to launch an interactive Web SSH terminal session."
+      />
+    );
+  }
+
+  return (
+    <div className={`space-y-4 ${isFullScreen ? 'fixed inset-0 z-50 p-6 bg-[#0a0a0f] overflow-auto' : ''}`}>
+      <Card>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-accent-violet/10 text-accent-violet-light border border-accent-violet/20">
+              <TerminalIcon />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <span>Interactive Web SSH Terminal</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-accent-violet/20 text-accent-violet-light border border-accent-violet/30">
+                  {nodeLabel || nodeId.slice(0, 8)}
+                </span>
+              </h3>
+              <p className="text-xs text-text-muted mt-0.5">
+                Direct WebSocket SSH shell gateway with xterm.js terminal emulation.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setReconnectKey((k) => k + 1)}
+            >
+              Reconnect
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsFullScreen((fs) => !fs)}
+            >
+              {isFullScreen ? 'Exit Full Screen' : 'Full Screen'}
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <div className={`glass rounded-2xl border border-white/[0.08] overflow-hidden p-2 bg-[#0a0a0f] shadow-2xl ${isFullScreen ? 'h-[calc(100vh-140px)]' : 'min-h-[500px]'}`}>
+        <SshTerminal
+          key={`${nodeId}-${reconnectKey}`}
+          kind="node"
+          id={nodeId}
+          onClose={() => {}}
+        />
+      </div>
     </div>
   );
 }

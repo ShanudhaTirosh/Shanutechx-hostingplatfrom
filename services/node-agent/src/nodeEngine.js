@@ -1,10 +1,10 @@
 /**
  * nodeEngine.js — Node Agent System Engine & Docker Orchestration Module
- * 
+ *
  * Provides host node telemetry, systemd service administration, Linux user accounts,
  * OS package management/installation, listening ports detection, UFW firewall rules,
  * advanced Docker container & network orchestration, and Docker Compose stack management.
- * 
+ *
  * SECURITY DIRECTIVE:
  * All commands are executed strictly via child_process.execFile / spawn with argument arrays.
  * User inputs are sanitized using strict regex whitelists before command execution.
@@ -16,10 +16,13 @@ const fs = require('fs/promises');
 const path = require('path');
 const si = require('systeminformation');
 const Docker = require('dockerode');
+const pino = require('pino');
 
 const execFileAsync = util.promisify(execFile);
 const execAsync = util.promisify(exec);
 const docker = new Docker();
+
+const log = pino({ level: process.env.LOG_LEVEL || 'info', name: 'nodeEngine' });
 
 // Whitelist Regexes
 const REGEX_SERVICE_NAME = /^[a-zA-Z0-9_\-\.]+\.service$|^[a-zA-Z0-9_\-\.]+$/;
@@ -170,7 +173,7 @@ async function getListeningPorts() {
 
     return ports;
   } catch (err) {
-    console.error('[nodeEngine] getListeningPorts failed:', err?.message || err);
+    log.error({ err }, 'getListeningPorts failed');
     return [];
   }
 }
@@ -213,7 +216,7 @@ async function listSystemdServices() {
 
     return services;
   } catch (err) {
-    console.error('[nodeEngine] listSystemdServices failed:', err?.message || err);
+    log.error({ err }, 'listSystemdServices failed');
     return [];
   }
 }
@@ -279,7 +282,7 @@ async function listLinuxUsers() {
 
     return users;
   } catch (err) {
-    console.error('[nodeEngine] listLinuxUsers failed:', err?.message || err);
+    log.error({ err }, 'listLinuxUsers failed');
     return [];
   }
 }
@@ -365,7 +368,7 @@ async function listDockerContainers() {
       })),
     }));
   } catch (err) {
-    console.error('[nodeEngine] listDockerContainers failed:', err?.message || err);
+    log.error({ err }, 'listDockerContainers failed');
     return [];
   }
 }
@@ -439,7 +442,7 @@ async function createDockerContainer({ name, image, env = [], ports = [], volume
       });
     });
   } catch (e) {
-    console.warn(`[nodeEngine] docker.pull for image ${image} encountered notice: ${e?.message || e}. Continuing with local image if available.`);
+    log.warn({ err: e, image }, 'docker.pull notice — continuing with local image if available');
   }
 
   const portBindings = {};
@@ -503,7 +506,7 @@ async function listDockerNetworks() {
       scope: n.Scope,
     }));
   } catch (err) {
-    console.error('[nodeEngine] listDockerNetworks failed:', err?.message || err);
+    log.error({ err }, 'listDockerNetworks failed');
     return [];
   }
 }
@@ -547,33 +550,220 @@ async function deployDockerCompose(yamlContent, projectName = 'stx-stack') {
 
 async function pruneDockerResources() {
   const containers = await docker.pruneContainers();
-  const images = await docker.pruneImages();
-  return { ok: true, containersPruned: containers.ContainersDeleted?.length || 0, imagesPruned: images.ImagesDeleted?.length || 0 };
+  const images = await docker.pruneImages({ filters: { dangling: { true: true } } });
+  const volumes = await docker.pruneVolumes();
+  return {
+    ok: true,
+    containersPruned: containers.ContainersDeleted?.length || 0,
+    imagesPruned: images.ImagesDeleted?.length || 0,
+    volumesPruned: volumes.VolumesDeleted?.length || 0,
+    spaceReclaimedBytes: (containers.SpaceReclaimed || 0) + (images.SpaceReclaimed || 0) + (volumes.SpaceReclaimed || 0),
+  };
+}
+
+// ── 6b. DOCKER IMAGE MANAGEMENT ────────────────────────────────────────────
+
+async function getDockerImages() {
+  try {
+    const images = await docker.listImages({ all: false });
+    return images.map((img) => ({
+      id: img.Id,
+      shortId: img.Id.replace('sha256:', '').slice(0, 12),
+      repoTags: img.RepoTags || [],
+      repoDigests: img.RepoDigests || [],
+      size: img.Size,
+      sizeHuman: `${Math.round(img.Size / 1024 / 1024)}MB`,
+      created: img.Created,
+      labels: img.Labels || {},
+    }));
+  } catch (err) {
+    log.error({ err }, 'getDockerImages failed');
+    return [];
+  }
+}
+
+async function pullDockerImage(imageName) {
+  if (!imageName || typeof imageName !== 'string') throw new Error('Image name required');
+  // Allowlist: only pull from docker.io / no scheme; prevent protocol injection
+  if (/[;<>&|`$]/.test(imageName)) throw new Error('Invalid image name');
+
+  return new Promise((resolve, reject) => {
+    docker.pull(imageName, (err, stream) => {
+      if (err) return reject(err);
+      let output = '';
+      docker.modem.followProgress(
+        stream,
+        (pullErr, result) => {
+          if (pullErr) return reject(pullErr);
+          resolve({ ok: true, image: imageName, output: output.trim() });
+        },
+        (event) => { output += (event.status || '') + '\n'; }
+      );
+    });
+  });
+}
+
+async function removeDockerImage(imageId, force = false) {
+  if (!imageId || typeof imageId !== 'string') throw new Error('Image ID required');
+  const image = docker.getImage(imageId);
+  await image.remove({ force });
+  return { ok: true, imageId };
+}
+
+// ── 6c. DOCKER VOLUME MANAGEMENT ───────────────────────────────────────────
+
+async function getDockerVolumes() {
+  try {
+    const { Volumes } = await docker.listVolumes();
+    return (Volumes || []).map((v) => ({
+      name: v.Name,
+      driver: v.Driver,
+      mountpoint: v.Mountpoint,
+      created: v.CreatedAt,
+      labels: v.Labels || {},
+      scope: v.Scope,
+    }));
+  } catch (err) {
+    log.error({ err }, 'getDockerVolumes failed');
+    return [];
+  }
+}
+
+async function createDockerVolume(name, driver = 'local', labels = {}) {
+  if (!name || !/^[a-zA-Z0-9_.-]{1,64}$/.test(name)) throw new Error('Invalid volume name');
+  const vol = await docker.createVolume({ Name: name, Driver: driver, Labels: labels });
+  return { ok: true, name: vol.name || name, mountpoint: vol.Mountpoint };
+}
+
+async function removeDockerVolume(name, force = false) {
+  if (!name || !/^[a-zA-Z0-9_.-]{1,64}$/.test(name)) throw new Error('Invalid volume name');
+  const vol = docker.getVolume(name);
+  await vol.remove({ force });
+  return { ok: true, name };
+}
+
+// ── 6d. DOCKER NETWORK DELETION ────────────────────────────────────────────
+
+async function removeDockerNetwork(networkId) {
+  if (!networkId || typeof networkId !== 'string') throw new Error('Network ID required');
+  const net = docker.getNetwork(networkId);
+  await net.remove();
+  return { ok: true, networkId };
+}
+
+// ── 6e. DOCKER CONTAINER INSPECT & STATS ───────────────────────────────────
+
+async function getDockerContainerInspect(containerId) {
+  if (!containerId || typeof containerId !== 'string') throw new Error('Container ID required');
+  const container = docker.getContainer(containerId);
+  const info = await container.inspect();
+  return {
+    id: info.Id,
+    name: info.Name?.replace(/^\//, ''),
+    image: info.Config?.Image,
+    status: info.State?.Status,
+    running: info.State?.Running,
+    startedAt: info.State?.StartedAt,
+    finishedAt: info.State?.FinishedAt,
+    restartCount: info.RestartCount,
+    ports: info.NetworkSettings?.Ports || {},
+    mounts: (info.Mounts || []).map((m) => ({ type: m.Type, source: m.Source, destination: m.Destination, mode: m.Mode })),
+    env: info.Config?.Env || [],
+    labels: info.Config?.Labels || {},
+    networkMode: info.HostConfig?.NetworkMode,
+    restartPolicy: info.HostConfig?.RestartPolicy,
+    ipAddress: info.NetworkSettings?.IPAddress,
+  };
+}
+
+async function getDockerContainerStats(containerId) {
+  if (!containerId || typeof containerId !== 'string') throw new Error('Container ID required');
+  const container = docker.getContainer(containerId);
+  // stream=false gives a single stats snapshot
+  const stats = await container.stats({ stream: false });
+
+  // Calculate CPU % using the Docker formula
+  const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
+  const systemDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
+  const numCpus = stats.cpu_stats.cpu_usage.percpu_usage?.length || stats.cpu_stats.online_cpus || 1;
+  const cpuPct = systemDelta > 0 ? (cpuDelta / systemDelta) * numCpus * 100 : 0;
+
+  const mem = stats.memory_stats;
+  const memUsed = mem.usage - (mem.stats?.cache || 0);
+  const memTotal = mem.limit || 1;
+
+  const netRx = Object.values(stats.networks || {}).reduce((acc, n) => acc + (n.rx_bytes || 0), 0);
+  const netTx = Object.values(stats.networks || {}).reduce((acc, n) => acc + (n.tx_bytes || 0), 0);
+
+  return {
+    containerId,
+    cpuPct: Math.round(cpuPct * 100) / 100,
+    memUsedMb: Math.round(memUsed / 1024 / 1024),
+    memLimitMb: Math.round(memTotal / 1024 / 1024),
+    memPct: Math.round((memUsed / memTotal) * 10000) / 100,
+    netRxBytes: netRx,
+    netTxBytes: netTx,
+  };
 }
 
 // ── 7. UFW FIREWALL CONFIGURATION ──────────────────────────────────────────
 
 async function getUfwStatus() {
   try {
-    const { stdout } = await execFileAsync('ufw', ['status', 'verbose']);
+    let stdout = '';
+    try {
+      const res = await execFileAsync('ufw', ['status', 'numbered']);
+      stdout = res.stdout;
+    } catch {
+      const res = await execFileAsync('ufw', ['status', 'verbose']);
+      stdout = res.stdout;
+    }
+
     const lines = stdout.split('\n');
     const isActive = stdout.includes('Status: active');
-
     const rules = [];
-    let parsingRules = false;
 
-    for (const line of lines) {
-      if (line.includes('To') && line.includes('Action') && line.includes('From')) {
-        parsingRules = true;
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      // Match numbered rule lines: e.g. "[ 1] 80/tcp ALLOW IN Anywhere" or "[12] 443 ALLOW IN Anywhere (v6)"
+      const numberedMatch = line.match(/^\[\s*(\d+)\]\s+(.*?)\s+(ALLOW|DENY|REJECT)(?:\s+IN)?\s+(.*)$/i);
+      if (numberedMatch) {
+        const index = parseInt(numberedMatch[1], 10);
+        const to = numberedMatch[2].trim();
+        const action = numberedMatch[3].toUpperCase();
+        const from = numberedMatch[4].trim();
+
+        // Extract port and protocol if available
+        let port = to;
+        let protocol = 'any';
+        const protoMatch = to.match(/^(\d+(?::\d+)?)\/([a-zA-Z0-9]+)/);
+        if (protoMatch) {
+          port = protoMatch[1];
+          protocol = protoMatch[2].toLowerCase();
+        }
+
+        rules.push({
+          index,
+          to,
+          action,
+          from,
+          port,
+          protocol,
+        });
         continue;
       }
-      if (parsingRules && line.trim()) {
-        const parts = line.trim().split(/\s+/);
+
+      // Fallback for non-numbered output with columns "To Action From"
+      if (!line.startsWith('To') && !line.startsWith('--') && !line.startsWith('Status:')) {
+        const parts = line.split(/\s{2,}/);
         if (parts.length >= 3) {
           rules.push({
-            to: parts[0],
-            action: parts[1],
-            from: parts[2],
+            index: rules.length + 1,
+            to: parts[0].trim(),
+            action: parts[1].trim(),
+            from: parts[2].trim(),
+            port: parts[0].trim(),
+            protocol: 'tcp',
           });
         }
       }
@@ -585,15 +775,15 @@ async function getUfwStatus() {
   }
 }
 
-async function addUfwRule(port, protocol = 'tcp', action = 'allow') {
-  const portNum = Number(port);
-  if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
-    throw new Error('Port must be an integer between 1 and 65535');
+async function addUfwRule(port, protocol = 'tcp', action = 'allow', sourceIp) {
+  const portStr = String(port).trim();
+  if (!portStr || !/^(\d{1,5})(?::(\d{1,5}))?$/.test(portStr)) {
+    throw new Error('Port must be a valid number (1-65535) or port range (e.g. 3000:3010)');
   }
 
   const cleanProto = String(protocol).toLowerCase();
-  if (cleanProto !== 'tcp' && cleanProto !== 'udp') {
-    throw new Error('Protocol must be tcp or udp');
+  if (cleanProto !== 'tcp' && cleanProto !== 'udp' && cleanProto !== 'any') {
+    throw new Error('Protocol must be tcp, udp, or any');
   }
 
   const cleanAction = String(action).toLowerCase();
@@ -601,28 +791,68 @@ async function addUfwRule(port, protocol = 'tcp', action = 'allow') {
     throw new Error('Action must be allow or deny');
   }
 
-  const rule = `${portNum}/${cleanProto}`;
-  await execFileAsync('ufw', [cleanAction, rule]);
-  return { ok: true, port: portNum, protocol: cleanProto, action: cleanAction };
+  const ufwArgs = [cleanAction];
+
+  if (sourceIp && typeof sourceIp === 'string' && sourceIp.trim() && sourceIp.trim() !== 'Anywhere') {
+    const cleanIp = sourceIp.trim();
+    if (!/^[0-9a-fA-F.:/]+$/.test(cleanIp)) {
+      throw new Error('Invalid source IP / CIDR format');
+    }
+    ufwArgs.push('from', cleanIp, 'to', 'any', 'port', portStr);
+    if (cleanProto !== 'any') {
+      ufwArgs.push('proto', cleanProto);
+    }
+  } else {
+    if (cleanProto === 'any') {
+      ufwArgs.push(portStr);
+    } else {
+      ufwArgs.push(`${portStr}/${cleanProto}`);
+    }
+  }
+
+  await execFileAsync('ufw', ufwArgs);
+  return { ok: true, port: portStr, protocol: cleanProto, action: cleanAction };
 }
 
-async function deleteUfwRule(port, protocol = 'tcp') {
-  const portNum = Number(port);
-  if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
-    throw new Error('Port must be an integer between 1 and 65535');
+async function deleteUfwRule(portOrIndex, protocol = 'tcp', explicitRuleIndex) {
+  // If ruleIndex is provided or portOrIndex is purely an index number
+  const ruleIdx = explicitRuleIndex !== undefined && explicitRuleIndex !== null
+    ? parseInt(String(explicitRuleIndex), 10)
+    : undefined;
+
+  if (ruleIdx && !isNaN(ruleIdx) && ruleIdx > 0) {
+    await execFileAsync('ufw', ['--force', 'delete', String(ruleIdx)]);
+    return { ok: true, ruleIndex: ruleIdx };
   }
 
+  const portStr = String(portOrIndex).trim();
   const cleanProto = String(protocol).toLowerCase();
-  if (cleanProto !== 'tcp' && cleanProto !== 'udp') {
-    throw new Error('Protocol must be tcp or udp');
+
+  // Try deleting by port and protocol
+  const rule = cleanProto === 'any' ? portStr : `${portStr}/${cleanProto}`;
+  try {
+    await execFileAsync('ufw', ['delete', 'allow', rule]);
+  } catch {
+    await execFileAsync('ufw', ['delete', 'deny', rule]);
   }
 
-  const rule = `${portNum}/${cleanProto}`;
-  await execFileAsync('ufw', ['delete', 'allow', rule]).catch(() =>
-    execFileAsync('ufw', ['delete', 'deny', rule])
-  );
+  return { ok: true, port: portStr, protocol: cleanProto };
+}
 
-  return { ok: true, port: portNum, protocol: cleanProto };
+async function enableUfw() {
+  // --force avoids the interactive "Command may disrupt existing ssh connections" prompt
+  await execFileAsync('ufw', ['--force', 'enable']);
+  return { ok: true, status: 'enabled' };
+}
+
+async function disableUfw() {
+  await execFileAsync('ufw', ['disable']);
+  return { ok: true, status: 'disabled' };
+}
+
+async function resetUfw() {
+  await execFileAsync('ufw', ['--force', 'reset']);
+  return { ok: true, status: 'reset' };
 }
 
 module.exports = {
@@ -642,12 +872,24 @@ module.exports = {
   controlDockerContainer,
   getDockerContainerLogs,
   getDockerContainerLogStream,
+  getDockerContainerInspect,
+  getDockerContainerStats,
   createDockerContainer,
+  getDockerImages,
+  pullDockerImage,
+  removeDockerImage,
+  getDockerVolumes,
+  createDockerVolume,
+  removeDockerVolume,
   listDockerNetworks,
   createDockerNetwork,
+  removeDockerNetwork,
   deployDockerCompose,
   pruneDockerResources,
   getUfwStatus,
   addUfwRule,
   deleteUfwRule,
+  enableUfw,
+  disableUfw,
+  resetUfw,
 };

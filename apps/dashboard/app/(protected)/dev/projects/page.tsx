@@ -535,7 +535,7 @@ export default function UnifiedDevProjectsPage() {
         <div className="p-4 bg-white/5 border border-white/15 rounded-2xl flex items-center justify-between text-xs text-neutral-300 font-mono">
           <span>{actionNotice}</span>
           <button onClick={() => setActionNotice(null)} className="text-text-muted hover:text-white font-bold">
-            ✕
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
       )}
@@ -1102,7 +1102,7 @@ export default function UnifiedDevProjectsPage() {
                                 Self-Hosted Supabase Stack
                               </span>
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 flex items-center gap-1">
-                                ⭐ Main VPS Node: {selectedSupabaseProject.nodeLabel || selectedSupabaseProject.nodeIp || 'Main VPS'}
+                                Main VPS Node: {selectedSupabaseProject.nodeLabel || selectedSupabaseProject.nodeIp || 'Main VPS'}
                               </span>
                             </div>
                             <h2 className="text-xl font-black text-white mt-1 flex items-center gap-2">
@@ -1810,7 +1810,7 @@ export default function UnifiedDevProjectsPage() {
                           <div className="p-4 bg-white/[0.02] border border-white/10 rounded-xl space-y-3">
                             <h4 className="font-bold text-amber-400 uppercase text-[11px]">Security Linter Audit</h4>
                             {advisorsData.security.length === 0 ? (
-                              <p className="text-emerald-400 text-xs">✓ No critical security advisories detected.</p>
+                              <p className="text-emerald-400 text-xs flex items-center gap-1"><IconCheckCircle size={11} className="inline" /> No critical security advisories detected.</p>
                             ) : (
                               advisorsData.security.map((sec: any, idx: number) => (
                                 <div key={idx} className="p-2.5 bg-black/40 rounded-lg border border-amber-500/20 text-text-muted">
@@ -1824,7 +1824,7 @@ export default function UnifiedDevProjectsPage() {
                           <div className="p-4 bg-white/[0.02] border border-white/10 rounded-xl space-y-3">
                             <h4 className="font-bold text-cyan-400 uppercase text-[11px]">Performance Linter Audit</h4>
                             {advisorsData.performance.length === 0 ? (
-                              <p className="text-emerald-400 text-xs">✓ Database indexes & query plans optimized.</p>
+                              <p className="text-emerald-400 text-xs flex items-center gap-1"><IconCheckCircle size={11} className="inline" /> Database indexes & query plans optimized.</p>
                             ) : (
                               advisorsData.performance.map((perf: any, idx: number) => (
                                 <div key={idx} className="p-2.5 bg-black/40 rounded-lg border border-cyan-500/20 text-text-muted">
@@ -2114,14 +2114,14 @@ export default function UnifiedDevProjectsPage() {
                         const isMain = n.roleTags?.includes('main-node') || n.label.toLowerCase().includes('main');
                         return (
                           <option key={n.id} value={n.id}>
-                            {isMain ? '⭐ [MAIN VPS NODE] ' : ''}{n.label} ({n.ip}) - {n.cpuCores || 4} Cores / {n.ramMb || 8192} MB RAM
+                            {isMain ? '[MAIN VPS NODE] ' : ''}{n.label} ({n.ip}) - {n.cpuCores || 4} Cores / {n.ramMb || 8192} MB RAM
                           </option>
                         );
                       })}
-                      <option value="">⚡ Auto-Select Optimal Node (Lowest CPU/RAM Load)</option>
+                      <option value="">Auto-Select Optimal Node (Lowest CPU/RAM Load)</option>
                     </select>
                     <p className="text-[10px] text-emerald-400 font-mono mt-1">
-                      ⭐ Deploys on your Main VPS node with full self-hosted Supabase Studio dashboard, Kong API gateway, PostgreSQL & Auth.
+                      Deploys on your Main VPS node with full self-hosted Supabase Studio dashboard, Kong API gateway, PostgreSQL & Auth.
                     </p>
                   </div>
                 </>
@@ -2273,7 +2273,7 @@ export default function UnifiedDevProjectsPage() {
                 onClick={() => setProjectLogsModal(null)}
                 className="text-text-muted hover:text-white font-bold text-sm"
               >
-                ✕
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
 

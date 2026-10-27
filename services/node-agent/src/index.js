@@ -1397,6 +1397,99 @@ app.post('/agent/engine/docker/prune', async (_req, res) => {
   }
 });
 
+// ── Docker Image Management ───────────────────────────────────────────────────
+
+app.get('/agent/engine/docker/images', async (_req, res) => {
+  try {
+    const images = await nodeEngine.getDockerImages();
+    res.json({ images });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/engine/docker/images/pull', async (req, res) => {
+  const { imageName } = req.body || {};
+  try {
+    const result = await nodeEngine.pullDockerImage(imageName);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/agent/engine/docker/images/:imageId', async (req, res) => {
+  const force = req.query.force === 'true';
+  try {
+    const result = await nodeEngine.removeDockerImage(req.params.imageId, force);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ── Docker Volume Management ──────────────────────────────────────────────────
+
+app.get('/agent/engine/docker/volumes', async (_req, res) => {
+  try {
+    const volumes = await nodeEngine.getDockerVolumes();
+    res.json({ volumes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/engine/docker/volumes', async (req, res) => {
+  const { name, driver, labels } = req.body || {};
+  try {
+    const result = await nodeEngine.createDockerVolume(name, driver, labels);
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/agent/engine/docker/volumes/:name', async (req, res) => {
+  const force = req.query.force === 'true';
+  try {
+    const result = await nodeEngine.removeDockerVolume(req.params.name, force);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ── Docker Network Deletion ────────────────────────────────────────────────────
+
+app.delete('/agent/engine/docker/networks/:networkId', async (req, res) => {
+  try {
+    const result = await nodeEngine.removeDockerNetwork(req.params.networkId);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ── Docker Container Inspect & Stats ──────────────────────────────────────────
+
+app.get('/agent/engine/docker/containers/:id/inspect', async (req, res) => {
+  try {
+    const result = await nodeEngine.getDockerContainerInspect(req.params.id);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/agent/engine/docker/containers/:id/stats', async (req, res) => {
+  try {
+    const result = await nodeEngine.getDockerContainerStats(req.params.id);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.get('/agent/engine/firewall', async (_req, res) => {
   try {
     const status = await nodeEngine.getUfwStatus();
@@ -1407,9 +1500,9 @@ app.get('/agent/engine/firewall', async (_req, res) => {
 });
 
 app.post('/agent/engine/firewall/rules', async (req, res) => {
-  const { port, protocol, action } = req.body || {};
+  const { port, protocol, action, sourceIp } = req.body || {};
   try {
-    const result = await nodeEngine.addUfwRule(port, protocol, action);
+    const result = await nodeEngine.addUfwRule(port, protocol, action, sourceIp);
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1417,12 +1510,39 @@ app.post('/agent/engine/firewall/rules', async (req, res) => {
 });
 
 app.delete('/agent/engine/firewall/rules', async (req, res) => {
-  const { port, protocol } = req.query || {};
+  const { port, protocol, ruleIndex } = req.query || {};
   try {
-    const result = await nodeEngine.deleteUfwRule(port, protocol);
+    const result = await nodeEngine.deleteUfwRule(port || ruleIndex, protocol, ruleIndex);
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/agent/engine/firewall/enable', async (_req, res) => {
+  try {
+    const result = await nodeEngine.enableUfw();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/engine/firewall/disable', async (_req, res) => {
+  try {
+    const result = await nodeEngine.disableUfw();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/agent/engine/firewall/reset', async (_req, res) => {
+  try {
+    const result = await nodeEngine.resetUfw();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

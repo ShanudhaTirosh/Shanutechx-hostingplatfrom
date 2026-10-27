@@ -1220,7 +1220,7 @@ EOF`;
                           <div className="flex items-center gap-2">
                             <span>MX</span>
                             {dnsCheckDetails[dom.id]?.mx ? (
-                              <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold">✓ Verified</span>
+                              <span className="inline-flex items-center gap-0.5 text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold"><svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Verified</span>
                             ) : (
                               <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">Check Required</span>
                             )}
@@ -1243,7 +1243,7 @@ EOF`;
                           <div className="flex items-center gap-2">
                             <span>TXT (SPF)</span>
                             {dnsCheckDetails[dom.id]?.spf ? (
-                              <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold">✓ Verified</span>
+                              <span className="inline-flex items-center gap-0.5 text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold"><svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Verified</span>
                             ) : (
                               <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">Check Required</span>
                             )}
@@ -1266,7 +1266,7 @@ EOF`;
                           <div className="flex items-center gap-2">
                             <span>TXT (DKIM)</span>
                             {dnsCheckDetails[dom.id]?.dkim ? (
-                              <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold">✓ Verified</span>
+                              <span className="inline-flex items-center gap-0.5 text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold"><svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Verified</span>
                             ) : (
                               <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">Check Required</span>
                             )}
@@ -1289,7 +1289,7 @@ EOF`;
                           <div className="flex items-center gap-2">
                             <span>TXT (DMARC)</span>
                             {dnsCheckDetails[dom.id]?.dmarc ? (
-                              <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold">✓ Verified</span>
+                              <span className="inline-flex items-center gap-0.5 text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold"><svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Verified</span>
                             ) : (
                               <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">Check Required</span>
                             )}
@@ -1611,7 +1611,7 @@ EOF`;
               <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 w-full max-w-md space-y-4 shadow-2xl">
                 <div className="flex items-center justify-between border-b border-white/10 pb-3">
                   <h3 className="font-bold text-sm text-white">Add WildDuck Mail Host Node</h3>
-                  <button onClick={() => setShowAddHostModal(false)} className="text-slate-400 hover:text-white text-xs">✕</button>
+                  <button onClick={() => setShowAddHostModal(false)} className="text-slate-400 hover:text-white text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
 
                 <form onSubmit={handleAddMailHost} className="space-y-3">
@@ -1831,7 +1831,7 @@ EOF`;
                 <p className="text-xs text-slate-400 mt-0.5">Provision an isolated mailbox with custom storage quota and credentials.</p>
               </div>
               <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-white p-1">
-                ✕
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
 
@@ -1990,7 +1990,7 @@ EOF`;
                 <p className="text-xs text-slate-400 mt-0.5 font-mono">{quotaModalMailbox.email}</p>
               </div>
               <button onClick={() => setQuotaModalMailbox(null)} className="text-slate-400 hover:text-white p-1">
-                ✕
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
 
@@ -2092,7 +2092,7 @@ EOF`;
                 onClick={() => setWebsiteConnectMailbox(null)}
                 className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800/60"
               >
-                ✕
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
 

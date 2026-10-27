@@ -696,7 +696,7 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
             )}
             {latestPayment.status === 'rejected' && latestPayment.rejectionReason && (
               <p className="text-red-400 text-[11px] leading-relaxed">
-                ❌ Proof could not be verified: <span className="text-text-primary font-medium">{latestPayment.rejectionReason}</span>. Please re-upload a clear transfer receipt.
+                <span className="text-red-400 font-semibold flex items-center gap-1"><IconClose size={12} className="inline" /> Proof could not be verified:</span> <span className="text-text-primary font-medium">{latestPayment.rejectionReason}</span>. Please re-upload a clear transfer receipt.
               </p>
             )}
           </div>

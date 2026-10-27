@@ -428,7 +428,7 @@ export default function ProjectsPage() {
         {deleteModalProj && (
           <div className="space-y-4">
             <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-300 space-y-1">
-              <p className="font-bold">⚠️ Warning: Irreversible Action</p>
+              <p className="font-bold flex items-center gap-1"><IconAlert size={13} className="inline text-amber-400" /> Warning: Irreversible Action</p>
               <p>
                 Deleting <strong>{deleteModalProj.name}</strong> will terminate all associated PostgreSQL container engines, drop database tables, and revoke access for all members.
               </p>

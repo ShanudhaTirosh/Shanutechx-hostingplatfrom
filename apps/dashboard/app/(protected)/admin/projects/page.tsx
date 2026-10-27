@@ -231,7 +231,7 @@ function ProvisionForm({
         value={customerEmail}
         onChange={(e) => setCustomerEmail(e.target.value)}
         onBlur={handleEmailBlur}
-        hint={userId ? `✓ Resolved to user ID: ${userId}` : 'Tab out to resolve to a user ID'}
+        hint={userId ? `Resolved to user ID: ${userId}` : 'Tab out to resolve to a user ID'}
       />
 
       <Input

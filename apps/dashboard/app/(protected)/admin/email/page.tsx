@@ -176,7 +176,7 @@ export default function AdminEmailPage() {
         action={
           <div className="flex items-center gap-2">
             <Button size="sm" variant="secondary" onClick={handleTestGlobalSmtp} loading={testingSmtp}>
-              ⚡ Test Outbound SMTP Relay
+              Test Outbound SMTP Relay
             </Button>
             <Button size="sm" onClick={() => setShowProvisionModal(true)}>
               + Provision Mail Account
@@ -191,7 +191,11 @@ export default function AdminEmailPage() {
       {smtpResult && (
         <div className={`p-4 rounded-2xl border ${smtpResult.ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'} text-xs flex items-center justify-between`}>
           <div className="flex items-center gap-2">
-            <span className="font-bold">{smtpResult.ok ? '✓ Global Outbound SMTP Active' : '✕ Outbound SMTP Failure:'}</span>
+            <span className="font-bold flex items-center gap-1">
+              {smtpResult.ok
+                ? <><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Global Outbound SMTP Active</>
+                : <><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Outbound SMTP Failure:</>}
+            </span>
             <span>{smtpResult.message}</span>
           </div>
           {smtpResult.latencyMs && <span className="font-mono text-[11px] bg-slate-900 px-2 py-0.5 rounded">{smtpResult.latencyMs}ms Latency</span>}
@@ -218,7 +222,7 @@ export default function AdminEmailPage() {
           href="/dev/webmail"
           className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition-all shadow-md shrink-0 flex items-center gap-1.5"
         >
-          ⚙ Open Dev Control Center & S3 Setup →
+          Open Dev Control Center & S3 Setup →
         </a>
       </div>
 
@@ -348,7 +352,7 @@ export default function AdminEmailPage() {
                 onClick={() => setShowProvisionModal(false)}
                 className="text-text-muted hover:text-white text-xs"
               >
-                ✕
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
 

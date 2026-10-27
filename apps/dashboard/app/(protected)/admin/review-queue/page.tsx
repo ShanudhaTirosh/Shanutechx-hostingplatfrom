@@ -290,7 +290,7 @@ export default function ReviewQueuePage() {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 text-xs bg-white/5 hover:bg-white/10 text-accent-teal-bright px-3 py-2 rounded-xl border border-white/10 transition-all"
                     >
-                      📄 View PDF Payment Proof Document →
+                      View PDF Payment Proof Document →
                     </a>
                   ) : (
                     <div

@@ -340,7 +340,7 @@ export default function ProjectDetailPage() {
 
     // Destructive query safeguard
     const isDestructive = /drop|truncate|delete\s+from\s+[^\s]+\s*$/i.test(sqlQuery);
-    if (isDestructive && !confirm('⚠️ Warning: This SQL statement contains destructive operations (DROP/TRUNCATE/DELETE). Execute anyway?')) {
+    if (isDestructive && !confirm('Warning: This SQL statement contains destructive operations (DROP/TRUNCATE/DELETE). Execute anyway?')) {
       return;
     }
 
@@ -610,7 +610,7 @@ export default function ProjectDetailPage() {
                           isSelected ? 'bg-emerald-500/30 text-emerald-300' : 'bg-white/5 text-text-muted hover:text-white'
                         }`}
                       >
-                        {isSelected ? '✓ Selected' : 'Select'}
+                        {isSelected ? 'Selected' : 'Select'}
                       </button>
                     </div>
 
@@ -959,7 +959,7 @@ export default function ProjectDetailPage() {
                       onClick={() => handleCopy(connDetails.connectionString, 'dsn')}
                       className="text-emerald-400 hover:text-emerald-300"
                     >
-                      {copiedLabel === 'dsn' ? '✓ Copied' : 'Copy'}
+                      {copiedLabel === 'dsn' ? 'Copied' : 'Copy'}
                     </button>
                   </div>
                   <p className="text-emerald-300 break-all select-all font-mono">{connDetails.connectionString}</p>
@@ -973,7 +973,7 @@ export default function ProjectDetailPage() {
                       onClick={() => handleCopy(connDetails.connectionString.replace(':5432', ':6543'), 'pool')}
                       className="text-cyan-400 hover:text-cyan-300"
                     >
-                      {copiedLabel === 'pool' ? '✓ Copied' : 'Copy'}
+                      {copiedLabel === 'pool' ? 'Copied' : 'Copy'}
                     </button>
                   </div>
                   <p className="text-cyan-300 break-all select-all font-mono">
@@ -1026,7 +1026,7 @@ export default function ProjectDetailPage() {
           {createdUserPasswordNotice && (
             <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 font-mono flex items-center justify-between">
               <span>{createdUserPasswordNotice}</span>
-              <button onClick={() => setCreatedUserPasswordNotice(null)} className="text-white">✕</button>
+              <button onClick={() => setCreatedUserPasswordNotice(null)} className="text-white"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
           )}
 

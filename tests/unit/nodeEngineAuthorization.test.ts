@@ -73,3 +73,29 @@ test('support staff keep read-only visibility (monitoring, services, users list)
   assert.deepEqual(statuses, [200, 200, 200], `statuses=${statuses}`);
   assert.equal(agentCalls.length, 3);
 });
+
+test('system cluster nodes (platform infra) are strictly restricted to role dev', async () => {
+  agentCalls.length = 0;
+  const clusterNode = () => ({ id: 'sys-node-1', ip: '10.0.0.1', label: 'prod-node-1', projects: [] });
+  const f = makeFakePrisma({
+    'node.findUnique': clusterNode,
+    'vpsProvision.findUnique': () => null,
+    'auditLog.create': () => ({}),
+  });
+  const s = await mountRouter('nodeEngine', 'nodeEngineRouter', f.prisma);
+
+  try {
+    // 1. Non-dev roles (admin, support, customer) MUST receive 404 / access denied on system nodes
+    const nonDevRoles = ['admin', 'support', 'customer'];
+    for (const role of nonDevRoles) {
+      const res = await s.call('GET', '/nodes/sys-node-1/engine/firewall', { user: 'user1', role });
+      assert.equal(res.status, 404, `Role ${role} must not access system compute node engine`);
+    }
+
+    // 2. Dev superuser role CAN access system compute nodes
+    const devRes = await s.call('GET', '/nodes/sys-node-1/engine/firewall', { user: 'dev1', role: 'dev' });
+    assert.equal(devRes.status, 200, 'Dev role can manage system compute node engine');
+  } finally {
+    s.close();
+  }
+});

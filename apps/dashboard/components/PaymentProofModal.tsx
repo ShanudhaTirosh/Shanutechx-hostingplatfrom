@@ -392,7 +392,7 @@ export default function PaymentProofModal({
 
               {activeChannel.details.note && (
                 <p className="text-[11px] text-slate-400 leading-relaxed pt-1 border-t border-white/5">
-                  💡 <span className="text-slate-300">{activeChannel.details.note}</span>
+                  <IconLightbulb className="w-3.5 h-3.5 text-amber-400 inline mr-1" /> <span className="text-slate-300">{activeChannel.details.note}</span>
                 </p>
               )}
             </div>
@@ -466,7 +466,7 @@ export default function PaymentProofModal({
           {/* Submission Notice & Buttons */}
           <div className="pt-2 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-[11px] text-slate-400 leading-tight">
-              🔒 Proofs are securely stored in WebP format and manually reviewed by staff. VPS setups deliver within 24 to 72 hours.
+              <IconLock className="w-3.5 h-3.5 inline mr-1" /> Proofs are securely stored in WebP format and manually reviewed by staff. VPS setups deliver within 24 to 72 hours.
             </p>
             <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0">
               <button

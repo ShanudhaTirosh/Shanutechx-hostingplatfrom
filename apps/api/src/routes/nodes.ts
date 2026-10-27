@@ -312,6 +312,10 @@ const createNodeSchema = z.object({
 });
 
 nodesRouter.post('/nodes', async (req: AuthedRequest, res: Response) => {
+  if (req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'System compute nodes can strictly only be created by dev superusers' });
+  }
+
   const parsed = createNodeSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -618,6 +622,10 @@ async function upsertNodeRecord(opts: {
  * POST /api/nodes/connect/stream
  */
 nodesRouter.post('/nodes/connect', async (req: AuthedRequest, res: Response) => {
+  if (req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'System compute nodes can strictly only be onboarded by dev superusers' });
+  }
+
   const parsed = connectSSHSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -685,6 +693,10 @@ nodesRouter.post('/nodes/connect', async (req: AuthedRequest, res: Response) => 
  * provisioning step in real-time so the UI can show a live progress log.
  */
 nodesRouter.post('/nodes/connect/stream', async (req: AuthedRequest, res: Response) => {
+  if (req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'System compute nodes can strictly only be onboarded by dev superusers' });
+  }
+
   const parsed = connectSSHSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -748,9 +760,21 @@ nodesRouter.post('/nodes/connect/stream', async (req: AuthedRequest, res: Respon
 
 
 
-const updateNodeSchema = z.object({ isActive: z.boolean() });
+const updateNodeSchema = z.object({
+  isActive: z.boolean().optional(),
+  isDraining: z.boolean().optional(),
+  label: z.string().min(1).max(64).optional(),
+  roleTags: z.array(z.string().min(1).max(64)).optional(),
+  monthlyBandwidthGb: z.number().int().positive().optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+  message: 'At least one field to update must be provided',
+});
 
 nodesRouter.patch('/nodes/:id', async (req: AuthedRequest, res: Response) => {
+  if (req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'System compute nodes can strictly only be updated by dev superusers' });
+  }
+
   const parsed = updateNodeSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -764,15 +788,16 @@ nodesRouter.patch('/nodes/:id', async (req: AuthedRequest, res: Response) => {
   }
 
   await prisma.auditLog.create({
-    data: { adminId: req.user!.id, action: 'node.set_active', target: `${node.id} -> ${parsed.data.isActive}` },
+    data: {
+      adminId: req.user!.id,
+      action: 'node.update',
+      target: `${node.id}: ${JSON.stringify(parsed.data)}`,
+    },
   });
 
   // BUG-H05 FIX: When deactivating a node, notify that any active SSH sessions
-  // on this node will be silently dropped. Clients that are connected will not
-  // receive a friendly disconnect message — a proper fix would involve tracking
-  // active WebSocket connections per node and sending close frames. As an interim
-  // measure we log a prominent warning and notify via Discord so ops staff know.
-  if (!parsed.data.isActive) {
+  // on this node will be silently dropped.
+  if (parsed.data.isActive === false) {
     logger.warn({ nodeId: node.id, nodeLabel: node.label }, 'Node deactivated — any active SSH terminal sessions on this node will be silently dropped');
     notifyDiscordChannel('deployment_failed', {
       event: 'Node Deactivated',
@@ -792,6 +817,10 @@ nodesRouter.patch('/nodes/:id', async (req: AuthedRequest, res: Response) => {
  * Evacuates deployments, managed databases, LiveKit keys, and exposed ports across remaining cluster nodes.
  */
 nodesRouter.post('/nodes/:id/failover', async (req: AuthedRequest, res: Response) => {
+  if (req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'System compute node failover can strictly only be triggered by dev superusers' });
+  }
+
   const node = await prisma.node.findUnique({ where: { id: req.params.id } });
   if (!node) return res.status(404).json({ error: 'Node not found' });
 
