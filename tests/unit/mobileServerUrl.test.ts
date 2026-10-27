@@ -22,9 +22,18 @@ test('plain http is rejected for real servers, even in dev builds', () => {
   bad('http://evil.example', { allowInsecureLoopback: true });
 });
 
-test('plain http is accepted only for loopback / emulator hosts and only when explicitly allowed (dev builds)', () => {
+test('plain http is accepted only for loopback / emulator / LAN dev hosts and only when explicitly allowed (dev builds)', () => {
   bad('http://localhost:4000');
-  for (const u of ['http://localhost:4000', 'http://127.0.0.1:4000', 'http://10.0.2.2:4000', 'http://[::1]:4000']) {
+  for (const u of [
+    'http://localhost:4000',
+    'http://127.0.0.1:4000',
+    'http://10.0.2.2:4000',
+    'http://[::1]:4000',
+    'http://192.168.1.150:4000',
+    'http://10.0.0.5:4000',
+    'http://172.20.10.2:4000',
+    'http://my-macbook.local:4000',
+  ]) {
     assert.equal(ok(u, { allowInsecureLoopback: true }), u);
   }
 });

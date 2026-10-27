@@ -10,8 +10,19 @@
  */
 export type ServerUrlResult = { ok: true; url: string } | { ok: false; error: string };
 
-// Plain http is only ever acceptable for a dev machine / emulator, never for a real server.
+// Plain http is only ever acceptable for a dev machine / emulator / local LAN, never for a real server.
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '10.0.2.2']);
+
+function isDevNetworkHost(host: string): boolean {
+  if (LOOPBACK_HOSTS.has(host)) return true;
+  // Standard RFC 1918 private IPv4 networks (e.g. phone on local Wi-Fi connected to dev machine)
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+  if (/^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+  // mDNS local hostnames (e.g. my-macbook.local)
+  if (host.endsWith('.local')) return true;
+  return false;
+}
 
 const URL_RE = /^(https?):\/\/(\[[0-9a-fA-F:]+\]|[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?)(?::(\d{1,5}))?((?:\/[^\s?#]*)?)$/i;
 
@@ -32,7 +43,7 @@ export function normalizeServerUrl(input: string, opts: { allowInsecureLoopback?
   const port = m[3];
   if (port !== undefined && Number(port) > 65535) return { ok: false, error: 'Invalid port number.' };
 
-  if (scheme === 'http' && !(opts.allowInsecureLoopback && LOOPBACK_HOSTS.has(host))) {
+  if (scheme === 'http' && !(opts.allowInsecureLoopback && isDevNetworkHost(host))) {
     return { ok: false, error: 'The server URL must use https:// (credentials are sent to it).' };
   }
 
