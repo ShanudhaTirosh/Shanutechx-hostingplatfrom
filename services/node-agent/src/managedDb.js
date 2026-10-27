@@ -19,14 +19,10 @@ const DEFAULT_PORTS = {
 };
 
 /**
- * Runs a standalone database container on the node's internal Docker
- * network only — no port published to the host, no Traefik route. The
- * customer's app deployments reach it by container name (Docker's
- * internal DNS resolves container names within the same network), the
- * same way the control-plane's own Postgres/Redis are reached by `api`
- * and `worker` in docker-compose.yml.
+ * Runs a standalone database container. By default runs on the node's internal Docker
+ * network. If publicAccess or publishedPort is specified, publishes the port to the host.
  */
-async function provisionDatabase({ databaseId, type, password }) {
+async function provisionDatabase({ databaseId, type, password, publicAccess = false, publishedPort = null }) {
   const image = IMAGES[type];
   if (!image) throw new Error(`Unknown database type: ${type}`);
 
@@ -44,21 +40,32 @@ async function provisionDatabase({ databaseId, type, password }) {
 
   const cmd = type === 'redis' ? ['redis-server', '--requirepass', password] : undefined;
 
+  const exposedPorts = {};
+  const portBindings = {};
+  const hostPort = publishedPort || (publicAccess ? internalPort : null);
+  if (hostPort) {
+    const portKey = `${internalPort}/tcp`;
+    exposedPorts[portKey] = {};
+    portBindings[portKey] = [{ HostPort: String(hostPort) }];
+  }
+
   const container = await docker.createContainer({
     Image: image,
     name: containerName,
     Env: env,
     ...(cmd ? { Cmd: cmd } : {}),
+    ...(Object.keys(exposedPorts).length > 0 ? { ExposedPorts: exposedPorts } : {}),
     HostConfig: {
       NetworkMode: 'shanutechx-internal',
       RestartPolicy: { Name: 'unless-stopped' },
       SecurityOpt: ['no-new-privileges:true'],
+      ...(Object.keys(portBindings).length > 0 ? { PortBindings: portBindings } : {}),
     },
   });
 
   await container.start();
 
-  return { containerId: container.id, containerName, internalPort };
+  return { containerId: container.id, containerName, internalPort, publishedPort: hostPort ? Number(hostPort) : null };
 }
 
 /**
@@ -449,6 +456,21 @@ async function restoreDatabase({ containerId, type, databaseId, backupId, master
   return { ok: true, containerId, backupId: safeBackupId, message: 'Database snapshot successfully restored.' };
 }
 
+/**
+ * Executes a light ping/test query against a running database engine.
+ */
+async function pingDatabase({ containerId, type, masterPassword, dbName }) {
+  try {
+    let testQuery = 'SELECT 1;';
+    if (type === 'redis') testQuery = 'PING';
+    if (type === 'mongodb') testQuery = 'db.runCommand({ ping: 1 })';
+    const result = await executeDatabaseQuery({ containerId, type, query: testQuery, masterPassword, dbName });
+    return { ok: true, output: result.output, durationMs: result.durationMs || 0 };
+  } catch (err) {
+    return { ok: false, error: err.message || 'Database ping failed' };
+  }
+}
+
 module.exports = {
   provisionDatabase,
   scaleDatabase,
@@ -458,6 +480,7 @@ module.exports = {
   backupDatabase,
   listDatabaseBackups,
   restoreDatabase,
+  pingDatabase,
 };
 
 

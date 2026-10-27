@@ -50,6 +50,7 @@ export const api = {
   me: () => request<any>('/me'),
   updateProfile: (data: { displayName?: string; avatarUrl?: string }) => request<any>('/me', { method: 'PATCH', body: JSON.stringify(data) }),
   post: <T = any>(path: string, body?: any) => request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+  delete: <T = any>(path: string) => request<T>(path, { method: 'DELETE' }),
 
   auth: {
     me: () => request<any>('/me'),
@@ -101,7 +102,15 @@ export const api = {
       if (category) q.append('category', category);
       return request<any>(`/webmail/messages?${q.toString()}`);
     },
-    listThreads: (folder = 'inbox') => request<any>(`/webmail/threads?folder=${folder}`),
+    listThreads: (folder = 'inbox', smtpAccountId?: string) => {
+      const q = new URLSearchParams({ folder });
+      if (smtpAccountId) q.append('smtpAccountId', smtpAccountId);
+      return request<any>(`/webmail/threads?${q.toString()}`);
+    },
+    createAlias: (data: { smtpAccountId: string; aliasEmail: string }) =>
+      request<any>('/webmail/aliases', { method: 'POST', body: JSON.stringify(data) }),
+    deleteAlias: (data: { smtpAccountId: string; aliasEmail: string }) =>
+      request<any>('/webmail/aliases', { method: 'DELETE', body: JSON.stringify(data) }),
     getThread: (threadId: string) => request<any>(`/webmail/threads/${threadId}`),
     getMessage: (id: string) => request<any>(`/webmail/messages/${id}`),
     send: (data: any) => request<any>('/webmail/send', { method: 'POST', body: JSON.stringify(data) }),
@@ -109,6 +118,15 @@ export const api = {
     bulkAction: (data: any) => request<any>('/webmail/bulk', { method: 'POST', body: JSON.stringify(data) }),
     patchMessage: (id: string, data: any) => request<any>(`/webmail/messages/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     deleteMessage: (id: string) => request<any>(`/webmail/messages/${id}`, { method: 'DELETE' }),
+    restoreMessage: (id: string) => request<any>(`/webmail/messages/${id}/restore`, { method: 'POST' }),
+    moveMessage: (id: string, folder?: string, category?: string) =>
+      request<any>(`/webmail/messages/${id}/move`, { method: 'POST', body: JSON.stringify({ folder, category }) }),
+    setImportance: (id: string, isImportant: boolean) =>
+      request<any>(`/webmail/messages/${id}/importance`, { method: 'POST', body: JSON.stringify({ isImportant }) }),
+    muteThread: (threadId: string) => request<any>(`/webmail/threads/${threadId}/mute`, { method: 'POST' }),
+    suggestContacts: (q: string) => request<any>(`/webmail/contacts/suggest?q=${encodeURIComponent(q)}`),
+    reportThreat: (messageId: string, threatType = 'phishing', comment?: string) =>
+      request<any>('/webmail/security/threat-report', { method: 'POST', body: JSON.stringify({ messageId, threatType, comment }) }),
 
     // Custom Folders
     listFolders: () => request<any>('/webmail/folders'),

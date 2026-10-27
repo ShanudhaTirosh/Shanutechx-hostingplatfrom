@@ -6,7 +6,7 @@ import {
   Settings, FileSignature, FileText, Sun, Ban, X, Trash2, Plus, Zap, HardDrive,
   MailCheck, ArrowUpCircle, CheckCircle2, ExternalLink, Globe, ShieldCheck, User,
   Check, RefreshCw, Layers, Key, Upload, Image, Camera, Code, Copy, Send, Eye, EyeOff, Server,
-  Briefcase, Building, Phone, UserCircle, AlertCircle, Sparkles
+  Briefcase, Building, Phone, UserCircle, AlertCircle, Sparkles, SlidersHorizontal, Columns, Rows, Bell, Monitor
 } from 'lucide-react';
 
 export interface WebmailSettingsModalProps {
@@ -15,10 +15,45 @@ export interface WebmailSettingsModalProps {
   mailboxes?: any[];
   activeMailboxId?: string | null;
   onRefreshData?: () => void;
+  density?: 'comfortable' | 'default' | 'compact';
+  onDensityChange?: (d: 'comfortable' | 'default' | 'compact') => void;
+  readingPane?: 'right' | 'bottom' | 'off';
+  onReadingPaneChange?: (rp: 'right' | 'bottom' | 'off') => void;
 }
 
-export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMailboxId, onRefreshData }: WebmailSettingsModalProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'connect' | 'dns' | 'signatures' | 'templates' | 'autoreply' | 'blocklist' | 'upgrade'>('profile');
+export function WebmailSettingsModal({
+  isOpen,
+  onClose,
+  mailboxes = [],
+  activeMailboxId,
+  onRefreshData,
+  density = 'default',
+  onDensityChange,
+  readingPane = 'right',
+  onReadingPaneChange,
+}: WebmailSettingsModalProps) {
+  const [activeSubTab, setActiveSubTab] = useState<'general' | 'profile' | 'connect' | 'dns' | 'signatures' | 'templates' | 'autoreply' | 'blocklist' | 'upgrade'>('general');
+  const [notificationStatus, setNotificationStatus] = useState<'default' | 'granted' | 'denied'>('default');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationStatus(Notification.permission);
+    }
+  }, [isOpen]);
+
+  const requestNotificationPermission = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const permission = await Notification.requestPermission();
+        setNotificationStatus(permission);
+        if (permission === 'granted') {
+          toast('Desktop notifications enabled successfully!', 'success');
+        } else {
+          toast('Desktop notifications were not enabled', 'info');
+        }
+      } catch (_) {}
+    }
+  };
 
   const [mailboxInfo, setMailboxInfo] = useState<any | null>(null);
 
@@ -307,12 +342,33 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
     e.preventDefault();
     if (!newAliasPrefix.trim() || !mailboxInfo?.id) return;
     try {
-      const res = await api.post(`/smtp-accounts/${mailboxInfo.id}/aliases`, { prefix: newAliasPrefix.trim() });
+      const res = await api.post(`/smtp-accounts/${mailboxInfo.id}/aliases`, { prefix: newAliasPrefix.trim() }).catch(async () => {
+        return await api.webmail.createAlias({
+          smtpAccountId: mailboxInfo.id,
+          aliasEmail: `${newAliasPrefix.trim()}@${customDomainInput}`,
+        });
+      });
       setAliases(res.aliases || [...aliases, `${newAliasPrefix.trim()}@${customDomainInput}`]);
       setNewAliasPrefix('');
       toast(`Alias added successfully!`, 'success');
+      onRefreshData?.();
     } catch (err: any) {
       toast(err.message || 'Failed to add alias', 'error');
+    }
+  };
+
+  const handleDeleteAlias = async (aliasEmail: string) => {
+    if (!mailboxInfo?.id) return;
+    const prefix = aliasEmail.split('@')[0];
+    try {
+      const res = await api.delete(`/smtp-accounts/${mailboxInfo.id}/aliases/${prefix}`).catch(async () => {
+        return await api.webmail.deleteAlias({ smtpAccountId: mailboxInfo.id, aliasEmail });
+      });
+      setAliases(res.aliases || aliases.filter((a) => a !== aliasEmail));
+      toast(`Alias ${aliasEmail} removed!`, 'info');
+      onRefreshData?.();
+    } catch (err: any) {
+      toast(err.message || 'Failed to remove alias', 'error');
     }
   };
 
@@ -396,6 +452,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
         {/* SUB TABS */}
         <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto">
           {[
+            { id: 'general', label: 'General & View', icon: SlidersHorizontal },
             { id: 'profile', label: 'Profile', icon: User },
             { id: 'connect', label: 'Website Connect', icon: Code },
             { id: 'dns', label: 'DNS & Aliases', icon: Globe },
@@ -422,6 +479,114 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
             );
           })}
         </div>
+
+        {/* TAB: GENERAL & VIEW PREFERENCES */}
+        {activeSubTab === 'general' && (
+          <div className="space-y-5 text-xs max-h-[65vh] overflow-y-auto pr-1">
+            {/* Display Density */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <div>
+                <h4 className="font-bold text-slate-100 flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-indigo-400" /> Display Density
+                </h4>
+                <p className="text-[11px] text-slate-400">Choose how compact or spacious message list rows appear in your inbox</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  { id: 'compact', label: 'Compact', desc: 'Maximum emails visible per screen' },
+                  { id: 'default', label: 'Default', desc: 'Balanced spacing and clarity' },
+                  { id: 'comfortable', label: 'Comfortable', desc: 'Spacious padding and breathing room' },
+                ].map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => onDensityChange?.(d.id as any)}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      density === d.id
+                        ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-md'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                    }`}
+                  >
+                    <span className="font-bold text-xs block">{d.label}</span>
+                    <span className="text-[10px] text-slate-500 block mt-0.5">{d.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Reading Pane Layout */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <div>
+                <h4 className="font-bold text-slate-100 flex items-center gap-2">
+                  <Columns className="w-4 h-4 text-indigo-400" /> Reading Pane Placement
+                </h4>
+                <p className="text-[11px] text-slate-400">Configure how message contents are displayed alongside the mailbox list</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  { id: 'right', label: 'Right of inbox', icon: Columns, desc: 'Side-by-side view (recommended)' },
+                  { id: 'bottom', label: 'Below inbox', icon: Rows, desc: 'Horizontal split view' },
+                  { id: 'off', label: 'No split', icon: Layers, desc: 'Full width reading mode' },
+                ].map((rp) => {
+                  const Icon = rp.icon;
+                  return (
+                    <button
+                      key={rp.id}
+                      type="button"
+                      onClick={() => onReadingPaneChange?.(rp.id as any)}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        readingPane === rp.id
+                          ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-md'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Icon className="w-3.5 h-3.5 text-indigo-400" />
+                        <span className="font-bold text-xs">{rp.label}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 block">{rp.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Desktop Notifications */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-slate-100 flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-indigo-400" /> Desktop & Push Alerts
+                  </h4>
+                  <p className="text-[11px] text-slate-400">Receive instant operating system notifications when new messages arrive</p>
+                </div>
+                {notificationStatus === 'granted' ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <CheckCircle2 className="w-3 h-3" /> Notifications Active
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={requestNotificationPermission}
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors shadow-sm"
+                  >
+                    Enable Notifications
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Keyboard Shortcuts Reference */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
+              <h4 className="font-bold text-slate-100 flex items-center gap-2">
+                <Monitor className="w-4 h-4 text-indigo-400" /> Keyboard Shortcuts Support
+              </h4>
+              <p className="text-[11px] text-slate-400">
+                Press <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px] text-indigo-300">?</kbd> at any time in the mailbox to view all navigation shortcuts, <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px] text-indigo-300">c</kbd> to compose, <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px] text-indigo-300">/</kbd> to search, <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px] text-indigo-300">r</kbd> to reply, <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px] text-indigo-300">e</kbd> to archive, <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px] text-indigo-300">#</kbd> to delete.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* TAB 0: PROFILE & AVATAR */}
         {activeSubTab === 'profile' && (
@@ -1008,9 +1173,19 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
                 {aliases.map((al) => (
                   <div key={al} className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between font-mono text-[11px]">
                     <span className="text-indigo-300">{al}</span>
-                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                      Active Alias
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                        Active Alias
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAlias(al)}
+                        className="p-1 hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 rounded transition-colors"
+                        title={`Remove alias ${al}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

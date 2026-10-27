@@ -20,38 +20,60 @@ import {
   AlertCircle,
   File,
   UploadCloud,
+  Lock,
+  ChevronDown,
+  User,
+  ShieldAlert,
 } from 'lucide-react';
 import { api } from '../lib/api';
+
+export interface AttachmentItem {
+  filename: string;
+  sizeStr: string;
+  url?: string;
+  content?: string;
+  contentType?: string;
+}
 
 interface ComposerProps {
   isOpen: boolean;
   onClose: () => void;
   defaultRecipient?: string;
+  defaultCc?: string;
+  defaultBcc?: string;
   defaultSubject?: string;
   defaultBody?: string;
+  defaultAttachments?: AttachmentItem[];
   threadId?: string;
   inReplyTo?: string;
   smtpAccountId?: string;
+  availableSenders?: { email: string; label: string }[];
   onSent?: () => void;
+  onRequestUndoSend?: (payload: any) => void;
 }
 
 export const Composer: React.FC<ComposerProps> = ({
   isOpen,
   onClose,
   defaultRecipient = '',
+  defaultCc = '',
+  defaultBcc = '',
   defaultSubject = '',
   defaultBody = '',
+  defaultAttachments = [],
   threadId,
   inReplyTo,
   smtpAccountId,
+  availableSenders = [],
   onSent,
+  onRequestUndoSend,
 }) => {
   const [recipient, setRecipient] = useState(defaultRecipient);
   const [subject, setSubject] = useState(defaultSubject);
   const [body, setBody] = useState(defaultBody);
-  const [showCc, setShowCc] = useState(false);
-  const [cc, setCc] = useState('');
-  const [bcc, setBcc] = useState('');
+  const [showCc, setShowCc] = useState(!!defaultCc || !!defaultBcc);
+  const [cc, setCc] = useState(defaultCc);
+  const [bcc, setBcc] = useState(defaultBcc);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -60,6 +82,22 @@ export const Composer: React.FC<ComposerProps> = ({
   const [scheduledDate, setScheduledDate] = useState('');
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
+  // Selected from identity (aliases / mailboxes)
+  const [selectedFromEmail, setSelectedFromEmail] = useState<string>('');
+
+  // Confidential mode
+  const [isConfidential, setIsConfidential] = useState(false);
+  const [confidentialDays, setConfidentialDays] = useState(7);
+
+  // Draft saving state
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftStatus, setDraftStatus] = useState<string>('');
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Contact Autocomplete Suggestions
+  const [contactSuggestions, setContactSuggestions] = useState<{ name: string; email: string }[]>([]);
+  const [activeField, setActiveField] = useState<'to' | 'cc' | 'bcc' | null>(null);
+
   // Signatures & Canned templates
   const [signatures, setSignatures] = useState<any[]>([]);
   const [selectedSignature, setSelectedSignature] = useState<string>('');
@@ -67,7 +105,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const [showTemplates, setShowTemplates] = useState(false);
 
   // Attachments
-  const [attachments, setAttachments] = useState<{ filename: string; sizeStr: string; url?: string; content?: string; contentType?: string }[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>(defaultAttachments);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -75,9 +113,18 @@ export const Composer: React.FC<ComposerProps> = ({
   useEffect(() => {
     if (isOpen) {
       setRecipient(defaultRecipient);
+      setCc(defaultCc);
+      setBcc(defaultBcc);
       setSubject(defaultSubject);
       setBody(defaultBody);
+      setAttachments(defaultAttachments || []);
       setErrorMsg(null);
+      setDraftStatus('');
+      setDraftId(null);
+
+      if (availableSenders.length > 0) {
+        setSelectedFromEmail(availableSenders[0].email);
+      }
 
       // Load signatures & templates
       api.webmail
@@ -96,7 +143,63 @@ export const Composer: React.FC<ComposerProps> = ({
         })
         .catch(() => {});
     }
-  }, [isOpen, defaultRecipient, defaultSubject, defaultBody]);
+  }, [isOpen, defaultRecipient, defaultCc, defaultBcc, defaultSubject, defaultBody, defaultAttachments, availableSenders]);
+
+  // Debounced Auto-save draft every 3 seconds while typing
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!subject.trim() && !body.trim() && !recipient.trim()) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    autoSaveTimerRef.current = setTimeout(async () => {
+      try {
+        setDraftStatus('Saving draft...');
+        const res = await api.webmail.saveDraft({
+          id: draftId || undefined,
+          recipientEmail: recipient.trim(),
+          subject: subject.trim() || '(Draft)',
+          htmlBody: body,
+          smtpAccountId,
+        });
+        if (res?.draft?.id) {
+          setDraftId(res.draft.id);
+          const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          setDraftStatus(`Saved at ${nowStr}`);
+        }
+      } catch (_) {
+        setDraftStatus('');
+      }
+    }, 3000);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [recipient, subject, body, isOpen, draftId]);
+
+  // Contact suggestion query debounced
+  const handleQuerySuggestions = async (val: string, field: 'to' | 'cc' | 'bcc') => {
+    setActiveField(field);
+    const trimmed = val.trim();
+    if (!trimmed || trimmed.includes(',')) {
+      setContactSuggestions([]);
+      return;
+    }
+    try {
+      const res = await api.webmail.suggestContacts(trimmed);
+      setContactSuggestions(res.suggestions || []);
+    } catch {
+      setContactSuggestions([]);
+    }
+  };
+
+  const handleSelectSuggestion = (email: string) => {
+    if (activeField === 'to') setRecipient(email);
+    else if (activeField === 'cc') setCc(email);
+    else if (activeField === 'bcc') setBcc(email);
+    setContactSuggestions([]);
+    setActiveField(null);
+  };
 
   if (!isOpen) return null;
 
@@ -110,29 +213,48 @@ export const Composer: React.FC<ComposerProps> = ({
       return;
     }
 
-    setIsSending(true);
-    setErrorMsg(null);
-
     let finalHtml = body;
+    if (isConfidential) {
+      finalHtml = `
+        <div style="border: 2px dashed #6366f1; padding: 12px; border-radius: 8px; margin-bottom: 16px; background-color: #f8fafc; font-size: 12px; color: #475569;">
+          <strong>🔒 Confidential Email Notice:</strong> This message expires in ${confidentialDays} days. Please do not forward or copy without authorization.
+        </div>
+        ${finalHtml}
+      `;
+    }
+
     if (selectedSignature) {
       finalHtml += `<br/><br/>--<br/>${selectedSignature}`;
     }
 
-    try {
-      await api.webmail.send({
-        recipientEmail: recipient.trim(),
-        cc: cc.trim() || undefined,
-        bcc: bcc.trim() || undefined,
-        subject: subject.trim(),
-        htmlBody: finalHtml,
-        smtpAccountId,
-        threadId,
-        inReplyTo,
-        scheduledAt: scheduledDate ? new Date(scheduledDate).toISOString() : undefined,
-        readReceipt,
-        attachments,
-      });
+    const payload = {
+      recipientEmail: recipient.trim(),
+      fromEmail: selectedFromEmail || undefined,
+      cc: cc.trim() || undefined,
+      bcc: bcc.trim() || undefined,
+      subject: subject.trim(),
+      htmlBody: finalHtml,
+      smtpAccountId,
+      threadId,
+      inReplyTo,
+      scheduledAt: scheduledDate ? new Date(scheduledDate).toISOString() : undefined,
+      readReceipt,
+      attachments,
+      draftId,
+    };
 
+    if (onRequestUndoSend) {
+      // Delegate to layout's 5s Undo-Send buffer
+      onRequestUndoSend(payload);
+      onClose();
+      return;
+    }
+
+    setIsSending(true);
+    setErrorMsg(null);
+
+    try {
+      await api.webmail.send(payload);
       setIsSending(false);
       onClose();
       if (onSent) onSent();
@@ -150,7 +272,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
   const addFiles = async (files: File[]) => {
     const filePromises = files.map((f) => {
-      return new Promise<{ filename: string; sizeStr: string; url?: string; content?: string; contentType?: string }>((resolve) => {
+      return new Promise<AttachmentItem>((resolve) => {
         const reader = new FileReader();
         reader.onload = () => {
           resolve({
@@ -203,6 +325,7 @@ export const Composer: React.FC<ComposerProps> = ({
     else if (tag === 'i') formatted = `<i>${selectedText || 'italic text'}</i>`;
     else if (tag === 'u') formatted = `<u>${selectedText || 'underlined text'}</u>`;
     else if (tag === 'ul') formatted = `\n<ul>\n  <li>${selectedText || 'Item 1'}</li>\n</ul>\n`;
+    else if (tag === 'ol') formatted = `\n<ol>\n  <li>${selectedText || 'Item 1'}</li>\n</ol>\n`;
 
     const newText = body.substring(0, start) + formatted + body.substring(end);
     setBody(newText);
@@ -264,20 +387,36 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* Top Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-slate-950 border-b border-slate-800 text-slate-200 select-none">
-        <span className="text-sm font-semibold flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <Send className="w-4 h-4 text-indigo-400" />
-          {inReplyTo ? 'Reply to Thread' : 'New Email Message'}
-        </span>
+          <span className="text-sm font-semibold">
+            {inReplyTo ? 'Reply to Thread' : 'New Email Message'}
+          </span>
+          {draftStatus && (
+            <span className="text-[10px] text-slate-500 font-normal ml-2">
+              {draftStatus}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setIsMinimized(true)}
+            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors hidden sm:inline-flex"
+            title="Minimize"
+          >
+            <Minimize2 className="w-3.5 h-3.5" />
+          </button>
           <button
             onClick={() => setIsMaximized(!isMaximized)}
             className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors hidden sm:inline-flex"
+            title={isMaximized ? 'Restore' : 'Maximize'}
           >
             {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
           <button
             onClick={onClose}
             className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
+            title="Close"
           >
             <X className="w-4 h-4" />
           </button>
@@ -295,14 +434,36 @@ export const Composer: React.FC<ComposerProps> = ({
         </div>
       )}
 
-      {/* Recipient Fields */}
-      <div className="p-3 border-b border-slate-800/80 space-y-2 text-xs bg-slate-900/50">
-        <div className="flex items-center gap-2">
+      {/* Recipient & From Fields */}
+      <div className="p-3 border-b border-slate-800/80 space-y-2 text-xs bg-slate-900/50 relative">
+        {/* From Identity Selector (if aliases exist) */}
+        {availableSenders.length > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="w-14 text-slate-400 font-medium">From:</span>
+            <select
+              value={selectedFromEmail}
+              onChange={(e) => setSelectedFromEmail(e.target.value)}
+              className="flex-1 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+            >
+              {availableSenders.map((s) => (
+                <option key={s.email} value={s.email}>
+                  {s.label} ({s.email})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* To Field with Autocomplete */}
+        <div className="flex items-center gap-2 relative">
           <span className="w-14 text-slate-400 font-medium">To:</span>
           <input
             type="email"
             value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
+            onChange={(e) => {
+              setRecipient(e.target.value);
+              handleQuerySuggestions(e.target.value, 'to');
+            }}
             placeholder="recipient@example.com"
             className="flex-1 bg-transparent text-slate-100 placeholder-slate-500 border-none focus:outline-none focus:ring-0 text-xs"
           />
@@ -314,29 +475,80 @@ export const Composer: React.FC<ComposerProps> = ({
               Cc / Bcc
             </button>
           )}
+
+          {/* Autocomplete Suggestions Menu */}
+          {activeField === 'to' && contactSuggestions.length > 0 && (
+            <div className="absolute left-16 top-full mt-1 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-2xl z-50 py-1 text-xs">
+              {contactSuggestions.map((c, i) => (
+                <button
+                  key={i}
+                  onMouseDown={() => handleSelectSuggestion(c.email)}
+                  className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-slate-800 text-left"
+                >
+                  <span className="font-semibold text-slate-200 truncate">{c.name}</span>
+                  <span className="text-[10px] text-slate-400 truncate">{c.email}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {showCc && (
           <>
-            <div className="flex items-center gap-2 border-t border-slate-800/50 pt-1.5">
+            <div className="flex items-center gap-2 border-t border-slate-800/50 pt-1.5 relative">
               <span className="w-14 text-slate-400 font-medium">Cc:</span>
               <input
                 type="text"
                 value={cc}
-                onChange={(e) => setCc(e.target.value)}
+                onChange={(e) => {
+                  setCc(e.target.value);
+                  handleQuerySuggestions(e.target.value, 'cc');
+                }}
                 placeholder="cc@example.com"
                 className="flex-1 bg-transparent text-slate-100 placeholder-slate-500 focus:outline-none text-xs"
               />
+              {activeField === 'cc' && contactSuggestions.length > 0 && (
+                <div className="absolute left-16 top-full mt-1 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-2xl z-50 py-1 text-xs">
+                  {contactSuggestions.map((c, i) => (
+                    <button
+                      key={i}
+                      onMouseDown={() => handleSelectSuggestion(c.email)}
+                      className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-slate-800 text-left"
+                    >
+                      <span className="font-semibold text-slate-200 truncate">{c.name}</span>
+                      <span className="text-[10px] text-slate-400 truncate">{c.email}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-2 border-t border-slate-800/50 pt-1.5">
+
+            <div className="flex items-center gap-2 border-t border-slate-800/50 pt-1.5 relative">
               <span className="w-14 text-slate-400 font-medium">Bcc:</span>
               <input
                 type="text"
                 value={bcc}
-                onChange={(e) => setBcc(e.target.value)}
+                onChange={(e) => {
+                  setBcc(e.target.value);
+                  handleQuerySuggestions(e.target.value, 'bcc');
+                }}
                 placeholder="bcc@example.com"
                 className="flex-1 bg-transparent text-slate-100 placeholder-slate-500 focus:outline-none text-xs"
               />
+              {activeField === 'bcc' && contactSuggestions.length > 0 && (
+                <div className="absolute left-16 top-full mt-1 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-2xl z-50 py-1 text-xs">
+                  {contactSuggestions.map((c, i) => (
+                    <button
+                      key={i}
+                      onMouseDown={() => handleSelectSuggestion(c.email)}
+                      className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-slate-800 text-left"
+                    >
+                      <span className="font-semibold text-slate-200 truncate">{c.name}</span>
+                      <span className="text-[10px] text-slate-400 truncate">{c.email}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -353,7 +565,7 @@ export const Composer: React.FC<ComposerProps> = ({
         </div>
       </div>
 
-      {/* Formatting Toolbar */}
+      {/* Formatting & Template Toolbar */}
       <div className="px-3 py-1.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between text-slate-400 text-xs">
         <div className="flex items-center gap-1">
           <button
@@ -385,36 +597,61 @@ export const Composer: React.FC<ComposerProps> = ({
           >
             <List className="w-3.5 h-3.5" />
           </button>
+          <button
+            onClick={() => insertFormat('ol')}
+            title="Numbered List"
+            className="p-1 hover:bg-slate-800 rounded hover:text-slate-200"
+          >
+            <ListOrdered className="w-3.5 h-3.5" />
+          </button>
         </div>
 
-        {/* Templates dropdown */}
-        {templates.length > 0 && (
-          <div className="relative">
-            <button
-              onClick={() => setShowTemplates(!showTemplates)}
-              className="text-[11px] text-slate-400 hover:text-indigo-300 flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-800"
-            >
-              <FileText className="w-3 h-3" /> Canned Response
-            </button>
-            {showTemplates && (
-              <div className="absolute right-0 top-full mt-1 w-56 bg-slate-900 border border-slate-800 rounded-lg shadow-xl z-50 py-1">
-                {templates.map((tpl) => (
-                  <button
-                    key={tpl.id}
-                    onClick={() => {
-                      setBody((prev) => prev + '\n' + tpl.body);
-                      if (tpl.subject && !subject) setSubject(tpl.subject);
-                      setShowTemplates(false);
-                    }}
-                    className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 truncate"
-                  >
-                    {tpl.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Confidential Mode Toggle */}
+          <button
+            onClick={() => setIsConfidential(!isConfidential)}
+            className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded transition-colors ${
+              isConfidential
+                ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            }`}
+            title="Toggle Confidential Mode"
+          >
+            <Lock className="w-3 h-3" /> Confidential
+          </button>
+
+          {/* Templates dropdown */}
+          {templates.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowTemplates(!showTemplates)}
+                className="text-[11px] text-slate-400 hover:text-indigo-300 flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-800"
+              >
+                <FileText className="w-3 h-3" /> Canned Response
+              </button>
+              {showTemplates && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowTemplates(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-56 bg-slate-900 border border-slate-800 rounded-lg shadow-xl z-50 py-1">
+                    {templates.map((tpl) => (
+                      <button
+                        key={tpl.id}
+                        onClick={() => {
+                          setBody((prev) => prev + '\n' + tpl.body);
+                          if (tpl.subject && !subject) setSubject(tpl.subject);
+                          setShowTemplates(false);
+                        }}
+                        className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 truncate"
+                      >
+                        {tpl.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Editor Area */}

@@ -61,16 +61,40 @@ export interface SupabaseEdgeFunction {
   updated_at: string;
 }
 
+/** Matches the full `ClientProject` interface returned by the API's `serializeProject()` */
 export interface ClientSupabaseProject {
   id: string;
   name: string;
   clientEmail: string;
   dbName: string;
   region: string;
-  status: 'ACTIVE' | 'PROVISIONING' | 'SUSPENDED';
+  status: 'ACTIVE' | 'PROVISIONING' | 'STOPPED' | 'FAILED' | 'SUSPENDED';
+  errorMessage?: string | null;
   anonKey: string;
   serviceKey: string;
+  hasServiceKey: boolean;
   smtpConfigured: boolean;
+  studioPort?: number;
+  apiPort?: number;
+  dbPort?: number;
+  storageLimitMb?: number;
+  extensions?: string[];
+  authSettingsJson?: Record<string, any>;
+  poolerSettingsJson?: Record<string, any>;
+  nodeId?: string | null;
+  nodeIp?: string | null;
+  nodeLabel?: string | null;
+  subdomain?: string;
+  studioUrl?: string;
+  apiUrl?: string;
+  metaUrl?: string;
+  dbUrl?: string;
+  resourceUsage?: {
+    cpuPct: number;
+    ramMb: number;
+    diskMb: number;
+    dbSizeMb: number;
+  };
   createdAt: string;
 }
 
@@ -103,23 +127,68 @@ export interface SmtpDeliveryLog {
   timestamp: string;
 }
 
+export interface ProjectStats {
+  cpuPct: number;
+  ramMb: number;
+  diskMb: number;
+  dbSizeMb: number;
+}
+
 export const supabaseAdmin = {
   health: () => apiFetch('/api/supabase/health').then((r) => asJson<SupabaseHealth>(r)),
 
   projects: {
-    list: () => apiFetch('/api/supabase/projects').then((r) => asJson<{ projects: ClientSupabaseProject[]; total: number }>(r)),
-    create: (data: { name: string; clientEmail: string; region?: string }) =>
+    list: () =>
+      apiFetch('/api/supabase/projects').then((r) =>
+        asJson<{ projects: ClientSupabaseProject[]; total: number }>(r)
+      ),
+
+    get: (id: string) =>
+      apiFetch(`/api/supabase/projects/${id}`).then((r) =>
+        asJson<{ project: ClientSupabaseProject }>(r)
+      ),
+
+    create: (data: { name: string; clientEmail: string; region?: string; nodeId?: string }) =>
       apiFetch('/api/supabase/projects', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<{ project: ClientSupabaseProject }>(r)
       ),
+
     delete: (id: string) =>
       apiFetch(`/api/supabase/projects/${id}`, { method: 'DELETE' }).then((r) =>
         asJson<{ ok: boolean; deletedId: string }>(r)
       ),
+
+    start: (id: string) =>
+      apiFetch(`/api/supabase/projects/${id}/start`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; project: ClientSupabaseProject }>(r)
+      ),
+
+    stop: (id: string) =>
+      apiFetch(`/api/supabase/projects/${id}/stop`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; project: ClientSupabaseProject }>(r)
+      ),
+
+    restart: (id: string) =>
+      apiFetch(`/api/supabase/projects/${id}/restart`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; project: ClientSupabaseProject }>(r)
+      ),
+
+    retry: (id: string) =>
+      apiFetch(`/api/supabase/projects/${id}/retry`, { method: 'POST' }).then((r) =>
+        asJson<{ ok: boolean; project: ClientSupabaseProject }>(r)
+      ),
+
+    getStats: (id: string) =>
+      apiFetch(`/api/supabase/projects/${id}/stats`).then((r) =>
+        asJson<{ ok: boolean; stats: ProjectStats }>(r)
+      ),
   },
 
   smtp: {
-    getConfig: () => apiFetch('/api/supabase/smtp/config').then((r) => asJson<{ smtpConfig: SupabaseSmtpConfig; hasPassword: boolean }>(r)),
+    getConfig: () =>
+      apiFetch('/api/supabase/smtp/config').then((r) =>
+        asJson<{ smtpConfig: SupabaseSmtpConfig; hasPassword: boolean }>(r)
+      ),
     saveConfig: (data: Partial<SupabaseSmtpConfig & { pass?: string }>) =>
       apiFetch('/api/supabase/smtp/config', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<{ ok: boolean; smtpConfig: SupabaseSmtpConfig }>(r)
@@ -129,31 +198,44 @@ export const supabaseAdmin = {
         asJson<{ ok: boolean; message: string; latencyMs: number }>(r)
       ),
     sendTestEmail: (recipientEmail?: string, templateId?: string) =>
-      apiFetch('/api/supabase/smtp/test-email', { method: 'POST', body: JSON.stringify({ recipientEmail, templateId }) }).then((r) =>
+      apiFetch('/api/supabase/smtp/test-email', {
+        method: 'POST',
+        body: JSON.stringify({ recipientEmail, templateId }),
+      }).then((r) =>
         asJson<{ ok: boolean; delivered: boolean; recipient: string; messageId: string; response: string; timestamp: string }>(r)
       ),
-    getTemplates: () => apiFetch('/api/supabase/smtp/templates').then((r) => asJson<{ templates: EmailTemplate[] }>(r)),
-    saveTemplate: (id: string, data: { subject: string; html: string }) =>
-      apiFetch('/api/supabase/smtp/templates', { method: 'POST', body: JSON.stringify({ id, ...data }) }).then((r) =>
-        asJson<{ ok: boolean; template: EmailTemplate }>(r)
+    getTemplates: () =>
+      apiFetch('/api/supabase/smtp/templates').then((r) =>
+        asJson<{ templates: EmailTemplate[] }>(r)
       ),
-    getLogs: () => apiFetch('/api/supabase/smtp/logs').then((r) => asJson<{ logs: SmtpDeliveryLog[] }>(r)),
+    saveTemplate: (id: string, data: { subject: string; html: string }) =>
+      apiFetch('/api/supabase/smtp/templates', {
+        method: 'POST',
+        body: JSON.stringify({ id, ...data }),
+      }).then((r) => asJson<{ ok: boolean; template: EmailTemplate }>(r)),
+    getLogs: () =>
+      apiFetch('/api/supabase/smtp/logs').then((r) => asJson<{ logs: SmtpDeliveryLog[] }>(r)),
   },
 
   auth: {
-    users: () => apiFetch('/api/supabase/auth/users').then((r) => asJson<{ users: SupabaseAuthUser[]; total: number }>(r)),
+    users: () =>
+      apiFetch('/api/supabase/auth/users').then((r) =>
+        asJson<{ users: SupabaseAuthUser[]; total: number }>(r)
+      ),
     createUser: (data: { email: string; password: string; user_metadata?: Record<string, any> }) =>
       apiFetch('/api/supabase/auth/users', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<SupabaseAuthUser>(r)
       ),
     sendResetPassword: (id: string, email?: string) =>
-      apiFetch(`/api/supabase/auth/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ email }) }).then((r) =>
-        asJson<{ ok: boolean; message: string }>(r)
-      ),
+      apiFetch(`/api/supabase/auth/users/${id}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
     updateUser: (id: string, data: { banned?: boolean; role?: string; user_metadata?: Record<string, any> }) =>
-      apiFetch(`/api/supabase/auth/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) =>
-        asJson<{ ok: boolean; user?: SupabaseAuthUser }>(r)
-      ),
+      apiFetch(`/api/supabase/auth/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }).then((r) => asJson<{ ok: boolean; user?: SupabaseAuthUser }>(r)),
     deleteUser: (id: string) =>
       apiFetch(`/api/supabase/auth/users/${id}`, { method: 'DELETE' }).then((r) =>
         asJson<{ ok: boolean; deletedId: string }>(r)
@@ -161,8 +243,14 @@ export const supabaseAdmin = {
   },
 
   db: {
-    schemas: () => apiFetch('/api/supabase/db/schemas').then((r) => asJson<{ schemas: Array<{ name: string; owner: string }> }>(r)),
-    tables: () => apiFetch('/api/supabase/db/tables').then((r) => asJson<{ tables: SupabaseDbTable[] }>(r)),
+    schemas: () =>
+      apiFetch('/api/supabase/db/schemas').then((r) =>
+        asJson<{ schemas: Array<{ name: string; owner: string }> }>(r)
+      ),
+    tables: () =>
+      apiFetch('/api/supabase/db/tables').then((r) =>
+        asJson<{ tables: SupabaseDbTable[] }>(r)
+      ),
     query: (sql: string) =>
       apiFetch('/api/supabase/db/query', { method: 'POST', body: JSON.stringify({ sql }) }).then((r) =>
         asJson<{ rows: Record<string, any>[]; rowCount: number }>(r)
@@ -170,7 +258,10 @@ export const supabaseAdmin = {
   },
 
   storage: {
-    buckets: () => apiFetch('/api/supabase/storage/buckets').then((r) => asJson<{ buckets: SupabaseStorageBucket[] }>(r)),
+    buckets: () =>
+      apiFetch('/api/supabase/storage/buckets').then((r) =>
+        asJson<{ buckets: SupabaseStorageBucket[] }>(r)
+      ),
     createBucket: (data: { id: string; name: string; isPublic: boolean }) =>
       apiFetch('/api/supabase/storage/buckets', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<SupabaseStorageBucket>(r)
@@ -178,13 +269,19 @@ export const supabaseAdmin = {
   },
 
   functions: {
-    list: () => apiFetch('/api/supabase/functions').then((r) => asJson<{ functions: SupabaseEdgeFunction[] }>(r)),
+    list: () =>
+      apiFetch('/api/supabase/functions').then((r) =>
+        asJson<{ functions: SupabaseEdgeFunction[] }>(r)
+      ),
     create: (data: { name: string; code?: string }) =>
       apiFetch('/api/supabase/functions', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
         asJson<{ function: SupabaseEdgeFunction }>(r)
       ),
     invoke: (name: string, payload: any) =>
-      apiFetch(`/api/supabase/functions/${name}/invoke`, { method: 'POST', body: JSON.stringify(payload) }).then((r) =>
+      apiFetch(`/api/supabase/functions/${name}/invoke`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }).then((r) =>
         asJson<{ status: number; ok: boolean; executionTimeMs: number; response: any }>(r)
       ),
   },
@@ -241,4 +338,3 @@ export const supabaseAdmin = {
       asJson<{ supabaseUrl: string; anonKey: string; serviceRoleKey: string; studioUrl: string; smtpConfigured: boolean }>(r)
     ),
 };
-

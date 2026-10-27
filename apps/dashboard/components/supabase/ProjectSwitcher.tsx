@@ -1,42 +1,83 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-
+import { useState, useEffect, useCallback } from 'react';
+import { X, Play, Square, RotateCcw, RefreshCw, Trash2, Plus, ExternalLink, AlertCircle, Loader2 } from 'lucide-react';
 import { supabaseAdmin, ClientSupabaseProject } from '@/lib/supabaseAdmin';
 import { ProjectConfigModal } from './ProjectConfigModal';
+import { useToast } from '@/components/ui';
 
 interface ProjectSwitcherProps {
   activeProject: ClientSupabaseProject | null;
   onSelectProject: (proj: ClientSupabaseProject) => void;
 }
 
+type LifecycleAction = 'start' | 'stop' | 'restart' | 'retry' | 'delete';
+
+const STATUS_STYLES: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+  ACTIVE:       { bg: 'bg-emerald-500/20', text: 'text-emerald-300', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
+  PROVISIONING: { bg: 'bg-amber-500/20',   text: 'text-amber-300',   border: 'border-amber-500/30',   dot: 'bg-amber-400 animate-pulse' },
+  STOPPED:      { bg: 'bg-slate-500/20',   text: 'text-slate-300',   border: 'border-slate-500/30',   dot: 'bg-slate-400' },
+  FAILED:       { bg: 'bg-red-500/20',     text: 'text-red-300',     border: 'border-red-500/30',     dot: 'bg-red-400 animate-pulse' },
+  SUSPENDED:    { bg: 'bg-orange-500/20',  text: 'text-orange-300',  border: 'border-orange-500/30',  dot: 'bg-orange-400' },
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const s = STATUS_STYLES[status] || STATUS_STYLES.ACTIVE;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${s.bg} ${s.text} border ${s.border}`}>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.dot}`} />
+      {status}
+    </span>
+  );
+}
+
 export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitcherProps) {
   const [projects, setProjects] = useState<ClientSupabaseProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null); // projectId of in-progress action
   const [showModal, setShowModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<ClientSupabaseProject | null>(null);
 
   // New Project Form
   const [name, setName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [creating, setCreating] = useState(false);
 
-  const loadProjects = () => {
+  const { toast } = useToast();
+
+  const loadProjects = useCallback(() => {
     supabaseAdmin.projects
       .list()
       .then((res) => {
         setProjects(res.projects);
         if (res.projects.length > 0 && !activeProject) {
           onSelectProject(res.projects[0]);
+        } else if (activeProject) {
+          // Refresh the active project data in case status changed
+          const updated = res.projects.find((p) => p.id === activeProject.id);
+          if (updated) onSelectProject(updated);
         }
       })
+      .catch((err) => toast(err.message, 'error'))
       .finally(() => setLoading(false));
-  };
+  }, [activeProject, onSelectProject, toast]);
 
   useEffect(() => {
     loadProjects();
-  }, []);
+    // Poll every 8 seconds if any project is PROVISIONING
+    const interval = setInterval(() => {
+      if (projects.some((p) => p.status === 'PROVISIONING')) {
+        loadProjects();
+      }
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [projects.some((p) => p.status === 'PROVISIONING')]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Initial load only
+  useEffect(() => {
+    loadProjects();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreateProject = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,77 +89,243 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
         setName('');
         setClientEmail('');
         setShowModal(false);
-        setProjects((prev: ClientSupabaseProject[]) => [...prev, res.project]);
+        setProjects((prev) => [res.project, ...prev]);
         onSelectProject(res.project);
+        toast(`Project "${res.project.name}" provisioning started`, 'success');
       })
-      .catch((err) => alert(err.message))
+      .catch((err) => toast(err.message, 'error'))
       .finally(() => setCreating(false));
   };
 
+  const handleLifecycleAction = async (project: ClientSupabaseProject, action: LifecycleAction) => {
+    if (action === 'delete') {
+      setConfirmDelete(project);
+      return;
+    }
+
+    setActionLoading(`${project.id}:${action}`);
+    try {
+      let updated: ClientSupabaseProject;
+      if (action === 'start') {
+        const res = await supabaseAdmin.projects.start(project.id);
+        updated = res.project;
+        toast(`Project "${project.name}" started`, 'success');
+      } else if (action === 'stop') {
+        const res = await supabaseAdmin.projects.stop(project.id);
+        updated = res.project;
+        toast(`Project "${project.name}" stopped`, 'success');
+      } else if (action === 'restart') {
+        const res = await supabaseAdmin.projects.restart(project.id);
+        updated = res.project;
+        toast(`Project "${project.name}" restarted`, 'success');
+      } else {
+        // retry
+        const res = await supabaseAdmin.projects.retry(project.id);
+        updated = res.project;
+        toast(`Retrying provisioning for "${project.name}"`, 'success');
+      }
+      setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      if (activeProject?.id === updated.id) onSelectProject(updated);
+    } catch (err: any) {
+      toast(err.message || 'Action failed', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteConfirmed = async () => {
+    if (!confirmDelete) return;
+    const target = confirmDelete;
+    setConfirmDelete(null);
+    setActionLoading(`${target.id}:delete`);
+    try {
+      await supabaseAdmin.projects.delete(target.id);
+      const remaining = projects.filter((p) => p.id !== target.id);
+      setProjects(remaining);
+      if (activeProject?.id === target.id) {
+        onSelectProject(remaining[0] || null as any);
+      }
+      toast(`Project "${target.name}" deleted`, 'success');
+    } catch (err: any) {
+      toast(err.message || 'Delete failed', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const isActing = (id: string) => actionLoading?.startsWith(id) ?? false;
+
   return (
-    <div className="flex items-center justify-between glass p-3 rounded-xl border border-white/[0.06]">
-      <div className="flex items-center gap-3">
-        <div className="h-8 w-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-          </svg>
-        </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <p className="text-[10px] uppercase font-semibold text-text-faint tracking-wider">Active Supabase BaaS Project</p>
-            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-violet-500/20 text-violet-300 border border-violet-500/30 flex items-center gap-1">
-              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+    <>
+      <div className="glass rounded-xl border border-white/[0.06] overflow-hidden">
+        {/* Header Row */}
+        <div className="flex items-center justify-between p-3 border-b border-white/[0.04]">
+          <div className="flex items-center gap-2.5">
+            <div className="h-7 w-7 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
               </svg>
-              Dev User Studio
-            </span>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase font-semibold text-text-faint tracking-wider">Supabase Project</p>
+              {loading ? (
+                <p className="text-xs text-text-muted">Loading projects...</p>
+              ) : projects.length === 0 ? (
+                <p className="text-xs text-text-muted italic">No projects yet</p>
+              ) : (
+                <div className="flex items-center gap-2 mt-0.5">
+                  <select
+                    value={activeProject?.id || ''}
+                    onChange={(e) => {
+                      const found = projects.find((p) => p.id === e.target.value);
+                      if (found) onSelectProject(found);
+                    }}
+                    className="bg-transparent text-sm font-bold text-text-primary focus:outline-none cursor-pointer max-w-[220px]"
+                  >
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id} className="bg-[#0f111a] text-text-primary">
+                        {p.name} — {p.clientEmail}
+                      </option>
+                    ))}
+                  </select>
+                  {activeProject && <StatusBadge status={activeProject.status} />}
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            <select
-              value={activeProject?.id || ''}
-              onChange={(e) => {
-                const found = projects.find((p: ClientSupabaseProject) => p.id === e.target.value);
-                if (found) onSelectProject(found);
-              }}
-              className="bg-transparent text-sm font-bold text-text-primary focus:outline-none cursor-pointer"
-            >
-              {projects.map((p: ClientSupabaseProject) => (
-                <option key={p.id} value={p.id} className="bg-[#0f111a] text-text-primary">
-                  {p.name} ({p.clientEmail})
-                </option>
-              ))}
-            </select>
+
+          <div className="flex items-center gap-1.5">
+            {/* Open Studio URL */}
+            {activeProject?.studioUrl && activeProject.status === 'ACTIVE' && (
+              <a
+                href={activeProject.studioUrl}
+                target="_blank"
+                rel="noreferrer"
+                title="Open Supabase Studio"
+                className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+
+            {/* Lifecycle controls for active project */}
             {activeProject && (
-              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30">
-                {activeProject.dbName}
+              <>
+                {(activeProject.status === 'STOPPED' || activeProject.status === 'SUSPENDED') && (
+                  <button
+                    onClick={() => handleLifecycleAction(activeProject, 'start')}
+                    disabled={isActing(activeProject.id)}
+                    title="Start project"
+                    className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all disabled:opacity-50"
+                  >
+                    {isActing(activeProject.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                  </button>
+                )}
+                {activeProject.status === 'ACTIVE' && (
+                  <>
+                    <button
+                      onClick={() => handleLifecycleAction(activeProject, 'restart')}
+                      disabled={isActing(activeProject.id)}
+                      title="Restart project"
+                      className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 transition-all disabled:opacity-50"
+                    >
+                      {isActing(activeProject.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => handleLifecycleAction(activeProject, 'stop')}
+                      disabled={isActing(activeProject.id)}
+                      title="Stop project"
+                      className="p-1.5 rounded-lg bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 border border-slate-500/20 transition-all disabled:opacity-50"
+                    >
+                      {isActing(activeProject.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Square className="w-3.5 h-3.5" />}
+                    </button>
+                  </>
+                )}
+                {activeProject.status === 'FAILED' && (
+                  <button
+                    onClick={() => handleLifecycleAction(activeProject, 'retry')}
+                    disabled={isActing(activeProject.id)}
+                    title="Retry provisioning"
+                    className="p-1.5 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 border border-violet-500/20 transition-all disabled:opacity-50"
+                  >
+                    {isActing(activeProject.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  </button>
+                )}
+
+                {/* Config modal */}
+                <button
+                  onClick={() => setShowConfigModal(true)}
+                  className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 text-xs font-semibold transition-all flex items-center gap-1.5"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span className="hidden sm:inline">Config</span>
+                </button>
+
+                {/* Delete */}
+                <button
+                  onClick={() => handleLifecycleAction(activeProject, 'delete')}
+                  disabled={isActing(activeProject.id)}
+                  title="Delete project"
+                  className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-all disabled:opacity-50"
+                >
+                  {isActing(activeProject.id) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                </button>
+              </>
+            )}
+
+            {/* New project */}
+            <button
+              onClick={() => setShowModal(true)}
+              className="px-2.5 py-1.5 rounded-lg bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet-light border border-accent-violet/30 text-xs font-semibold transition-all flex items-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">New Project</span>
+            </button>
+          </div>
+        </div>
+
+        {/* FAILED error detail strip */}
+        {activeProject?.status === 'FAILED' && activeProject.errorMessage && (
+          <div className="px-3 py-2 bg-red-500/5 border-t border-red-500/20 flex items-start gap-2">
+            <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-red-300 leading-snug font-mono">{activeProject.errorMessage}</p>
+          </div>
+        )}
+
+        {/* Compact project info strip when ACTIVE */}
+        {activeProject && activeProject.status === 'ACTIVE' && (
+          <div className="px-3 py-2 bg-black/20 border-t border-white/[0.03] flex items-center gap-4 overflow-x-auto">
+            <span className="text-[10px] text-text-faint font-mono whitespace-nowrap">
+              DB: <span className="text-text-muted">{activeProject.dbName}</span>
+            </span>
+            {activeProject.nodeLabel && (
+              <span className="text-[10px] text-text-faint font-mono whitespace-nowrap">
+                Node: <span className="text-text-muted">{activeProject.nodeLabel}</span>
+              </span>
+            )}
+            {activeProject.apiPort && (
+              <span className="text-[10px] text-text-faint font-mono whitespace-nowrap">
+                API: <span className="text-text-muted">:{activeProject.apiPort}</span>
+              </span>
+            )}
+            {activeProject.studioPort && (
+              <span className="text-[10px] text-text-faint font-mono whitespace-nowrap">
+                Studio: <span className="text-text-muted">:{activeProject.studioPort}</span>
+              </span>
+            )}
+            {activeProject.region && (
+              <span className="text-[10px] text-text-faint font-mono whitespace-nowrap">
+                Region: <span className="text-text-muted">{activeProject.region}</span>
               </span>
             )}
           </div>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        {activeProject && (
-          <button
-            onClick={() => setShowConfigModal(true)}
-            className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all flex items-center gap-1.5"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span>View & Copy Config</span>
-          </button>
         )}
-
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-3 py-1.5 rounded-lg bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet-light border border-accent-violet/30 text-xs font-semibold transition-all flex items-center gap-1.5"
-        >
-          <span>+ New Client Project</span>
-        </button>
       </div>
 
+      {/* ProjectConfigModal */}
       <ProjectConfigModal
         project={activeProject}
         isOpen={showConfigModal}
@@ -131,13 +338,9 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
           <div className="glass rounded-2xl p-6 border border-white/[0.1] max-w-md w-full space-y-4">
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
               <h3 className="font-semibold text-sm text-text-primary">Create Supabase Client Project</h3>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-text-muted hover:text-text-primary text-xs"
-              >
+              <button onClick={() => setShowModal(false)} className="text-text-muted hover:text-text-primary">
                 <X className="w-4 h-4" />
               </button>
-
             </div>
 
             <form onSubmit={handleCreateProject} className="space-y-3">
@@ -165,7 +368,11 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
                 />
               </div>
 
-              <div className="pt-2 flex justify-end gap-2">
+              <p className="text-[10px] text-text-faint">
+                A full 8-container Supabase stack (DB, Auth, PostgREST, Storage, Realtime, Kong, Meta, Studio) will be auto-provisioned on the optimal VPS node.
+              </p>
+
+              <div className="pt-1 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
@@ -176,15 +383,49 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
                 <button
                   type="submit"
                   disabled={creating}
-                  className="px-4 py-2 rounded-lg bg-accent-violet text-white text-xs font-medium hover:opacity-90 transition-all shadow-glow-violet"
+                  className="px-4 py-2 rounded-lg bg-accent-violet text-white text-xs font-medium hover:opacity-90 transition-all shadow-glow-violet flex items-center gap-1.5"
                 >
-                  {creating ? 'Provisioning...' : 'Provision Supabase Project'}
+                  {creating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {creating ? 'Provisioning...' : 'Provision Project'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </div>
+
+      {/* Delete Confirm Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in p-4">
+          <div className="glass rounded-2xl p-6 border border-red-500/30 max-w-sm w-full space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm text-text-primary">Delete Project?</h3>
+                <p className="text-xs text-text-muted mt-0.5">
+                  This will permanently remove <span className="text-red-300 font-bold">{confirmDelete.name}</span> and all its containers.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="px-4 py-2 rounded-lg bg-white/[0.06] text-text-muted text-xs font-medium hover:bg-white/[0.1]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirmed}
+                className="px-4 py-2 rounded-lg bg-red-500 text-white text-xs font-bold hover:bg-red-600 transition-all"
+              >
+                Delete Project
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -26,7 +26,7 @@ export const webmailRouter = Router();
 
 useForOwnRoutes(webmailRouter, requireAuth);
 
-const FOLDERS = ['inbox', 'starred', 'drafts', 'sent', 'spam', 'trash', 'archive', 'snoozed'] as const;
+const FOLDERS = ['inbox', 'starred', 'drafts', 'sent', 'spam', 'trash', 'archive', 'snoozed', 'all_mail', 'important'] as const;
 
 /**
  * Helper to check if the authenticated user has access to a given SmtpAccount.
@@ -43,7 +43,8 @@ function canAccessMailbox(
 
 /**
  * Search operator parser helper for webmail query strings
- * Supports: from:email, to:email, subject:word, is:unread, is:starred, is:pinned, category:val, label:val
+ * Supports: from:, to:, subject:, is:unread, is:starred, is:pinned, is:important,
+ *           has:attachment, category:, label:, after:, before:, in:spam, in:trash, in:all, in:sent, in:drafts, in:inbox
  */
 function parseSearchQuery(queryStr: string) {
   const where: any = {};
@@ -65,12 +66,32 @@ function parseSearchQuery(queryStr: string) {
       andConditions.push({ isStarred: true });
     } else if (part === 'is:pinned') {
       andConditions.push({ isPinned: true });
+    } else if (part === 'is:important') {
+      andConditions.push({ OR: [{ priority: 'high' }, { isPinned: true }] });
     } else if (part === 'has:attachment') {
       andConditions.push({ hasAttachments: true });
     } else if (part.startsWith('category:')) {
       andConditions.push({ category: part.slice(9) });
     } else if (part.startsWith('label:')) {
       andConditions.push({ labels: { has: part.slice(6) } });
+    } else if (part.startsWith('after:')) {
+      const d = new Date(part.slice(6));
+      if (!Number.isNaN(d.getTime())) andConditions.push({ createdAt: { gte: d } });
+    } else if (part.startsWith('before:')) {
+      const d = new Date(part.slice(7));
+      if (!Number.isNaN(d.getTime())) andConditions.push({ createdAt: { lte: d } });
+    } else if (part === 'in:spam') {
+      andConditions.push({ folder: 'spam' });
+    } else if (part === 'in:trash') {
+      andConditions.push({ folder: 'trash' });
+    } else if (part === 'in:all') {
+      andConditions.push({ folder: { notIn: ['spam', 'trash'] } });
+    } else if (part === 'in:sent') {
+      andConditions.push({ folder: 'sent' });
+    } else if (part === 'in:drafts') {
+      andConditions.push({ folder: 'drafts' });
+    } else if (part === 'in:inbox') {
+      andConditions.push({ folder: 'inbox' });
     } else {
       terms.push(part);
     }
@@ -166,6 +187,17 @@ webmailRouter.get('/webmail/messages', async (req: AuthedRequest, res: Response)
     }
   }
 
+  // Return expired snoozed messages to inbox
+  await prisma.webmailMessage.updateMany({
+    where: {
+      folder: 'snoozed',
+      snoozedUntil: { lte: new Date() },
+    },
+    data: {
+      folder: 'inbox',
+    },
+  }).catch(() => {});
+
   const accessibleAccountIds = accessibleAccounts.map((a) => a.id);
   const parsedWhere = parseSearchQuery(search);
 
@@ -178,6 +210,15 @@ webmailRouter.get('/webmail/messages', async (req: AuthedRequest, res: Response)
 
   if (folder === 'starred') {
     where.isStarred = true;
+    where.folder = { notIn: ['spam', 'trash'] };
+  } else if (folder === 'all_mail') {
+    where.folder = { notIn: ['spam', 'trash'] };
+  } else if (folder === 'important') {
+    where.AND = [
+      ...(where.AND || []),
+      { OR: [{ priority: 'high' }, { isPinned: true }] },
+      { folder: { notIn: ['spam', 'trash'] } },
+    ];
   } else if (folder === 'snoozed') {
     where.folder = 'snoozed';
   } else {
@@ -228,7 +269,14 @@ webmailRouter.get('/webmail/messages', async (req: AuthedRequest, res: Response)
       },
       orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
     }),
-    prisma.webmailMessage.count({ where: { userId, folder: 'inbox', isRead: false } }),
+    prisma.webmailMessage.count({
+      where: {
+        folder: 'inbox',
+        isRead: false,
+        ...(role === 'dev' ? {} : { OR: [{ userId }, { smtpAccountId: { in: accessibleAccountIds } }] }),
+        ...(smtpAccountId ? { smtpAccountId } : {}),
+      },
+    }),
     prisma.webmailMessage.count({ where }),
   ]);
 
@@ -238,11 +286,38 @@ webmailRouter.get('/webmail/messages', async (req: AuthedRequest, res: Response)
 // 1.2 Threaded Conversation List
 webmailRouter.get('/webmail/threads', async (req: AuthedRequest, res: Response) => {
   const userId = req.user!.id;
+  const role = req.user!.role;
   const folder = (req.query.folder as string) || 'inbox';
+  const smtpAccountId = req.query.smtpAccountId as string | undefined;
 
-  const where: any = { userId };
-  if (folder === 'starred') where.isStarred = true;
-  else where.folder = folder;
+  const accessibleAccounts = await prisma.smtpAccount.findMany({
+    where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+    select: { id: true },
+  });
+  const accessibleAccountIds = accessibleAccounts.map((a) => a.id);
+
+  const where: any = {
+    ...(role === 'dev' ? {} : { OR: [{ userId }, { smtpAccountId: { in: accessibleAccountIds } }] }),
+  };
+
+  if (folder === 'starred') {
+    where.isStarred = true;
+    where.folder = { notIn: ['spam', 'trash'] };
+  } else if (folder === 'all_mail') {
+    where.folder = { notIn: ['spam', 'trash'] };
+  } else if (folder === 'important') {
+    where.AND = [
+      ...(where.AND || []),
+      { OR: [{ priority: 'high' }, { isPinned: true }] },
+      { folder: { notIn: ['spam', 'trash'] } },
+    ];
+  } else if (folder === 'snoozed') {
+    where.folder = 'snoozed';
+  } else {
+    where.folder = folder;
+  }
+
+  if (smtpAccountId) where.smtpAccountId = smtpAccountId;
 
   const messages = await prisma.webmailMessage.findMany({
     where,
@@ -286,9 +361,21 @@ webmailRouter.get('/webmail/threads', async (req: AuthedRequest, res: Response) 
 webmailRouter.get('/webmail/threads/:threadId', async (req: AuthedRequest, res: Response) => {
   const { threadId } = req.params;
   const userId = req.user!.id;
+  const role = req.user!.role;
+
+  const accessibleAccounts = await prisma.smtpAccount.findMany({
+    where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+    select: { id: true },
+  });
+  const accessibleAccountIds = accessibleAccounts.map((a) => a.id);
+
+  const where: any = {
+    OR: [{ threadId }, { id: threadId }],
+    ...(role === 'dev' ? {} : { AND: [{ OR: [{ userId }, { smtpAccountId: { in: accessibleAccountIds } }] }] }),
+  };
 
   const messages = await prisma.webmailMessage.findMany({
-    where: { userId, OR: [{ threadId }, { id: threadId }] },
+    where,
     orderBy: { createdAt: 'asc' },
   });
 
@@ -479,6 +566,8 @@ webmailRouter.get('/webmail/messages/:id/attachments/:filename', async (req: Aut
 // =====================================================================
 
 const sendSchema = z.object({
+  fromEmail: z.string().email().optional(),
+  draftId: z.string().optional(),
   recipientEmail: z.string().email(),
   cc: z.string().optional(),
   bcc: z.string().optional(),
@@ -511,7 +600,7 @@ function cleanIdempotencyMap() {
   }
 }
 
-// 2.1 Send Outbound Email (Support Scheduled Send & Threading)
+// 2.1 Send Outbound Email (Support Scheduled Send, Threading, Aliases & Attachments)
 webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) => {
   const parsed = sendSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
@@ -526,7 +615,7 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
     }
   }
 
-  const { recipientEmail, cc, bcc, subject, htmlBody, smtpAccountId, threadId, inReplyTo, scheduledAt, readReceipt, labels, attachments } = parsed.data;
+  const { fromEmail, draftId, recipientEmail, cc, bcc, subject, htmlBody, smtpAccountId, threadId, inReplyTo, scheduledAt, readReceipt, labels, attachments } = parsed.data;
   const userId = req.user!.id;
   const role = req.user!.role;
 
@@ -562,9 +651,24 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
   }
 
   const senderDomain = account.customDomain || account.smtpHost.replace(/^mail\./, '');
-  const senderEmail = account.smtpUsername.includes('@')
+  const defaultSenderEmail = account.smtpUsername.includes('@')
     ? account.smtpUsername
     : `${account.smtpUsername}@${senderDomain}`;
+
+  let senderEmail = defaultSenderEmail;
+  if (fromEmail) {
+    const isAllowed =
+      fromEmail.toLowerCase() === defaultSenderEmail.toLowerCase() ||
+      (account.aliases || []).some((al: string) => {
+        const full = al.includes('@') ? al : `${al}@${senderDomain}`;
+        return full.toLowerCase() === fromEmail.toLowerCase();
+      });
+    if (!isAllowed && role !== 'dev') {
+      return res.status(403).json({ error: `Identity ${fromEmail} is not an authorized sender for this mailbox.` });
+    }
+    senderEmail = fromEmail;
+  }
+
   const profile = normalizeMailboxProfile(account.profileJson, (req.user as any)?.displayName || req.user?.email, senderEmail);
   const rawSenderName = profile.displayName || (req.user as any)?.displayName || req.user?.email || senderEmail;
   const senderName = String(rawSenderName).replace(/[\r\n]/g, '').trim();
@@ -597,6 +701,12 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
 
   if (!isScheduled) {
     try {
+      const validAttachments = attachments?.filter((a) => a.content).map((a) => ({
+        filename: a.filename,
+        content: a.content!.replace(/^data:[^;]+;base64,/, ''),
+        contentType: a.contentType || 'application/octet-stream',
+      }));
+
       if (account.wildduckUserId) {
         const toList = [recipientEmail];
         const ccList = cc ? cc.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
@@ -609,6 +719,7 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
           subject,
           html: htmlBody,
           text: htmlBody.replace(/<[^>]+>/g, ''),
+          attachments: validAttachments && validAttachments.length > 0 ? validAttachments : undefined,
         });
         logger.info({ recipientEmail, senderUserId: userId }, 'WildDuck API webmail message submitted');
       } else {
@@ -622,7 +733,7 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
             bcc,
             subject,
             html: htmlBody,
-            attachments,
+            attachments: validAttachments && validAttachments.length > 0 ? validAttachments : undefined,
           }
         );
         logger.info({ recipientEmail, messageId: sendResult.messageId, senderUserId: userId }, 'Delegated webmail message delivered via SMTP');
@@ -632,6 +743,13 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
         where: { id: account.id },
         data: { dailySendCount: { increment: 1 } },
       });
+
+      // Cleanup draft from drafts folder if converted to sent email
+      if (draftId) {
+        await prisma.webmailMessage.deleteMany({
+          where: role === 'dev' ? { id: draftId } : { id: draftId, userId: account.userId },
+        }).catch(() => {});
+      }
     } catch (err: any) {
       logger.error({ err: err.message, recipientEmail }, 'Webmail email delivery failed');
       return res.status(502).json({
@@ -656,11 +774,37 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
 // 2.2 Save / Auto-Save Draft
 webmailRouter.post('/webmail/drafts', async (req: AuthedRequest, res: Response) => {
   const userId = req.user!.id;
-  const { recipientEmail, subject, htmlBody, id } = req.body || {};
+  const role = req.user!.role;
+  const { recipientEmail, subject, htmlBody, id, smtpAccountId } = req.body || {};
+
+  let draftSenderEmail = req.user?.email || 'me@shanutechx.com';
+  let draftSenderName = (req.user as any)?.displayName || 'Me';
+  let targetAccountId = smtpAccountId;
+
+  if (!targetAccountId) {
+    const acc = await prisma.smtpAccount.findFirst({
+      where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+      select: { id: true, smtpUsername: true, customDomain: true, smtpHost: true },
+    });
+    if (acc) {
+      targetAccountId = acc.id;
+      const domain = acc.customDomain || acc.smtpHost.replace(/^mail\./, '');
+      draftSenderEmail = acc.smtpUsername.includes('@') ? acc.smtpUsername : `${acc.smtpUsername}@${domain}`;
+    }
+  } else {
+    const acc = await prisma.smtpAccount.findUnique({
+      where: { id: targetAccountId },
+      select: { id: true, smtpUsername: true, customDomain: true, smtpHost: true },
+    });
+    if (acc) {
+      const domain = acc.customDomain || acc.smtpHost.replace(/^mail\./, '');
+      draftSenderEmail = acc.smtpUsername.includes('@') ? acc.smtpUsername : `${acc.smtpUsername}@${domain}`;
+    }
+  }
 
   if (id) {
     const existing = await prisma.webmailMessage.findFirst({
-      where: (req.user as any)?.role === 'dev' ? { id } : { id, userId },
+      where: role === 'dev' ? { id } : { id, userId },
     });
     if (!existing) {
       return res.status(404).json({ error: 'Draft not found or access denied' });
@@ -673,6 +817,8 @@ webmailRouter.post('/webmail/drafts', async (req: AuthedRequest, res: Response) 
         htmlBody: htmlBody || '',
         snippet: (htmlBody || '').replace(/<[^>]+>/g, '').slice(0, 100),
         folder: 'drafts',
+        smtpAccountId: targetAccountId,
+        senderEmail: draftSenderEmail,
       },
     });
     return res.json({ draft: updated });
@@ -681,9 +827,10 @@ webmailRouter.post('/webmail/drafts', async (req: AuthedRequest, res: Response) 
   const draft = await prisma.webmailMessage.create({
     data: {
       userId,
+      smtpAccountId: targetAccountId,
       folder: 'drafts',
-      senderName: (req.user as any)?.displayName || req.user?.email || 'Me',
-      senderEmail: req.user?.email || 'me@shanutechx.com',
+      senderName: draftSenderName,
+      senderEmail: draftSenderEmail,
       recipientEmail: recipientEmail || '',
       subject: subject || '(Draft)',
       snippet: (htmlBody || '').replace(/<[^>]+>/g, '').slice(0, 100),
@@ -695,10 +842,30 @@ webmailRouter.post('/webmail/drafts', async (req: AuthedRequest, res: Response) 
   res.status(201).json({ draft });
 });
 
+// Helper to check message ownership or shared mailbox access
+async function canAccessMessage(
+  userId: string,
+  role: string,
+  message: { userId: string; smtpAccountId: string | null }
+): Promise<boolean> {
+  if (role === 'dev') return true;
+  if (message.userId === userId) return true;
+  if (message.smtpAccountId) {
+    const account = await prisma.smtpAccount.findUnique({
+      where: { id: message.smtpAccountId },
+      select: { userId: true, allowedAdminIds: true },
+    });
+    if (account && (account.userId === userId || account.allowedAdminIds.includes(userId))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // 2.3 Bulk Multi-Select Operations
 const bulkSchema = z.object({
   messageIds: z.array(z.string()).min(1),
-  action: z.enum(['markRead', 'markUnread', 'star', 'unstar', 'pin', 'unpin', 'archive', 'delete', 'moveFolder', 'applyLabel', 'snooze']),
+  action: z.enum(['markRead', 'markUnread', 'star', 'unstar', 'pin', 'unpin', 'archive', 'delete', 'restore', 'markImportant', 'unmarkImportant', 'spam', 'moveFolder', 'applyLabel', 'snooze']),
   targetFolder: z.string().optional(),
   label: z.string().optional(),
   snoozeUntil: z.string().optional(),
@@ -710,6 +877,17 @@ webmailRouter.post('/webmail/bulk', async (req: AuthedRequest, res: Response) =>
 
   const { messageIds, action, targetFolder, label, snoozeUntil } = parsed.data;
   const userId = req.user!.id;
+  const role = req.user!.role;
+
+  const accessibleAccounts = await prisma.smtpAccount.findMany({
+    where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+    select: { id: true },
+  });
+  const accessibleAccountIds = accessibleAccounts.map((a) => a.id);
+
+  const scopeWhere: any = role === 'dev'
+    ? { id: { in: messageIds } }
+    : { id: { in: messageIds }, OR: [{ userId }, { smtpAccountId: { in: accessibleAccountIds } }] };
 
   const updateData: any = {};
   if (action === 'markRead') updateData.isRead = true;
@@ -720,6 +898,10 @@ webmailRouter.post('/webmail/bulk', async (req: AuthedRequest, res: Response) =>
   else if (action === 'unpin') updateData.isPinned = false;
   else if (action === 'archive') updateData.folder = 'archive';
   else if (action === 'delete') updateData.folder = 'trash';
+  else if (action === 'restore') updateData.folder = 'inbox';
+  else if (action === 'markImportant') updateData.priority = 'high';
+  else if (action === 'unmarkImportant') updateData.priority = 'normal';
+  else if (action === 'spam') updateData.folder = 'spam';
   else if (action === 'moveFolder' && targetFolder) updateData.folder = targetFolder;
   else if (action === 'snooze' && snoozeUntil) {
     updateData.folder = 'snoozed';
@@ -728,7 +910,7 @@ webmailRouter.post('/webmail/bulk', async (req: AuthedRequest, res: Response) =>
 
   if (action === 'applyLabel' && label) {
     const messages = await prisma.webmailMessage.findMany({
-      where: { id: { in: messageIds }, userId },
+      where: scopeWhere,
       select: { id: true, labels: true },
     });
     for (const msg of messages) {
@@ -743,7 +925,7 @@ webmailRouter.post('/webmail/bulk', async (req: AuthedRequest, res: Response) =>
   }
 
   const result = await prisma.webmailMessage.updateMany({
-    where: { id: { in: messageIds }, userId },
+    where: scopeWhere,
     data: updateData,
   });
 
@@ -755,6 +937,7 @@ const patchSchema = z.object({
   isRead: z.boolean().optional(),
   isStarred: z.boolean().optional(),
   isPinned: z.boolean().optional(),
+  priority: z.enum(['low', 'normal', 'high']).optional(),
   folder: z.string().min(1).optional(),
   category: z.string().optional(),
   labels: z.array(z.string()).optional(),
@@ -792,7 +975,7 @@ webmailRouter.patch('/webmail/messages/:id', async (req: AuthedRequest, res: Res
     return res.status(404).json({ error: 'Message not found' });
   }
 
-  if (existing.userId !== userId && role !== 'dev') {
+  if (!(await canAccessMessage(userId, role, existing))) {
     return res.status(404).json({ error: 'Message not found' });
   }
 
@@ -840,7 +1023,7 @@ webmailRouter.delete('/webmail/messages/:id', async (req: AuthedRequest, res: Re
     return res.status(404).json({ error: 'Message not found' });
   }
 
-  if (existing.userId !== userId && role !== 'dev') {
+  if (!(await canAccessMessage(userId, role, existing))) {
     return res.status(404).json({ error: 'Message not found' });
   }
 
@@ -858,6 +1041,152 @@ webmailRouter.delete('/webmail/messages/:id', async (req: AuthedRequest, res: Re
   }
 
   res.json({ ok: true, deletedId: id });
+});
+
+// 2.6 Restore Message from Trash to Inbox
+webmailRouter.post('/webmail/messages/:id/restore', async (req: AuthedRequest, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user!.id;
+  const role = req.user!.role;
+
+  const existing = await prisma.webmailMessage.findUnique({ where: { id } });
+  if (!existing || !(await canAccessMessage(userId, role, existing))) {
+    return res.status(404).json({ error: 'Message not found' });
+  }
+
+  const restored = await prisma.webmailMessage.update({
+    where: { id },
+    data: { folder: 'inbox' },
+  });
+
+  res.json({ ok: true, message: restored });
+});
+
+// 2.7 Move Message to Target Folder or Category
+webmailRouter.post('/webmail/messages/:id/move', async (req: AuthedRequest, res: Response) => {
+  const { id } = req.params;
+  const { folder, category } = req.body;
+  const userId = req.user!.id;
+  const role = req.user!.role;
+
+  const existing = await prisma.webmailMessage.findUnique({ where: { id } });
+  if (!existing || !(await canAccessMessage(userId, role, existing))) {
+    return res.status(404).json({ error: 'Message not found' });
+  }
+
+  const updateData: any = {};
+  if (folder) updateData.folder = folder;
+  if (category) updateData.category = category;
+
+  const updated = await prisma.webmailMessage.update({
+    where: { id },
+    data: updateData,
+  });
+
+  res.json({ ok: true, message: updated });
+});
+
+// 2.8 Toggle Message Importance
+webmailRouter.post('/webmail/messages/:id/importance', async (req: AuthedRequest, res: Response) => {
+  const { id } = req.params;
+  const { isImportant } = req.body;
+  const userId = req.user!.id;
+  const role = req.user!.role;
+
+  const existing = await prisma.webmailMessage.findUnique({ where: { id } });
+  if (!existing || !(await canAccessMessage(userId, role, existing))) {
+    return res.status(404).json({ error: 'Message not found' });
+  }
+
+  const priority = isImportant ? 'high' : 'normal';
+  const updated = await prisma.webmailMessage.update({
+    where: { id },
+    data: { priority },
+  });
+
+  res.json({ ok: true, message: updated });
+});
+
+// 2.9 Mute Conversation Thread
+webmailRouter.post('/webmail/threads/:threadId/mute', async (req: AuthedRequest, res: Response) => {
+  const { threadId } = req.params;
+  const userId = req.user!.id;
+  const role = req.user!.role;
+
+  const accessibleAccounts = await prisma.smtpAccount.findMany({
+    where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+    select: { id: true },
+  });
+  const accessibleAccountIds = accessibleAccounts.map((a) => a.id);
+
+  const result = await prisma.webmailMessage.updateMany({
+    where: role === 'dev'
+      ? { OR: [{ threadId }, { id: threadId }] }
+      : {
+          OR: [{ threadId }, { id: threadId }],
+          AND: [{ OR: [{ userId }, { smtpAccountId: { in: accessibleAccountIds } }] }],
+        },
+    data: { folder: 'archive', tag: 'muted' },
+  });
+
+  await prisma.webmailAuditLog.create({
+    data: {
+      userId,
+      action: 'thread_muted',
+      details: { threadId, messageCount: result.count },
+    },
+  }).catch(() => {});
+
+  res.json({ ok: true, mutedCount: result.count });
+});
+
+// 2.10 Contact Autocomplete Suggestions
+webmailRouter.get('/webmail/contacts/suggest', async (req: AuthedRequest, res: Response) => {
+  const userId = req.user!.id;
+  const q = (req.query.q as string || '').trim().toLowerCase();
+
+  const contacts = await prisma.emailContact.findMany({
+    where: {
+      userId,
+      ...(q ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { email: { contains: q, mode: 'insensitive' } }] } : {}),
+    },
+    take: 10,
+    select: { name: true, email: true },
+  });
+
+  // Query unique recent recipients from WebmailMessage
+  const recentMessages = await prisma.webmailMessage.findMany({
+    where: {
+      userId,
+      ...(q ? { OR: [{ recipientEmail: { contains: q, mode: 'insensitive' } }, { senderName: { contains: q, mode: 'insensitive' } }] } : {}),
+    },
+    take: 20,
+    select: { recipientEmail: true, senderName: true, senderEmail: true },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const seen = new Set<string>();
+  const suggestions: { name: string; email: string }[] = [];
+
+  for (const c of contacts) {
+    if (!seen.has(c.email.toLowerCase())) {
+      seen.add(c.email.toLowerCase());
+      suggestions.push({ name: c.name, email: c.email });
+    }
+  }
+
+  for (const m of recentMessages) {
+    if (m.recipientEmail && !seen.has(m.recipientEmail.toLowerCase())) {
+      seen.add(m.recipientEmail.toLowerCase());
+      suggestions.push({ name: m.recipientEmail.split('@')[0], email: m.recipientEmail });
+    }
+    if (m.senderEmail && !seen.has(m.senderEmail.toLowerCase())) {
+      seen.add(m.senderEmail.toLowerCase());
+      suggestions.push({ name: m.senderName || m.senderEmail.split('@')[0], email: m.senderEmail });
+    }
+  }
+
+  res.json({ suggestions: suggestions.slice(0, 15) });
 });
 
 // =====================================================================
@@ -2194,7 +2523,7 @@ webmailRouter.post('/webmail/aliases', async (req: AuthedRequest, res: Response)
     }
 
     const smtpAccount = await prisma.smtpAccount.findFirst({
-      where: req.user!.role === 'dev' ? { id: smtpAccountId } : { id: smtpAccountId, userId },
+      where: req.user!.role === 'dev' ? { id: smtpAccountId } : { id: smtpAccountId, OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
     });
 
     if (!smtpAccount) return res.status(404).json({ error: 'Mailbox not found' });
@@ -2215,6 +2544,24 @@ webmailRouter.post('/webmail/aliases', async (req: AuthedRequest, res: Response)
       return res.status(403).json({ error: `Alias limit reached (${smtpAccount.maxAliases} aliases max)` });
     }
 
+    // Sync alias address to WildDuck if mailbox is on WildDuck
+    if (smtpAccount.wildduckUserId) {
+      try {
+        const senderName =
+          (smtpAccount.profileJson as any)?.displayName ||
+          (req.user as any)?.displayName ||
+          smtpAccount.smtpUsername.split('@')[0];
+        await wildduckClient.createAddress(
+          smtpAccount.wildduckUserId,
+          cleanAlias,
+          senderName,
+          smtpAccount.mailHostId
+        );
+      } catch (wdErr: any) {
+        logger.warn({ wdErr: wdErr.message, cleanAlias }, 'Failed to create WildDuck alias address');
+      }
+    }
+
     const updatedAliases = [...currentAliases, cleanAlias];
     await prisma.smtpAccount.update({
       where: { id: smtpAccountId },
@@ -2224,6 +2571,51 @@ webmailRouter.post('/webmail/aliases', async (req: AuthedRequest, res: Response)
     return res.json({ ok: true, aliases: updatedAliases });
   } catch (err: any) {
     return res.status(500).json({ error: 'Failed to create alias' });
+  }
+});
+
+/**
+ * DELETE /webmail/aliases
+ * Remove an email alias from mailbox and sync with WildDuck
+ */
+webmailRouter.delete('/webmail/aliases', async (req: AuthedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const role = req.user!.role;
+    const { smtpAccountId, aliasEmail } = req.body;
+    if (!smtpAccountId || !aliasEmail) {
+      return res.status(400).json({ error: 'smtpAccountId and aliasEmail required' });
+    }
+
+    const cleanAlias = aliasEmail.trim().toLowerCase();
+    const smtpAccount = await prisma.smtpAccount.findFirst({
+      where: role === 'dev' ? { id: smtpAccountId } : { id: smtpAccountId, OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+    });
+
+    if (!smtpAccount) return res.status(404).json({ error: 'Mailbox not found' });
+
+    const currentAliases = smtpAccount.aliases || [];
+    const updatedAliases = currentAliases.filter((a) => a.toLowerCase() !== cleanAlias);
+    await prisma.smtpAccount.update({
+      where: { id: smtpAccountId },
+      data: { aliases: updatedAliases },
+    });
+
+    if (smtpAccount.wildduckUserId) {
+      try {
+        const addresses = await wildduckClient.listAddresses(smtpAccount.wildduckUserId, smtpAccount.mailHostId);
+        const match = addresses.find((a) => a.address.toLowerCase() === cleanAlias && !a.main);
+        if (match) {
+          await wildduckClient.deleteAddress(smtpAccount.wildduckUserId, match.id, smtpAccount.mailHostId);
+        }
+      } catch (wdErr: any) {
+        logger.warn({ wdErr: wdErr.message, cleanAlias }, 'Failed to delete WildDuck alias address');
+      }
+    }
+
+    return res.json({ ok: true, aliases: updatedAliases });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to delete alias' });
   }
 });
 

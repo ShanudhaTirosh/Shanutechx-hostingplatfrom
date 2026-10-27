@@ -201,6 +201,7 @@ model User {
   notificationChannels  NotificationChannel[]
   claimedTickets        Ticket[]               @relation("ClaimedTickets")
   createdAnnouncements  Announcement[]         @relation("CreatedAnnouncements")
+  supabaseProjects      SupabaseClientProject[]
 
   @@index([assignedAdminId])
 }
@@ -236,6 +237,7 @@ model Node {
   diskGb             Int
   roleTags           String[] // e.g. ["web-hosting", "node-hosting", "python-hosting"]
   isActive           Boolean  @default(true)
+  isDraining         Boolean  @default(false)
   monthlyBandwidthGb Int      @default(30000)
   createdAt          DateTime @default(now())
 
@@ -249,6 +251,7 @@ model Node {
   deployments      Deployment[]
   managedDatabases ManagedDatabase[]
   portExposures    NodePortExposure[]
+  supabaseProjects SupabaseClientProject[]
 
   // Set when this Node IS a VPS the admin/dev bought manually through
   // Leaseweb's portal and then linked here via the "import as a node" flow
@@ -1271,12 +1274,17 @@ model SupabaseClientProject {
   poolerSettingsJson Json?
   storageLimitMb     Int?     @default(5120)
   extensions         String[] @default(["uuid-ossp", "pgcrypto", "pgvector"])
+  // Multi-tenant tenancy
+  userId             String?  // Owning user ID
+  user               User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   // Target VPS node for this Supabase stack
   nodeId             String?  // Node.id this stack is provisioned on
+  node               Node?    @relation(fields: [nodeId], references: [id], onDelete: SetNull)
   nodeIp             String?  // Cached node IP for direct Studio URL: http://nodeIp:studioPort
   errorMessage       String?  // Provisioning failure reason or last error message
   createdAt          DateTime @default(now())
 
+  @@index([userId])
   @@index([nodeId])
 }
 
@@ -1534,6 +1542,8 @@ model ManagedDatabase {
   credentialRef       String? // encrypted master password — see lib/secretsVault.ts
   dbName              String?               @default("main_db")
   allowedIps          String[]              @default(["0.0.0.0/0"])
+  publicAccess        Boolean               @default(false)
+  publishedPort       Int?                  // Published port on VPS host node if publicly accessible or firewalled
   maxConnections      Int?                  @default(100)
   dbVersion           String?               @default("latest")
   sslMode             String                @default("require")

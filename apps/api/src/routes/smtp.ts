@@ -567,6 +567,15 @@ smtpRouter.post('/smtp-accounts/:id/aliases', async (req: AuthedRequest, res) =>
     return res.status(400).json({ error: 'Alias already exists' });
   }
 
+  // Provision alias address on WildDuck mail server
+  if (account.wildduckUserId) {
+    try {
+      await wildduckClient.createAddress(account.wildduckUserId, newAlias, undefined, account.mailHostId);
+    } catch (wdErr: any) {
+      logger.warn({ wdErr: wdErr.message, newAlias }, 'Failed to sync alias to WildDuck address in smtpRouter');
+    }
+  }
+
   const updated = await prisma.smtpAccount.update({
     where: { id: account.id },
     data: { customDomain: domain, aliases: [...account.aliases, newAlias] },
@@ -582,6 +591,19 @@ smtpRouter.delete('/smtp-accounts/:id/aliases/:prefix', async (req: AuthedReques
 
   if (!(await verifyResourceOwnershipAsync(account.userId, req, res))) {
     return;
+  }
+
+  // Remove alias address from WildDuck mail server
+  if (account.wildduckUserId) {
+    try {
+      const addresses = await wildduckClient.listAddresses(account.wildduckUserId, account.mailHostId);
+      const targetAddr = addresses.find((a) => a.address.toLowerCase().startsWith(`${prefix.toLowerCase()}@`));
+      if (targetAddr && !targetAddr.main) {
+        await wildduckClient.deleteAddress(account.wildduckUserId, targetAddr.id, account.mailHostId);
+      }
+    } catch (wdErr: any) {
+      logger.warn({ wdErr: wdErr.message, prefix }, 'Failed to remove alias from WildDuck in smtpRouter');
+    }
   }
 
   const filteredAliases = account.aliases.filter((a: string) => a.split('@')[0] !== prefix.toLowerCase());

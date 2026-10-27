@@ -1248,7 +1248,8 @@ emailRouter.post('/email/mailboxes/:id/aliases', async (req: AuthedRequest, res)
 
     const isOwner = account.userId === req.user!.id;
     const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
-    if (!isOwner && !isStaff) return res.status(403).json({ error: 'Access denied' });
+    const isAllowedAdmin = !!(account.allowedAdminIds && account.allowedAdminIds.includes(req.user!.id));
+    if (!isOwner && !isStaff && !isAllowedAdmin) return res.status(403).json({ error: 'Access denied' });
 
     const maxAliases = account.maxAliases || 10;
     if ((account.aliases || []).length >= maxAliases) {
@@ -1302,7 +1303,8 @@ emailRouter.delete('/email/mailboxes/:id/aliases/:prefix', async (req: AuthedReq
 
     const isOwner = account.userId === req.user!.id;
     const isStaff = req.user!.role === 'admin' || req.user!.role === 'dev';
-    if (!isOwner && !isStaff) return res.status(403).json({ error: 'Access denied' });
+    const isAllowedAdmin = !!(account.allowedAdminIds && account.allowedAdminIds.includes(req.user!.id));
+    if (!isOwner && !isStaff && !isAllowedAdmin) return res.status(403).json({ error: 'Access denied' });
 
     // Remove alias address from WildDuck mail server
     if (account.wildduckUserId) {

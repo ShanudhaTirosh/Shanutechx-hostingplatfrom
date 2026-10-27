@@ -30,12 +30,18 @@ import {
   X,
   Key,
   Menu,
+  Bookmark,
+  Layers,
+  Columns,
+  Rows,
+  Sliders,
+  Undo2,
 } from 'lucide-react';
 import { MailboxSwitcher, Mailbox } from './MailboxSwitcher';
 import { ThreadList, WebmailMessage } from './ThreadList';
 import { ThreadViewer, MessageDetail } from './ThreadViewer';
-import { Composer } from './Composer';
-import { SettingsModal } from './SettingsModal';
+import { Composer, AttachmentItem } from './Composer';
+import { WebmailSettingsModal as SettingsModal } from './SettingsModal';
 import { WebmailCredentialsModal } from './WebmailCredentialsModal';
 import { api } from '../lib/api';
 import { firebaseAuth } from '../lib/firebaseClient';
@@ -50,6 +56,7 @@ export interface ToastNotification {
 export const WebmailLayout: React.FC = () => {
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [activeMailboxId, setActiveMailboxId] = useState<string | null>(null);
+  const [activeAlias, setActiveAlias] = useState<string | null>(null);
 
   const [activeFolder, setActiveFolder] = useState<string>('inbox');
   const [activeCategory, setActiveCategory] = useState<string>('primary');
@@ -64,13 +71,28 @@ export const WebmailLayout: React.FC = () => {
   const [selectedThreadSubject, setSelectedThreadSubject] = useState<string>('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  // Layout & Display Preferences
+  const [readingPane, setReadingPane] = useState<'right' | 'bottom' | 'off'>('right');
+  const [density, setDensity] = useState<'comfortable' | 'default' | 'compact'>('default');
+  const [showViewMenu, setShowViewMenu] = useState<boolean>(false);
+
   // Modals & Composer
   const [isComposerOpen, setIsComposerOpen] = useState<boolean>(false);
   const [composerDefaultRecipient, setComposerDefaultRecipient] = useState<string>('');
+  const [composerDefaultCc, setComposerDefaultCc] = useState<string>('');
+  const [composerDefaultBcc, setComposerDefaultBcc] = useState<string>('');
   const [composerDefaultSubject, setComposerDefaultSubject] = useState<string>('');
   const [composerDefaultBody, setComposerDefaultBody] = useState<string>('');
+  const [composerDefaultAttachments, setComposerDefaultAttachments] = useState<AttachmentItem[]>([]);
   const [composerThreadId, setComposerThreadId] = useState<string | undefined>(undefined);
   const [composerInReplyTo, setComposerInReplyTo] = useState<string | undefined>(undefined);
+
+  // Undo Send Buffer
+  const [pendingUndoSend, setPendingUndoSend] = useState<{
+    id: string;
+    payload: any;
+    timer: any;
+  } | null>(null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isCredentialsOpen, setIsCredentialsOpen] = useState<boolean>(false);
@@ -88,6 +110,34 @@ export const WebmailLayout: React.FC = () => {
     usedMb: 0,
     limitMb: 10240,
   });
+
+  // Load layout preferences from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedPane = localStorage.getItem('webmail_reading_pane') as any;
+      if (savedPane && ['right', 'bottom', 'off'].includes(savedPane)) {
+        setReadingPane(savedPane);
+      }
+      const savedDensity = localStorage.getItem('webmail_density') as any;
+      if (savedDensity && ['comfortable', 'default', 'compact'].includes(savedDensity)) {
+        setDensity(savedDensity);
+      }
+    }
+  }, []);
+
+  const handleChangeReadingPane = (pane: 'right' | 'bottom' | 'off') => {
+    setReadingPane(pane);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('webmail_reading_pane', pane);
+    }
+  };
+
+  const handleChangeDensity = (d: 'comfortable' | 'default' | 'compact') => {
+    setDensity(d);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('webmail_density', d);
+    }
+  };
 
   // Toast System
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
@@ -267,10 +317,14 @@ export const WebmailLayout: React.FC = () => {
       setSelectedThreadMessages(threadRes.messages || []);
       setSelectedThreadSubject(targetMsg.subject);
 
-      // Mark local state as read
-      setMessages((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, isRead: true } : m))
-      );
+      // Mark local state and backend as read if unread
+      if (!targetMsg.isRead) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === id ? { ...m, isRead: true } : m))
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+        api.webmail.patchMessage(id, { isRead: true }).catch(() => {});
+      }
     } catch (err) {
       // Fallback
     }
@@ -379,10 +433,61 @@ export const WebmailLayout: React.FC = () => {
     { id: 'snoozed', label: 'Snoozed', icon: Clock },
     { id: 'sent', label: 'Sent', icon: Send },
     { id: 'drafts', label: 'Drafts', icon: FileText },
+    { id: 'important', label: 'Important', icon: Bookmark },
+    { id: 'all_mail', label: 'All Mail', icon: Layers },
     { id: 'archive', label: 'Archive', icon: Archive },
     { id: 'spam', label: 'Spam', icon: AlertOctagon },
     { id: 'trash', label: 'Trash', icon: Trash2 },
   ];
+
+  const activeMb = mailboxes.find((m) => m.id === activeMailboxId);
+  const primaryEmail = activeMb?.email || activeMb?.smtpUsername || '';
+  const availableSenders: { email: string; label: string }[] = activeMb && primaryEmail
+    ? [
+        { email: primaryEmail, label: `${primaryEmail} (Primary)` },
+        ...(activeMb.aliases || []).map((alias: string) => ({ email: alias, label: `${alias} (Alias)` })),
+      ]
+    : [];
+
+  const handleRequestUndoSend = (payload: any) => {
+    const id = Date.now().toString();
+    const timer = setTimeout(async () => {
+      try {
+        await api.webmail.send(payload);
+        addToast('Email message dispatched successfully!', 'success');
+        loadMessages();
+      } catch (err: any) {
+        addToast(err.message || 'Failed to dispatch email', 'error');
+      } finally {
+        setPendingUndoSend(null);
+      }
+    }, 5000);
+
+    setPendingUndoSend({
+      id,
+      payload,
+      timer,
+    });
+  };
+
+  const handleExecuteUndo = () => {
+    if (!pendingUndoSend) return;
+    clearTimeout(pendingUndoSend.timer);
+    const saved = pendingUndoSend.payload;
+    setPendingUndoSend(null);
+
+    setComposerDefaultRecipient(saved.recipientEmail || '');
+    setComposerDefaultCc(saved.cc || '');
+    setComposerDefaultBcc(saved.bcc || '');
+    setComposerDefaultSubject(saved.subject || '');
+    setComposerDefaultBody(saved.htmlBody || '');
+    setComposerDefaultAttachments(saved.attachments || []);
+    setComposerThreadId(saved.threadId);
+    setComposerInReplyTo(saved.inReplyTo);
+    setIsComposerOpen(true);
+
+    addToast('Sending undone. Message reopened in composer.', 'info');
+  };
 
   const formatStorage = (mb: number) => {
     if (mb >= 1024) {
@@ -425,12 +530,20 @@ export const WebmailLayout: React.FC = () => {
 
           <div className="h-5 w-px bg-slate-800 mx-1 hidden md:block" />
 
-          {/* Desktop Mailbox Switcher */}
+          {/* Desktop Mailbox Switcher with Aliases */}
           <div className="hidden md:block">
             <MailboxSwitcher
               mailboxes={mailboxes}
               activeMailboxId={activeMailboxId}
-              onSelectMailbox={(id) => setActiveMailboxId(id)}
+              onSelectMailbox={(id) => {
+                setActiveMailboxId(id);
+                setActiveAlias(null);
+              }}
+              activeAlias={activeAlias}
+              onSelectAlias={(alias) => {
+                setActiveAlias(alias);
+                if (alias) addToast(`Active identity: ${alias}`, 'info');
+              }}
             />
           </div>
         </div>
@@ -462,16 +575,22 @@ export const WebmailLayout: React.FC = () => {
           {/* Search Syntax Help Popover */}
           {showSearchHelp && !searchQuery && (
             <div className="absolute top-full left-0 right-0 mt-1.5 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-3 z-50 text-xs space-y-2 animate-in fade-in duration-150">
-              <p className="font-semibold text-slate-300 text-[11px] uppercase tracking-wider">Search Shortcuts</p>
+              <p className="font-semibold text-slate-300 text-[11px] uppercase tracking-wider">Search Operators</p>
               <div className="grid grid-cols-2 gap-1.5 text-slate-400 font-mono text-[11px]">
                 <button onMouseDown={() => setSearchQuery('from:')} className="text-left hover:text-indigo-300 p-1 rounded hover:bg-slate-800">
-                  from:email@domain
+                  from:user@domain.com
                 </button>
                 <button onMouseDown={() => setSearchQuery('is:unread')} className="text-left hover:text-indigo-300 p-1 rounded hover:bg-slate-800">
                   is:unread
                 </button>
+                <button onMouseDown={() => setSearchQuery('is:starred')} className="text-left hover:text-indigo-300 p-1 rounded hover:bg-slate-800">
+                  is:starred
+                </button>
+                <button onMouseDown={() => setSearchQuery('is:important')} className="text-left hover:text-indigo-300 p-1 rounded hover:bg-slate-800">
+                  is:important
+                </button>
                 <button onMouseDown={() => setSearchQuery('subject:')} className="text-left hover:text-indigo-300 p-1 rounded hover:bg-slate-800">
-                  subject:keyword
+                  subject:invoice
                 </button>
                 <button onMouseDown={() => setSearchQuery('has:attachment')} className="text-left hover:text-indigo-300 p-1 rounded hover:bg-slate-800">
                   has:attachment
@@ -483,6 +602,75 @@ export const WebmailLayout: React.FC = () => {
 
         {/* Right Header Actions */}
         <div className="flex items-center gap-1">
+          {/* Quick View Options Menu */}
+          <div className="relative">
+            <button
+              onClick={() => setShowViewMenu((prev) => !prev)}
+              className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors hidden sm:flex items-center gap-1"
+              title="Display Density & Reading Pane"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+            </button>
+            {showViewMenu && (
+              <div className="absolute right-0 top-full mt-2 w-56 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-3 z-50 text-xs space-y-3 animate-in fade-in duration-150">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Reading Pane</span>
+                  <div className="grid grid-cols-3 gap-1">
+                    {[
+                      { id: 'right', label: 'Right', icon: Columns },
+                      { id: 'bottom', label: 'Bottom', icon: Rows },
+                      { id: 'off', label: 'Off', icon: Layers },
+                    ].map((item) => {
+                      const IconC = item.icon;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            handleChangeReadingPane(item.id as any);
+                            setShowViewMenu(false);
+                          }}
+                          className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-all ${
+                            readingPane === item.id
+                              ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <IconC className="w-3.5 h-3.5 mb-0.5" />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Display Density</span>
+                  <div className="grid grid-cols-3 gap-1">
+                    {[
+                      { id: 'compact', label: 'Compact' },
+                      { id: 'default', label: 'Default' },
+                      { id: 'comfortable', label: 'Comfortable' },
+                    ].map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          handleChangeDensity(item.id as any);
+                          setShowViewMenu(false);
+                        }}
+                        className={`py-1.5 px-1 rounded-lg text-[10px] font-semibold border text-center truncate transition-all ${
+                          density === item.id
+                            ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => setShowKeyboardHelp(true)}
             className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors hidden sm:flex"
@@ -556,6 +744,13 @@ export const WebmailLayout: React.FC = () => {
                   activeMailboxId={activeMailboxId}
                   onSelectMailbox={(id) => {
                     setActiveMailboxId(id);
+                    setActiveAlias(null);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  activeAlias={activeAlias}
+                  onSelectAlias={(alias) => {
+                    setActiveAlias(alias);
+                    if (alias) addToast(`Active identity: ${alias}`, 'info');
                     setIsMobileMenuOpen(false);
                   }}
                 />
@@ -790,56 +985,439 @@ export const WebmailLayout: React.FC = () => {
           </div>
         </aside>
 
-        {/* Center Thread List Pane */}
-        <div className={`w-full lg:w-96 shrink-0 h-full ${selectedMessageId ? 'hidden lg:block' : 'block'}`}>
-          <ThreadList
-            messages={messages}
-            selectedMessageId={selectedMessageId}
-            onSelectMessage={handleSelectMessage}
-            activeCategory={activeCategory}
-            onSelectCategory={(cat) => setActiveCategory(cat)}
-            selectedIds={selectedIds}
-            onToggleSelectAll={() => {
-              if (selectedIds.length === messages.length) setSelectedIds([]);
-              else setSelectedIds(messages.map((m) => m.id));
-            }}
-            onToggleSelectId={(id) => {
-              setSelectedIds((prev) =>
-                prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-              );
-            }}
-            onBulkAction={handleBulkAction}
-            onToggleStar={handleToggleStar}
-            onTogglePin={handleTogglePin}
-            isLoading={isLoadingMessages}
-          />
-        </div>
-
-        {/* Right Detail Pane */}
-        <div className={`flex-1 h-full min-w-0 ${selectedMessageId ? 'block' : 'hidden lg:block'}`}>
-          {selectedMessageId ? (
-            <ThreadViewer
-              messages={selectedThreadMessages}
-              subject={selectedThreadSubject}
-              onBack={() => setSelectedMessageId(null)}
-              onReply={handleOpenReply}
-              onQuickReply={handleQuickReply}
-              onForward={handleOpenForward}
-              onDelete={handleDeleteMessage}
-              onStar={handleToggleStar}
-            />
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center p-8 bg-slate-950 text-slate-500 text-center space-y-3">
-              <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600 shadow-xl">
-                <Inbox className="w-8 h-8 text-indigo-500/50" />
-              </div>
-              <h3 className="text-sm font-semibold text-slate-300">No message selected</h3>
-              <p className="text-xs text-slate-500 max-w-sm">
-                Select an email thread from the inbox list on the left to read its contents or send a quick reply. Press <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px]">?</kbd> for shortcuts.
-              </p>
+        {/* Center & Detail Panels with Configurable Reading Pane */}
+        {readingPane === 'right' && (
+          <>
+            {/* Center Thread List Pane */}
+            <div className={`w-full lg:w-96 shrink-0 h-full ${selectedMessageId ? 'hidden lg:block' : 'block'}`}>
+              <ThreadList
+                messages={messages}
+                selectedMessageId={selectedMessageId}
+                onSelectMessage={handleSelectMessage}
+                activeFolder={activeFolder}
+                activeCategory={activeCategory}
+                onSelectCategory={(cat) => setActiveCategory(cat)}
+                selectedIds={selectedIds}
+                onToggleSelectAll={() => {
+                  if (selectedIds.length === messages.length) setSelectedIds([]);
+                  else setSelectedIds(messages.map((m) => m.id));
+                }}
+                onToggleSelectId={(id) => {
+                  setSelectedIds((prev) =>
+                    prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+                  );
+                }}
+                onSelectByCondition={(type) => {
+                  switch (type) {
+                    case 'all':
+                      setSelectedIds(messages.map((m) => m.id));
+                      break;
+                    case 'none':
+                      setSelectedIds([]);
+                      break;
+                    case 'read':
+                      setSelectedIds(messages.filter((m) => m.isRead).map((m) => m.id));
+                      break;
+                    case 'unread':
+                      setSelectedIds(messages.filter((m) => !m.isRead).map((m) => m.id));
+                      break;
+                    case 'starred':
+                      setSelectedIds(messages.filter((m) => m.isStarred).map((m) => m.id));
+                      break;
+                    case 'unstarred':
+                      setSelectedIds(messages.filter((m) => !m.isStarred).map((m) => m.id));
+                      break;
+                  }
+                }}
+                onBulkAction={handleBulkAction}
+                onToggleStar={handleToggleStar}
+                onTogglePin={handleTogglePin}
+                density={density}
+                isLoading={isLoadingMessages}
+              />
             </div>
-          )}
-        </div>
+
+            {/* Right Detail Pane */}
+            <div className={`flex-1 h-full min-w-0 ${selectedMessageId ? 'block' : 'hidden lg:block'}`}>
+              {selectedMessageId ? (
+                <ThreadViewer
+                  messages={selectedThreadMessages}
+                  subject={selectedThreadSubject}
+                  onBack={() => setSelectedMessageId(null)}
+                  onReply={handleOpenReply}
+                  onReplyAll={(recipient, cc, replySub, msgId) => {
+                    setComposerDefaultRecipient(recipient);
+                    setComposerDefaultCc(cc);
+                    setComposerDefaultSubject(replySub);
+                    setComposerDefaultBody('');
+                    setComposerInReplyTo(msgId);
+                    setIsComposerOpen(true);
+                  }}
+                  onQuickReply={handleQuickReply}
+                  onForward={handleOpenForward}
+                  onForwardAsAttachment={(fwdSub, message) => {
+                    setComposerDefaultRecipient('');
+                    setComposerDefaultSubject(fwdSub);
+                    setComposerDefaultBody(`<p>Attached is the original message for your reference.</p>`);
+                    setComposerDefaultAttachments([
+                      {
+                        filename: `${message.subject || 'message'}.eml`,
+                        sizeStr: '12 KB',
+                        content: `From: ${message.senderName} <${message.senderEmail}>\nTo: ${message.recipientEmail}\nSubject: ${message.subject}\nDate: ${message.createdAt}\n\n${message.snippet}`,
+                        contentType: 'message/rfc822',
+                      },
+                    ]);
+                    setIsComposerOpen(true);
+                  }}
+                  onDelete={handleDeleteMessage}
+                  onRestore={async (id) => {
+                    await api.webmail.restoreMessage(id);
+                    addToast('Message restored to Inbox', 'success');
+                    setSelectedMessageId(null);
+                    loadMessages();
+                  }}
+                  onStar={handleToggleStar}
+                  onToggleImportant={async (id, currentImportant) => {
+                    await api.webmail.setImportance(id, !currentImportant);
+                    setMessages((prev) =>
+                      prev.map((m) => (m.id === id ? { ...m, priority: !currentImportant ? 'high' : 'normal' } : m))
+                    );
+                    setSelectedThreadMessages((prev) =>
+                      prev.map((m) => (m.id === id ? { ...m, priority: !currentImportant ? 'high' : 'normal' } : m))
+                    );
+                    addToast(!currentImportant ? 'Marked as Important' : 'Removed importance', 'info');
+                  }}
+                  onMarkUnread={async (id) => {
+                    await api.webmail.patchMessage(id, { isRead: false });
+                    setMessages((prev) =>
+                      prev.map((m) => (m.id === id ? { ...m, isRead: false } : m))
+                    );
+                    setSelectedMessageId(null);
+                    addToast('Marked as unread', 'info');
+                  }}
+                  onMuteThread={async (threadId) => {
+                    await api.webmail.muteThread(threadId);
+                    addToast('Conversation muted and archived', 'info');
+                    setSelectedMessageId(null);
+                    loadMessages();
+                  }}
+                  onBlockSender={async (email) => {
+                    await api.webmail.blockedSenders.add({ emailOrDomain: email });
+                    addToast(`Blocked sender: ${email}`, 'info');
+                  }}
+                  onReportThreat={async (id, type) => {
+                    await api.webmail.reportThreat(id, type);
+                    addToast(`Reported as ${type} and moved to Spam`, 'info');
+                    setSelectedMessageId(null);
+                    loadMessages();
+                  }}
+                  onMoveFolder={async (id, targetFolder) => {
+                    await api.webmail.moveMessage(id, targetFolder);
+                    addToast(`Moved message to ${targetFolder}`, 'success');
+                    setSelectedMessageId(null);
+                    loadMessages();
+                  }}
+                  availableFolders={[
+                    { id: 'inbox', name: 'Inbox' },
+                    { id: 'archive', name: 'Archive' },
+                    { id: 'spam', name: 'Spam' },
+                    { id: 'trash', name: 'Trash' },
+                    ...customFolders.map((f) => ({ id: f.name, name: f.name })),
+                  ]}
+                />
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center p-8 bg-slate-950 text-slate-500 text-center space-y-3">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600 shadow-xl">
+                    <Inbox className="w-8 h-8 text-indigo-500/50" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-slate-300">No message selected</h3>
+                  <p className="text-xs text-slate-500 max-w-sm">
+                    Select an email thread from the inbox list on the left to read its contents or send a quick reply. Press <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px]">?</kbd> for shortcuts.
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {readingPane === 'bottom' && (
+          <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <div className={`w-full ${selectedMessageId ? 'h-2/5 border-b border-slate-800' : 'h-full'} overflow-hidden shrink-0`}>
+              <ThreadList
+                messages={messages}
+                selectedMessageId={selectedMessageId}
+                onSelectMessage={handleSelectMessage}
+                activeFolder={activeFolder}
+                activeCategory={activeCategory}
+                onSelectCategory={(cat) => setActiveCategory(cat)}
+                selectedIds={selectedIds}
+                onToggleSelectAll={() => {
+                  if (selectedIds.length === messages.length) setSelectedIds([]);
+                  else setSelectedIds(messages.map((m) => m.id));
+                }}
+                onToggleSelectId={(id) => {
+                  setSelectedIds((prev) =>
+                    prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+                  );
+                }}
+                onSelectByCondition={(type) => {
+                  switch (type) {
+                    case 'all':
+                      setSelectedIds(messages.map((m) => m.id));
+                      break;
+                    case 'none':
+                      setSelectedIds([]);
+                      break;
+                    case 'read':
+                      setSelectedIds(messages.filter((m) => m.isRead).map((m) => m.id));
+                      break;
+                    case 'unread':
+                      setSelectedIds(messages.filter((m) => !m.isRead).map((m) => m.id));
+                      break;
+                    case 'starred':
+                      setSelectedIds(messages.filter((m) => m.isStarred).map((m) => m.id));
+                      break;
+                    case 'unstarred':
+                      setSelectedIds(messages.filter((m) => !m.isStarred).map((m) => m.id));
+                      break;
+                  }
+                }}
+                onBulkAction={handleBulkAction}
+                onToggleStar={handleToggleStar}
+                onTogglePin={handleTogglePin}
+                density={density}
+                isLoading={isLoadingMessages}
+              />
+            </div>
+            {selectedMessageId && (
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ThreadViewer
+                  messages={selectedThreadMessages}
+                  subject={selectedThreadSubject}
+                  onBack={() => setSelectedMessageId(null)}
+                  onReply={handleOpenReply}
+                  onReplyAll={(recipient, cc, replySub, msgId) => {
+                    setComposerDefaultRecipient(recipient);
+                    setComposerDefaultCc(cc);
+                    setComposerDefaultSubject(replySub);
+                    setComposerDefaultBody('');
+                    setComposerInReplyTo(msgId);
+                    setIsComposerOpen(true);
+                  }}
+                  onQuickReply={handleQuickReply}
+                  onForward={handleOpenForward}
+                  onForwardAsAttachment={(fwdSub, message) => {
+                    setComposerDefaultRecipient('');
+                    setComposerDefaultSubject(fwdSub);
+                    setComposerDefaultBody(`<p>Attached is the original message for your reference.</p>`);
+                    setComposerDefaultAttachments([
+                      {
+                        filename: `${message.subject || 'message'}.eml`,
+                        sizeStr: '12 KB',
+                        content: `From: ${message.senderName} <${message.senderEmail}>\nTo: ${message.recipientEmail}\nSubject: ${message.subject}\nDate: ${message.createdAt}\n\n${message.snippet}`,
+                        contentType: 'message/rfc822',
+                      },
+                    ]);
+                    setIsComposerOpen(true);
+                  }}
+                  onDelete={handleDeleteMessage}
+                  onRestore={async (id) => {
+                    await api.webmail.restoreMessage(id);
+                    addToast('Message restored to Inbox', 'success');
+                    setSelectedMessageId(null);
+                    loadMessages();
+                  }}
+                  onStar={handleToggleStar}
+                  onToggleImportant={async (id, currentImportant) => {
+                    await api.webmail.setImportance(id, !currentImportant);
+                    setMessages((prev) =>
+                      prev.map((m) => (m.id === id ? { ...m, priority: !currentImportant ? 'high' : 'normal' } : m))
+                    );
+                    setSelectedThreadMessages((prev) =>
+                      prev.map((m) => (m.id === id ? { ...m, priority: !currentImportant ? 'high' : 'normal' } : m))
+                    );
+                    addToast(!currentImportant ? 'Marked as Important' : 'Removed importance', 'info');
+                  }}
+                  onMarkUnread={async (id) => {
+                    await api.webmail.patchMessage(id, { isRead: false });
+                    setMessages((prev) =>
+                      prev.map((m) => (m.id === id ? { ...m, isRead: false } : m))
+                    );
+                    setSelectedMessageId(null);
+                    addToast('Marked as unread', 'info');
+                  }}
+                  onMuteThread={async (threadId) => {
+                    await api.webmail.muteThread(threadId);
+                    addToast('Conversation muted and archived', 'info');
+                    setSelectedMessageId(null);
+                    loadMessages();
+                  }}
+                  onBlockSender={async (email) => {
+                    await api.webmail.blockedSenders.add({ emailOrDomain: email });
+                    addToast(`Blocked sender: ${email}`, 'info');
+                  }}
+                  onReportThreat={async (id, type) => {
+                    await api.webmail.reportThreat(id, type);
+                    addToast(`Reported as ${type} and moved to Spam`, 'info');
+                    setSelectedMessageId(null);
+                    loadMessages();
+                  }}
+                  onMoveFolder={async (id, targetFolder) => {
+                    await api.webmail.moveMessage(id, targetFolder);
+                    addToast(`Moved message to ${targetFolder}`, 'success');
+                    setSelectedMessageId(null);
+                    loadMessages();
+                  }}
+                  availableFolders={[
+                    { id: 'inbox', name: 'Inbox' },
+                    { id: 'archive', name: 'Archive' },
+                    { id: 'spam', name: 'Spam' },
+                    { id: 'trash', name: 'Trash' },
+                    ...customFolders.map((f) => ({ id: f.name, name: f.name })),
+                  ]}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {readingPane === 'off' && (
+          <div className="flex-1 h-full overflow-hidden">
+            {!selectedMessageId ? (
+              <ThreadList
+                messages={messages}
+                selectedMessageId={selectedMessageId}
+                onSelectMessage={handleSelectMessage}
+                activeFolder={activeFolder}
+                activeCategory={activeCategory}
+                onSelectCategory={(cat) => setActiveCategory(cat)}
+                selectedIds={selectedIds}
+                onToggleSelectAll={() => {
+                  if (selectedIds.length === messages.length) setSelectedIds([]);
+                  else setSelectedIds(messages.map((m) => m.id));
+                }}
+                onToggleSelectId={(id) => {
+                  setSelectedIds((prev) =>
+                    prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+                  );
+                }}
+                onSelectByCondition={(type) => {
+                  switch (type) {
+                    case 'all':
+                      setSelectedIds(messages.map((m) => m.id));
+                      break;
+                    case 'none':
+                      setSelectedIds([]);
+                      break;
+                    case 'read':
+                      setSelectedIds(messages.filter((m) => m.isRead).map((m) => m.id));
+                      break;
+                    case 'unread':
+                      setSelectedIds(messages.filter((m) => !m.isRead).map((m) => m.id));
+                      break;
+                    case 'starred':
+                      setSelectedIds(messages.filter((m) => m.isStarred).map((m) => m.id));
+                      break;
+                    case 'unstarred':
+                      setSelectedIds(messages.filter((m) => !m.isStarred).map((m) => m.id));
+                      break;
+                  }
+                }}
+                onBulkAction={handleBulkAction}
+                onToggleStar={handleToggleStar}
+                onTogglePin={handleTogglePin}
+                density={density}
+                isLoading={isLoadingMessages}
+              />
+            ) : (
+              <ThreadViewer
+                messages={selectedThreadMessages}
+                subject={selectedThreadSubject}
+                onBack={() => setSelectedMessageId(null)}
+                onReply={handleOpenReply}
+                onReplyAll={(recipient, cc, replySub, msgId) => {
+                  setComposerDefaultRecipient(recipient);
+                  setComposerDefaultCc(cc);
+                  setComposerDefaultSubject(replySub);
+                  setComposerDefaultBody('');
+                  setComposerInReplyTo(msgId);
+                  setIsComposerOpen(true);
+                }}
+                onQuickReply={handleQuickReply}
+                onForward={handleOpenForward}
+                onForwardAsAttachment={(fwdSub, message) => {
+                  setComposerDefaultRecipient('');
+                  setComposerDefaultSubject(fwdSub);
+                  setComposerDefaultBody(`<p>Attached is the original message for your reference.</p>`);
+                  setComposerDefaultAttachments([
+                    {
+                      filename: `${message.subject || 'message'}.eml`,
+                      sizeStr: '12 KB',
+                      content: `From: ${message.senderName} <${message.senderEmail}>\nTo: ${message.recipientEmail}\nSubject: ${message.subject}\nDate: ${message.createdAt}\n\n${message.snippet}`,
+                      contentType: 'message/rfc822',
+                    },
+                  ]);
+                  setIsComposerOpen(true);
+                }}
+                onDelete={handleDeleteMessage}
+                onRestore={async (id) => {
+                  await api.webmail.restoreMessage(id);
+                  addToast('Message restored to Inbox', 'success');
+                  setSelectedMessageId(null);
+                  loadMessages();
+                }}
+                onStar={handleToggleStar}
+                onToggleImportant={async (id, currentImportant) => {
+                  await api.webmail.setImportance(id, !currentImportant);
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === id ? { ...m, priority: !currentImportant ? 'high' : 'normal' } : m))
+                  );
+                  setSelectedThreadMessages((prev) =>
+                    prev.map((m) => (m.id === id ? { ...m, priority: !currentImportant ? 'high' : 'normal' } : m))
+                  );
+                  addToast(!currentImportant ? 'Marked as Important' : 'Removed importance', 'info');
+                }}
+                onMarkUnread={async (id) => {
+                  await api.webmail.patchMessage(id, { isRead: false });
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === id ? { ...m, isRead: false } : m))
+                  );
+                  setSelectedMessageId(null);
+                  addToast('Marked as unread', 'info');
+                }}
+                onMuteThread={async (threadId) => {
+                  await api.webmail.muteThread(threadId);
+                  addToast('Conversation muted and archived', 'info');
+                  setSelectedMessageId(null);
+                  loadMessages();
+                }}
+                onBlockSender={async (email) => {
+                  await api.webmail.blockedSenders.add({ emailOrDomain: email });
+                  addToast(`Blocked sender: ${email}`, 'info');
+                }}
+                onReportThreat={async (id, type) => {
+                  await api.webmail.reportThreat(id, type);
+                  addToast(`Reported as ${type} and moved to Spam`, 'info');
+                  setSelectedMessageId(null);
+                  loadMessages();
+                }}
+                onMoveFolder={async (id, targetFolder) => {
+                  await api.webmail.moveMessage(id, targetFolder);
+                  addToast(`Moved message to ${targetFolder}`, 'success');
+                  setSelectedMessageId(null);
+                  loadMessages();
+                }}
+                availableFolders={[
+                  { id: 'inbox', name: 'Inbox' },
+                  { id: 'archive', name: 'Archive' },
+                  { id: 'spam', name: 'Spam' },
+                  { id: 'trash', name: 'Trash' },
+                  ...customFolders.map((f) => ({ id: f.name, name: f.name })),
+                ]}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Mobile Floating Compose Button */}
@@ -847,8 +1425,11 @@ export const WebmailLayout: React.FC = () => {
         <button
           onClick={() => {
             setComposerDefaultRecipient('');
+            setComposerDefaultCc('');
+            setComposerDefaultBcc('');
             setComposerDefaultSubject('');
             setComposerDefaultBody('');
+            setComposerDefaultAttachments([]);
             setComposerThreadId(undefined);
             setComposerInReplyTo(undefined);
             setIsComposerOpen(true);
@@ -911,6 +1492,27 @@ export const WebmailLayout: React.FC = () => {
         </div>
       )}
 
+      {/* Undo-Send Notification Banner */}
+      {pendingUndoSend && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-indigo-500/50 shadow-2xl rounded-2xl px-5 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+            </span>
+            <span className="text-xs font-semibold text-slate-100">
+              Sending email... (5s window)
+            </span>
+          </div>
+          <button
+            onClick={handleExecuteUndo}
+            className="flex items-center gap-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg transition-all"
+          >
+            <Undo2 className="w-3.5 h-3.5" /> Undo Send
+          </button>
+        </div>
+      )}
+
       {/* Action Toast Notifications with Undo */}
       <div className="fixed bottom-6 left-6 z-50 space-y-2 pointer-events-none">
         {toasts.map((toast) => (
@@ -940,11 +1542,16 @@ export const WebmailLayout: React.FC = () => {
         isOpen={isComposerOpen}
         onClose={() => setIsComposerOpen(false)}
         defaultRecipient={composerDefaultRecipient}
+        defaultCc={composerDefaultCc}
+        defaultBcc={composerDefaultBcc}
         defaultSubject={composerDefaultSubject}
         defaultBody={composerDefaultBody}
+        defaultAttachments={composerDefaultAttachments}
         threadId={composerThreadId}
         inReplyTo={composerInReplyTo}
         smtpAccountId={activeMailboxId || undefined}
+        availableSenders={availableSenders}
+        onRequestUndoSend={handleRequestUndoSend}
         onSent={() => {
           addToast('Email message dispatched successfully!', 'success');
           loadMessages();
@@ -958,6 +1565,10 @@ export const WebmailLayout: React.FC = () => {
         mailboxes={mailboxes}
         activeMailboxId={activeMailboxId}
         onRefreshData={loadFoldersAndLabels}
+        density={density}
+        onDensityChange={handleChangeDensity}
+        readingPane={readingPane}
+        onReadingPaneChange={handleChangeReadingPane}
       />
 
       {/* Developer Credentials & System Provisioning Modal */}

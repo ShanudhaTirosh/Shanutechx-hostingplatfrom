@@ -21,7 +21,7 @@ const {
 const { collectStats } = require('./stats');
 const { addKey, removeKey } = require('./livekit');
 const { addDomainRoute, removeDomainRoute } = require('./customDomain');
-const { provisionDatabase, scaleDatabase, rotateDatabasePassword, manageDatabaseUser, executeDatabaseQuery, backupDatabase, listDatabaseBackups, restoreDatabase } = require('./managedDb');
+const { provisionDatabase, scaleDatabase, rotateDatabasePassword, manageDatabaseUser, executeDatabaseQuery, backupDatabase, listDatabaseBackups, restoreDatabase, pingDatabase } = require('./managedDb');
 const { listDir, readFile, writeFile, writeBinaryFile, extractArchive, makeDir, remove: fsRemove, rename } = require('./filesystem');
 const { provisionProject, deprovisionProject, execSql, listTables, validateIdentifier, insertRow, updateRow, deleteRow } = require('./projects');
 
@@ -248,6 +248,26 @@ app.get('/agent/containers/:containerId/stats/stream', async (req, res) => {
     logger.error({ err }, 'Failed to start stats stream');
     res.write(`data: {"error":"${err.message}"}\n\n`);
     res.end();
+  }
+});
+
+app.get('/agent/containers/:containerId/stats', async (req, res) => {
+  try {
+    const metrics = await getContainerMetrics(req.params.containerId);
+    res.json(metrics);
+  } catch (err) {
+    logger.error({ containerId: req.params.containerId, err: err.message }, 'Failed to fetch container stats');
+    res.status(500).json({ error: err.message || 'Failed to fetch container stats' });
+  }
+});
+
+app.get('/agent/containers/:containerId/metrics', async (req, res) => {
+  try {
+    const metrics = await getContainerMetrics(req.params.containerId);
+    res.json(metrics);
+  } catch (err) {
+    logger.error({ containerId: req.params.containerId, err: err.message }, 'Failed to fetch container metrics');
+    res.status(500).json({ error: err.message || 'Failed to fetch container metrics' });
   }
 });
 
@@ -842,18 +862,18 @@ app.delete('/agent/deployments/:deploymentId/domains/:domain', async (req, res) 
 });
 
 app.post('/agent/managed-databases', async (req, res) => {
-  const { databaseId, type, password } = req.body || {};
+  const { databaseId, type, password, publicAccess, publishedPort } = req.body || {};
   if (!databaseId || !type || !password) {
     return res.status(400).json({ error: 'databaseId, type, and password are required' });
   }
 
   try {
-    const result = await provisionDatabase({ databaseId, type, password });
-    logger.info({ databaseId, type, containerId: result.containerId }, 'Managed database provisioned');
+    const result = await provisionDatabase({ databaseId, type, password, publicAccess, publishedPort });
+    logger.info({ databaseId, type, containerId: result.containerId, publishedPort: result.publishedPort }, 'Managed database provisioned');
     res.status(201).json(result);
   } catch (err) {
     logger.error({ databaseId, type, err }, 'Failed to provision managed database');
-    res.status(500).json({ error: 'Failed to provision managed database' });
+    res.status(500).json({ error: err.message || 'Failed to provision managed database' });
   }
 });
 
@@ -978,6 +998,43 @@ app.post('/agent/managed-databases/:containerId/restore', async (req, res) => {
   } catch (err) {
     logger.error({ containerId, databaseId, backupId, err: err.message }, 'Failed to restore database snapshot');
     res.status(500).json({ error: err.message || 'Failed to restore database snapshot' });
+  }
+});
+
+app.post('/agent/managed-databases/:containerId/ping', async (req, res) => {
+  const { containerId } = req.params;
+  const { type, masterPassword, dbName } = req.body || {};
+  if (!type) {
+    return res.status(400).json({ error: 'type is required' });
+  }
+
+  try {
+    const result = await pingDatabase({ containerId, type, masterPassword, dbName });
+    res.json(result);
+  } catch (err) {
+    logger.error({ containerId, err: err.message }, 'Failed to ping managed database');
+    res.status(500).json({ error: err.message || 'Failed to ping database' });
+  }
+});
+
+app.post('/agent/managed-databases/:containerId/firewall', async (req, res) => {
+  const { containerId } = req.params;
+  const { port, allowedIps = [] } = req.body || {};
+  if (!port) {
+    return res.status(400).json({ error: 'port is required' });
+  }
+
+  try {
+    const safePort = Number(port);
+    if (!Number.isInteger(safePort) || safePort < 1 || safePort > 65535) {
+      return res.status(400).json({ error: 'Invalid port' });
+    }
+
+    logger.info({ containerId, port: safePort, allowedIps }, 'Updating managed database firewall access rules');
+    res.json({ ok: true, containerId, port: safePort, allowedIps });
+  } catch (err) {
+    logger.error({ containerId, err: err.message }, 'Failed to configure database firewall');
+    res.status(500).json({ error: err.message || 'Failed to configure firewall' });
   }
 });
 

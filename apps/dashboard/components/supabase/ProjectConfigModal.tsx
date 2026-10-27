@@ -22,19 +22,23 @@ export function ProjectConfigModal({ project, isOpen, onClose }: ProjectConfigMo
 
   if (!isOpen || !project) return null;
 
-  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://supabase.shanutechx.net';
+  // Use real per-project URLs from serializeProject() — never hardcoded env vars
+  const baseUrl = project.apiUrl || 'http://localhost:8001';
+  const studioUrl = project.studioUrl || 'http://localhost:8000';
   const restUrl = `${baseUrl}/rest/v1`;
   const authUrl = `${baseUrl}/auth/v1`;
-  const realtimeUrl = baseUrl.replace(/^http/, 'ws') + '/socket/websocket';
+  const realtimeUrl = baseUrl.replace(/^https?/, 'wss').replace(/^http$/, 'ws') + '/realtime/v1/websocket';
   const storageUrl = `${baseUrl}/storage/v1`;
   const graphqlUrl = `${baseUrl}/graphql/v1`;
-  const dbUri = `postgres://postgres:[YOUR-PASSWORD]@db.shanutechx.net:5432/${project.dbName}`;
+  const dbUri = project.dbUrl || `postgres://postgres:[YOUR-PASSWORD]@${project.nodeIp || 'localhost'}:${project.dbPort || 5432}/${project.dbName}`;
 
   const envContent = `# ===================================================
 # ShanuTechX Supabase BaaS Client Environment Config
 # Project: ${project.name} (${project.id})
 # DB Name: ${project.dbName}
-# Region: ${project.region || 'cmbo-us1'}
+# Region: ${project.region || 'ap-southeast-1 (Local)'}
+# Node: ${project.nodeLabel || 'localhost'} ${project.nodeIp ? `(${project.nodeIp})` : ''}
+# Studio: ${studioUrl}
 # ===================================================
 
 NEXT_PUBLIC_SUPABASE_URL=${baseUrl}
@@ -44,6 +48,7 @@ SUPABASE_DB_URL=${dbUri}
 SUPABASE_REALTIME_URL=${realtimeUrl}
 SUPABASE_STORAGE_URL=${storageUrl}
 SUPABASE_GRAPHQL_URL=${graphqlUrl}
+SUPABASE_STUDIO_URL=${studioUrl}
 `;
 
   const sdkSnippets = {
@@ -227,11 +232,21 @@ curl -X GET "${restUrl}/" \\
               </svg>
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base font-bold text-text-primary">{project.name}</h3>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${
+                  project.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
+                  project.status === 'FAILED' ? 'bg-red-500/20 text-red-300 border-red-500/30' :
+                  project.status === 'PROVISIONING' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                  'bg-slate-500/20 text-slate-300 border-slate-500/30'
+                }`}>
                   {project.status}
                 </span>
+                {project.nodeLabel && (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/[0.06] text-text-muted border border-white/[0.06]">
+                    {project.nodeLabel}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-text-muted mt-0.5 font-mono">
                 ID: {project.id} • DB: {project.dbName} • Owner: {project.clientEmail}
@@ -281,13 +296,14 @@ curl -X GET "${restUrl}/" \\
               </p>
 
               {[
-                { label: 'Project URL (Gateway Base)', value: baseUrl, desc: 'Base REST & API Gateway Host' },
-                { label: 'PostgREST API Endpoint', value: restUrl, desc: 'Auto-generated REST API for PostgreSQL tables' },
+                { label: 'Project URL (Kong Gateway)', value: baseUrl, desc: 'Base REST & API Gateway Host — use as SUPABASE_URL' },
+                { label: 'Supabase Studio UI', value: studioUrl, desc: 'Open the Studio web interface (Table Editor, Auth, Storage)' },
+                { label: 'PostgREST REST API', value: restUrl, desc: 'Auto-generated REST API for PostgreSQL tables' },
                 { label: 'GoTrue Auth Endpoint', value: authUrl, desc: 'User authentication & JWT token management' },
-                { label: 'Realtime WebSockets URL', value: realtimeUrl, desc: 'PostgreSQL CDC & Broadcast WebSocket stream' },
+                { label: 'Realtime WebSocket URL', value: realtimeUrl, desc: 'PostgreSQL CDC & Broadcast WebSocket stream' },
                 { label: 'Storage S3 API URL', value: storageUrl, desc: 'Object Storage Buckets API endpoint' },
                 { label: 'GraphQL API URL', value: graphqlUrl, desc: 'pg_graphql endpoint' },
-                { label: 'Direct PostgreSQL Connection String', value: dbUri, desc: 'Direct DB access URI' },
+                { label: 'Direct PostgreSQL DSN', value: dbUri, desc: `Direct DB access — port ${project.dbPort ?? 5432}` },
               ].map((item, idx) => (
                 <div key={idx} className="p-3 rounded-xl bg-black/40 border border-white/[0.06] space-y-1">
                   <div className="flex items-center justify-between">
