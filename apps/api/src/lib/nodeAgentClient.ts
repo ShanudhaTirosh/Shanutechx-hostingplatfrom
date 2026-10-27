@@ -8,12 +8,13 @@ interface Node {
   ip: string;
 }
 
-function agentUrl(node: Node, path: string) {
-  const host =
-    node.ip === '127.0.0.1' || node.ip === 'localhost'
-      ? process.env.LOCAL_NODE_AGENT_HOST || 'node-agent'
-      : node.ip;
-  return `http://${host}:${env.nodeAgentPort}${path}`;
+export function agentUrl(node: Node | { ip: string } | string, path: string) {
+  const ip = typeof node === 'string' ? node : node.ip;
+  const port = process.env.NODE_AGENT_PORT ? Number(process.env.NODE_AGENT_PORT) : env.nodeAgentPort;
+  const isLocal = ip === '127.0.0.1' || ip === 'localhost';
+  const defaultLocalHost = process.env.NODE_ENV === 'test' ? '127.0.0.1' : (process.env.IN_DOCKER ? 'node-agent' : '127.0.0.1');
+  const host = isLocal ? (process.env.LOCAL_NODE_AGENT_HOST || defaultLocalHost) : ip;
+  return `http://${host}:${port}${path}`;
 }
 
 function agentHeaders(extra: Record<string, string> = {}) {
@@ -581,10 +582,24 @@ export async function streamNodeAgentSSE(node: Node, agentPath: string, req: imp
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
 
+  const controller = new AbortController();
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  req.on('close', () => {
+    controller.abort();
+    reader?.cancel().catch(() => {});
+  });
+
   let upstream: Response;
   try {
-    upstream = await fetch(agentUrl(node, agentPath), { headers: agentHeaders() });
-  } catch (err) {
+    upstream = await fetch(agentUrl(node, agentPath), {
+      headers: agentHeaders(),
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    if (controller.signal.aborted) {
+      res.end();
+      return;
+    }
     res.write(`data: ${JSON.stringify({ type: 'error', message: err instanceof Error ? err.message : 'Could not reach the node' })}\n\n`);
     res.end();
     return;
@@ -595,9 +610,8 @@ export async function streamNodeAgentSSE(node: Node, agentPath: string, req: imp
     return;
   }
 
-  const reader = upstream.body.getReader();
+  reader = upstream.body.getReader();
   const decoder = new TextDecoder();
-  req.on('close', () => reader.cancel().catch(() => {}));
 
   try {
     while (true) {
@@ -606,7 +620,9 @@ export async function streamNodeAgentSSE(node: Node, agentPath: string, req: imp
       res.write(decoder.decode(value, { stream: true }));
     }
   } catch (err) {
-    logger.warn({ err, agentPath }, 'SSE proxy stream from node agent ended with an error');
+    if (!controller.signal.aborted) {
+      logger.warn({ err, agentPath }, 'SSE proxy stream from node agent ended with an error');
+    }
   } finally {
     res.end();
   }

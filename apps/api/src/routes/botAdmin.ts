@@ -83,6 +83,16 @@ botAdminRouter.get('/admin/bots/discord/status', async (_req: AuthedRequest, res
   res.status(result.status).json(result.data);
 });
 
+/** Reconnect Discord bot gateway */
+botAdminRouter.post('/admin/bots/discord/reconnect', async (_req: AuthedRequest, res: Response) => {
+  const result = await postInternalBot(
+    `${env.discordBotUrl}/internal/reconnect`,
+    env.discordInternalSecret,
+    {}
+  );
+  res.status(result.status).json(result.data);
+});
+
 /** Send test Discord message (Channel or DM) */
 botAdminRouter.post('/admin/bots/discord/send-test', async (req: AuthedRequest, res: Response) => {
   const { channelId, discordUserId, message } = req.body || {};

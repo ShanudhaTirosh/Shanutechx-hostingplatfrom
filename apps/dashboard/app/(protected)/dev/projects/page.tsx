@@ -36,6 +36,7 @@ import { api } from '@/lib/api';
 import { SupabaseClientProject, Node } from '@/lib/types';
 import { useAppUser } from '@/lib/AppUserContext';
 import DatabaseMigrationScaleModal from '@/components/DatabaseMigrationScaleModal';
+import { IconCheckCircle } from '@/components/Icons';
 
 export default function UnifiedDevProjectsPage() {
   const { apiUser } = useAppUser();

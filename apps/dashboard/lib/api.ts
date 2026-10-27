@@ -276,6 +276,7 @@ export const api = {
       whatsappReconnect: () => apiFetch('/api/admin/bots/whatsapp/reconnect', { method: 'POST' }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
       whatsappSendTest: (phoneNumber: string, message: string) => apiFetch('/api/admin/bots/whatsapp/send-test', { method: 'POST', body: JSON.stringify({ phoneNumber, message }) }).then((r) => asJson<{ ok: boolean }>(r)),
       discordStatus: () => apiFetch('/api/admin/bots/discord/status').then((r) => asJson<{ status: string; botTag?: string; guildsCount?: number; guilds?: any[]; activeTicketChannels?: number; staffRoleId?: string | null }>(r)),
+      discordReconnect: () => apiFetch('/api/admin/bots/discord/reconnect', { method: 'POST' }).then((r) => asJson<{ ok: boolean; message: string }>(r)),
       discordSendTest: (message: string, channelId?: string, discordUserId?: string) => apiFetch('/api/admin/bots/discord/send-test', { method: 'POST', body: JSON.stringify({ message, channelId, discordUserId }) }).then((r) => asJson<{ ok: boolean }>(r)),
     },
     monitoring: {

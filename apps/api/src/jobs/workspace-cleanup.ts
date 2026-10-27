@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { env } from '../env';
 import { logger } from '../lib/logger';
+import { agentUrl } from '../lib/nodeAgentClient';
 
 const RETENTION_MS = 24 * 60 * 60 * 1000; // 24 hours retention period
 
@@ -39,7 +40,7 @@ export async function executeWorkspaceCleanupJob(): Promise<{ cleanedCount: numb
     for (const deployment of validCandidates) {
 
       try {
-        const url = `http://${deployment.node.ip}:${env.nodeAgentPort}/agent/fs/${deployment.id}/cleanup`;
+        const url = agentUrl(deployment.node.ip, `/agent/fs/${deployment.id}/cleanup`);
         const res = await fetch(url, {
           method: 'DELETE',
           headers: {

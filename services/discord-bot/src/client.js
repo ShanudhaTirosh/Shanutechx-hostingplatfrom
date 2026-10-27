@@ -136,7 +136,7 @@ function connect() {
 
   const token = process.env.DISCORD_BOT_TOKEN;
   if (!token) {
-    logger.error('DISCORD_BOT_TOKEN not provided in .env');
+    logger.warn('DISCORD_BOT_TOKEN not provided in .env');
     return Promise.reject(new Error('DISCORD_BOT_TOKEN missing'));
   }
 

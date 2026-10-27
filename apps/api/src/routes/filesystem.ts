@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { canAccessResource, accessActionForRequest } from '../middleware/rbac';
 import { pushWorkspaceToShadowRepo } from '../lib/shadowBackup';
+import { agentUrl } from '../lib/nodeAgentClient';
 import { env } from '../env';
 
 export const filesystemRouter = Router();
@@ -23,10 +24,6 @@ async function canAccessFs(req: AuthedRequest, deploymentId: string): Promise<bo
   const deployment = await prisma.deployment.findUnique({ where: { id: deploymentId } });
   if (!deployment) return false;
   return canAccessResource(deployment.userId, req, undefined, undefined, accessActionForRequest(req));
-}
-
-function agentUrl(nodeIp: string, path: string) {
-  return `http://${nodeIp}:${env.nodeAgentPort}${path}`;
 }
 
 function agentHeaders() {

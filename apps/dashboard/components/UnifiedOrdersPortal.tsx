@@ -28,6 +28,7 @@ import {
 import { apiFetch } from '@/lib/useAuth';
 import InvoiceModal from '@/components/InvoiceModal';
 import PaymentProofModal from '@/components/PaymentProofModal';
+import { IconClose } from '@/components/Icons';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 function CalendarIcon() {

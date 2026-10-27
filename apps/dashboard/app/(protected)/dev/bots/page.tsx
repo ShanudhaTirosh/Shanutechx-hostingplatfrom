@@ -54,6 +54,7 @@ export default function DevBotStudioPage() {
   // Action states
   const [resetting, setResetting] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  const [reconnectingDiscord, setReconnectingDiscord] = useState(false);
 
   // Tester state
   const [testTarget, setTestTarget] = useState<'whatsapp' | 'discord_channel' | 'discord_dm'>('whatsapp');
@@ -141,6 +142,19 @@ export default function DevBotStudioPage() {
       toast('Failed to trigger reconnection', 'error');
     } finally {
       setReconnecting(false);
+    }
+  };
+
+  const handleDiscordReconnect = async () => {
+    setReconnectingDiscord(true);
+    try {
+      await api.admin.bots.discordReconnect();
+      toast('Discord reconnection sequence triggered', 'info');
+      loadDiscordStatus();
+    } catch (err: any) {
+      toast(err.message || 'Failed to trigger Discord reconnection', 'error');
+    } finally {
+      setReconnectingDiscord(false);
     }
   };
 
@@ -339,9 +353,19 @@ export default function DevBotStudioPage() {
                 </div>
               </div>
 
-              <Button variant="secondary" onClick={loadDiscordStatus} loading={loadingDiscord} className="text-xs flex items-center gap-1.5">
-                <RefreshCw className="h-3.5 w-3.5" /> Refresh Status
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" onClick={loadDiscordStatus} loading={loadingDiscord} className="text-xs flex items-center gap-1.5">
+                  <RefreshCw className="h-3.5 w-3.5" /> Refresh Status
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={handleDiscordReconnect}
+                  loading={reconnectingDiscord}
+                  className="text-xs flex items-center gap-1.5 text-amber-400 border-amber-500/20 hover:bg-amber-500/10"
+                >
+                  <Power className="h-3.5 w-3.5" /> Reconnect
+                </Button>
+              </div>
             </div>
           </Card>
 

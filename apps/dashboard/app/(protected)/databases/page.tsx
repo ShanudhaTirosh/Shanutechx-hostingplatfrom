@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { useAppUser } from '@/lib/AppUserContext';
 import { ManagedDatabase, ManagedDatabaseUser, Node } from '@/lib/types';
+import { IconLock } from '@/components/Icons';
 
 type ActiveTab = 'overview' | 'query' | 'scaling' | 'backups' | 'migration' | 'security' | 'connection';
 

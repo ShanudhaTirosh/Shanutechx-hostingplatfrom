@@ -69,7 +69,7 @@ const INFRA_PANELS = [
     countKey: 'databases',
   },
   {
-    href: '/vps',
+    href: '/dev/vps',
     label: 'Global VPS Fleet & Compute Host Nodes',
     description: 'Manage all customer & system VPS host nodes, per-VPS 30 TB bandwidth quotas, and SSH/SFTP testing.',
     icon: <CloudIcon />,
@@ -83,6 +83,22 @@ const INFRA_PANELS = [
     icon: <ServerIcon />,
     color: 'bg-fuchsia-500/10 text-fuchsia-300',
     countKey: 'containers',
+  },
+  {
+    href: '/dev/bots',
+    label: 'Bot Management & Studio',
+    description: 'Dev Studio real-time WhatsApp Gateway (Baileys) & Discord Bot Engine daemons orchestration.',
+    icon: <ServerIcon />,
+    color: 'bg-emerald-500/10 text-emerald-300',
+    countKey: 'bots',
+  },
+  {
+    href: '/dev/ports',
+    label: 'Exposed Ports & Firewall',
+    description: 'Configure Cloudflare public subdomain routing exposures or manage Linux kernel host firewall rules.',
+    icon: <ShieldIcon />,
+    color: 'bg-amber-500/10 text-amber-300',
+    countKey: 'ports',
   },
   {
     href: '/settings',
@@ -203,6 +219,8 @@ export default function DevLandingPage() {
     settings: 'Protected',
     containers: 'Inspect',
     catalog: 'Browse',
+    bots: 'Studio',
+    ports: 'Firewall',
   };
 
   const adminBadges: Record<string, string | number> = {

@@ -673,7 +673,7 @@ export function VercelDeployModal({ isOpen, onClose, onDeployed }: Props) {
                             <option value="">Choose a repository…</option>
                             {repos.map((r) => (
                               <option key={r.id} value={r.fullName}>
-                                {r.fullName} {r.private ? <IconLock size={10} className="inline ml-0.5 text-slate-400" /> : null}
+                                {r.fullName} {r.private ? '🔒 (private)' : ''}
                               </option>
                             ))}
                           </select>

@@ -225,14 +225,14 @@ app.post('/internal/create-ticket-channel', async (req, res) => {
 app.get('/internal/status', (_req, res) => {
   try {
     const client = getClient();
-    const guilds = client.guilds.cache.map((g) => ({ id: g.id, name: g.name, memberCount: g.memberCount }));
-    const activeTicketChannels = client.channels.cache.filter(
+    const guilds = client.guilds?.cache ? client.guilds.cache.map((g) => ({ id: g.id, name: g.name, memberCount: g.memberCount })) : [];
+    const activeTicketChannels = client.channels?.cache ? client.channels.cache.filter(
       (c) => c.name && c.name.startsWith('ticket-')
-    ).size;
+    ).size : 0;
 
     res.json({
       status: 'connected',
-      botTag: client.user.tag,
+      botTag: client.user ? client.user.tag : 'Connected',
       guildsCount: guilds.length,
       guilds,
       activeTicketChannels,
@@ -249,12 +249,21 @@ app.get('/internal/status', (_req, res) => {
   }
 });
 
+/** Trigger Discord bot reconnection */
+app.post('/internal/reconnect', async (_req, res) => {
+  try {
+    await connect();
+    res.json({ ok: true, message: 'Discord reconnect initiated' });
+  } catch (err) {
+    logger.error({ err }, 'Failed to reconnect Discord client');
+    res.status(500).json({ error: 'Failed to reconnect: ' + (err.message || 'Unknown error') });
+  }
+});
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, 'discord-bot internal API listening');
 });
 
 connect().catch((err) => {
-  logger.fatal({ err }, 'Failed to connect Discord client');
-  process.exit(1);
+  logger.warn({ err: err.message }, 'Could not connect Discord client at startup (will retry on /internal/reconnect or when credentials are provided)');
 });
