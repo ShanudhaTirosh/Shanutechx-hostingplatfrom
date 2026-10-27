@@ -48,6 +48,9 @@ function friendlyError(err: any): string {
   if (msg.includes('unauthorized-domain')) {
     return 'This domain is not authorized for OAuth in Firebase configuration.';
   }
+  if (msg.includes('operation-not-supported-in-this-environment')) {
+    return 'Browser OAuth popups are not supported in this native environment. Please use the "Staff API Key" tab with your personal shx_ key.';
+  }
   return msg || 'Authentication failed. Please try again.';
 }
 

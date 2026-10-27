@@ -9,6 +9,7 @@ import { TicketsScreen } from '@/screens/TicketsScreen';
 import { NodesScreen } from '@/screens/NodesScreen';
 import { AnalyticsScreen } from '@/screens/AnalyticsScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fontFamily, spacing } from '@/theme/tokens';
 import type { MainTabParamList } from './types';
 
@@ -37,6 +38,8 @@ function TabIcon({ label, focused }: { label: keyof MainTabParamList; focused: b
 }
 
 export function MainTabNavigator() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -45,7 +48,13 @@ export function MainTabNavigator() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: { fontFamily: fontFamily.bodyMedium, fontSize: 9 },
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            height: 58 + Math.max(insets.bottom, 12),
+            paddingBottom: Math.max(insets.bottom, 8),
+          },
+        ],
         tabBarBackground: () => <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />,
         tabBarIcon: ({ focused }) => <TabIcon label={route.name} focused={focused} />,
       })}
@@ -66,9 +75,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.glassBorder,
     backgroundColor: 'rgba(20,18,24,0.85)',
-    height: 82,
     paddingTop: 8,
-    paddingBottom: 20,
   },
   iconActiveWrapper: {
     paddingHorizontal: 8,

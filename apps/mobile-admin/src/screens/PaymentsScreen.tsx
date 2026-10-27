@@ -13,6 +13,7 @@ import {
   Platform,
   Linking,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,21 +22,45 @@ import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '@/components/GlassCard';
 import { Button } from '@/components/Button';
 import { Badge } from '@/components/Badge';
-import { api, Payment, ApiError, getEffectiveApiBase } from '@/lib/api';
+import { api, Payment, ApiError, resolveProofUrl } from '@/lib/api';
 import { colors, fontFamily, radius, spacing } from '@/theme/tokens';
 import type { RootStackParamList } from '@/navigation/types';
 
-function formatLkr(n: number | undefined): string {
-  if (n === undefined || isNaN(n)) return 'Rs 0';
-  return `Rs ${n.toLocaleString('en-LK', { maximumFractionDigits: 0 })}`;
+function formatLkr(n: number | null | undefined): string {
+  if (n === undefined || n === null || isNaN(n)) return 'Rs 0';
+  return `Rs ${Number(n).toLocaleString('en-LK', { maximumFractionDigits: 0 })}`;
 }
 
-function resolveProofUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  const base = getEffectiveApiBase();
-  const cleanPath = url.startsWith('/') ? url : `/${url}`;
-  return `${base}${cleanPath}`;
+function ReceiptSlipImage({ uri, onPreview }: { uri: string; onPreview: () => void }) {
+  const [loadError, setLoadError] = useState(false);
+
+  if (loadError) {
+    return (
+      <Pressable onPress={() => Linking.openURL(uri)} style={styles.pdfCard}>
+        <Ionicons name="image-outline" size={24} color={colors.warning} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.pdfTitle}>Receipt Image Attached</Text>
+          <Text style={styles.pdfSub}>Tap to open in external browser</Text>
+        </View>
+        <Ionicons name="open-outline" size={13} color={colors.warning} />
+      </Pressable>
+    );
+  }
+
+  return (
+    <Pressable onPress={onPreview} style={styles.proofContainer}>
+      <Image
+        source={{ uri }}
+        style={styles.proofImage}
+        resizeMode="cover"
+        onError={() => setLoadError(true)}
+      />
+      <View style={styles.zoomHint}>
+        <Ionicons name="scan-outline" size={12} color="#ffffff" />
+        <Text style={styles.zoomHintText}>Tap to inspect receipt</Text>
+      </View>
+    </Pressable>
+  );
 }
 
 type FilterTab = 'manual_review' | 'manually_approved' | 'rejected' | 'all';
@@ -98,16 +123,29 @@ export function PaymentsScreen() {
   }
 
   async function handleApprove(payment: Payment) {
-    setBusyId(payment.id);
-    try {
-      await api.payments.review(payment.id, true);
-      showToast(`Order #${payment.orderId.slice(0, 8).toUpperCase()} approved!`, 'success');
-      load(statusFilter);
-    } catch (err: any) {
-      showToast(err instanceof ApiError ? err.message : 'Failed to approve payment', 'error');
-    } finally {
-      setBusyId(null);
-    }
+    const amountStr = formatLkr(payment.order?.totalLkr ?? payment.order?.total);
+    Alert.alert(
+      'Approve Payment & Provision',
+      `Approve payment of ${amountStr} for Order #${payment.orderId.slice(0, 8).toUpperCase()}? This will immediately provision hosting resources and activate subscriptions.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Approve & Provision',
+          onPress: async () => {
+            setBusyId(payment.id);
+            try {
+              await api.payments.review(payment.id, true);
+              showToast(`Order #${payment.orderId.slice(0, 8).toUpperCase()} approved!`, 'success');
+              load(statusFilter);
+            } catch (err: any) {
+              showToast(err instanceof ApiError ? err.message : 'Failed to approve payment', 'error');
+            } finally {
+              setBusyId(null);
+            }
+          },
+        },
+      ]
+    );
   }
 
   function openDecline(payment: Payment) {
@@ -286,13 +324,7 @@ export function PaymentsScreen() {
                     </View>
                   </Pressable>
                 ) : (
-                  <Pressable onPress={() => setPreviewProofUrl(fullProofUrl)} style={styles.proofContainer}>
-                    <Image source={{ uri: fullProofUrl }} style={styles.proofImage} resizeMode="cover" />
-                    <View style={styles.zoomHint}>
-                      <Ionicons name="scan-outline" size={12} color="#ffffff" />
-                      <Text style={styles.zoomHintText}>Tap to inspect receipt</Text>
-                    </View>
-                  </Pressable>
+                  <ReceiptSlipImage uri={fullProofUrl} onPreview={() => setPreviewProofUrl(fullProofUrl)} />
                 )
               ) : (
                 <View style={styles.noProofBox}>

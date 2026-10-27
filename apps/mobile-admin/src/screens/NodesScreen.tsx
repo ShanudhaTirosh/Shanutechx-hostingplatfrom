@@ -18,8 +18,18 @@ import { Button } from '@/components/Button';
 import { api, Node } from '@/lib/api';
 import { colors, fontFamily, radius, statusStyle } from '@/theme/tokens';
 
+function formatUptime(seconds?: number): string {
+  if (!seconds || isNaN(seconds)) return '—';
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
 function UsageBar({ pct, color }: { pct: number | null; color: string }) {
-  const val = pct ?? 0;
+  const val = typeof pct === 'number' && !isNaN(pct) ? pct : 0;
   return (
     <View style={styles.barTrack}>
       <View
@@ -61,10 +71,12 @@ function NodeCard({
   node,
   onToggleActive,
   onOpenNodeEngine,
+  onFailover,
 }: {
   node: Node;
   onToggleActive: (node: Node) => void;
   onOpenNodeEngine: (node: Node) => void;
+  onFailover: (node: Node) => void;
 }) {
   const s = statusStyle(node.status);
   const autoDomain = `node-${node.label.toLowerCase().replace(/[^a-z0-9]/g, '-')}.shanutechx.com`;
@@ -119,13 +131,18 @@ function NodeCard({
             {node.deploymentCount} deployment{node.deploymentCount !== 1 ? 's' : ''}
           </Text>
         </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          {node.status !== 'online' && (
+            <Pressable onPress={() => onFailover(node)} style={[styles.actionBtn, { borderColor: 'rgba(245,158,11,0.5)', backgroundColor: 'rgba(245,158,11,0.08)' }]}>
+              <Text style={[styles.actionBtnText, { color: colors.warning }]}>Failover</Text>
+            </Pressable>
+          )}
           <Pressable onPress={() => onOpenNodeEngine(node)} style={[styles.nodeEngineBtn, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-            <Ionicons name="flash-outline" size={11} color={colors.primary} />
+            <Ionicons name="flash-outline" size={11} color={colors.cyan} />
             <Text style={styles.nodeEngineBtnText}>Node Engine</Text>
           </Pressable>
           <Pressable onPress={() => onToggleActive(node)} style={styles.actionBtn}>
-            <Text style={styles.actionBtnText}>{node.status === 'online' ? 'Pause' : 'Activate'}</Text>
+            <Text style={styles.actionBtnText}>{node.isActive ? 'Pause' : 'Activate'}</Text>
           </Pressable>
         </View>
       </View>
@@ -185,20 +202,43 @@ export function NodesScreen() {
   }
 
   async function handleToggleActive(target: Node) {
-    const nextStatus = target.status === 'online' ? false : true;
+    const nextActive = !target.isActive;
     Alert.alert(
-      `${nextStatus ? 'Activate' : 'Pause'} Node`,
-      `Are you sure you want to set node "${target.label}" to ${nextStatus ? 'Active' : 'Paused'}?`,
+      `${nextActive ? 'Activate' : 'Pause'} Node`,
+      `Are you sure you want to set node "${target.label}" to ${nextActive ? 'Active' : 'Paused'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Confirm',
           onPress: async () => {
             try {
-              await api.nodes.toggleActive(target.id, nextStatus);
+              await api.nodes.toggleActive(target.id, nextActive);
               load();
             } catch (err: any) {
               Alert.alert('Error', err.message || 'Failed to update node status');
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  async function handleFailover(target: Node) {
+    Alert.alert(
+      'Evacuate Workloads (Failover)',
+      `Failover will safely migrate all container deployments and databases away from node "${target.label}" to healthy nodes. Continue?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Initiate Failover',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await api.nodes.failover(target.id);
+              Alert.alert('Failover Initiated', res.message || 'Evacuation started in background.');
+              load();
+            } catch (err: any) {
+              Alert.alert('Failover Error', err.message || 'Failed to initiate failover');
             }
           },
         },
@@ -285,6 +325,7 @@ export function NodesScreen() {
           node={node}
           onToggleActive={handleToggleActive}
           onOpenNodeEngine={handleOpenNodeEngine}
+          onFailover={handleFailover}
         />
       ))}
 
@@ -327,29 +368,57 @@ export function NodesScreen() {
                 <View style={styles.telemetryCard}>
                   <TelemetryRow
                     label="Docker Engine"
-                    value={engineData?.docker?.status || engineData?.dockerStatus || 'ONLINE'}
-                    highlight
+                    value={engineData?.docker?.status || engineData?.dockerStatus || (engineData?.cpu ? 'ONLINE' : '—')}
+                    highlight={engineData?.docker?.status === 'online' || !!engineData?.cpu}
                   />
-                  <TelemetryRow
-                    label="Containers Running"
-                    value={String(engineData?.docker?.containersRunning ?? engineData?.containersRunning ?? engineData?.containers?.running ?? '—')}
-                  />
-                  <TelemetryRow
-                    label="Total Containers"
-                    value={String(engineData?.docker?.containersTotal ?? engineData?.containersTotal ?? engineData?.containers?.total ?? '—')}
-                  />
+                  {engineData?.docker?.containersRunning !== undefined || engineData?.containersRunning !== undefined ? (
+                    <TelemetryRow
+                      label="Containers Running"
+                      value={String(engineData?.docker?.containersRunning ?? engineData?.containersRunning ?? engineData?.containers?.running ?? '0')}
+                    />
+                  ) : null}
                   <TelemetryRow
                     label="CPU Load"
-                    value={engineData?.system?.cpuPct ? `${engineData.system.cpuPct}%` : (engineData?.cpu?.usage ? `${engineData.cpu.usage}%` : '—')}
+                    value={
+                      engineData?.cpu?.usagePct !== undefined
+                        ? `${engineData.cpu.usagePct}% (${engineData.cpu.cores || 1} cores)`
+                        : engineData?.system?.cpuPct
+                        ? `${engineData.system.cpuPct}%`
+                        : '—'
+                    }
                   />
+                  {engineData?.cpu?.brand ? (
+                    <TelemetryRow
+                      label="Processor"
+                      value={engineData.cpu.brand}
+                    />
+                  ) : null}
                   <TelemetryRow
                     label="RAM Memory"
-                    value={engineData?.system?.ramUsedGb ? `${engineData.system.ramUsedGb} GB / ${engineData.system.ramTotalGb} GB` : '—'}
+                    value={
+                      engineData?.memory?.usedMb !== undefined
+                        ? `${(engineData.memory.usedMb / 1024).toFixed(1)} GB / ${(engineData.memory.totalMb / 1024).toFixed(1)} GB (${engineData.memory.usedPct}%)`
+                        : engineData?.system?.ramUsedGb
+                        ? `${engineData.system.ramUsedGb} GB / ${engineData.system.ramTotalGb} GB`
+                        : '—'
+                    }
                   />
                   <TelemetryRow
                     label="Disk Storage"
-                    value={engineData?.system?.diskUsedGb ? `${engineData.system.diskUsedGb} GB / ${engineData.system.diskTotalGb} GB` : '—'}
+                    value={
+                      Array.isArray(engineData?.disks) && engineData.disks.length > 0
+                        ? `${engineData.disks[0].usedGb} GB / ${engineData.disks[0].sizeGb} GB (${engineData.disks[0].usedPct}%)`
+                        : engineData?.system?.diskUsedGb
+                        ? `${engineData.system.diskUsedGb} GB / ${engineData.system.diskTotalGb} GB`
+                        : '—'
+                    }
                   />
+                  {engineData?.network ? (
+                    <TelemetryRow
+                      label="Monthly Bandwidth"
+                      value={`${engineData.network.usedGb || 0} GB / ${engineData.network.monthlyLimitGb || 30000} GB (${engineData.network.usedPct || 0}%)`}
+                    />
+                  ) : null}
                   <TelemetryRow
                     label="Agent Version"
                     value={engineData?.agentVersion || 'v1.4.0'}
@@ -357,7 +426,11 @@ export function NodesScreen() {
                   />
                   <TelemetryRow
                     label="System Uptime"
-                    value={engineData?.uptime || engineData?.system?.uptime || 'Active'}
+                    value={
+                      engineData?.uptimeSeconds !== undefined
+                        ? formatUptime(engineData.uptimeSeconds)
+                        : engineData?.uptime || engineData?.system?.uptime || 'Active'
+                    }
                     mono
                   />
                 </View>

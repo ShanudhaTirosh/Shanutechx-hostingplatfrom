@@ -64,12 +64,17 @@ export function TicketChatScreen() {
 
   useEffect(() => {
     load();
+    const timer = setInterval(() => {
+      load();
+    }, 5000);
+    return () => clearInterval(timer);
   }, [load]);
 
   async function handleSend(textToSend?: string) {
-    const body = (textToSend || draft).trim();
+    const isQuick = typeof textToSend === 'string';
+    const body = (isQuick ? textToSend : draft).trim();
     if (!body) return;
-    setDraft('');
+    if (!isQuick) setDraft('');
     setSending(true);
     try {
       await api.tickets.reply(ticketId, body);
@@ -77,7 +82,7 @@ export function TicketChatScreen() {
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 150);
     } catch (err: any) {
       setError(err.message || 'Failed to send message');
-      setDraft(body);
+      if (!isQuick) setDraft(body);
     } finally {
       setSending(false);
     }
@@ -143,7 +148,7 @@ export function TicketChatScreen() {
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: colors.bgBase }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 44 : 0}
     >
       {/* Top Header */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>

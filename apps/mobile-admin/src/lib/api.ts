@@ -204,6 +204,9 @@ export interface Deployment {
   nodeId: string | null;
   publicUrl: string | null;
   port?: number | null;
+  internalPort?: number | null;
+  cpuLimit?: number | null;
+  memoryLimit?: number | null;
   createdAt: string;
   updatedAt: string;
   lastDeployAt?: string | null;
@@ -326,11 +329,40 @@ export interface ApiUser {
   email: string;
   displayName: string | null;
   role: 'customer' | 'admin' | 'support' | 'dev';
+  avatarUrl?: string | null;
+  phoneNumber?: string | null;
+  discordUserId?: string | null;
+  isBanned?: boolean;
+}
+
+/** Resolves receipt proof or uploaded media URLs with Windows backslash fixes and data: URI preservation */
+export function resolveProofUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith('data:')) return url;
+  const normalized = url.replace(/\\/g, '/');
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) return normalized;
+  const base = getEffectiveApiBase().replace(/\/+$/, '');
+  const cleanPath = normalized.startsWith('/') ? normalized : `/${normalized}`;
+  return `${base}${cleanPath}`;
 }
 
 // ── Normalizers ────────────────────────────────────────────────────────────
 
 function normalizeDeployment(d: any): Deployment {
+  if (!d) {
+    return {
+      id: '',
+      name: 'Unknown',
+      status: 'stopped',
+      image: 'docker',
+      tag: 'latest',
+      nodeId: null,
+      publicUrl: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      userId: '',
+    };
+  }
   const repoName = d.repoUrl ? d.repoUrl.split('/').pop()?.replace('.git', '') : undefined;
   const name =
     d.name ||
@@ -573,19 +605,22 @@ export const api = {
         .then(({ deployment }) => ({ deployment: normalizeDeployment(deployment) })),
     restart: (id: string) =>
       apiFetch(`/api/deployments/${id}/restart`, { method: 'POST' })
-        .then((r) => asJson<{ deployment: any }>(r))
-        .then(({ deployment }) => ({ deployment: normalizeDeployment(deployment) })),
+        .then(() => api.deployments.get(id)),
     stop: (id: string) =>
       apiFetch(`/api/deployments/${id}/stop`, { method: 'POST' })
-        .then((r) => asJson<{ deployment: any }>(r))
-        .then(({ deployment }) => ({ deployment: normalizeDeployment(deployment) })),
+        .then(() => api.deployments.get(id)),
+    start: (id: string) =>
+      apiFetch(`/api/deployments/${id}/start`, { method: 'POST' })
+        .then(() => api.deployments.get(id)),
+    redeploy: (id: string) =>
+      apiFetch(`/api/deployments/${id}/redeploy`, { method: 'POST' })
+        .then(() => api.deployments.get(id)),
     updateSubdomain: (id: string, subdomain: string) =>
       apiFetch(`/api/deployments/${id}/subdomain`, {
         method: 'PATCH',
         body: JSON.stringify({ subdomain }),
       })
-        .then((r) => asJson<{ deployment: any }>(r))
-        .then(({ deployment }) => ({ deployment: normalizeDeployment(deployment) })),
+        .then(() => api.deployments.get(id)),
     logs: (id: string, tail?: number) =>
       apiFetch(`/api/deployments/${id}/logs${tail ? `?tail=${tail}` : ''}`).then((r) =>
         asJson<{ logs: string | DeploymentLog[] }>(r)
@@ -605,6 +640,11 @@ export const api = {
       apiFetch(`/api/nodes/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive }) })
         .then((r) => asJson<{ node: any }>(r))
         .then(({ node }) => ({ node: normalizeNode(node) })),
+    failover: (id: string, targetNodeId?: string) =>
+      apiFetch(`/api/nodes/${id}/failover`, {
+        method: 'POST',
+        body: JSON.stringify({ targetNodeId }),
+      }).then((r) => asJson<{ ok: boolean; message?: string }>(r)),
     engineMonitoring: (nodeId: string) =>
       apiFetch(`/api/nodes/${nodeId}/engine/monitoring`).then((r) => asJson<any>(r)),
   },

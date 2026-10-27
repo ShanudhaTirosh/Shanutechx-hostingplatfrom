@@ -23,10 +23,11 @@ const RANGES = [
 ];
 
 function formatLkr(n?: number | null): string {
-  if (n === undefined || n === null) return '—';
-  if (n >= 1_000_000) return `Rs ${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `Rs ${(n / 1_000).toFixed(1)}k`;
-  return `Rs ${n.toLocaleString('en-LK', { maximumFractionDigits: 0 })}`;
+  if (n === undefined || n === null || isNaN(n)) return '—';
+  const val = Number(n);
+  if (Math.abs(val) >= 1_000_000) return `Rs ${(val / 1_000_000).toFixed(2)}M`;
+  if (Math.abs(val) >= 1_000) return `Rs ${(val / 1_000).toFixed(1)}k`;
+  return `Rs ${val.toLocaleString('en-LK', { maximumFractionDigits: 0 })}`;
 }
 
 export function AnalyticsScreen() {
@@ -246,6 +247,49 @@ export function AnalyticsScreen() {
             </GlassCard>
           );
         })
+      )}
+
+      {/* Fleet Resource Pool Overview */}
+      {summary?.fleetSummary && (
+        <>
+          <Text style={styles.sectionTitle}>Compute Fleet Resources</Text>
+          <GlassCard style={{ padding: 14 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text style={{ fontFamily: fontFamily.headExtrabold, fontSize: 18, color: colors.onSurface }}>
+                  {summary.fleetSummary.healthyNodes}/{summary.fleetSummary.totalNodes}
+                </Text>
+                <Text style={{ fontFamily: fontFamily.body, fontSize: 10, color: colors.muted, marginTop: 2 }}>
+                  Healthy Nodes
+                </Text>
+              </View>
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text style={{ fontFamily: fontFamily.headExtrabold, fontSize: 18, color: colors.cyan }}>
+                  {summary.fleetSummary.totalCpuCores}
+                </Text>
+                <Text style={{ fontFamily: fontFamily.body, fontSize: 10, color: colors.muted, marginTop: 2 }}>
+                  CPU Cores
+                </Text>
+              </View>
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text style={{ fontFamily: fontFamily.headExtrabold, fontSize: 18, color: colors.primary }}>
+                  {summary.fleetSummary.totalRamGb} GB
+                </Text>
+                <Text style={{ fontFamily: fontFamily.body, fontSize: 10, color: colors.muted, marginTop: 2 }}>
+                  Total RAM
+                </Text>
+              </View>
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text style={{ fontFamily: fontFamily.headExtrabold, fontSize: 18, color: colors.success }}>
+                  {summary.fleetSummary.totalDiskGb} GB
+                </Text>
+                <Text style={{ fontFamily: fontFamily.body, fontSize: 10, color: colors.muted, marginTop: 2 }}>
+                  Total Storage
+                </Text>
+              </View>
+            </View>
+          </GlassCard>
+        </>
       )}
     </ScrollView>
   );

@@ -29,7 +29,7 @@ export function DeploymentDetailScreen() {
   const [logsText, setLogsText] = useState<string>('');
   const [logFilter, setLogFilter] = useState<'all' | 'info' | 'warn' | 'error'>('all');
   const [refreshing, setRefreshing] = useState(false);
-  const [actionLoading, setActionLoading] = useState<'restart' | 'stop' | 'logs' | null>(null);
+  const [actionLoading, setActionLoading] = useState<'restart' | 'stop' | 'start' | 'redeploy' | 'logs' | null>(null);
   const [subdomainModalVisible, setSubdomainModalVisible] = useState(false);
   const [newSubdomain, setNewSubdomain] = useState('');
   const [subdomainSaving, setSubdomainSaving] = useState(false);
@@ -96,6 +96,40 @@ export function DeploymentDetailScreen() {
             Alert.alert('Container Restarted', 'The deployment rebuild & restart sequence has been initiated.');
           } catch (err: any) {
             Alert.alert('Restart Error', err.message || 'Failed to restart deployment');
+          } finally {
+            setActionLoading(null);
+          }
+        },
+      },
+    ]);
+  }
+
+  async function handleStart() {
+    setActionLoading('start');
+    try {
+      const { deployment: dep } = await api.deployments.start(params.deploymentId);
+      setDeployment(dep);
+      Alert.alert('Container Started', 'The container has been started successfully.');
+    } catch (err: any) {
+      Alert.alert('Start Error', err.message || 'Failed to start deployment');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleRedeploy() {
+    Alert.alert('Redeploy Container', 'Trigger a full rebuild and deployment from latest code?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Redeploy Now',
+        onPress: async () => {
+          setActionLoading('redeploy');
+          try {
+            const { deployment: dep } = await api.deployments.redeploy(params.deploymentId);
+            setDeployment(dep);
+            Alert.alert('Redeploy Started', 'Build and deployment pipeline is now executing.');
+          } catch (err: any) {
+            Alert.alert('Redeploy Error', err.message || 'Failed to trigger redeployment');
           } finally {
             setActionLoading(null);
           }
@@ -193,16 +227,29 @@ export function DeploymentDetailScreen() {
           <GlassCard style={{ marginBottom: 16, padding: 14 }}>
             <Text style={styles.sectionTitle}>Operations</Text>
             <View style={styles.actionsRow}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Button
-                  label={actionLoading === 'restart' ? 'Restarting…' : 'Restart'}
-                  icon={<Ionicons name="sync-outline" size={15} color={colors.primary} />}
-                  variant="outline"
-                  size="sm"
-                  onPress={handleRestart}
-                  disabled={!!actionLoading || deployment.status === 'building'}
-                />
-              </View>
+              {deployment.status === 'stopped' ? (
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Button
+                    label={actionLoading === 'start' ? 'Starting…' : 'Start Container'}
+                    icon={<Ionicons name="play-circle-outline" size={15} color="#1a0f33" />}
+                    variant="primary"
+                    size="sm"
+                    onPress={handleStart}
+                    disabled={!!actionLoading}
+                  />
+                </View>
+              ) : (
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Button
+                    label={actionLoading === 'restart' ? 'Restarting…' : 'Restart'}
+                    icon={<Ionicons name="sync-outline" size={15} color={colors.primary} />}
+                    variant="outline"
+                    size="sm"
+                    onPress={handleRestart}
+                    disabled={!!actionLoading || deployment.status === 'building'}
+                  />
+                </View>
+              )}
               <View style={{ flex: 1 }}>
                 <Button
                   label={actionLoading === 'stop' ? 'Stopping…' : 'Stop'}
@@ -215,19 +262,31 @@ export function DeploymentDetailScreen() {
               </View>
             </View>
 
-            {deployment.publicUrl && (
-              <View style={{ marginTop: 10 }}>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+              <View style={{ flex: 1 }}>
                 <Button
-                  label="Open in Browser"
-                  icon={<Ionicons name="open-outline" size={15} color="#1a0f33" />}
-                  variant="primary"
+                  label={actionLoading === 'redeploy' ? 'Redeploying…' : 'Redeploy'}
+                  icon={<Ionicons name="git-branch-outline" size={15} color={colors.cyan} />}
+                  variant="glass"
                   size="sm"
-                  onPress={() => {
-                    if (deployment.publicUrl) Linking.openURL(deployment.publicUrl);
-                  }}
+                  onPress={handleRedeploy}
+                  disabled={!!actionLoading || deployment.status === 'building'}
                 />
               </View>
-            )}
+              {deployment.publicUrl && (
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label="Open in Browser"
+                    icon={<Ionicons name="open-outline" size={15} color="#1a0f33" />}
+                    variant="primary"
+                    size="sm"
+                    onPress={() => {
+                      if (deployment.publicUrl) Linking.openURL(deployment.publicUrl);
+                    }}
+                  />
+                </View>
+              )}
+            </View>
           </GlassCard>
 
           {/* Container & Spec Info */}
@@ -239,6 +298,16 @@ export function DeploymentDetailScreen() {
             />
             <InfoRow label="Docker Image" value={`${deployment.image}:${deployment.tag}`} mono />
             <InfoRow label="Compute Node" value={deployment.node?.label ?? 'Auto Assigned'} />
+            {deployment.cpuLimit || deployment.memoryLimit ? (
+              <InfoRow
+                label="Resource Allocation"
+                value={`${deployment.cpuLimit ? `${deployment.cpuLimit} vCPU` : ''}${deployment.cpuLimit && deployment.memoryLimit ? ' · ' : ''}${deployment.memoryLimit ? `${deployment.memoryLimit} MB RAM` : ''}`}
+                mono
+              />
+            ) : null}
+            {deployment.exposureMode ? (
+              <InfoRow label="Exposure Mode" value={deployment.exposureMode.toUpperCase()} />
+            ) : null}
             {deployment.port ? <InfoRow label="Assigned Port" value={`:${deployment.port}`} mono /> : null}
             {deployment.publicUrl && (
               <Pressable onPress={() => Linking.openURL(deployment.publicUrl!)}>

@@ -88,8 +88,11 @@ export function DeploymentsScreen() {
         (d) =>
           d.name.toLowerCase().includes(search.toLowerCase()) ||
           d.user?.email?.toLowerCase().includes(search.toLowerCase()) ||
+          d.user?.displayName?.toLowerCase().includes(search.toLowerCase()) ||
           d.publicUrl?.toLowerCase().includes(search.toLowerCase()) ||
-          d.customSubdomain?.toLowerCase().includes(search.toLowerCase())
+          d.customSubdomain?.toLowerCase().includes(search.toLowerCase()) ||
+          d.subdomain?.toLowerCase().includes(search.toLowerCase()) ||
+          d.image?.toLowerCase().includes(search.toLowerCase())
       )
     : deployments;
 

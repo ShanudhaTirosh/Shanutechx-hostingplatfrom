@@ -17,9 +17,9 @@ type DashboardNav = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 
-function formatLkr(n: number | undefined): string {
-  if (n === undefined || isNaN(n)) return 'Rs 0';
-  return `Rs ${n.toLocaleString('en-LK', { maximumFractionDigits: 0 })}`;
+function formatLkr(n: number | null | undefined): string {
+  if (n === undefined || n === null || isNaN(n)) return 'Rs 0';
+  return `Rs ${Number(n).toLocaleString('en-LK', { maximumFractionDigits: 0 })}`;
 }
 
 function getGreeting(): string {
