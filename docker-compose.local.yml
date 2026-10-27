@@ -113,7 +113,7 @@ services:
   # Storage expect to already exist, then exits. Runs every startup but is
   # idempotent (`mc mb --ignore-existing`), so it's harmless on restarts.
   minio-init:
-    image: minio/mc:latest
+    image: minio/minio:latest
     container_name: shanutechx-minio-init
     depends_on:
       minio:
