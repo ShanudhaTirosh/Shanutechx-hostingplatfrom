@@ -103,15 +103,15 @@ graph LR
     Apps --> API[api/<br/>Express REST API]
     Apps --> Dash[dashboard/<br/>Next.js Admin UI]
     Apps --> WebSite[web/<br/>Landing Site]
+    Apps --> Webmail[webmail/<br/>Business Email Client]
     
     Packages --> DBPkg[db/<br/>Prisma Schema]
-    Packages --> AuthJS[auth-js/<br/>Auth Client]
-    Packages --> SupaJS[supabase-js/<br/>Main SDK]
-    Packages --> PostgREST[postgrest-js/<br/>Query Builder]
-    Packages --> Realtime[realtime-js/<br/>WebSocket]
-    Packages --> Storage[storage-js/<br/>Object Storage]
-    Packages --> Functions[functions-js/<br/>Edge Functions]
-    Packages --> Tracing[tracing/<br/>OpenTelemetry]
+    Packages --> ClientPkg[client/<br/>Developer SDK]
+    Packages --> CatalogPkg[catalog/<br/>App Templates]
+    Packages --> DeployPkg[deployments/<br/>Deploy Engine]
+    Packages --> AgentPkg[node-agent/<br/>Node Agent RPC]
+    Packages --> AuthPkg[auth/<br/>Auth Middleware]
+    Packages --> TypesPkg[types/<br/>Platform Types]
     
     Services --> Agent[node-agent/<br/>VPS Agent]
     Services --> DiscordBot[discord-bot/<br/>Notifications]
@@ -328,40 +328,45 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph "SDK Entry Point"
-        SupabaseJS[📦 @shanutechx/supabase-js<br/>Main Client Library]
+    subgraph "Core Shared Packages"
+        DBPkg[🗃️ @shanutechx/db<br/>Prisma 5.22 Schema & Migrations]
+        TypesPkg[📐 @shanutechx/types<br/>Shared Platform Interfaces]
+        AuthPkg[🔐 @shanutechx/auth<br/>Token & Auth Middleware]
+        DeployPkg[🚀 @shanutechx/deployments<br/>Deploy Types & Build Helpers]
+        CatalogPkg[📦 @shanutechx/catalog<br/>Compose Templates Engine]
+        AgentPkg[🖥️ @shanutechx/node-agent<br/>Node Agent RPC Interfaces]
+        ClientPkg[💻 @shanutechx/client<br/>Developer REST API SDK]
     end
 
-    subgraph "Core Packages"
-        AuthJS[🔐 @shanutechx/auth-js<br/>JWT, OAuth, MFA, Web3]
-        PostgRESTJS[🗄️ @shanutechx/postgrest-js<br/>Type-safe Query Builder]
-        RealtimeJS[⚡ @shanutechx/realtime-js<br/>WebSocket Subscriptions]
-        StorageJS[📦 @shanutechx/storage-js<br/>Object Storage Client]
-        FunctionsJS[⚙️ @shanutechx/functions-js<br/>Edge Function Invocation]
+    subgraph "Applications & Services"
+        API[⚡ API Server]
+        Dashboard[🎨 Dashboard]
+        NodeAgent[🖥️ Node Agent]
+        WebSite[🌐 Web Storefront]
+        Webmail[✉️ Webmail]
     end
 
-    subgraph "Support Packages"
-        TracingPkg[📊 @shanutechx/tracing<br/>OpenTelemetry Helpers]
-        DBPkg[🗃️ @shanutechx/db<br/>Prisma Schema & Migrations]
-    end
+    API --> DBPkg
+    API --> TypesPkg
+    API --> AuthPkg
+    API --> DeployPkg
+    API --> CatalogPkg
+    API --> AgentPkg
 
-    SupabaseJS --> AuthJS
-    SupabaseJS --> PostgRESTJS
-    SupabaseJS --> RealtimeJS
-    SupabaseJS --> StorageJS
-    SupabaseJS --> FunctionsJS
-    
-    PostgRESTJS --> TracingPkg
-    RealtimeJS --> TracingPkg
-    
-    API[⚡ API Server] --> DBPkg
-    Dashboard[🎨 Dashboard] --> SupabaseJS
-    NodeAgent[🖥️ Node Agent] --> DBPkg
+    Dashboard --> TypesPkg
+    Dashboard --> ClientPkg
+    Dashboard --> CatalogPkg
 
-    style SupabaseJS fill:#3ecf8e,stroke:#333,stroke-width:3px
-    style AuthJS fill:#ff6b6b,stroke:#333,stroke-width:2px
-    style PostgRESTJS fill:#336791,stroke:#333,stroke-width:2px
-    style RealtimeJS fill:#ffa500,stroke:#333,stroke-width:2px
+    NodeAgent --> TypesPkg
+    NodeAgent --> AgentPkg
+
+    ClientPkg --> TypesPkg
+    DeployPkg --> TypesPkg
+
+    style DBPkg fill:#336791,stroke:#333,stroke-width:2px
+    style ClientPkg fill:#3ecf8e,stroke:#333,stroke-width:2px
+    style AuthPkg fill:#ff6b6b,stroke:#333,stroke-width:2px
+    style TypesPkg fill:#ffa500,stroke:#333,stroke-width:2px
 ```
 
 ---

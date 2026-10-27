@@ -168,7 +168,7 @@ references/
 
 ## 4. Monorepo Package Design & Inter-Service Data Flow
 
-The monorepo shares TypeScript definitions and SDK modules across 14 packages in `packages/`:
+The monorepo shares TypeScript definitions and SDK modules across 7 core packages in `packages/`:
 
 ```text
 packages/
@@ -178,10 +178,10 @@ packages/
 ├── deployments/     # Shared deployment type definitions & build engine helpers
 ├── node-agent/      # @shanutechx/node-agent RPC client interfaces
 ├── auth/            # Auth middleware SDK helpers
-├── types/           # Core shared platform TypeScript type definitions
-├── tracing/         # OpenTelemetry tracing wrappers
-└── supabase-js/     # Supabase Client SDK Suite (auth-js, functions-js, postgrest-js, realtime-js, storage-js)
+└── types/           # Core shared platform TypeScript type definitions
 ```
+
+> **Note on Supabase:** Applications and developers use the official `@supabase/supabase-js` npm package to connect to self-hosted Supabase instances rather than vendored forks.
 
 ### Inter-Service Communication Flow
 1. **User Action**: Client triggers an action in Next.js Dashboard ([`apps/dashboard`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard)).

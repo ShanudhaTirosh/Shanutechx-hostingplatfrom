@@ -34,7 +34,7 @@ Welcome to the ShanuTechX documentation hub. This directory contains comprehensi
 shanutechx/
 ├── apps/           # Core applications (api, dashboard, web, webmail, mobile-admin)
 ├── services/       # Autonomous daemons (node-agent, discord-bot, whatsapp-bot)
-├── packages/       # Shared SDKs & modules (db, client, catalog, deployments, auth, types, tracing, supabase-js suite)
+├── packages/       # Shared SDKs & modules (db, client, catalog, deployments, auth, types, node-agent)
 ├── infra/          # Traefik, PostgreSQL, Redis control-plane & node configs
 ├── templates/      # 15+ One-click catalog Compose application templates
 ├── tests/          # Node test runner unit tests & Playwright E2E suites

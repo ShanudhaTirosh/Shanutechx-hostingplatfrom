@@ -164,15 +164,15 @@ graphify-out/GRAPH_REPORT.md
 - **WhatsApp Bot** → `services/whatsapp-bot`
 - **Discord Bot** → `services/discord-bot`
 
-### SDK Layer (8 packages)
-- `@shanutechx/supabase-js` - Main SDK
-- `@shanutechx/auth-js` - Authentication
-- `@shanutechx/postgrest-js` - Query builder
-- `@shanutechx/realtime-js` - WebSocket
-- `@shanutechx/storage-js` - Object storage
-- `@shanutechx/functions-js` - Edge functions
-- `@shanutechx/tracing` - OpenTelemetry
-- `@shanutechx/db` - Prisma schema
+### Packages & SDK Layer (7 core packages)
+- `@shanutechx/client` - Developer REST API TypeScript SDK
+- `@shanutechx/db` - Prisma 5.22 schema & migrations
+- `@shanutechx/catalog` - App catalog manager
+- `@shanutechx/deployments` - Deployment types & helpers
+- `@shanutechx/node-agent` - Node agent RPC client interfaces
+- `@shanutechx/auth` - Auth middleware helpers
+- `@shanutechx/types` - Shared TypeScript definitions
+*(Supabase integration standardizes on official `@supabase/supabase-js`)*
 
 ---
 
@@ -210,7 +210,7 @@ graphify-out/GRAPH_REPORT.md
 
 ### Most Connected
 - API Server → 12 outbound connections
-- Supabase-JS SDK → 5 package dependencies
+- Node Agent Client → Inter-node communication across fleet
 - PostgreSQL → 4 services reading/writing
 
 ### Deployment Flow
@@ -262,7 +262,7 @@ This will update all graph files automatically.
 
 - **Main README:** `/README.md`
 - **API Documentation:** `apps/api/src/routes/*.ts`
-- **SDK Documentation:** `packages/supabase-js/README.md`
+- **SDK Documentation:** `packages/client/README.md`
 - **Template Catalog:** `templates/` (360+ apps)
 - **Deployment Guide:** `docs/deployment/`
 

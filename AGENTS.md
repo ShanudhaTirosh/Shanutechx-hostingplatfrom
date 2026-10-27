@@ -24,8 +24,7 @@ ShanuTechX is an autonomous enterprise cloud-hosting platform and container orch
   - [`node-agent`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/node-agent) — `@shanutechx/node-agent` RPC client interfaces.
   - [`auth`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/auth) — Authentication middleware and token validation helpers.
   - [`types`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/types) — Core shared platform TypeScript type definitions.
-  - [`tracing`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/tracing) — OpenTelemetry tracing & metrics instrumentation wrappers.
-  - **Supabase SDK Suite:** [`supabase-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/supabase-js), [`auth-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/auth-js), [`functions-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/functions-js), [`postgrest-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/postgrest-js), [`realtime-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/realtime-js), [`storage-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/storage-js).
+  - **Supabase Integration:** Uses official `@supabase/supabase-js` npm package against the self-hosted Supabase cluster.
 
 ---
 

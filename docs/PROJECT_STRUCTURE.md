@@ -22,7 +22,7 @@ shanutechx/
 ├── docker-compose.prod.yml      # Production infrastructure Compose stack with Traefik 3.x
 ├── apps/                        # Platform frontend & API applications
 ├── services/                    # Autonomous daemons & microservices
-├── packages/                    # Shared TypeScript SDKs & core modules (14 packages)
+├── packages/                    # Shared TypeScript SDKs & core modules (7 packages)
 ├── templates/                   # Docker Compose application catalog templates
 ├── infra/                       # Control-plane & node infrastructure configurations
 ├── tests/                       # Unit test runner suite & Playwright E2E scaffolding
@@ -51,7 +51,7 @@ shanutechx/
 
 ---
 
-### 3. [`packages/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages) — Shared Packages & Derived Supabase SDKs
+### 3. [`packages/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages) — Shared Platform SDKs & Packages (7 Packages)
 
 - **[`db`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/db)** — Prisma 5.22 schema, database migrations ledger, and seeders.
 - **[`client`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/client)** — `@shanutechx/client` Developer REST API TypeScript SDK.
@@ -60,8 +60,7 @@ shanutechx/
 - **[`node-agent`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/node-agent)** — `@shanutechx/node-agent` RPC client interfaces.
 - **[`auth`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/auth)** — Authentication middleware and token validation helpers.
 - **[`types`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/types)** — Core shared platform TypeScript type definitions.
-- **[`tracing`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/tracing)** — OpenTelemetry tracing wrappers.
-- **Supabase SDK Suite:** [`supabase-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/supabase-js), [`auth-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/auth-js), [`functions-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/functions-js), [`postgrest-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/postgrest-js), [`realtime-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/realtime-js), [`storage-js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/packages/storage-js).
+- **Supabase Integration**: Developers and applications consume the official `@supabase/supabase-js` npm package pointing to the self-hosted Supabase cluster (`https://supabase.<domain>`).
 
 ---
 

@@ -31,7 +31,7 @@
   - [`discord-bot/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/discord-bot) — Discord webhook, ticketing, and review alerts.
   - [`whatsapp-bot/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/whatsapp-bot) — Baileys automated customer notification gateway.
 - **Packages (`packages/`)**:
-  - `db`, `client`, `catalog`, `deployments`, `node-agent`, `auth`, `types`, `tracing`, `supabase-js`, `auth-js`, `functions-js`, `postgrest-js`, `realtime-js`, `storage-js`.
+  - `db`, `client`, `catalog`, `deployments`, `node-agent`, `auth`, `types`.
 
 ---
 

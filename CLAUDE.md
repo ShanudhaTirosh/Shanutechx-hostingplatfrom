@@ -61,9 +61,7 @@ shanutechx/
 │   ├── deployments/     # Shared deployment type definitions and build helpers
 │   ├── node-agent/      # Node agent client interfaces
 │   ├── auth/            # Auth middleware SDK helpers
-│   ├── types/           # Shared TypeScript types
-│   ├── tracing/         # OpenTelemetry tracing wrappers
-│   └── supabase-js/     # Derived Supabase Client SDK Suite (+ auth-js, functions-js, postgrest-js, realtime-js, storage-js)
+│   └── types/           # Core shared platform TypeScript type definitions
 ├── services/
 │   ├── node-agent/      # Plain JS (.js) VPS container control agent & telemetry daemon
 │   ├── discord-bot/     # Discord notification and ticket management bot
