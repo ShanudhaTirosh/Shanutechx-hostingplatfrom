@@ -16,6 +16,7 @@ volumes:
   shanutechx-prod-workspaces:
   shanutechx-prod-uploads:
   minio-prod-data:
+  status-prod-data:
 
 services:
   # ========================================
@@ -232,6 +233,39 @@ services:
       - "traefik.http.routers.web.entrypoints=websecure"
       - "traefik.http.routers.web.tls.certresolver=letsencrypt"
       - "traefik.http.services.web.loadbalancer.server.port=3000"
+    networks:
+      - shanutechx-prod
+
+  # ========================================
+  # Public Cloud Status & Uptime Telemetry
+  # ========================================
+  status:
+    build:
+      context: apps/status
+      dockerfile: Dockerfile
+    container_name: shanutechx-status-prod
+    restart: unless-stopped
+    cap_add:
+      - NET_RAW
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+      - DATABASE_URL=/app/data/status.db
+      - ADMIN_PASSWORD=${STATUS_ADMIN_PASSWORD:-changeme}
+      - SESSION_SECRET=${STATUS_SESSION_SECRET:-shanutechx-status-session-secret-change-in-prod}
+      - STX_API_URL=https://api.${ROOT_DOMAIN:-shanutechx.com}/health
+      - STX_WEB_URL=https://${ROOT_DOMAIN:-shanutechx.com}
+      - STX_DASHBOARD_URL=https://dashboard.${ROOT_DOMAIN:-shanutechx.com}
+    volumes:
+      - status-prod-data:/app/data
+    ports:
+      - "127.0.0.1:3003:3003"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.status.rule=Host(`status.${ROOT_DOMAIN:-shanutechx.com}`)"
+      - "traefik.http.routers.status.entrypoints=websecure"
+      - "traefik.http.routers.status.tls.certresolver=letsencrypt"
+      - "traefik.http.services.status.loadbalancer.server.port=3003"
     networks:
       - shanutechx-prod
 

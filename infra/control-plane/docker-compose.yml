@@ -21,6 +21,7 @@ volumes:
   supabase-db-data:
   supabase-kong-config:
   mongo-mail-data:
+  status-data:
 
 services:
   postgres:
@@ -258,6 +259,35 @@ services:
       - traefik.http.routers.webmail.entrypoints=websecure
       - traefik.http.routers.webmail.tls.certresolver=le
       - traefik.http.services.webmail.loadbalancer.server.port=3002
+
+  status:
+    build:
+      context: ../../apps/status
+      dockerfile: Dockerfile
+    container_name: shanutechx-status
+    restart: unless-stopped
+    cap_add:
+      - NET_RAW
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+      - DATABASE_URL=/app/data/status.db
+      - ADMIN_PASSWORD=${STATUS_ADMIN_PASSWORD:-changeme}
+      - SESSION_SECRET=${STATUS_SESSION_SECRET:-shanutechx-status-session-secret-change-in-prod}
+      - STX_API_URL=https://api.${ROOT_DOMAIN}/health
+      - STX_WEB_URL=https://${ROOT_DOMAIN}
+      - STX_DASHBOARD_URL=https://app.${ROOT_DOMAIN}
+      - STX_WEBMAIL_URL=https://webmail.${ROOT_DOMAIN}
+    volumes:
+      - status-data:/app/data
+    networks: [shanutechx-public]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=control-plane_shanutechx-public
+      - traefik.http.routers.status.rule=Host(`status.${ROOT_DOMAIN}`)
+      - traefik.http.routers.status.entrypoints=websecure
+      - traefik.http.routers.status.tls.certresolver=le
+      - traefik.http.services.status.loadbalancer.server.port=3003
 
   whatsapp-bot:
     build:

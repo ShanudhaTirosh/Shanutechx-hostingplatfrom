@@ -1,0 +1,17 @@
+services:
+  status-page:
+    build: .
+    container_name: status-page
+    ports:
+      - "34500:3000"
+    volumes:
+      - /opt/uptime/data:/app/data
+    environment:
+      - TZ=Asia/Colombo
+      # Admin panel — change these before deploying.
+      - ADMIN_PASSWORD=changeme
+      - SESSION_SECRET=please-change-this-to-a-long-random-string
+    # Required for ICMP "ping" monitors. Safe to remove if you only use HTTP/TCP monitors.
+    cap_add:
+      - NET_RAW
+    restart: unless-stopped

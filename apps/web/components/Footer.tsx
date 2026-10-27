@@ -262,12 +262,15 @@ export default function Footer() {
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/status"
-                    className="hover:text-white transition-colors"
+                  <a
+                    href={process.env.NEXT_PUBLIC_STATUS_URL || "https://status.shanutechx.com"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-white transition-colors flex items-center gap-1.5 text-emerald-400 font-medium"
                   >
-                    Status Page
-                  </Link>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Status &amp; Uptime <span className="text-[10px]">↗</span>
+                  </a>
                 </li>
               </ul>
             </div>
@@ -399,6 +402,15 @@ export default function Footer() {
               className="hover:text-white transition-colors"
             >
               GitHub
+            </a>
+            <a
+              href={process.env.NEXT_PUBLIC_STATUS_URL || "https://status.shanutechx.com"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-emerald-400 transition-colors flex items-center gap-1.5 text-slate-300"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              All Systems Operational
             </a>
             <a
               href={`${dashboardUrl}/login`}

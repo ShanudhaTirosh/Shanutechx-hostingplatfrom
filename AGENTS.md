@@ -11,6 +11,7 @@ ShanuTechX is an autonomous enterprise cloud-hosting platform and container orch
   - [`dashboard/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard) — Next.js 14 App Router customer & admin control panel dashboard.
   - [`web/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web) — Next.js 14 App Router public storefront, SEO documentation portal, and AI discovery hub.
   - [`webmail/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/webmail) — Next.js 14 App Router enterprise business email & mailbox web client.
+  - [`status/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/status) — Next.js 15 App Router public cloud status page & uptime telemetry monitor with live `/admin` studio (port 3003, `status.<domain>`).
   - [`mobile-admin/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/mobile-admin) — Standalone Expo / React Native Android & iOS admin app (excluded from root npm workspaces via `!apps/mobile-admin`).
 - **`services/`**
   - [`node-agent/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent) — Plain JavaScript (`.js`) Docker management & telemetry agent running per VPS host node. Core modules: [`filesystem.js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent/src/filesystem.js), [`nodeEngine.js`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/services/node-agent/src/nodeEngine.js).

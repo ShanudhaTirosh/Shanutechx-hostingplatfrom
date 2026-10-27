@@ -53,6 +53,7 @@ shanutechx/
 │   ├── dashboard/       # Control Panel Studio (Next.js 14 App Router)
 │   ├── web/             # Public Dark-Theme Marketing & Landing Site (Next.js 14 App Router)
 │   ├── webmail/         # Enterprise Business Email Client (Next.js 14 App Router)
+│   ├── status/          # Public Cloud Status & Uptime Telemetry Platform (Next.js 15, port 3003)
 │   └── mobile-admin/    # Standalone Mobile Admin App (Expo / React Native)
 ├── packages/
 │   ├── db/              # Prisma 5.22 Schema & Database Migrations Ledger

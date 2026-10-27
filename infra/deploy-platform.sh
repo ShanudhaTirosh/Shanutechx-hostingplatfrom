@@ -66,6 +66,8 @@ NODE_AGENT_SECRET=${NODE_AGENT_SECRET}
 WILDDUCK_FROM_ADDRESS=no-reply@${ROOT_DOMAIN}
 NEXT_PUBLIC_API_BASE_URL=https://api.${ROOT_DOMAIN}
 MAIN_NODE_IP=${MAIN_NODE_IP}
+STATUS_ADMIN_PASSWORD=${STATUS_ADMIN_PASSWORD:-$(openssl rand -hex 12 2>/dev/null || echo "ShanuTechXStatusAdmin2026!")}
+STATUS_SESSION_SECRET=$(openssl rand -hex 32 2>/dev/null || echo "shanutechx_status_session_secret_token_2026")
 EOF
 
 chmod 0600 "${CONTROL_PLANE_DIR}/.env"
@@ -82,7 +84,10 @@ docker compose exec -T api npx prisma migrate deploy || echo "⚠️ Migration d
 
 echo "============================================================"
 echo "🎉 ShanuTechX Control Plane & Stack deployed successfully!"
-echo "   API Base URL: https://api.${ROOT_DOMAIN}"
+echo "   Storefront:  https://${ROOT_DOMAIN}"
+echo "   API Base:    https://api.${ROOT_DOMAIN}"
 echo "   Dashboard:   https://app.${ROOT_DOMAIN}"
+echo "   Status Page: https://status.${ROOT_DOMAIN} (Admin: /admin)"
+echo "   Webmail:     https://webmail.${ROOT_DOMAIN}"
 echo "   Studio:      https://studio.${ROOT_DOMAIN}"
 echo "============================================================"

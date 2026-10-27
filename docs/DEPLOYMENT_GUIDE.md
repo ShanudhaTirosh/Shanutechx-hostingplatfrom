@@ -11,7 +11,7 @@ Defect Audit Report: see [`BUG_AUDIT.md`](file:///c:/Users/tiros/OneDrive/Deskto
 |---|---|---|
 | `docker compose -f docker/docker-compose.shanutechx.yml up -d` (repo root) | **Unified Local Dev**: Control plane + self-hosted Supabase + Infisical secrets manager. No TLS, HTTP on localhost. | Control Plane, Supabase Stack, Infisical |
 | `docker compose -f docker-compose.local.yml up -d` (repo root) | **Standalone Dev Stack**: Control plane + MinIO + Node Agent. | API, Dashboard, Web, Node Agent, MinIO |
-| `docker compose -f infra/control-plane/docker-compose.yml up -d` (`infra/control-plane/`) | **Production Deployment**: Real production stack with Traefik 3.x, Let's Encrypt TLS, and network isolation. | Traefik SSL, Core API, Worker, Dashboard, Web, Webmail, Bots |
+| `docker compose -f infra/control-plane/docker-compose.yml up -d` (`infra/control-plane/`) | **Production Deployment**: Real production stack with Traefik 3.x, Let's Encrypt TLS, and network isolation. | Traefik SSL, Core API, Worker, Dashboard, Web, Webmail, Status, Bots |
 
 ---
 
@@ -137,3 +137,22 @@ BACKUP_MAX_SIZE_MB=1500
 ```
 - **Permission**: Ensure the token has `repo` (Full control of private repositories) or fine-grained repository administration rights.
 - **Verification**: When `BACKUP_GITHUB_TOKEN` is supplied, every ZIP deployment and Web IDE change will automatically commit and push to your private GitHub backup repo.
+
+---
+
+## 📊 Public Status Page & Live Telemetry Architecture ([`apps/status/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/status))
+
+The platform includes a dedicated, autonomous Next.js 15 status page and live infrastructure monitor ([`apps/status`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/status)) running under Traefik at `https://status.<rootDomain>`.
+
+### Key Features:
+- **Zero-Code Runtime Admin Panel**: Visit `/admin` to add, edit, disable, or delete HTTP/HTTPS, TCP port, or ICMP ping monitors without redeploying.
+- **SQLite History**: High-performance local SQLite database (`status.db`) mounted to Docker volume `status-data` (`/app/data`).
+- **Telemetry Capabilities**: Real-time ICMP ping latencies, HTTP response time timelines, and incident degradation tracking.
+- **Multi-Channel Alert Dispatch**: Built-in notifications for Telegram, Discord, MS Teams, Google Chat, and SMTP email.
+- **Footer & Navigation Integration**: Automatically integrated with pulsing green health badges across [`apps/web`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web) footer and [`apps/dashboard`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard) status studio.
+
+### Configuration (`infra/control-plane/.env`):
+```env
+STATUS_ADMIN_PASSWORD=your-secure-admin-password
+STATUS_SESSION_SECRET=a-long-random-stable-session-string
+```

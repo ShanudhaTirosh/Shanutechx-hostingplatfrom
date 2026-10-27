@@ -39,6 +39,7 @@ shanutechx/
 - **[`apps/dashboard/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/dashboard)** — Next.js 14 App Router customer & admin control panel dashboard studio. Protected with `noindex` robots directive.
 - **[`apps/web/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/web)** — Next.js 14 App Router dark-theme public marketing storefront, documentation portal, and AI discovery hub.
 - **[`apps/webmail/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/webmail)** — Next.js 14 App Router enterprise business email client with IMAP/SMTP synchronization, dark mode, and mailbox management. Protected with `noindex` robots directive.
+- **[`apps/status/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/status)** — Next.js 15 App Router public cloud status page & live infrastructure uptime telemetry platform (port 3003, `https://status.<domain>`) with SQLite persistence and runtime `/admin` management studio.
 - **[`apps/mobile-admin/`](file:///c:/Users/tiros/OneDrive/Desktop/shanutechx/apps/mobile-admin)** — Standalone Expo / React Native Android & iOS admin mobile app.
 
 ---

@@ -148,5 +148,8 @@ jobs:
       - name: Validate Webmail Dockerfile
         run: docker buildx build --check -f apps/webmail/Dockerfile .
 
+      - name: Validate Status Dockerfile
+        run: docker buildx build --check -f apps/status/Dockerfile apps/status
+
       - name: Validate Node Agent Dockerfile
         run: docker buildx build --check -f services/node-agent/Dockerfile .

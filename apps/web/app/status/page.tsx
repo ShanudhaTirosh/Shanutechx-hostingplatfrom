@@ -255,6 +255,26 @@ export default function StatusPage() {
 
       {/* Main Container */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-8 flex-1 w-full">
+        {/* Dedicated Status Page Alert Banner */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-950/60 via-indigo-950/40 to-[#0b0c1b] border border-purple-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+            <div>
+              <p className="text-xs font-bold text-white">Dedicated ShanuTechX Real-Time Status &amp; Uptime Monitor</p>
+              <p className="text-[11px] text-slate-400">View real-time ping latency, ICMP telemetry, and live component graphs on our standalone status platform.</p>
+            </div>
+          </div>
+          <a
+            href={process.env.NEXT_PUBLIC_STATUS_URL || "https://status.shanutechx.com"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-purple-600/30 shrink-0 transition-transform hover:scale-105"
+          >
+            <span>Launch Live Status Portal</span>
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        </div>
+
         {/* Main Status Hero Banner */}
         <div
           className={`border rounded-3xl p-8 md:p-10 text-center space-y-3 shadow-2xl relative overflow-hidden transition-all ${
