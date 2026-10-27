@@ -1111,6 +1111,7 @@ enum NotificationEvent {
   deployment_recovered
   vps_assigned
   new_ai_subscription_request
+  cluster_offline
 }
 
 // Infra-level Discord channel webhooks, configured from the Dev Dashboard —

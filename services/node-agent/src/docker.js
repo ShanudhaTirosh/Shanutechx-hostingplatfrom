@@ -1,7 +1,7 @@
 const Docker = require('dockerode');
 const { resolveExposure } = require('./exposure');
 
-const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+const docker = new Docker(process.env.DOCKER_SOCKET ? { socketPath: process.env.DOCKER_SOCKET } : undefined);
 
 const PUBLIC_NETWORK = process.env.AGENT_PUBLIC_NETWORK || 'shanutechx-public';
 

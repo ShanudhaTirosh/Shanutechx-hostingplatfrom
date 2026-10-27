@@ -27,9 +27,9 @@ function parseRedisConnection(url: string) {
         }
         return Math.min(times * 500, 2000);
       },
-      enableOfflineQueue: false,
+      enableOfflineQueue: true,
       enableReadyCheck: false,
-      connectTimeout: 3000,
+      connectTimeout: 5000,
       maxRetriesPerRequest: null,
     };
   } catch {

@@ -1,5 +1,5 @@
 const Docker = require('dockerode');
-const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+const docker = new Docker(process.env.DOCKER_SOCKET ? { socketPath: process.env.DOCKER_SOCKET } : undefined);
 
 const IMAGES = {
   postgres: 'postgres:16-alpine',

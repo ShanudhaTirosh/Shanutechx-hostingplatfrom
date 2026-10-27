@@ -2,7 +2,7 @@ const fs = require('fs/promises');
 const yaml = require('js-yaml');
 const Docker = require('dockerode');
 
-const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+const docker = new Docker(process.env.DOCKER_SOCKET ? { socketPath: process.env.DOCKER_SOCKET } : undefined);
 
 const CONFIG_FILE = process.env.LIVEKIT_CONFIG_FILE || '/etc/livekit/livekit.yaml';
 const LIVEKIT_CONTAINER_NAME = process.env.LIVEKIT_CONTAINER_NAME || 'livekit-server';
