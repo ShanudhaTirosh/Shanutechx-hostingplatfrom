@@ -30,21 +30,21 @@ export async function checkMetricAlerts(thresholds: MetricAlertThresholds = DEFA
 
       if ((node.cpuUsedPct ?? 0) >= thresholds.cpuPctLimit) {
         alertsTriggered++;
-        const msg = `⚠️ Node Alert: Host "${node.label}" (${node.ip}) CPU utilization reached ${node.cpuUsedPct}% (Threshold: ${thresholds.cpuPctLimit}%).`;
+        const msg = `[WARNING] Node Alert: Host "${node.label}" (${node.ip}) CPU utilization reached ${node.cpuUsedPct}% (Threshold: ${thresholds.cpuPctLimit}%).`;
         logger.warn({ nodeId: node.id, cpu: node.cpuUsedPct }, msg);
         void notifyAdmins(msg);
       }
 
       if (ramUsedPct >= thresholds.ramPctLimit) {
         alertsTriggered++;
-        const msg = `⚠️ Node Alert: Host "${node.label}" (${node.ip}) RAM utilization reached ${ramUsedPct}% (Threshold: ${thresholds.ramPctLimit}%).`;
+        const msg = `[WARNING] Node Alert: Host "${node.label}" (${node.ip}) RAM utilization reached ${ramUsedPct}% (Threshold: ${thresholds.ramPctLimit}%).`;
         logger.warn({ nodeId: node.id, ramUsedPct }, msg);
         void notifyAdmins(msg);
       }
 
       if (diskUsedPct >= thresholds.diskPctLimit) {
         alertsTriggered++;
-        const msg = `⚠️ Node Alert: Host "${node.label}" (${node.ip}) Disk utilization reached ${diskUsedPct}% (Threshold: ${thresholds.diskPctLimit}%).`;
+        const msg = `[WARNING] Node Alert: Host "${node.label}" (${node.ip}) Disk utilization reached ${diskUsedPct}% (Threshold: ${thresholds.diskPctLimit}%).`;
         logger.warn({ nodeId: node.id, diskUsedPct }, msg);
         void notifyAdmins(msg);
       }
@@ -59,7 +59,7 @@ export async function checkMetricAlerts(thresholds: MetricAlertThresholds = DEFA
     for (const dep of failedDeployments) {
       if (dep.user) {
         alertsTriggered++;
-        const msg = `🔴 Deployment Alert: Service "${dep.subdomain || dep.id}" entered failed state. Check dashboard logs.`;
+        const msg = `[ALERT] Deployment Alert: Service "${dep.subdomain || dep.id}" entered failed state. Check dashboard logs.`;
         void notifyCustomer(dep.user, msg);
       }
     }

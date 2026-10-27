@@ -169,7 +169,7 @@ export function renderPaymentReviewEmail({
     subject,
     `
     ${statusBadge}
-    <h1>${approved ? 'Payment Verification Successful 🎉' : 'Payment Proof Action Needed'}</h1>
+    <h1>${approved ? 'Payment Verification Successful' : 'Payment Proof Action Needed'}</h1>
     ${bodyHtml}
     <a href="https://${env.rootDomain}/orders" class="btn">View Order Status →</a>
   `
@@ -287,7 +287,7 @@ export function renderWelcomeEmail({
   customerName: string;
 }): { subject: string; html: string; text: string } {
   const safeName = escapeHtml(customerName);
-  const subject = `Welcome to ShanuTechX Cloud Hosting! 🎉`;
+  const subject = `Welcome to ShanuTechX Cloud Hosting!`;
 
   const html = baseEmailLayout(
     subject,
@@ -297,7 +297,7 @@ export function renderWelcomeEmail({
     <p>We are excited to have you on board. ShanuTechX gives you full power over high-performance cloud deployments, managed databases, VPS servers, and custom bot hosting.</p>
     
     <div class="quote-box">
-      <strong>🚀 What you can do right now:</strong><br/>
+      <strong>What you can do right now:</strong><br/>
       • Connect your GitHub or GitLab account &amp; deploy in seconds.<br/>
       • Host WhatsApp Baileys MD bots &amp; Discord bots with persistent state.<br/>
       • Run Lavalink audio nodes with direct TCP port mapping.<br/>
@@ -376,7 +376,7 @@ export function renderDeploymentStatusEmail({
     subject,
     `
     ${statusBadge}
-    <h1>${isSuccess ? `${safeName} is Live! 🚀` : `Issue detected with ${safeName}`}</h1>
+    <h1>${isSuccess ? `${safeName} is Live!` : `Issue detected with ${safeName}`}</h1>
     <p>${isSuccess ? `Your application container has been successfully deployed and is running.` : `Your deployment status changed to <strong>${status}</strong>.`}</p>
     
     ${safeMsg ? `<div class="quote-box"><strong>Log / Error Output:</strong><br/>${safeMsg}</div>` : ''}

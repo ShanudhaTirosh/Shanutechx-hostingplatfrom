@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { PageHeader, Card, Spinner, ErrorBanner, Button, useToast } from '@/components/ui';
+import { IconExternalLink } from '@/components/Icons';
 import { api } from '@/lib/api';
 
 interface Mailbox {
@@ -318,8 +319,10 @@ export default function AdminEmailPage() {
                         size="sm"
                         variant="secondary"
                         onClick={() => handleLaunchSso(mb.id)}
+                        className="inline-flex items-center gap-1.5"
                       >
-                        Launch Webmail ↗
+                        <span>Launch Webmail</span>
+                        <IconExternalLink size={12} />
                       </Button>
                       <Button
                         size="sm"

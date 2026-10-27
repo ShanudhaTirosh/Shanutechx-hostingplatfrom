@@ -40,7 +40,7 @@ const EVENT_TITLE: Record<NotificationEvent, string> = {
   deployment_failed: 'Deployment Failed',
   deployment_recovered: 'Deployment Recovered',
   vps_assigned: 'VPS Instance Assigned',
-  cluster_offline: '🚨 CLUSTER OFFLINE ALERT',
+  cluster_offline: '[ALERT] CLUSTER OFFLINE',
 };
 
 function buildEmbed(event: NotificationEvent, payload: Record<string, unknown>) {
@@ -128,7 +128,7 @@ export async function sendTestDiscordWebhook(webhookUrl: string): Promise<{ ok: 
       body: JSON.stringify({
         embeds: [
           {
-            title: '🔔 Test Notification from ShanuTechX Platform',
+            title: 'Test Notification from ShanuTechX Platform',
             description: 'The unified Discord Webhook integration is working correctly!',
             color: 0x3498db,
             timestamp: new Date().toISOString(),

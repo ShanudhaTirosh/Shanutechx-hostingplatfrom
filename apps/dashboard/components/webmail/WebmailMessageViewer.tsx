@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { sanitizeHtml } from '@/lib/sanitize';
-import { IconTrash } from '@/components/Icons';
+import { IconTrash, IconReply } from '@/components/Icons';
 
 interface WebmailMessageViewerProps {
   message: any;
@@ -33,9 +33,9 @@ export function WebmailMessageViewer({
         <div className="flex items-center gap-2">
           <button
             onClick={() => onReply(message.senderEmail, `Re: ${message.subject}`)}
-            className="px-3 py-1.5 rounded-xl bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet-light border border-accent-violet/30 text-xs font-semibold transition-all"
+            className="px-3 py-1.5 rounded-xl bg-accent-violet/20 hover:bg-accent-violet/30 text-accent-violet-light border border-accent-violet/30 text-xs font-semibold transition-all flex items-center gap-1.5"
           >
-            ↩ Reply
+            <IconReply size={13} /> Reply
           </button>
           <button
             onClick={() => onDelete(message.id)}

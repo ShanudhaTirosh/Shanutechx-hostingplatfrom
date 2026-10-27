@@ -248,7 +248,7 @@ function SupabaseStudioLayoutInner({ children }: { children: React.ReactNode }) 
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] text-text-muted hover:text-text-primary hover:bg-white/[0.04]"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              <span>Supabase Docs ↗</span>
+              <span>Supabase Docs</span>
             </a>
           </div>
         </aside>

@@ -63,11 +63,11 @@ export async function checkNodeHealthAndFailover(): Promise<{ audited: number; f
         'SINGLE-NODE CLUSTER OFFLINE: The only compute node is unreachable. No failover target exists. Manual intervention required.'
       );
       void notifyDiscordChannel('cluster_offline', {
-        '🚨 Alert Type': 'SINGLE-NODE CLUSTER OFFLINE',
+        'Alert Type': 'SINGLE-NODE CLUSTER OFFLINE',
         'Node Label': offlineNode.label,
         'Node IP': offlineNode.ip,
         'Last Heartbeat': offlineNode.lastSeenAt ? offlineNode.lastSeenAt.toISOString() : 'Never',
-        'Action': '⛔ No failover possible — there are no other healthy nodes. Immediate ops intervention required.',
+        'Action': 'No failover possible — there are no other healthy nodes. Immediate ops intervention required.',
         'Impact': 'All platform services on this node are OFFLINE.',
       });
     } else {

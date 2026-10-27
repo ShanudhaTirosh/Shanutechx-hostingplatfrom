@@ -32,8 +32,8 @@ const STATS = [
 
 const TERMINAL_LINES = [
   { text: 'stx deploy --git github.com/shanudha/express-api --branch main', prompt: true },
-  { text: '➜ Building container image node:20-alpine...' },
-  { text: '➜ Provisioning PostgreSQL database cluster & vault secrets...' },
+  { text: '> Building container image node:20-alpine...' },
+  { text: '> Provisioning PostgreSQL database cluster & vault secrets...' },
   { text: 'Deployment complete (18.4s)', success: true },
   { text: 'https://express-api-production.shanutech.cloud', link: true },
 ];

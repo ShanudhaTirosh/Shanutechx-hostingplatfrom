@@ -755,7 +755,7 @@ internalBotRouter.post('/internal/invoices/generate-and-send', async (req: Reque
     update: {},
   });
 
-  const messageText = `📄 *Invoice ${invoiceNumber}*\n\nOrder Total: ${order.currency} ${(order.total / 100).toFixed(2)}\nStatus: ${order.status.toUpperCase()}\nDate: ${new Date(
+  const messageText = `*Invoice ${invoiceNumber}*\n\nOrder Total: ${order.currency} ${(order.total / 100).toFixed(2)}\nStatus: ${order.status.toUpperCase()}\nDate: ${new Date(
     order.createdAt
   ).toLocaleDateString()}`;
 

@@ -3,20 +3,21 @@
 import React from 'react';
 import Reveal from './motion/Reveal';
 import GlobeCanvas from './GlobeCanvas';
+import { MapPin } from 'lucide-react';
 
 const LOCATIONS = {
   Europe: [
-    { name: 'Amsterdam', detail: 'EU West (10 Gbps Uplink)', flag: '🇩🇪' },
+    { name: 'Amsterdam', detail: 'EU West (10 Gbps Uplink)' },
   ],
   Americas: [
-    { name: 'Chicago, IL', detail: 'US Central (Low Latency)', flag: '🇺🇸' },
-    { name: 'Dallas, TX', detail: 'US South (DDoS Shielded)', flag: '🇺🇸' },
-    { name: 'Seattle, WA', detail: 'US West (Asia-Pac Route)', flag: '🇺🇸' },
+    { name: 'Chicago, IL', detail: 'US Central (Low Latency)' },
+    { name: 'Dallas, TX', detail: 'US South (DDoS Shielded)' },
+    { name: 'Seattle, WA', detail: 'US West (Asia-Pac Route)' },
   ],
   AsiaPacific: [
-    { name: 'Tokyo', detail: 'Asia East (Ultra-Low Ping)', flag: '🇯🇵' },
-    { name: 'Singapore', detail: 'Asia South (Tier 4 DC)', flag: '🇸🇬' },
-    { name: 'Colombo', detail: 'LK Central (Local POP)', flag: '🇱🇰' },
+    { name: 'Tokyo', detail: 'Asia East (Ultra-Low Ping)' },
+    { name: 'Singapore', detail: 'Asia South (Tier 4 DC)' },
+    { name: 'Colombo', detail: 'LK Central (Local POP)' },
   ],
 };
 
@@ -52,7 +53,7 @@ export default function GlobeVisual() {
                   <div className="space-y-3">
                     {locs.map((loc) => (
                       <div key={loc.name} className="flex items-start gap-2.5">
-                        <span className="text-base">{loc.flag}</span>
+                        <MapPin className="w-3.5 h-3.5 text-indigo-400 mt-0.5 shrink-0" />
                         <div>
                           <p className="text-xs font-bold text-white">{loc.name}</p>
                           <p className="text-[10px] text-text-muted">{loc.detail}</p>

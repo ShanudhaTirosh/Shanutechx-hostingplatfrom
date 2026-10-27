@@ -97,7 +97,7 @@ export async function sendSmtpReleaseEmail(details: SmtpReleaseDetails): Promise
       </div>
 
       <div style="background-color: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; border-left: 4px solid #10b981;">
-        <h2 style="color: #10b981; font-size: 16px; margin: 0 0 8px 0;">✓ Payment Approved &amp; Order Confirmed</h2>
+        <h2 style="color: #10b981; font-size: 16px; margin: 0 0 8px 0;">Payment Approved &amp; Order Confirmed</h2>
         <p style="font-size: 13px; margin: 4px 0; color: #cbd5e1;">Payment Status: <strong>APPROVED</strong></p>
         ${details.paymentId ? `<p style="font-size: 13px; margin: 4px 0; color: #cbd5e1;">Payment ID: <code style="color: #38bdf8;">${details.paymentId}</code></p>` : ''}
         ${details.orderId ? `<p style="font-size: 13px; margin: 4px 0; color: #cbd5e1;">Order Ref: <code style="color: #38bdf8;">${details.orderId}</code></p>` : ''}
@@ -105,7 +105,7 @@ export async function sendSmtpReleaseEmail(details: SmtpReleaseDetails): Promise
       </div>
 
       <div style="background-color: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
-        <h3 style="color: #f8fafc; font-size: 15px; margin: 0 0 12px 0;">🔑 Your SMTP Account Credentials</h3>
+        <h3 style="color: #f8fafc; font-size: 15px; margin: 0 0 12px 0;">Your SMTP Account Credentials</h3>
         <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #cbd5e1;">
           <tr><td style="padding: 6px 0; color: #94a3b8;">Plan Tier:</td><td style="font-weight: bold; color: #a78bfa;">${details.planName} (${details.tier.storageLimitGb}GB Storage)</td></tr>
           <tr><td style="padding: 6px 0; color: #94a3b8;">Configured Domain:</td><td style="font-mono: true; font-weight: bold; color: #38bdf8;">${details.domain}</td></tr>
@@ -117,7 +117,7 @@ export async function sendSmtpReleaseEmail(details: SmtpReleaseDetails): Promise
       </div>
 
       <div style="background-color: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
-        <h3 style="color: #f8fafc; font-size: 15px; margin: 0 0 12px 0;">📧 Configured Email Aliases (${details.aliases.length} / ${details.tier.maxAliases})</h3>
+        <h3 style="color: #f8fafc; font-size: 15px; margin: 0 0 12px 0;">Configured Email Aliases (${details.aliases.length} / ${details.tier.maxAliases})</h3>
         <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #38bdf8;">
           ${details.aliases.map((a) => `<li style="margin-bottom: 4px;"><code>${a}</code></li>`).join('')}
         </ul>

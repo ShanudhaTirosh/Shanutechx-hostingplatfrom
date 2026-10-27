@@ -156,7 +156,8 @@ export default function OrbitHero() {
               boxShadow: '0 0 20px rgba(124, 58, 237, 0.2)',
             }}
           >
-            <span>🇱🇰</span> Sri Lanka's #1 Hosting &amp; Cloud Platform
+            <Globe size={14} style={{ display: 'inline-block', marginRight: '6px', color: '#a78bfa', verticalAlign: 'middle' }} />
+            Sri Lanka's #1 Hosting &amp; Cloud Platform
           </div>
 
           {/* Main Title */}
@@ -295,8 +296,9 @@ export default function OrbitHero() {
             <div>
               <span style={{ fontSize: '13px', fontWeight: 900, color: '#fff' }}>4.5 / 5 </span>
               <span style={{ fontSize: '11px', color: '#64748b' }}>Based on 15 reviews </span>
-              <span style={{ fontSize: '13px', fontWeight: 900, color: '#00b67a', marginLeft: '6px' }}>
-                ★ Trustpilot
+              <span style={{ fontSize: '13px', fontWeight: 900, color: '#00b67a', marginLeft: '6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                <Star size={12} fill="#00b67a" color="#00b67a" />
+                Trustpilot
               </span>
             </div>
           </div>

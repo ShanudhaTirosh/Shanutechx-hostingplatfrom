@@ -407,7 +407,7 @@ vpsRouter.post('/vps-provisions/:id/renew', async (req: AuthedRequest, res: Resp
         provision.user,
         `Your VPS (${provision.ip || provision.id}) has been renewed for ${months} month(s) by staff.`,
         undefined,
-        '🚀 VPS Subscription Renewed!'
+        'VPS Subscription Renewed!'
       ).catch(() => {});
     }
 

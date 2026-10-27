@@ -8,7 +8,7 @@ async function main() {
   const email = process.env.DEV_EMAIL;
 
   if (!firebaseUid && !email) {
-    console.error('❌  Must supply DEV_FIREBASE_UID and/or DEV_EMAIL as environment variables.');
+    console.error('[ERROR] Must supply DEV_FIREBASE_UID and/or DEV_EMAIL as environment variables.');
     process.exit(1);
   }
 
@@ -25,8 +25,8 @@ async function main() {
     },
   });
 
-  console.log('✅ Updated user accounts:', updated);
-  console.log('👤 Active User Details:', users);
+  console.log('[OK] Updated user accounts:', updated);
+  console.log('[INFO] Active User Details:', users);
 }
 
 main()

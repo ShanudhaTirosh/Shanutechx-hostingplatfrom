@@ -20,6 +20,7 @@ import {
   Gamepad2,
   HelpCircle,
   ArrowUp,
+  ExternalLink,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -174,7 +175,8 @@ export default function Footer() {
                     rel="noopener noreferrer"
                     className="hover:text-white transition-colors flex items-center gap-1"
                   >
-                    V2Ray Proxies <span className="text-[10px]">↗</span>
+                    <span>V2Ray Proxies</span>
+                    <ExternalLink className="w-3 h-3 opacity-60" />
                   </a>
                 </li>
                 <li>
@@ -184,7 +186,8 @@ export default function Footer() {
                     rel="noopener noreferrer"
                     className="hover:text-white transition-colors text-purple-300 font-extrabold flex items-center gap-1"
                   >
-                    STX Digital Goods <span className="text-[10px]">↗</span>
+                    <span>STX Digital Goods</span>
+                    <ExternalLink className="w-3 h-3 text-purple-300" />
                   </a>
                 </li>
               </ul>
@@ -269,7 +272,8 @@ export default function Footer() {
                     className="hover:text-white transition-colors flex items-center gap-1.5 text-emerald-400 font-medium"
                   >
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Status &amp; Uptime <span className="text-[10px]">↗</span>
+                    <span>Status &amp; Uptime</span>
+                    <ExternalLink className="w-3 h-3 text-emerald-400" />
                   </a>
                 </li>
               </ul>

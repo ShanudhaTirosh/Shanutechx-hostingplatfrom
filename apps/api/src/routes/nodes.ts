@@ -50,26 +50,26 @@ LABEL="\${3:-node-$(date +%s)}"
 ROLE_TAGS="\${4:-web-hosting,node-hosting,python-hosting}"
 
 echo "============================================================"
-echo "🚀 Starting ShanuTechX Compute Node Onboarding..."
+echo "[INFO] Starting ShanuTechX Compute Node Onboarding..."
 echo "============================================================"
 
 if [ "\$EUID" -ne 0 ]; then
-  echo "❌ Error: Please run this script as root (e.g., sudo bash)"
+  echo "[ERROR] Please run this script as root (e.g., sudo bash)"
   exit 1
 fi
 
 # 1. Install Docker & Curl if missing
 if ! command -v curl &> /dev/null; then
-  echo "📦 Installing curl..."
+  echo "[INFO] Installing curl..."
   apt-get update && apt-get install -y curl || yum install -y curl || apk add curl
 fi
 
 if ! command -v docker &> /dev/null; then
-  echo "🐳 Docker not found. Installing Docker Engine..."
+  echo "[INFO] Docker not found. Installing Docker Engine..."
   curl -fsSL https://get.docker.com | sh
   systemctl enable --now docker || service docker start
 else
-  echo "✅ Docker Engine is already installed."
+  echo "[OK] Docker Engine is already installed."
 fi
 
 # Ensure git and buildkit directory exist
@@ -81,7 +81,7 @@ RAM_MB=\$(free -m 2>/dev/null | awk '/^Mem:/{print \$2}' || echo 2048)
 DISK_GB=\$(df -BG / 2>/dev/null | awk 'NR==2 {print \$2}' | tr -d 'G' || echo 40)
 HOST_IP=\$(curl -s https://api.ipify.org 2>/dev/null || hostname -I 2>/dev/null | awk '{print \$1}' || echo "127.0.0.1")
 
-echo "📊 Detected Hardware Configuration:"
+echo "[INFO] Detected Hardware Configuration:"
 echo "   - Host IP:    \$HOST_IP"
 echo "   - CPU Cores:  \$CPU_CORES"
 echo "   - RAM Memory: \${RAM_MB} MB"
@@ -89,7 +89,7 @@ echo "   - Disk Space: \${DISK_GB} GB"
 echo "   - Role Tags:  \$ROLE_TAGS"
 
 # 3. Self-Register with Control Plane API
-echo "🔗 Registering Compute Node with Control Plane (\$API_URL)..."
+echo "[INFO] Registering Compute Node with Control Plane (\$API_URL)..."
 TAG_JSON=\$(echo "\$ROLE_TAGS" | tr ',' '\n' | sed 's/^/"/' | sed 's/\$/"/' | paste -sd, -)
 
 RESPONSE=\$(curl -s -X POST "\$API_URL/api/nodes/register" \\
@@ -104,11 +104,11 @@ RESPONSE=\$(curl -s -X POST "\$API_URL/api/nodes/register" \\
     \\"roleTags\\": [\$TAG_JSON]
   }")
 
-echo "✅ Registration Response: \$RESPONSE"
+echo "[OK] Registration Response: \$RESPONSE"
 
 if [ "\$5" != "--skip-docker-agent" ]; then
   # 4. Start ShanuTechX Production Node Agent Container
-  echo "🐳 Launching ShanuTechX Node Agent Service on Port 5000..."
+  echo "[INFO] Launching ShanuTechX Node Agent Service on Port 5000..."
   docker stop shanutechx-agent &>/dev/null || true
   docker rm shanutechx-agent &>/dev/null || true
 
@@ -116,7 +116,7 @@ if [ "\$5" != "--skip-docker-agent" ]; then
   if docker pull ghcr.io/shanutechx/node-agent:latest &>/dev/null; then
     AGENT_IMAGE="ghcr.io/shanutechx/node-agent:latest"
   else
-    echo "📦 Preparing standalone Node Agent runtime..."
+    echo "[INFO] Preparing standalone Node Agent runtime..."
     AGENT_IMAGE="node:20-alpine"
   fi
 
@@ -133,11 +133,11 @@ if [ "\$5" != "--skip-docker-agent" ]; then
     -v /var/lib/shanutechx:/var/lib/shanutechx \
     "\$AGENT_IMAGE" sh -c "if [ -f /opt/shanutechx/services/node-agent/src/index.js ]; then node /opt/shanutechx/services/node-agent/src/index.js; elif [ -f /repo/services/node-agent/src/index.js ]; then node /repo/services/node-agent/src/index.js; else echo 'Node Agent entry file not found'; exit 1; fi"
 else
-  echo "⏩ Skipping Docker container launch (--skip-docker-agent requested for native systemd service)"
+  echo "[INFO] Skipping Docker container launch (--skip-docker-agent requested for native systemd service)"
 fi
 
 echo "============================================================"
-echo "🎉 SUCCESS: Compute Node is onboarded & ONLINE in ShanuTechX!"
+echo "[SUCCESS] Compute Node is onboarded & ONLINE in ShanuTechX!"
 echo "============================================================"
 `;
 
@@ -453,14 +453,14 @@ async function runNodeProvisioningSteps(
   const { ip, label, roleTags, apiUrl } = opts;
 
   // Step 1: Install system packages
-  log('📦 [1/6] Installing required system packages...');
+  log('[1/6] Installing required system packages...');
   await sshExec(ssh, [
     'apt-get update -qq',
     'apt-get install -y systemd systemd-sysv ufw docker.io curl unzip tar util-linux nodejs npm 2>&1',
   ].join(' && '), log);
 
   // Step 2: Collect hardware specs
-  log('📊 [2/6] Collecting hardware specifications...');
+  log('[2/6] Collecting hardware specifications...');
   const cpuRes: string[] = [];
   const ramRes: string[] = [];
   const diskRes: string[] = [];
@@ -476,7 +476,7 @@ async function runNodeProvisioningSteps(
   log(`   CPU: ${cpuCores}c | RAM: ${ramMb}MB | Disk: ${diskGb}GB | IP: ${detectedIp}`);
 
   // Step 3: Create shanutechx-agent system user and directories
-  log('👤 [3/6] Creating shanutechx-agent system user...');
+  log('[3/6] Creating shanutechx-agent system user...');
   await sshExec(ssh, [
     'id shanutechx-agent &>/dev/null || useradd -r -s /bin/false -d /var/lib/shanutechx shanutechx-agent',
     'mkdir -p /var/lib/shanutechx/workspaces /opt/shanutechx/services/node-agent',
@@ -484,7 +484,7 @@ async function runNodeProvisioningSteps(
   ].join(' && '), log);
 
   // Step 4: Write sudoers file
-  log('🛡️ [4/6] Configuring sudoers permissions...');
+  log('[4/6] Configuring sudoers permissions...');
   const sudoersContent = [
     '# ShanuTechX Node Agent narrowly-scoped sudo privileges',
     'shanutechx-agent ALL=(ALL) NOPASSWD: /usr/bin/systemctl list-units',
@@ -504,7 +504,7 @@ async function runNodeProvisioningSteps(
   ].join(' && '), log);
 
   // Step 5: Download and install the node agent
-  log('🤖 [5/6] Deploying ShanuTechX Node Agent...');
+  log('[5/6] Deploying ShanuTechX Node Agent...');
   const cleanLabel = label.replace(/[^a-zA-Z0-9_\-\. ]/g, '');
   const cleanRoleTags = roleTags.map((t) => t.replace(/[^a-zA-Z0-9_\-]/g, '')).join(',');
   const secretB64 = Buffer.from(CLUSTER_SECRET).toString('base64');
@@ -523,7 +523,7 @@ async function runNodeProvisioningSteps(
   // S19 FIX: Detect the Node.js binary path at install-time instead of hardcoding /usr/bin/node,
   // which is absent on older Debian (they use /usr/bin/nodejs) and some Ubuntu/Alpine builds
   // that install Node via nvm or n into /usr/local/bin/node.
-  log('⚙️ [6/6] Configuring systemd service...');
+  log('[6/6] Configuring systemd service...');
   const envFileContent = `NODE_AGENT_SECRET=${CLUSTER_SECRET}\n`;
   const envB64 = Buffer.from(envFileContent, 'utf-8').toString('base64');
   await sshExec(ssh, [
@@ -569,7 +569,7 @@ async function runNodeProvisioningSteps(
     'systemctl enable --now shanutechx-node-agent 2>&1 || true',
   ].join(' && '), log);
 
-  log('🎉 All setup steps completed successfully!');
+  log('[SUCCESS] All setup steps completed successfully!');
   return { cpuCores, ramMb, diskGb, detectedIp };
 }
 
@@ -649,7 +649,7 @@ nodesRouter.post('/nodes/connect', async (req: AuthedRequest, res: Response) => 
       ssh.on('error', (e) => reject(e));
       ssh.connect(connectCfg);
     });
-    log(`✅ SSH connected to ${username}@${ip}:${port}`);
+    log(`[OK] SSH connected to ${username}@${ip}:${port}`);
 
     // S15: All 6 provisioning steps in one shared call
     const { cpuCores, ramMb, diskGb, detectedIp } = await runNodeProvisioningSteps(
@@ -734,7 +734,7 @@ nodesRouter.post('/nodes/connect/stream', async (req: AuthedRequest, res: Respon
       ssh.on('error', (e) => reject(e));
       ssh.connect(connectCfg);
     });
-    log(`✅ SSH connected to ${username}@${ip}:${port}`);
+    log(`[OK] SSH connected to ${username}@${ip}:${port}`);
 
     // S15: All 6 provisioning steps via shared helper; stream variant passes `step` via `log`
     const { cpuCores, ramMb, diskGb, detectedIp } = await runNodeProvisioningSteps(

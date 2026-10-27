@@ -217,7 +217,7 @@ export const Composer: React.FC<ComposerProps> = ({
     if (isConfidential) {
       finalHtml = `
         <div style="border: 2px dashed #6366f1; padding: 12px; border-radius: 8px; margin-bottom: 16px; background-color: #f8fafc; font-size: 12px; color: #475569;">
-          <strong>🔒 Confidential Email Notice:</strong> This message expires in ${confidentialDays} days. Please do not forward or copy without authorization.
+          <strong>Confidential Email Notice:</strong> This message expires in ${confidentialDays} days. Please do not forward or copy without authorization.
         </div>
         ${finalHtml}
       `;

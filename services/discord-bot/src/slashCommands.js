@@ -49,7 +49,7 @@ function isStaffMember(interaction) {
   );
 }
 
-const NO_PERMISSION = '❌ You do not have permission to execute staff commands.';
+const NO_PERMISSION = '[Access Denied] You do not have permission to execute staff commands.';
 
 const commands = [
   new SlashCommandBuilder()

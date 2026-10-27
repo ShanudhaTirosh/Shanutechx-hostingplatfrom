@@ -145,7 +145,7 @@ notificationsRouter.post('/notifications/channels/:id/test', async (req: AuthedR
       }
 
       const payload = channel.type === 'discord'
-        ? { content: '🚀 **ShanuTechX Notification Test**: Channel integration test successfully verified!' }
+        ? { content: '**ShanuTechX Notification Test**: Channel integration test successfully verified!' }
         : { event: 'test_notification', message: 'ShanuTechX notification test event', timestamp: new Date().toISOString() };
 
       const response = await fetch(targetUrl, {

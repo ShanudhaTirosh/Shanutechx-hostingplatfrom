@@ -271,7 +271,7 @@ async function handleCommand(senderPhone, messageText) {
   if (isStaffCommand) {
     const isStaff = await isStaffUser(cleanPhone);
     if (!isStaff) {
-      return `❌ Access Denied: This command is restricted to ShanuTechX staff members.`;
+      return `[Access Denied] This command is restricted to ShanuTechX staff members.`;
     }
   }
 

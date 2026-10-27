@@ -116,7 +116,7 @@ export async function banUserAndTeardownResources({
 
     // 5. Fire alert notification to staff
     void notifyAdmins(
-      `🚨 USER ACCOUNT BANNED (Abuse Detected)\nUser: ${updatedUser.email} (ID: ${userId})\nReason: ${reason}\nDetected By: ${detectedBy}\nStopped Deployments: ${stoppedCount}`
+      `[ALERT] USER ACCOUNT BANNED (Abuse Detected)\nUser: ${updatedUser.email} (ID: ${userId})\nReason: ${reason}\nDetected By: ${detectedBy}\nStopped Deployments: ${stoppedCount}`
     );
 
     return { ok: true, stoppedDeploymentsCount: stoppedCount };

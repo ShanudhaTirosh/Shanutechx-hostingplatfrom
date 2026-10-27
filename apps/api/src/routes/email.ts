@@ -1591,7 +1591,7 @@ emailRouter.post('/email/domains/:id/verify', async (req: AuthedRequest, res) =>
       dmarcVerified,
       message: isVerified
         ? 'Domain DNS records verified successfully!'
-        : `DNS verification pending. MX: ${mxVerified ? '✓' : '✗'}, SPF: ${spfVerified ? '✓' : '✗'}, DKIM: ${dkimVerified ? '✓' : '✗'}, DMARC: ${dmarcVerified ? '✓' : '✗'}`,
+        : `DNS verification pending. MX: ${mxVerified ? 'OK' : 'FAIL'}, SPF: ${spfVerified ? 'OK' : 'FAIL'}, DKIM: ${dkimVerified ? 'OK' : 'FAIL'}, DMARC: ${dmarcVerified ? 'OK' : 'FAIL'}`,
     });
   } catch (err: any) {
     logger.error({ err }, 'Failed to verify domain DNS');

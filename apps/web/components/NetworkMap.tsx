@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
 import { geoMercator, geoPath } from 'd3-geo';
 import { feature } from 'topojson-client';
-import { Activity, ShieldCheck, Zap, RefreshCw, Radio, Globe2, Server } from 'lucide-react';
+import { Activity, ShieldCheck, Zap, RefreshCw, Radio, Globe2, Server, MapPin } from 'lucide-react';
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 const W = 900, H = 440;
@@ -32,21 +32,21 @@ export interface NodeItem {
   coords: [number, number];
   basePing: number;
   spec: string;
-  flag: string;
+  country: string;
 }
 
 const NODES: NodeItem[] = [
-  { id: 'usw', name: 'US West',     city: 'Los Angeles', region: 'Americas',     coords: [-118.24, 34.05], basePing: 135, spec: '10 Gbps Uplink · Anycast BGP', flag: '🇺🇸' },
-  { id: 'use', name: 'US East',     city: 'New York',    region: 'Americas',     coords: [-74.01,  40.71],  basePing: 110, spec: 'DDoS Shielded · Tier 4 DC', flag: '🇺🇸' },
-  { id: 'br',  name: 'Brazil',      city: 'São Paulo',   region: 'Americas',     coords: [-46.63, -23.55], basePing: 175, spec: 'LATAM Edge Routing', flag: '🇧🇷' },
-  { id: 'uk',  name: 'UK Hub',      city: 'London',      region: 'Europe',       coords: [-0.13,  51.51],  basePing: 84,  spec: 'LINX Peering · 10Gbps Uplink', flag: '🇬🇧' },
-  { id: 'de',  name: 'DE Hub',      city: 'Frankfurt',   region: 'Europe',       coords: [8.68,   50.11],  basePing: 92,  spec: 'DE-CIX Core Direct', flag: '🇩🇪' },
-  { id: 'fr',  name: 'France',      city: 'Paris',       region: 'Europe',       coords: [2.35,   48.86],  basePing: 88,  spec: 'FranceIX IXP Hub', flag: '🇫🇷' },
-  { id: 'nl',  name: 'Netherlands', city: 'Amsterdam',   region: 'Europe',       coords: [4.90,   52.37],  basePing: 82,  spec: 'AMS-IX Ultra Low Ping', flag: '🇳🇱' },
-  { id: 'in',  name: 'IN Hub',      city: 'Mumbai',      region: 'Asia-Pacific', coords: [72.88,  19.08],  basePing: 45,  spec: 'NIXI Peering · Local POP', flag: '🇮🇳' },
-  { id: 'sg',  name: 'SG Hub',      city: 'Singapore',   region: 'Asia-Pacific', coords: [103.82,  1.35],  basePing: 55,  spec: 'SGIX Core · Trans-Asian IX', flag: '🇸🇬' },
-  { id: 'jp',  name: 'JP Hub',      city: 'Tokyo',       region: 'Asia-Pacific', coords: [139.69, 35.69],  basePing: 70,  spec: 'JPIX High Speed Fibre', flag: '🇯🇵' },
-  { id: 'au',  name: 'AU Hub',      city: 'Sydney',      region: 'Asia-Pacific', coords: [151.21,-33.87],  basePing: 160, spec: 'AusIX Pacific Backbone', flag: '🇦🇺' },
+  { id: 'usw', name: 'US West',     city: 'Los Angeles', region: 'Americas',     coords: [-118.24, 34.05], basePing: 135, spec: '10 Gbps Uplink · Anycast BGP', country: 'US' },
+  { id: 'use', name: 'US East',     city: 'New York',    region: 'Americas',     coords: [-74.01,  40.71],  basePing: 110, spec: 'DDoS Shielded · Tier 4 DC', country: 'US' },
+  { id: 'br',  name: 'Brazil',      city: 'São Paulo',   region: 'Americas',     coords: [-46.63, -23.55], basePing: 175, spec: 'LATAM Edge Routing', country: 'BR' },
+  { id: 'uk',  name: 'UK Hub',      city: 'London',      region: 'Europe',       coords: [-0.13,  51.51],  basePing: 84,  spec: 'LINX Peering · 10Gbps Uplink', country: 'GB' },
+  { id: 'de',  name: 'DE Hub',      city: 'Frankfurt',   region: 'Europe',       coords: [8.68,   50.11],  basePing: 92,  spec: 'DE-CIX Core Direct', country: 'DE' },
+  { id: 'fr',  name: 'France',      city: 'Paris',       region: 'Europe',       coords: [2.35,   48.86],  basePing: 88,  spec: 'FranceIX IXP Hub', country: 'FR' },
+  { id: 'nl',  name: 'Netherlands', city: 'Amsterdam',   region: 'Europe',       coords: [4.90,   52.37],  basePing: 82,  spec: 'AMS-IX Ultra Low Ping', country: 'NL' },
+  { id: 'in',  name: 'IN Hub',      city: 'Mumbai',      region: 'Asia-Pacific', coords: [72.88,  19.08],  basePing: 45,  spec: 'NIXI Peering · Local POP', country: 'IN' },
+  { id: 'sg',  name: 'SG Hub',      city: 'Singapore',   region: 'Asia-Pacific', coords: [103.82,  1.35],  basePing: 55,  spec: 'SGIX Core · Trans-Asian IX', country: 'SG' },
+  { id: 'jp',  name: 'JP Hub',      city: 'Tokyo',       region: 'Asia-Pacific', coords: [139.69, 35.69],  basePing: 70,  spec: 'JPIX High Speed Fibre', country: 'JP' },
+  { id: 'au',  name: 'AU Hub',      city: 'Sydney',      region: 'Asia-Pacific', coords: [151.21,-33.87],  basePing: 160, spec: 'AusIX Pacific Backbone', country: 'AU' },
 ];
 
 const EDGES: [string, string][] = [
@@ -418,9 +418,12 @@ function NetworkMap() {
             {/* Hover / Selection Tooltip Popup */}
             {hoverNode && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#080b24]/95 border border-cyan-500/40 rounded-2xl px-5 py-3.5 shadow-[0_10px_35px_rgba(0,0,0,0.7)] backdrop-blur-xl flex items-center gap-4 text-xs z-30 whitespace-nowrap animate-fade-in">
-                <span className="text-xl">{hoverNode.flag}</span>
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 font-mono font-bold text-xs shrink-0">
+                  <MapPin size={16} />
+                </div>
                 <div>
                   <div className="font-bold text-white text-sm flex items-center gap-2">
+                    <span className="px-1.5 py-0.5 rounded bg-white/10 text-cyan-300 font-mono text-[10px] font-semibold">{hoverNode.country}</span>
                     {hoverNode.name} — {hoverNode.city}
                     <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono font-bold">
                       ONLINE
@@ -502,7 +505,7 @@ function NetworkMap() {
             >
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-bold text-white tracking-tight flex items-center gap-1.5">
-                  <span>{node.flag}</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-cyan-300 font-semibold">{node.country}</span>
                   {node.name}
                 </span>
                 <span

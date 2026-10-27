@@ -510,7 +510,7 @@ export default function Navbar() {
 
         {/* Header Right Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* 🔍 Search Icon Button */}
+          {/* Search Icon Button */}
           <button
             onClick={() => setSearchOpen(true)}
             className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-all focus:outline-none"
@@ -519,7 +519,7 @@ export default function Navbar() {
             <Search className="h-4 w-4" />
           </button>
 
-          {/* 🛒 Cart Drawer Icon Button */}
+          {/* Cart Drawer Icon Button */}
           <button
             onClick={() => setCartOpen(!cartOpen)}
             className="relative p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-all focus:outline-none"
@@ -533,7 +533,7 @@ export default function Navbar() {
             )}
           </button>
 
-          {/* 🔔 Notification Bell with Click Outside Handler */}
+          {/* Notification Bell with Click Outside Handler */}
           <div ref={notifRef} className="relative">
             <button
               onClick={() => setNotifOpen((v) => !v)}
@@ -594,7 +594,7 @@ export default function Navbar() {
             </AnimatePresence>
           </div>
 
-          {/* 👤 CLIENT SPACE / User Profile Menu */}
+          {/* CLIENT SPACE / User Profile Menu */}
           {mounted && userSession ? (
             /* Logged-In User Pill with Avatar */
             <div ref={profileRef} className="relative">
@@ -721,7 +721,7 @@ export default function Navbar() {
         </div>
       </motion.nav>
 
-      {/* 🔍 Interactive Real-Time Search Modal Overlay */}
+      {/* Interactive Real-Time Search Modal Overlay */}
       <AnimatePresence>
         {searchOpen && (
           <div
@@ -853,7 +853,7 @@ export default function Navbar() {
         )}
       </AnimatePresence>
 
-      {/* 🛒 Cart Drawer Slide-over */}
+      {/* Cart Drawer Slide-over */}
       <AnimatePresence>
         {cartOpen && (
           <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">

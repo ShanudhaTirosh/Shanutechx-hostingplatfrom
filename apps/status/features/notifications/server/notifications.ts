@@ -76,7 +76,7 @@ async function sendDiscord(
   if (!cfg.enabled || !cfg.webhookUrl) return;
 
   const color = isUp ? 0x2ecc71 : 0xe74c3c;
-  const title = `${isUp ? "🟢 [RECOVERED]" : "🔴 [DOWN]"} ${site.name}`;
+  const title = `${isUp ? "[RECOVERED]" : "[DOWN]"} ${site.name}`;
 
   const fields: Array<{ name: string; value: string; inline?: boolean }> = [
     { name: "Service", value: site.name, inline: true },
@@ -179,7 +179,7 @@ async function sendTelegram(
 ) {
   if (!cfg.enabled || !cfg.botToken || !cfg.chatId) return;
 
-  const text = `${isUp ? "✅ RECOVERED" : "🔴 DOWN"}: ${site.name} (${site.url})\nTime: ${new Date().toLocaleString()}\n${isUp ? `Latency: ${latency}ms` : `Error: ${error}`}`;
+  const text = `${isUp ? "[RECOVERED]" : "[DOWN]"}: ${site.name} (${site.url})\nTime: ${new Date().toLocaleString()}\n${isUp ? `Latency: ${latency}ms` : `Error: ${error}`}`;
 
   try {
     await fetch(`https://api.telegram.org/bot${cfg.botToken}/sendMessage`, {
@@ -380,13 +380,13 @@ export async function sendTestNotification(
       throw new Error("Discord webhook URL is not configured");
     }
     const embed = {
-      title: "🧪 STX Status Test Notification",
+      title: "STX Status Test Notification",
       description: "Discord webhook integration is successfully configured and active on STX Status Page.",
       color: 0x2ecc71,
       fields: [
         { name: "Channel", value: "Discord Webhook", inline: true },
         { name: "Timestamp", value: new Date().toLocaleString(), inline: true },
-        { name: "Status", value: "Operational ✅", inline: true },
+        { name: "Status", value: "Operational", inline: true },
         { name: "Platform", value: "STX Cloud Infrastructure", inline: false },
       ],
       footer: { text: "STX Status Notification Engine" },

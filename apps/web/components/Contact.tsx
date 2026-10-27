@@ -426,20 +426,32 @@ export default function Contact() {
 
               <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-300">
                 <div className="p-2 rounded-xl bg-white/5 border border-white/5">
-                  <span className="block text-emerald-400 font-bold">🇺🇸 US-East</span>
-                  <span className="text-[10px] text-slate-400">Ashburn, VA</span>
+                  <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                    <Globe2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>US-East</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Ashburn, VA</span>
                 </div>
                 <div className="p-2 rounded-xl bg-white/5 border border-white/5">
-                  <span className="block text-emerald-400 font-bold">🇩🇪 EU-Central</span>
-                  <span className="text-[10px] text-slate-400">Frankfurt, DE</span>
+                  <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                    <Globe2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>EU-Central</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Frankfurt, DE</span>
                 </div>
                 <div className="p-2 rounded-xl bg-white/5 border border-white/5">
-                  <span className="block text-emerald-400 font-bold">🇸🇬 AP-South</span>
-                  <span className="text-[10px] text-slate-400">Singapore, SG</span>
+                  <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                    <Globe2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>AP-South</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Singapore, SG</span>
                 </div>
                 <div className="p-2 rounded-xl bg-white/5 border border-white/5">
-                  <span className="block text-emerald-400 font-bold">🇯🇵 AP-Northeast</span>
-                  <span className="text-[10px] text-slate-400">Tokyo, JP</span>
+                  <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                    <Globe2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>AP-Northeast</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Tokyo, JP</span>
                 </div>
               </div>
             </div>

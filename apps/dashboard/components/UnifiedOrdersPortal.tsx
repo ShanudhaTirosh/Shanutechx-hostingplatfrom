@@ -28,7 +28,7 @@ import {
 import { apiFetch } from '@/lib/useAuth';
 import InvoiceModal from '@/components/InvoiceModal';
 import PaymentProofModal from '@/components/PaymentProofModal';
-import { IconClose } from '@/components/Icons';
+import { IconClose, IconClock } from '@/components/Icons';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 function CalendarIcon() {
@@ -691,8 +691,9 @@ function OrderCard({ order, onChanged }: { order: Order; onChanged: () => void }
               <Badge status={latestPayment.status} />
             </div>
             {latestPayment.status === 'manual_review' && (
-              <p className="text-orange-300/90 text-[11px] leading-relaxed">
-                ⏳ Proof received — currently awaiting manual verification by staff. Services activate upon approval (VPS setups are delivered within 24 to 72 hours).
+              <p className="text-orange-300/90 text-[11px] leading-relaxed flex items-center gap-1.5">
+                <IconClock size={12} className="shrink-0 text-orange-400" />
+                <span>Proof received — currently awaiting manual verification by staff. Services activate upon approval (VPS setups are delivered within 24 to 72 hours).</span>
               </p>
             )}
             {latestPayment.status === 'rejected' && latestPayment.rejectionReason && (

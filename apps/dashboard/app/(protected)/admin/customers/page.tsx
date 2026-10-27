@@ -29,6 +29,7 @@ import {
   IconTicket,
   IconMask,
   IconThumbsUp,
+  IconExternalLink,
 } from '@/components/Icons';
 
 export const dynamic = 'force-dynamic';
@@ -829,9 +830,10 @@ export default function AdminCustomersPage() {
                                     href={vps.panelUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white font-medium text-xs transition-colors"
+                                    className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white font-medium text-xs transition-colors inline-flex items-center gap-1.5"
                                   >
-                                    Open Panel ↗
+                                    <span>Open Panel</span>
+                                    <IconExternalLink size={12} />
                                   </a>
                                 )}
                               </div>
@@ -871,9 +873,10 @@ export default function AdminCustomersPage() {
                                     href={`https://${d.subdomain}.shanutech.com`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-accent-teal hover:underline font-medium text-xs"
+                                    className="text-accent-teal hover:underline font-medium text-xs inline-flex items-center gap-1"
                                   >
-                                    Visit App ↗
+                                    <span>Visit App</span>
+                                    <IconExternalLink size={12} />
                                   </a>
                                 )}
                               </div>

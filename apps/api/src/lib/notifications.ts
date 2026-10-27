@@ -246,7 +246,7 @@ export async function notifyTicketEmbed({
   const discordUserMention = userDiscordId ? `<@${userDiscordId}>` : userEmail;
 
   const embed = {
-    title: `🎫 [TICKET #${shortId}] ${subject}`,
+    title: `[TICKET #${shortId}] ${subject}`,
     color: status === 'closed' ? 0x64748b : priority === 'high' || priority === 'urgent' ? 0xef4444 : 0x7c3aed,
     fields: [
       { name: 'Status', value: status.toUpperCase(), inline: true },
@@ -266,20 +266,20 @@ export async function notifyTicketEmbed({
         type: 2, // Button
         style: 1, // Primary (Blue/Blurple)
         custom_id: `claim_ticket:${ticketId}`,
-        label: claimedBy ? `Claimed by ${claimedBy}` : '🙋‍♂️ Claim Ticket',
+        label: claimedBy ? `Claimed by ${claimedBy}` : 'Claim Ticket',
         disabled: Boolean(claimedBy),
       },
       {
         type: 2, // Button
         style: 2, // Secondary (Gray)
         custom_id: `reply_ticket:${ticketId}`,
-        label: '💬 Reply',
+        label: 'Reply',
       },
       {
         type: 2, // Button
         style: 4, // Danger (Red)
         custom_id: `close_ticket:${ticketId}`,
-        label: '🔒 Close Ticket',
+        label: 'Close Ticket',
       },
     ],
   };

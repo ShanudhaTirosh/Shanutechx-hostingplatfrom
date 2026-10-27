@@ -1606,7 +1606,7 @@ export default function BentoGrid() {
                   transition: "all 0.3s ease",
                 }}
               >
-                Visit Store Portal ↗
+                Visit Store Portal
                 <motion.span
                   variants={{ initial: { x: 0 }, hover: { x: 5 } }}
                   transition={{ duration: 0.3 }}

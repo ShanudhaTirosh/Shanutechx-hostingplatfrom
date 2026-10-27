@@ -302,7 +302,7 @@ export async function fulfillOrder(orderId: string): Promise<{ success: boolean;
               senderName: 'ShanuTechX Mail System',
               senderEmail: `noreply@${env.rootDomain}`,
               recipientEmail: order.user.email,
-              subject: `🚀 Welcome to ShanuTechX Webmail (${fullEmail})`,
+              subject: `Welcome to ShanuTechX Webmail (${fullEmail})`,
               snippet: `Your enterprise mailbox ${fullEmail} is ready. View server connection settings and credentials.`,
               htmlBody: welcomeHtml,
               category: 'primary',

@@ -689,14 +689,14 @@ EOF`;
             className="px-5 py-3 rounded-2xl bg-white text-black hover:bg-neutral-200 font-bold text-xs md:text-sm shadow-xl shadow-md transition-all flex items-center gap-2"
           >
             <Plus className="h-4 w-4" />
-            <span>+ Create Mailbox</span>
+            <span>Create Mailbox</span>
           </button>
           <button
             onClick={() => handleOpenWebmail()}
             className="px-5 py-3 rounded-2xl bg-white text-black hover:bg-neutral-200 font-bold text-xs md:text-sm shadow-md transition-all flex items-center gap-2"
           >
             <ExternalLink className="h-4 w-4" />
-            <span>Launch Webmail Portal ↗</span>
+            <span>Launch Webmail Portal</span>
           </button>
         </div>
       </div>

@@ -31,7 +31,7 @@ async function main() {
         lastSeenAt: new Date(),
       },
     });
-    console.log('✅ Created primary compute node:', node);
+    console.log('[OK] Created primary compute node:', node);
   } else {
     // Update existing nodes to make sure they have node-hosting tag
     await prisma.node.updateMany({
@@ -52,7 +52,7 @@ async function main() {
         isActive: true,
       },
     });
-    console.log('✅ Updated existing nodes with full role tags suite!');
+    console.log('[OK] Updated existing nodes with full role tags suite!');
   }
 }
 

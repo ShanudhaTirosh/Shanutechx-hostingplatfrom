@@ -359,7 +359,7 @@ export function VercelDeployModal({ isOpen, onClose, onDeployed }: Props) {
         url: liveUrl,
       });
 
-      toast('🎉 Deployment is live!', 'success');
+      toast('Deployment is live!', 'success');
       onDeployed?.();
     } catch (err: any) {
       setDeployError(err.message || 'Deployment failed');
@@ -407,7 +407,7 @@ export function VercelDeployModal({ isOpen, onClose, onDeployed }: Props) {
       const res = await api.domains.verify(domainCnameInfo.domainId);
       if (res.verified) {
         setDomainCnameInfo((prev) => (prev ? { ...prev, verified: true } : null));
-        toast('🎉 Domain verified & SSL active!', 'success');
+        toast('Domain verified & SSL active!', 'success');
       } else {
         toast(res.message || 'DNS verification still pending. Please allow 1-5 minutes for propagation.', 'info');
       }
@@ -673,7 +673,7 @@ export function VercelDeployModal({ isOpen, onClose, onDeployed }: Props) {
                             <option value="">Choose a repository…</option>
                             {repos.map((r) => (
                               <option key={r.id} value={r.fullName}>
-                                {r.fullName} {r.private ? '🔒 (private)' : ''}
+                                {r.fullName} {r.private ? '(Private)' : ''}
                               </option>
                             ))}
                           </select>
