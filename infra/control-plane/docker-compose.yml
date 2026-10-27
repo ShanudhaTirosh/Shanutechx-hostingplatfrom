@@ -22,6 +22,7 @@ volumes:
   supabase-kong-config:
   mongo-mail-data:
   status-data:
+  supabase-edge-functions-data:
 
 services:
   postgres:
@@ -576,6 +577,10 @@ services:
         condition: service_started
       supabase-storage:
         condition: service_started
+      supabase-edge-runtime:
+        condition: service_started
+      supabase-imgproxy:
+        condition: service_started
     environment:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /kong-out/kong.yml
@@ -614,6 +619,55 @@ services:
       - traefik.http.routers.supabase-studio.entrypoints=websecure
       - traefik.http.routers.supabase-studio.tls.certresolver=le
       - traefik.http.services.supabase-studio.loadbalancer.server.port=3000
+
+  supabase-edge-runtime:
+    image: supabase/edge-runtime:v1.74.0
+    container_name: shanutechx-supabase-edge-runtime
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: http://supabase-kong:8000
+      SUPABASE_PUBLIC_URL: https://supabase.${ROOT_DOMAIN}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgresql://postgres:${SUPABASE_DB_PASSWORD}@supabase-db:5432/postgres
+      VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT:-false}"
+    volumes:
+      - supabase-edge-functions-data:/home/deno/functions
+    networks: [shanutechx-internal]
+
+  supabase-supavisor:
+    image: supabase/supavisor:1.1.8
+    container_name: shanutechx-supabase-supavisor
+    restart: unless-stopped
+    ports:
+      - "6543:6543"
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+    environment:
+      PORT: 6543
+      DATABASE_URL: postgres://postgres:${SUPABASE_DB_PASSWORD}@supabase-db:5432/postgres
+      SECRET_KEY_BASE: ${SUPABASE_REALTIME_SECRET}
+      VAULT_ENC_KEY: ${SUPAVISOR_VAULT_ENC_KEY:-8e68967f28c72a03e66391a7d274955d}
+      API_JWT_SECRET: ${JWT_SECRET}
+      METRICS_JWT_SECRET: ${JWT_SECRET}
+      POOL_SIZE: ${SUPAVISOR_POOL_SIZE:-20}
+      RESERVE_POOL_SIZE: ${SUPAVISOR_RESERVE_POOL_SIZE:-5}
+      MAX_CLIENT_CONN: ${SUPAVISOR_MAX_CLIENT_CONN:-10000}
+      DEFAULT_POOL_SIZE: ${SUPAVISOR_DEFAULT_POOL_SIZE:-15}
+    networks: [shanutechx-internal, shanutechx-public]
 
   # ── Self-Hosted Mail (WildDuck Mail Server) ─────────────────────────────────
   mongodb:

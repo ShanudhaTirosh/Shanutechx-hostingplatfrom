@@ -6,8 +6,8 @@ RUN apk add --no-cache iputils python3 make g++
 
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci --include=dev
 
 COPY . .
 

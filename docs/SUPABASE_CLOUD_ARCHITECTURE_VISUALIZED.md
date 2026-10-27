@@ -271,12 +271,15 @@ flowchart TD
 
 | Container Name | Official Docker Image | Internal Port | Host Port Binding | Role & Responsibilities |
 | :--- | :--- | :--- | :--- | :--- |
-| `supa-<slug>-db` | `supabase/postgres:15.6.1.139` | `5432` | `dbPort` (e.g. 5435) | Core PostgreSQL database engine with `pgcrypto`, `uuid-ossp`, and `pg_stat_statements`. |
-| `supa-<slug>-kong` | `kong:2.8.1` | `8000`, `8443` | `apiPort` (e.g. 8001) | API Gateway routing traffic to Auth, REST, Storage, Realtime, and Postgres-Meta. |
-| `supa-<slug>-auth` | `supabase/gotrue:v2.158.1` | `9999` | Internal only | User authentication, JWT issuance, email verification, social OAuth handlers. |
-| `supa-<slug>-rest` | `postgrest/postgrest:v12.0.2` | `3000` | Internal only | Instant OpenAPI / RESTful query interface directly exposing PostgreSQL schemas. |
-| `supa-<slug>-storage` | `supabase/storage-api:v1.14.5` | `5000` | Internal only | S3-compatible file and object storage with public/private ACL enforcement. |
+| `supa-<slug>-kong` | `kong:2.8.1` | `8000`, `8443` | `apiPort` (e.g. 8001) | API Gateway routing traffic to Auth, REST, Storage, Realtime, Functions, and Postgres-Meta. |
+| `supa-<slug>-db` | `supabase/postgres:15.6.1.143` | `5432` | `dbPort` (e.g. 5435) | Core PostgreSQL database engine with `pgcrypto`, `uuid-ossp`, and `pg_stat_statements`. |
+| `supa-<slug>-auth` | `supabase/gotrue:v2.164.0` | `9999` | Internal only | User authentication, JWT issuance, email verification, social OAuth handlers. |
+| `supa-<slug>-rest` | `postgrest/postgrest:v12.2.0` | `3000` | Internal only | Instant OpenAPI / RESTful query interface directly exposing PostgreSQL schemas. |
 | `supa-<slug>-realtime` | `supabase/realtime:v2.34.47` | `4000` | Internal only | WebSockets server for real-time Postgres CDC replication and broadcast channels. |
+| `supa-<slug>-storage` | `supabase/storage-api:v1.14.5` | `5000` | Internal only | S3-compatible file and object storage with public/private ACL enforcement. |
+| `supa-<slug>-edge-runtime` | `supabase/edge-runtime:v1.74.0` | `9000` | Internal only (`/functions/v1/`) | Executes TypeScript/Deno serverless Edge Functions for project workloads. |
+| `supa-<slug>-supavisor` | `supabase/supavisor:1.1.8` | `6543` | `6543` (Optional pooler) | PostgreSQL connection pooler for serverless & high-concurrency client connections. |
+| `supa-<slug>-imgproxy` | `darthsim/imgproxy:v3.27` | `5001` | Internal only (`/render/v1/`) | Processes, transforms, and optimizes images on the fly for Storage operations. |
 | `supa-<slug>-meta` | `supabase/postgres-meta:v0.84.2` | `8080` | Internal only | PostgreSQL catalog introspection engine queried by Studio via Kong (`/pg/`). |
 
 ---

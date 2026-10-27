@@ -18,6 +18,7 @@ DEV_ADMIN_PASSWORD="${4:-${DEV_ADMIN_PASSWORD:-$(openssl rand -hex 16 2>/dev/nul
 
 WILDDUCK_API_KEY="${WILDDUCK_API_KEY:-$(openssl rand -hex 16 2>/dev/null || echo "wildduck_secret_api_token_2026")}"
 SUPABASE_DB_PASSWORD="${SUPABASE_DB_PASSWORD:-$(openssl rand -hex 16 2>/dev/null || echo "SupabaseDBPass2026!")}"
+SUPAVISOR_VAULT_ENC_KEY="${SUPAVISOR_VAULT_ENC_KEY:-$(openssl rand -hex 16 2>/dev/null || echo "8e68967f28c72a03e66391a7d274955d")}"
 MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-$(openssl rand -hex 16 2>/dev/null || echo "MinioRootPass2026!")}"
 NODE_AGENT_SECRET="${NODE_AGENT_SECRET:-$(openssl rand -hex 16 2>/dev/null || echo "NodeAgentSecret2026!")}"
 
@@ -53,13 +54,27 @@ fi
 CONTROL_PLANE_DIR="${ROOT_DIR}/infra/control-plane"
 mkdir -p "${CONTROL_PLANE_DIR}"
 
+JWT_SECRET="${JWT_SECRET:-}"
+SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY:-}"
+if [ -z "${JWT_SECRET}" ] || [ -z "${SUPABASE_ANON_KEY}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]; then
+  if command -v node &> /dev/null; then
+    eval "$(node "${ROOT_DIR}/infra/supabase/generate-keys.js" 2>/dev/null | grep -E '^(JWT_SECRET|SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=')" || true
+  fi
+fi
+
 cat <<EOF > "${CONTROL_PLANE_DIR}/.env"
 ROOT_DOMAIN=${ROOT_DOMAIN}
 ACME_EMAIL=${DEV_ADMIN_EMAIL}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 WILDDUCK_API_KEY=${WILDDUCK_API_KEY}
+JWT_SECRET=${JWT_SECRET:-}
+SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
+SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
 SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
 SUPABASE_REALTIME_SECRET=$(openssl rand -hex 32 2>/dev/null || echo "supabaserealtimesecretkeylongstring2026")
+SUPAVISOR_VAULT_ENC_KEY=${SUPAVISOR_VAULT_ENC_KEY}
+FUNCTIONS_VERIFY_JWT=false
 MINIO_ROOT_USER=shanutechx_minio
 MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
 NODE_AGENT_SECRET=${NODE_AGENT_SECRET}

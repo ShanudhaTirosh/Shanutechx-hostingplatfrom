@@ -24,15 +24,22 @@
  * (`cd apps/api && npm install` first if you haven't).
  */
 const crypto = require('crypto');
-const jwt = require('../../apps/api/node_modules/jsonwebtoken');
+
+function signJwt(payload, secret) {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const b64url = (obj) => Buffer.from(typeof obj === 'string' ? obj : JSON.stringify(obj)).toString('base64url');
+  const unsignedToken = `${b64url(header)}.${b64url(payload)}`;
+  const signature = crypto.createHmac('sha256', secret).update(unsignedToken).digest('base64url');
+  return `${unsignedToken}.${signature}`;
+}
 
 const jwtSecret = crypto.randomBytes(32).toString('base64');
 
 const issuedAt = Math.floor(Date.now() / 1000);
-const expiresAt = issuedAt + 60 * 60 * 24 * 365 * 10; // 10 years — these are long-lived service credentials, rotate by re-running this script
+const expiresAt = issuedAt + 60 * 60 * 24 * 365 * 10; // 10 years
 
-const anonKey = jwt.sign({ role: 'anon', iss: 'supabase', iat: issuedAt, exp: expiresAt }, jwtSecret);
-const serviceRoleKey = jwt.sign({ role: 'service_role', iss: 'supabase', iat: issuedAt, exp: expiresAt }, jwtSecret);
+const anonKey = signJwt({ role: 'anon', iss: 'supabase', iat: issuedAt, exp: expiresAt }, jwtSecret);
+const serviceRoleKey = signJwt({ role: 'service_role', iss: 'supabase', iat: issuedAt, exp: expiresAt }, jwtSecret);
 
 console.log('# Paste into the repo-root .env (docker-compose.local.yml / infra/control-plane/.env):');
 console.log(`JWT_SECRET=${jwtSecret}`);

@@ -3,14 +3,20 @@ import assert from 'node:assert/strict';
 import { buildKongConfigYaml, buildSupabaseComposeYaml } from '../../apps/api/src/routes/supabase';
 import { getCentralStudioUrl } from '../../apps/dashboard/lib/supabaseAdmin';
 
-test('buildKongConfigYaml creates meta-v1 /pg/ route for platform introspection', () => {
+test('buildKongConfigYaml creates routes for all standard Supabase services', () => {
   const yaml = buildKongConfigYaml('anon-jwt', 'service-jwt');
   assert.ok(yaml.includes('name: meta-v1'), 'Kong config must define meta-v1 service');
   assert.ok(yaml.includes('url: http://supabase-meta:8080'), 'Kong config must route to supabase-meta:8080');
   assert.ok(yaml.includes('/pg/'), 'Kong config must register /pg/ path');
+  assert.ok(yaml.includes('name: auth-v1'), 'Kong config must define auth-v1');
+  assert.ok(yaml.includes('name: rest-v1'), 'Kong config must define rest-v1');
+  assert.ok(yaml.includes('name: storage-v1'), 'Kong config must define storage-v1');
+  assert.ok(yaml.includes('name: realtime-v1'), 'Kong config must define realtime-v1');
+  assert.ok(yaml.includes('name: functions-v1'), 'Kong config must define functions-v1 for Edge Runtime');
+  assert.ok(yaml.includes('name: imgproxy-v1'), 'Kong config must define imgproxy-v1');
 });
 
-test('buildSupabaseComposeYaml omits per-project studio container by default', () => {
+test('buildSupabaseComposeYaml includes full 9-component cluster and omits per-project studio container by default', () => {
   const compose = buildSupabaseComposeYaml({
     cleanSlug: 'test-app',
     projectName: 'Test App',
@@ -23,8 +29,17 @@ test('buildSupabaseComposeYaml omits per-project studio container by default', (
   });
 
   assert.ok(!compose.includes('supabase-studio:'), 'Per-project compose should NOT start a studio container by default');
+  // All 9 core cluster components verified:
+  assert.ok(compose.includes('supabase-kong:'), 'Must include Kong API gateway');
+  assert.ok(compose.includes('supabase-db:'), 'Must include PostgreSQL database');
+  assert.ok(compose.includes('supabase-auth:'), 'Must include GoTrue authentication service');
+  assert.ok(compose.includes('supabase-rest:'), 'Must include PostgREST REST API engine');
+  assert.ok(compose.includes('supabase-realtime:'), 'Must include Realtime subscriptions engine');
+  assert.ok(compose.includes('supabase-storage:'), 'Must include Storage API');
+  assert.ok(compose.includes('supabase-edge-runtime:'), 'Must include Edge Runtime');
+  assert.ok(compose.includes('supabase-supavisor:'), 'Must include Supavisor connection pooler');
+  assert.ok(compose.includes('supabase-imgproxy:'), 'Must include imgproxy image transformer');
   assert.ok(compose.includes('supabase-meta:'), 'Must include supabase-meta service');
-  assert.ok(compose.includes('supabase-kong:'), 'Must include supabase-kong service');
 });
 
 test('buildSupabaseComposeYaml includes studio container only when legacy studio is explicitly requested', () => {

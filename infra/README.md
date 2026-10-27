@@ -17,9 +17,7 @@
 | **Cache & Queue** | Redis 7 | 6379 | internal | Session cache, queue backend |
 | **Node Agent** | `node-agent` | 5000 | internal & public | Node container & workspace daemon |
 | **Build Engine** | BuildKit | - | socket | Container image builder for Railpack |
-| **Object Storage** | MinIO | 9000/9001 | internal | Self-hosted S3-compatible storage for backups, uploads, and Supabase Storage — swappable for real Cloudflare R2 |
-| **BaaS** | Supabase stack (`supabase-db`, `supabase-auth`, `supabase-rest`, `supabase-realtime`, `supabase-storage`, `supabase-imgproxy`, `supabase-meta`, `supabase-kong`, `supabase-studio`) | 8000 (Kong, public), Studio public | internal (Kong+Studio public) | Self-hosted Postgres+GoTrue+PostgREST+Realtime+Storage+Studio, backing the Managed Backend-as-a-Service module |
-| **Mail** | WildDuck (`wildduck-mongo`, `wildduck-api`, `wildduck-engine`, `wildduck-imap`, `haraka-app`) | 25, 587, 8080, 993 | internal & Traefik SSL | Self-hosted scalable IMAP/SMTP WildDuck mail server backing the Business Email / Webmail Studio |
+| **BaaS** | Supabase stack (9 components: `supabase-kong`, `supabase-db` [PostgreSQL], `supabase-auth` [GoTrue], `supabase-rest` [PostgREST], `supabase-realtime`, `supabase-storage`, `supabase-edge-runtime`, `supabase-supavisor`, `supabase-imgproxy`, plus `supabase-meta` & `supabase-studio`) | 8000 (Kong public), 6543 (Supavisor pooler), Studio public | internal + public | Enterprise self-hosted Supabase cluster: Kong API gateway, PostgreSQL 15/17 DB, GoTrue Auth, PostgREST REST APIs, Realtime CDC & presence, Storage API, Deno Edge Runtime, Supavisor connection pooler, and imgproxy image transformation |
 | **Observability** | Prometheus | 9090 | internal | Metrics collection & time series storage |
 | **Observability** | Grafana | 3000 | internal | Real-time monitoring dashboards |
 | **Observability** | Loki & Promtail | 3100, 9080 | internal | Container log aggregation stack |

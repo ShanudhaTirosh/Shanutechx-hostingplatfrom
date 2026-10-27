@@ -403,6 +403,20 @@ services:
         strip_path: true
         paths:
           - /pg/
+  - name: functions-v1
+    url: http://supabase-edge-runtime:9000
+    routes:
+      - name: functions-v1-all
+        strip_path: true
+        paths:
+          - /functions/v1/
+  - name: imgproxy-v1
+    url: http://supabase-imgproxy:5001
+    routes:
+      - name: imgproxy-v1-all
+        strip_path: true
+        paths:
+          - /render/v1/
 `;
 }
 
@@ -510,11 +524,55 @@ services:
       TENANT_ID: "stub"
       REGION: "global"
       GLOBAL_S3_BUCKET: "stub"
+      IMGPROXY_URL: "http://supabase-imgproxy:5001"
     depends_on:
       supabase-db:
         condition: service_healthy
       supabase-rest:
         condition: service_started
+
+  supabase-imgproxy:
+    image: darthsim/imgproxy:v3.27
+    container_name: supa-${params.cleanSlug}-imgproxy
+    restart: unless-stopped
+    environment:
+      IMGPROXY_BIND: ":5001"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+      IMGPROXY_USE_ETAG: "true"
+
+  supabase-edge-runtime:
+    image: supabase/edge-runtime:v1.74.0
+    container_name: supa-${params.cleanSlug}-edge-runtime
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: "${jwtSecret}"
+      SUPABASE_URL: http://supabase-kong:8000
+      SUPABASE_ANON_KEY: "${params.anonKey}"
+      SUPABASE_SERVICE_ROLE_KEY: "${params.serviceKey}"
+      SUPABASE_DB_URL: "postgresql://postgres:${params.dbPassword}@supabase-db:5432/postgres"
+      VERIFY_JWT: "false"
+
+  supabase-supavisor:
+    image: supabase/supavisor:1.1.8
+    container_name: supa-${params.cleanSlug}-supavisor
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    environment:
+      PORT: 6543
+      DATABASE_URL: "postgres://postgres:${params.dbPassword}@supabase-db:5432/postgres"
+      SECRET_KEY_BASE: "${jwtSecret}supavisorsecretkeylongenoughbase"
+      VAULT_ENC_KEY: "8e68967f28c72a03e66391a7d274955d"
+      API_JWT_SECRET: "${jwtSecret}"
+      METRICS_JWT_SECRET: "${jwtSecret}"
+      POOL_SIZE: 20
+      RESERVE_POOL_SIZE: 5
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 15
 
   supabase-realtime:
     image: supabase/realtime:v2.34.47
@@ -553,6 +611,8 @@ services:
       - supabase-storage
       - supabase-realtime
       - supabase-meta
+      - supabase-edge-runtime
+      - supabase-imgproxy
 ${params.enableLegacyStudio ? `
   supabase-studio:
     image: supabase/studio:20241202-7634f10

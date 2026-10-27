@@ -52,6 +52,22 @@ services:
         paths:
           - /pg/
 
+  - name: functions-v1
+    url: http://supabase-edge-runtime:9000
+    routes:
+      - name: functions-v1-all
+        strip_path: true
+        paths:
+          - /functions/v1/
+
+  - name: imgproxy-v1
+    url: http://supabase-imgproxy:5001
+    routes:
+      - name: imgproxy-v1-all
+        strip_path: true
+        paths:
+          - /render/v1/
+
 consumers:
   - username: anon
     keyauth_credentials:
