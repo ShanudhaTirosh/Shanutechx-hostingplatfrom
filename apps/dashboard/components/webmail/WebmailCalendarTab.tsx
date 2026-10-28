@@ -291,7 +291,7 @@ export function WebmailCalendarTab() {
 
               {syncProvider === 'google' && (
                 <div className="bg-white/5 border border-white/15 p-3 rounded-2xl text-[11px] text-neutral-300">
-                  Google Calendar OAuth integration configured. Clicking Connect will sync events between ShanuTechX Webmail and your Google Calendar account.
+                  Google Calendar OAuth integration configured. Clicking Connect will sync events between STX Webmail and your Google Calendar account.
                 </div>
               )}
 

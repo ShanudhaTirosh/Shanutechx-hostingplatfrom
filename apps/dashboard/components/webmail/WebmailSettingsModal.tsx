@@ -7,6 +7,7 @@ import {
   MailCheck, ArrowUpCircle, CheckCircle2, ExternalLink, Globe, ShieldCheck, User,
   Check, RefreshCw, Layers, Key, Upload, Image, Camera, Code, Copy, Send, Eye, EyeOff, Server
 } from 'lucide-react';
+import { ProductCard } from '@/components/ProductCard';
 
 interface WebmailSettingsModalProps {
   isOpen: boolean;
@@ -14,10 +15,41 @@ interface WebmailSettingsModalProps {
   mailboxes?: any[];
   activeMailboxId?: string | null;
   onRefreshData?: () => void;
+  userRole?: string;
 }
 
-export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMailboxId, onRefreshData }: WebmailSettingsModalProps) {
+export function WebmailSettingsModal({
+  isOpen,
+  onClose,
+  mailboxes = [],
+  activeMailboxId,
+  onRefreshData,
+  userRole = 'customer',
+}: WebmailSettingsModalProps) {
+  const isDev = userRole === 'dev';
   const [activeSubTab, setActiveSubTab] = useState<'profile' | 'connect' | 'dns' | 'signatures' | 'templates' | 'autoreply' | 'blocklist' | 'upgrade'>('profile');
+  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
+  const [isLoadingPlans, setIsLoadingPlans] = useState(false);
+
+  useEffect(() => {
+    if (isDev && activeSubTab === 'upgrade') {
+      setActiveSubTab('profile');
+    }
+  }, [isDev, activeSubTab]);
+
+  useEffect(() => {
+    if (isOpen && !isDev) {
+      setIsLoadingPlans(true);
+      api.email.plans()
+        .then((res: any) => {
+          if (res?.plans) {
+            setAvailablePlans(res.plans);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setIsLoadingPlans(false));
+    }
+  }, [isOpen, isDev]);
 
   const [mailboxInfo, setMailboxInfo] = useState<any | null>(null);
 
@@ -138,7 +170,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
         from: mailboxInfo?.email || 'user@shanutechx.com',
         to: testTo.trim(),
         subject: testSubject.trim() || 'Website Connection Test Email',
-        html: `<h3>Test Email from ShanuTechX Webmail</h3><p>Your website connection is verified and operational! Sent at ${new Date().toISOString()}.</p>`,
+        html: `<h3>Test Email from STX Webmail</h3><p>Your website connection is verified and operational! Sent at ${new Date().toISOString()}.</p>`,
       });
       setTestSendResult({ success: true, message: `Dispatched successfully! Message ID: ${res.id || 'ok'}` });
       toast('Test email delivered successfully!', 'success');
@@ -299,7 +331,7 @@ export function WebmailSettingsModal({ isOpen, onClose, mailboxes = [], activeMa
             { id: 'templates', label: 'Templates', icon: FileText },
             { id: 'autoreply', label: 'Vacation Reply', icon: Sun },
             { id: 'blocklist', label: 'Blocklist', icon: Ban },
-            { id: 'upgrade', label: 'Upgrade & Plan', icon: Zap },
+            ...(!isDev ? [{ id: 'upgrade' as const, label: 'Upgrade & Plan', icon: Zap }] : []),
           ].map((tab) => {
             const IconComp = tab.icon;
             return (
@@ -911,118 +943,108 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
 
         {/* TAB 6: MAILBOX UPGRADE */}
         {activeSubTab === 'upgrade' && (
-          <div className="space-y-5 text-xs">
+          <div className="space-y-6 text-xs">
             {/* Current usage summary */}
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
-              <h4 className="font-bold text-amber-400 flex items-center gap-1.5">
-                <HardDrive className="h-3.5 w-3.5" />
-                Current Mailbox Usage
+            <div className="bg-[#141416] border border-white/10 rounded-2xl p-5 space-y-4">
+              <h4 className="font-bold text-white flex items-center gap-2">
+                <HardDrive className="h-4 w-4 text-emerald-400" />
+                Current Mailbox Allocation
               </h4>
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-                  <span className="text-slate-400 block text-[10px] mb-1">Storage Quota</span>
-                  <span className="font-extrabold text-white text-sm">
+                <div className="p-3.5 bg-[#0c0c0e] rounded-xl border border-white/10">
+                  <span className="text-neutral-400 block text-[10px] uppercase font-bold tracking-wider mb-1">Storage Quota</span>
+                  <span className="font-mono font-extrabold text-white text-base">
                     {mailboxInfo?.storageQuotaMb ? `${mailboxInfo.storageQuotaMb} MB` : '10,240 MB'}
                   </span>
                 </div>
-                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-                  <span className="text-slate-400 block text-[10px] mb-1">Daily Send Limit</span>
-                  <span className="font-extrabold text-white text-sm">
+                <div className="p-3.5 bg-[#0c0c0e] rounded-xl border border-white/10">
+                  <span className="text-neutral-400 block text-[10px] uppercase font-bold tracking-wider mb-1">Daily Send Limit</span>
+                  <span className="font-mono font-extrabold text-white text-base">
                     {mailboxInfo?.dailySendLimit ?? 2000} emails/day
                   </span>
                 </div>
               </div>
-              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 flex items-center gap-2">
-                <MailCheck className="h-4 w-4 text-white" />
-                <span className="text-slate-300">
-                  <span className="font-bold text-white">{mailboxInfo?.email || 'user@shanutechx.com'}</span>
-                  {' '}&mdash; <span className="text-emerald-400 font-bold">Active Service</span>
+              <div className="p-3 bg-[#0c0c0e] rounded-xl border border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MailCheck className="h-4 w-4 text-emerald-400" />
+                  <span className="text-neutral-300">
+                    <span className="font-bold text-white font-mono">{mailboxInfo?.email || 'user@shanutechx.com'}</span>
+                  </span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                  Active Service
                 </span>
               </div>
             </div>
 
             {/* Upgrade plan cards */}
-            <div className="space-y-2">
-              <h4 className="font-bold text-slate-300 uppercase tracking-wider text-[10px]">Available Upgrade Plans</h4>
-              {[
-                {
-                  name: 'Starter',
-                  storage: '2 GB',
-                  sends: 500,
-                  price: 'Free',
-                  features: ['IMAP/SMTP Access', 'Basic Filters', '1 Alias'],
-                  color: 'border-slate-700',
-                  badge: 'text-slate-400 bg-slate-800',
-                  current: !mailboxInfo?.storageQuotaMb || mailboxInfo.storageQuotaMb <= 2048,
-                },
-                {
-                  name: 'Professional',
-                  storage: '10 GB',
-                  sends: 2000,
-                  price: '$4/mo',
-                  features: ['Everything in Starter', 'AI Drafts & Summarise', '5 Aliases', 'Priority Support'],
-                  color: 'border-white/15',
-                  badge: 'text-neutral-300 bg-white/10',
-                  current: mailboxInfo?.storageQuotaMb > 2048 && mailboxInfo?.storageQuotaMb <= 10240,
-                },
-                {
-                  name: 'Business',
-                  storage: '50 GB',
-                  sends: 10000,
-                  price: '$12/mo',
-                  features: ['Everything in Pro', 'Custom Domain', '20 Aliases', 'Delegated Admin', 'SLA 99.9%'],
-                  color: 'border-amber-500/40',
-                  badge: 'text-amber-300 bg-amber-500/20',
-                  current: mailboxInfo?.storageQuotaMb > 10240,
-                },
-              ].map((plan) => (
-                <div
-                  key={plan.name}
-                  className={`p-4 rounded-2xl border ${plan.color} bg-slate-950 flex items-start justify-between gap-3`}
-                >
-                  <div className="space-y-1.5 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${plan.badge}`}>{plan.name}</span>
-                      {plan.current && (
-                        <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-0.5">
-                          <CheckCircle2 className="h-3 w-3" /> Current
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-[11px] text-slate-300">
-                      <span><HardDrive className="h-3 w-3 inline mr-1 text-slate-500" />{plan.storage}</span>
-                      <span><MailCheck className="h-3 w-3 inline mr-1 text-slate-500" />{plan.sends.toLocaleString()} sends/day</span>
-                    </div>
-                    <ul className="space-y-0.5 text-[11px] text-slate-400">
-                      {plan.features.map((f) => (
-                        <li key={f} className="flex items-center gap-1.5">
-                          <span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />{f}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-extrabold text-white">{plan.price}</p>
-                    {!plan.current && (
-                      <a
-                        href="/dashboard/billing"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 bg-white text-black hover:bg-neutral-200 text-white font-bold text-[10px] rounded-xl transition-all"
-                      >
-                        <ArrowUpCircle className="h-3 w-3" />
-                        Upgrade
-                        <ExternalLink className="h-2.5 w-2.5" />
-                      </a>
-                    )}
-                  </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-white uppercase tracking-wider text-xs flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-amber-400" /> Available Plans &amp; Storage Upgrades
+                </h4>
+                {isLoadingPlans && <span className="text-[11px] text-neutral-400">Loading catalog...</span>}
+              </div>
+
+              {availablePlans.length === 0 && !isLoadingPlans ? (
+                <div className="p-8 rounded-2xl border border-white/10 bg-[#0c0c0e] text-center text-neutral-400 text-xs">
+                  No upgrade plans currently found in the catalog.
                 </div>
-              ))}
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {availablePlans.map((plan) => {
+                    const isCurrent =
+                      mailboxInfo?.storageQuotaMb &&
+                      Math.abs(mailboxInfo.storageQuotaMb - plan.storageQuotaMb) < 50;
+                    const formattedStorage =
+                      plan.storageQuotaMb >= 1024
+                        ? `${(plan.storageQuotaMb / 1024).toFixed(0)} GB`
+                        : `${plan.storageQuotaMb} MB`;
+                    const retailPrice = Math.round(plan.priceLkr * 1.35);
+
+                    return (
+                      <ProductCard
+                        key={plan.id}
+                        id={plan.id}
+                        name={plan.name}
+                        category="smtp"
+                        price={plan.priceLkr}
+                        retailPrice={retailPrice}
+                        discountBadge="27% under retail"
+                        billingType={plan.billingType}
+                        tierChips={[
+                          { label: 'Storage', priceText: formattedStorage },
+                          { label: 'Sends', priceText: `${plan.dailyQuota.toLocaleString()}/day` },
+                          { label: 'Aliases', priceText: `${plan.maxAliases} max` },
+                        ]}
+                        features={[
+                          { text: `${formattedStorage} High-speed SSD Storage`, iconName: 'hard-drive' },
+                          { text: `${plan.dailyQuota.toLocaleString()} Outbound Sends/Day`, iconName: 'mail' },
+                          { text: `Up to ${plan.maxAliases} Email Aliases`, iconName: 'globe' },
+                          { text: 'Spamhaus & DKIM/SPF DNS Authentication', iconName: 'shield' },
+                        ]}
+                        logistics={[
+                          { text: 'Instant provisioning upon payment approval', icon: 'truck' },
+                          { text: '24/7 dedicated SMTP cluster SLA', icon: 'clock' },
+                        ]}
+                        termsNote="Minimum 1 month subscription"
+                        inStock={true}
+                        stockLabel={isCurrent ? 'Current Plan' : 'In stock'}
+                        buyLabel={isCurrent ? 'Current Plan' : 'Upgrade'}
+                        disabled={isCurrent}
+                        isCurrent={isCurrent}
+                        onBuy={() => {
+                          window.location.href = `/orders?planId=${plan.id}`;
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            <p className="text-center text-[10px] text-slate-600">
-              To change your mailbox plan or renew subscriptions, visit the Billing section of your dashboard.
-              Upgrades apply immediately after payment approval.
+            <p className="text-center text-[11px] text-neutral-500">
+              To change your mailbox plan or renew subscriptions, upgrades apply immediately after payment approval.
             </p>
           </div>
         )}

@@ -46,6 +46,8 @@ import {
 } from 'lucide-react';
 import { MailboxProfileModal, type MailboxProfileData } from '@/components/email/MailboxProfileModal';
 import { MailboxStaffAccessModal } from '@/components/email/MailboxStaffAccessModal';
+import { ProductCard } from '@/components/ProductCard';
+import { ProductDetailsModal } from '@/components/ProductDetailsModal';
 
 export interface EmailPlanQuotas {
   isDev: boolean;
@@ -216,6 +218,30 @@ export default function BusinessEmailManagementDashboard() {
   const [userRole, setUserRole] = useState<string>('customer');
   const [usersList, setUsersList] = useState<any[]>([]);
 
+  // Email Plans & Upgrade Modal state
+  const [showPlansModal, setShowPlansModal] = useState(false);
+  const [emailPlans, setEmailPlans] = useState<any[]>([]);
+  const [loadingEmailPlans, setLoadingEmailPlans] = useState(false);
+  const [selectedPlanDetail, setSelectedPlanDetail] = useState<{
+    name: string;
+    price: number;
+    specs: Record<string, any>;
+    features: string[];
+  } | null>(null);
+
+  const handleOpenPlansModal = async () => {
+    setShowPlansModal(true);
+    setLoadingEmailPlans(true);
+    try {
+      const res = await api.email.plans();
+      setEmailPlans(res.plans || []);
+    } catch (err: any) {
+      toast(err.message || 'Failed to load email plans', 'error');
+    } finally {
+      setLoadingEmailPlans(false);
+    }
+  };
+
   const { toast } = useToast();
 
   const webmailBaseUrl = process.env.NEXT_PUBLIC_WEBMAIL_URL || 'http://localhost:3002';
@@ -271,19 +297,60 @@ export default function BusinessEmailManagementDashboard() {
 
   const activeMailbox = mailboxes.find((m) => m.id === selectedMailboxId) || mailboxes[0];
 
+  const [deletingMailboxId, setDeletingMailboxId] = useState<string | null>(null);
+  const [deletingDomain, setDeletingDomain] = useState<string | null>(null);
+
   const handleOpenWebmail = async (targetMailbox?: Mailbox) => {
     const target = targetMailbox || activeMailbox;
     try {
-      const ticketRes = await api.smtp.getSsoTicket(target?.id).catch(() => null);
-      if (ticketRes?.ssoToken) {
-        const dest = ticketRes.webmailUrl || target?.webmailUrl || webmailBaseUrl;
-        const separator = dest.includes('?') ? '&' : '?';
-        window.open(`${dest}${separator}ssoToken=${encodeURIComponent(ticketRes.ssoToken)}`, '_blank');
-        return;
+      if (target?.id) {
+        const ticketRes = await api.webmail.getSsoTicket(target.id).catch(() => null);
+        if (ticketRes?.ssoToken) {
+          const dest = ticketRes.webmailUrl || target?.webmailUrl || webmailBaseUrl;
+          const separator = dest.includes('?') ? '&' : '?';
+          window.open(`${dest}${separator}ssoToken=${encodeURIComponent(ticketRes.ssoToken)}`, '_blank');
+          return;
+        }
       }
     } catch {}
     const webmailUrl = target?.webmailUrl || webmailBaseUrl;
     window.open(webmailUrl, '_blank');
+  };
+
+  const handleDeleteMailbox = async (mb: Mailbox) => {
+    if (!window.confirm(`Are you sure you want to delete mailbox "${mb.email}"? All emails and mailbox data will be permanently removed.`)) {
+      return;
+    }
+    setDeletingMailboxId(mb.id);
+    try {
+      await api.email.deleteMailbox(mb.id);
+      toast(`Mailbox ${mb.email} deleted successfully`, 'success');
+      setMailboxes((prev) => prev.filter((m) => m.id !== mb.id));
+      if (selectedMailboxId === mb.id) {
+        const remaining = mailboxes.filter((m) => m.id !== mb.id);
+        setSelectedMailboxId(remaining.length > 0 ? remaining[0].id : '');
+      }
+    } catch (err: any) {
+      toast(err.message || 'Failed to delete mailbox', 'error');
+    } finally {
+      setDeletingMailboxId(null);
+    }
+  };
+
+  const handleDeleteDomain = async (domainItem: DomainRecord) => {
+    if (!window.confirm(`Are you sure you want to disconnect domain "${domainItem.domain}"? Active mailboxes using this domain must be removed first.`)) {
+      return;
+    }
+    setDeletingDomain(domainItem.domain);
+    try {
+      await api.email.deleteDomain(domainItem.id || domainItem.domain);
+      toast(`Domain ${domainItem.domain} disconnected successfully`, 'success');
+      setDomains((prev) => prev.filter((d) => d.domain !== domainItem.domain && d.id !== domainItem.id));
+    } catch (err: any) {
+      toast(err.message || 'Failed to delete domain', 'error');
+    } finally {
+      setDeletingDomain(null);
+    }
   };
 
   const handleOpenPasswordModal = (mb: Mailbox) => {
@@ -763,13 +830,15 @@ EOF`;
                   </p>
                 </div>
 
-                <a
-                  href="/billing"
-                  className="text-xs font-bold text-white hover:text-neutral-300 flex items-center gap-1.5 bg-white/10 hover:bg-white/10 px-4 py-2 rounded-xl border border-white/10 transition-all self-start md:self-auto"
-                >
-                  <span>Manage Plan & Add-ons</span>
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                </a>
+                {!planQuotas.isDev && (
+                  <button
+                    onClick={handleOpenPlansModal}
+                    className="text-xs font-bold text-white hover:text-neutral-300 flex items-center gap-1.5 bg-white/10 hover:bg-white/15 px-4 py-2 rounded-xl border border-white/10 transition-all self-start md:self-auto cursor-pointer"
+                  >
+                    <span>Manage Plan & Add-ons</span>
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
 
               {/* 3 Metric Columns */}
@@ -888,12 +957,12 @@ EOF`;
                         : 'You have reached the maximum mailbox limit for your active plan. Upgrade your plan for additional accounts.'}
                     </p>
                   </div>
-                  <a
-                    href="/billing"
-                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow-md shrink-0"
+                  <button
+                    onClick={handleOpenPlansModal}
+                    className="px-4 py-2 bg-white hover:bg-neutral-200 text-black font-bold text-xs rounded-xl shadow-md shrink-0 cursor-pointer"
                   >
                     Upgrade Plan
-                  </a>
+                  </button>
                 </div>
               )}
             </div>
@@ -1123,6 +1192,16 @@ EOF`;
                         </button>
 
                         <button
+                          onClick={() => handleDeleteMailbox(mb)}
+                          disabled={deletingMailboxId === mb.id}
+                          className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-bold text-xs transition-all flex items-center gap-1 border border-red-500/20 disabled:opacity-50"
+                          title="Delete Mailbox"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Delete</span>
+                        </button>
+
+                        <button
                           onClick={() => handleOpenWebmail(mb)}
                           className="px-3.5 py-1.5 rounded-xl bg-white text-black hover:bg-neutral-200 font-bold text-xs shadow-md transition-all flex items-center gap-1"
                         >
@@ -1192,14 +1271,25 @@ EOF`;
                     </span>
                   </div>
 
-                  <button
-                    onClick={() => handleRecheckDns(dom.id)}
-                    disabled={verifyingDomainId === dom.id}
-                    className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow transition-all flex items-center gap-2"
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${verifyingDomainId === dom.id ? 'animate-spin' : ''}`} />
-                    <span>Re-check DNS</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleRecheckDns(dom.id)}
+                      disabled={verifyingDomainId === dom.id}
+                      className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow transition-all flex items-center gap-2"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${verifyingDomainId === dom.id ? 'animate-spin' : ''}`} />
+                      <span>Re-check DNS</span>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteDomain(dom)}
+                      disabled={deletingDomain === dom.domain}
+                      className="bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 text-xs font-bold px-3 py-2 rounded-xl shadow transition-all flex items-center gap-1.5 disabled:opacity-50"
+                      title="Disconnect Domain"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Remove</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* DNS Records Table */}
@@ -2507,6 +2597,146 @@ EOF`;
             </form>
           </div>
         </div>
+      )}
+
+      {/* Dynamic Email Plans & Upgrade Modal */}
+      {showPlansModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-[#121215] border border-white/15 rounded-3xl p-6 md:p-8 w-full max-w-4xl space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-white" />
+                  <span>Available Email & Storage Plans</span>
+                </h3>
+                <p className="text-xs text-neutral-400 mt-1">
+                  Active paid enterprise tiers with dedicated WildDuck storage and send allocations.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPlansModal(false)}
+                className="text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {loadingEmailPlans ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-3 text-neutral-400 text-xs">
+                <Loader2 className="w-6 h-6 animate-spin text-white" />
+                <span>Fetching live plans from catalog...</span>
+              </div>
+            ) : emailPlans.length === 0 ? (
+              <div className="py-8 text-center text-neutral-400 text-xs">
+                No active plans currently found in the catalog.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {emailPlans.map((plan) => {
+                  const isCurrent =
+                    planQuotas?.planName &&
+                    (planQuotas.planName.toLowerCase().includes(plan.name.toLowerCase()) ||
+                      plan.name.toLowerCase().includes(planQuotas.planName.toLowerCase()));
+                  const formattedStorage =
+                    plan.storageQuotaMb >= 1024
+                      ? `${plan.storageQuotaMb / 1024} GB`
+                      : `${plan.storageQuotaMb} MB`;
+
+                  return (
+                    <ProductCard
+                      key={plan.id}
+                      id={plan.id}
+                      name={plan.name}
+                      category="smtp"
+                      categoryLabel="SMTP & Email"
+                      billingType={plan.billingType}
+                      price={plan.priceLkr}
+                      currency="Rs"
+                      discountBadge={isCurrent ? 'Current Plan' : '27% under retail'}
+                      isCurrent={!!isCurrent}
+                      tierChips={[
+                        { label: 'Quarterly', priceText: `Rs ${plan.priceLkr.toLocaleString()}` },
+                        {
+                          label: 'Monthly Eqv',
+                          priceText: `Rs ${plan.monthlyEquivalentLkr.toLocaleString()}`,
+                        },
+                        { label: 'Multi-Domain', priceText: 'Included' },
+                      ]}
+                      features={[
+                        { icon: '🧠', text: 'WildDuck Enterprise Engine' },
+                        { icon: '💾', text: `${formattedStorage} High-Speed NVMe Storage` },
+                        {
+                          icon: '⚡',
+                          text: `${plan.dailyQuota.toLocaleString()} High-Deliverability Sends/Day`,
+                        },
+                        { icon: '🌐', text: `Up to ${plan.maxAliases} Email Aliases & Routing` },
+                      ]}
+                      logistics={[
+                        { icon: 'truck', text: 'Held for you; delivered when you ask' },
+                        { icon: 'clock', text: 'Instant automated provisioning upon approval' },
+                        { icon: 'box', text: 'Ask for it within 7 days of buying' },
+                      ]}
+                      termsNote="Minimum 3-month commitment per order"
+                      inStock={true}
+                      buyLabel={isCurrent ? 'Active Plan' : 'Buy'}
+                      disabled={!!isCurrent}
+                      onDetails={() =>
+                        setSelectedPlanDetail({
+                          name: plan.name,
+                          price: plan.priceLkr,
+                          specs: {
+                            storage: formattedStorage,
+                            dailySends: `${plan.dailyQuota} sends/day`,
+                            aliases: `${plan.maxAliases} aliases`,
+                            billing: plan.billingType,
+                          },
+                          features: [
+                            '100% DKIM, SPF & DMARC Verified Delivery',
+                            'Modern Webmail Suite & WildDuck Webmail Interface',
+                            'Standard IMAP (993) & SMTP (465/587) TLS Access',
+                            'SpamAssassin & ClamAV Zero-Tolerance Anti-Spam',
+                          ],
+                        })
+                      }
+                      onBuy={() => {
+                        window.location.href = `/orders?planId=${plan.id}`;
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-neutral-400">
+              <span>Automatic provisioning upon payment confirmation.</span>
+              <button
+                onClick={() => setShowPlansModal(false)}
+                className="px-4 py-1.5 rounded-xl text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/5 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Selected Plan Details Modal */}
+      {selectedPlanDetail && (
+        <ProductDetailsModal
+          isOpen={true}
+          onClose={() => setSelectedPlanDetail(null)}
+          productName={selectedPlanDetail.name}
+          category="SMTP & Email"
+          price={selectedPlanDetail.price}
+          currency="Rs"
+          specs={selectedPlanDetail.specs}
+          features={selectedPlanDetail.features}
+          buyLabel="Order Plan Now"
+          onProceedToBuy={() => {
+            const plan = emailPlans.find((p) => p.name === selectedPlanDetail.name);
+            if (plan) window.location.href = `/orders?planId=${plan.id}`;
+          }}
+        />
       )}
     </div>
   );

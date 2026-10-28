@@ -1,9 +1,25 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageHeader, Card, Spinner, ErrorBanner, Button, useToast } from '@/components/ui';
 import { IconExternalLink } from '@/components/Icons';
 import { api } from '@/lib/api';
+import {
+  Mail,
+  HardDrive,
+  Send,
+  Globe,
+  ShieldCheck,
+  Server,
+  Key,
+  Eye,
+  Trash2,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowRight,
+  Zap,
+  X,
+} from 'lucide-react';
 
 interface Mailbox {
   id: string;
@@ -108,23 +124,13 @@ export default function AdminEmailPage() {
   async function handleRevealPassword(id: string) {
     try {
       const res = await api.smtp.revealPassword(id);
-      setRevealedPasswords((prev) => ({ ...prev, [id]: res.password }));
+      setRevealedPasswords((prev: Record<string, string>) => ({ ...prev, [id]: res.password }));
       toast('Decrypted mailbox password (Audit Logged)', 'info');
     } catch (err: any) {
       toast(err.message || 'Failed to reveal password', 'error');
     }
   }
 
-  async function handleLaunchSso(id: string) {
-    try {
-      const res = await api.smtp.getSsoTicket(id);
-      if (res.webmailUrl) {
-        window.open(res.webmailUrl, '_blank');
-      }
-    } catch (err: any) {
-      toast(err.message || 'Failed to launch SSO ticket', 'error');
-    }
-  }
 
   async function handleProvisionSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -170,13 +176,14 @@ export default function AdminEmailPage() {
   if (loading) return <Spinner label="Loading Platform Mail Admin Control Center..." />;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in text-white pb-12">
       <PageHeader
         title="Business Email & Platform Mail Cluster Admin"
-        description="Monitor mail relay nodes, provision corporate mail accounts, test global SMTP relays, and inspect custom customer quotas."
+        description="Monitor mail relay nodes, provision corporate mail accounts, test global SMTP relays, and inspect customer mailbox allocations."
         action={
           <div className="flex items-center gap-2">
             <Button size="sm" variant="secondary" onClick={handleTestGlobalSmtp} loading={testingSmtp}>
+              <Zap className="w-3.5 h-3.5 mr-1.5 text-amber-400" />
               Test Outbound SMTP Relay
             </Button>
             <Button size="sm" onClick={() => setShowProvisionModal(true)}>
@@ -190,147 +197,218 @@ export default function AdminEmailPage() {
 
       {/* Global SMTP Connection Verification Banner */}
       {smtpResult && (
-        <div className={`p-4 rounded-2xl border ${smtpResult.ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'} text-xs flex items-center justify-between`}>
-          <div className="flex items-center gap-2">
-            <span className="font-bold flex items-center gap-1">
-              {smtpResult.ok
-                ? <><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Global Outbound SMTP Active</>
-                : <><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Outbound SMTP Failure:</>}
+        <div
+          className={`p-4 rounded-2xl border ${
+            smtpResult.ok
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+              : 'bg-red-500/10 border-red-500/30 text-red-300'
+          } text-xs flex items-center justify-between shadow-lg backdrop-blur-md`}
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="font-bold flex items-center gap-1.5">
+              {smtpResult.ok ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  Global Outbound SMTP Active
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-4 h-4 text-red-400" />
+                  Outbound SMTP Failure:
+                </>
+              )}
             </span>
-            <span>{smtpResult.message}</span>
+            <span className="text-neutral-300">{smtpResult.message}</span>
           </div>
-          {smtpResult.latencyMs && <span className="font-mono text-[11px] bg-slate-900 px-2 py-0.5 rounded">{smtpResult.latencyMs}ms Latency</span>}
+          {smtpResult.latencyMs && (
+            <span className="font-mono text-[11px] bg-black/60 border border-white/10 px-2.5 py-1 rounded-full text-neutral-300">
+              {smtpResult.latencyMs}ms Latency
+            </span>
+          )}
         </div>
       )}
 
       {/* S3 Storage & Dev Webmail Banner */}
-      <div className="p-4 rounded-2xl border border-sky-500/30 bg-sky-500/10 text-sky-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-sky-500/20 rounded-xl text-sky-400 font-bold text-xs">
-            S3 / VPS
+      <div className="p-5 rounded-2xl border border-white/10 bg-[#141416] text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+            <Server className="w-5 h-5 text-white" />
           </div>
           <div>
-            <span className="font-bold text-sm block">Webmail Cluster & S3 Storage Extension</span>
-            <p className="text-xs opacity-80">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm text-white">Mail Cluster Engine & S3 Storage</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold">
+                WildDuck Cluster
+              </span>
+            </div>
+            <p className="text-xs text-neutral-400 mt-0.5">
               {telemetry?.s3Configured
-                ? `Attached Cloudflare R2 / S3 Storage Bucket: ${telemetry.s3BucketName || 'Active'}`
-                : 'S3 Object Storage is currently unconfigured (Local VPS disk storage in use).'}
-              {telemetry?.assignedNode && ` • Host VPS: ${telemetry.assignedNode.label} (${telemetry.assignedNode.ip})`}
+                ? `Attached Storage Bucket: ${telemetry.s3BucketName || 'Active'}`
+                : 'S3 Object Storage is unconfigured (Local VPS disk storage in use).'}
+              {telemetry?.assignedNode && ` • Host Node: ${telemetry.assignedNode.label} (${telemetry.assignedNode.ip})`}
             </p>
           </div>
         </div>
         <a
           href="/dev/webmail"
-          className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition-all shadow-md shrink-0 flex items-center gap-1.5"
+          className="px-4 py-2 rounded-xl bg-white text-black hover:bg-neutral-200 font-bold text-xs transition-all shadow-md shrink-0 flex items-center gap-1.5"
         >
-          Open Dev Control Center & S3 Setup →
+          <span>Dev Control Center &amp; Storage Setup</span>
+          <ArrowRight className="w-3.5 h-3.5" />
         </a>
       </div>
 
       {/* Admin Telemetry Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-4 border border-white/10 rounded-2xl bg-white/[0.02] space-y-1">
-          <p className="text-xs text-text-muted">Total Active Mailboxes</p>
-          <p className="text-xl font-bold text-white font-mono">{telemetry?.totalMailboxes ?? stats?.totalMailboxes ?? 0}</p>
+        <div className="p-5 border border-white/10 rounded-2xl bg-[#141416] space-y-2 shadow-lg">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-neutral-400 font-medium">Total Active Mailboxes</p>
+            <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-neutral-300">
+              <Mail className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <p className="text-2xl font-black text-white font-mono">
+            {telemetry?.totalMailboxes ?? stats?.totalMailboxes ?? 0}
+          </p>
         </div>
-        <div className="p-4 border border-white/10 rounded-2xl bg-white/[0.02] space-y-1">
-          <p className="text-xs text-text-muted">Allocated Storage Quota</p>
-          <p className="text-xl font-bold text-accent-cyan font-mono">{telemetry?.totalStorageMb ?? stats?.totalStorageMb ?? 0} MB</p>
+
+        <div className="p-5 border border-white/10 rounded-2xl bg-[#141416] space-y-2 shadow-lg">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-neutral-400 font-medium">Allocated Storage</p>
+            <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-neutral-300">
+              <HardDrive className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <p className="text-2xl font-black text-white font-mono">
+            {telemetry?.totalStorageMb ?? stats?.totalStorageMb ?? 0} <span className="text-xs font-normal text-neutral-400">MB</span>
+          </p>
         </div>
-        <div className="p-4 border border-white/10 rounded-2xl bg-white/[0.02] space-y-1">
-          <p className="text-xs text-text-muted">Emails Sent Today</p>
-          <p className="text-xl font-bold text-emerald-400 font-mono">{telemetry?.totalSentToday ?? stats?.totalSentToday ?? 0}</p>
+
+        <div className="p-5 border border-white/10 rounded-2xl bg-[#141416] space-y-2 shadow-lg">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-neutral-400 font-medium">Emails Sent Today</p>
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <Send className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <p className="text-2xl font-black text-emerald-400 font-mono">
+            {telemetry?.totalSentToday ?? stats?.totalSentToday ?? 0}
+          </p>
         </div>
-        <div className="p-4 border border-white/10 rounded-2xl bg-white/[0.02] space-y-1">
-          <p className="text-xs text-text-muted">Managed Custom Domains</p>
-          <p className="text-xl font-bold text-accent-violet-light font-mono">{telemetry?.totalDomains ?? stats?.totalDomains ?? 0}</p>
+
+        <div className="p-5 border border-white/10 rounded-2xl bg-[#141416] space-y-2 shadow-lg">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-neutral-400 font-medium">Managed Custom Domains</p>
+            <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-neutral-300">
+              <Globe className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <p className="text-2xl font-black text-white font-mono">
+            {telemetry?.totalDomains ?? stats?.totalDomains ?? 0}
+          </p>
         </div>
       </div>
 
       {/* Customer Mailboxes Table */}
-      <Card
-        title="Customer Mailbox Quotas & Access Control"
-        description="Manage storage limits, daily send quotas, reveal credentials (audit logged), and launch standalone webmail portals."
-      >
+      <div className="bg-[#141416] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+        <div className="p-5 border-b border-white/10 flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-sm text-white">Customer Mailbox Quotas &amp; Accounts</h3>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Manage storage allocations, daily message limits, reveal vault credentials, and manage mailbox states.
+            </p>
+          </div>
+          <span className="text-xs font-mono text-neutral-400 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
+            {mailboxes.length} Provisioned
+          </span>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-white/[0.03] text-text-muted border-b border-white/10 uppercase">
+            <thead className="bg-white/[0.03] text-neutral-400 border-b border-white/10 uppercase tracking-wider text-[11px]">
               <tr>
-                <th className="p-3">Assigned User</th>
-                <th className="p-3">Email Address</th>
-                <th className="p-3">SMTP Host</th>
-                <th className="p-3">Password</th>
-                <th className="p-3">Storage Quota</th>
-                <th className="p-3">Send Limit</th>
-                <th className="p-3">Status</th>
-                <th className="p-3 text-right">Actions</th>
+                <th className="p-3.5">Assigned Customer</th>
+                <th className="p-3.5">Mailbox Email</th>
+                <th className="p-3.5">SMTP Host &amp; Port</th>
+                <th className="p-3.5">Password</th>
+                <th className="p-3.5">Storage Quota</th>
+                <th className="p-3.5">Daily Sends</th>
+                <th className="p-3.5">Status</th>
+                <th className="p-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-xs">
               {mailboxes.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-text-muted font-sans">
+                  <td colSpan={8} className="p-10 text-center text-neutral-400 font-sans">
                     No mailboxes provisioned yet. Click <strong>+ Provision Mail Account</strong> above to add one.
                   </td>
                 </tr>
               ) : (
-                mailboxes.map((mb) => (
-                  <tr key={mb.id} className="hover:bg-white/[0.02]">
-                    <td className="p-3 font-sans">
+                mailboxes.map((mb: Mailbox) => (
+                  <tr key={mb.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="p-3.5 font-sans">
                       <p className="font-bold text-white">{mb.userDisplayName || mb.userEmail}</p>
-                      <p className="text-[10px] text-text-muted">{mb.userEmail}</p>
+                      <p className="text-[11px] text-neutral-400 font-mono">{mb.userEmail}</p>
                     </td>
-                    <td className="p-3">
-                      <p className="font-bold text-accent-cyan font-mono">{mb.email}</p>
-                      <p className="text-[10px] text-text-faint font-mono">{mb.username}</p>
+                    <td className="p-3.5">
+                      <p className="font-bold text-white font-mono">{mb.email}</p>
+                      <p className="text-[10px] text-neutral-400 font-mono">User: {mb.username}</p>
                     </td>
-                    <td className="p-3 font-mono text-white">
+                    <td className="p-3.5 font-mono text-neutral-300">
                       {mb.smtpHost}:{mb.smtpPort}
                     </td>
-                    <td className="p-3 font-mono">
+                    <td className="p-3.5 font-mono">
                       {revealedPasswords[mb.id] ? (
-                        <span className="text-emerald-400 font-bold">{revealedPasswords[mb.id]}</span>
+                        <span className="text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
+                          {revealedPasswords[mb.id]}
+                        </span>
                       ) : (
                         <button
                           onClick={() => handleRevealPassword(mb.id)}
-                          className="text-[11px] text-text-muted hover:text-white underline"
+                          className="text-[11px] text-neutral-400 hover:text-white flex items-center gap-1.5 bg-white/5 hover:bg-white/10 px-2.5 py-1 rounded-lg border border-white/10 transition-colors cursor-pointer"
                         >
-                          Reveal Password
+                          <Eye className="w-3 h-3 text-neutral-400" />
+                          <span>Reveal</span>
                         </button>
                       )}
                     </td>
-                    <td className="p-3 text-white font-mono">
-                      {mb.storageUsedMb} / {mb.storageQuotaMb} MB
+                    <td className="p-3.5 text-neutral-300 font-mono">
+                      <div className="space-y-1">
+                        <span>{mb.storageUsedMb} / {mb.storageQuotaMb} MB</span>
+                        <div className="w-20 bg-neutral-800 h-1 rounded-full overflow-hidden">
+                          <div
+                            className="bg-emerald-400 h-full rounded-full"
+                            style={{
+                              width: `${Math.min(100, Math.round((mb.storageUsedMb / Math.max(1, mb.storageQuotaMb)) * 100))}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
                     </td>
-                    <td className="p-3 text-white font-mono">
-                      {mb.dailySendCount} / {mb.dailySendLimit} msgs
+                    <td className="p-3.5 text-neutral-300 font-mono">
+                      {mb.dailySendCount} / {mb.dailySendLimit}
                     </td>
-                    <td className="p-3">
+                    <td className="p-3.5">
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                          mb.status === 'active' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono ${
+                          mb.status === 'active'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
                         }`}
                       >
                         {mb.status}
                       </span>
                     </td>
-                    <td className="p-3 text-right space-x-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleLaunchSso(mb.id)}
-                        className="inline-flex items-center gap-1.5"
-                      >
-                        <span>Launch Webmail</span>
-                        <IconExternalLink size={12} />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
+                    <td className="p-3.5 text-right">
+                      <button
+                        type="button"
                         onClick={() => handleDeleteMailbox(mb.id, mb.email)}
+                        className="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
                       >
-                        Delete
-                      </Button>
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -338,39 +416,42 @@ export default function AdminEmailPage() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
 
       {/* Admin Provisioning Modal */}
       {showProvisionModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-bg border border-white/10 rounded-3xl p-6 w-full max-w-lg space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                Provision Customer Mail Account
-              </h3>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#121215] border border-white/15 rounded-3xl p-6 md:p-8 w-full max-w-lg space-y-5 shadow-2xl text-white">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <h3 className="font-bold text-base text-white flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-emerald-400" />
+                  <span>Provision Customer Mailbox</span>
+                </h3>
+                <p className="text-xs text-neutral-400 mt-0.5">
+                  Assign a dedicated mailbox on the WildDuck mail cluster.
+                </p>
+              </div>
               <button
                 onClick={() => setShowProvisionModal(false)}
-                className="text-text-muted hover:text-white text-xs"
+                className="text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleProvisionSubmit} className="space-y-3">
+            <form onSubmit={handleProvisionSubmit} className="space-y-4">
               <div>
-                <label className="text-xs font-medium text-text-muted block mb-1">
+                <label className="text-xs font-bold text-neutral-300 block mb-1">
                   Assign To User Account <span className="text-red-400">*</span>
                 </label>
                 <select
                   value={targetUserId}
                   onChange={(e) => setTargetUserId(e.target.value)}
-                  className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-accent-cyan"
+                  className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                 >
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id} className="bg-bg text-white">
+                  {users.map((u: UserOption) => (
+                    <option key={u.id} value={u.id} className="bg-[#121215] text-white">
                       {u.displayName ? `${u.displayName} (${u.email})` : u.email} [{u.role}]
                     </option>
                   ))}
@@ -379,7 +460,7 @@ export default function AdminEmailPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-text-muted block mb-1">
+                  <label className="text-xs font-bold text-neutral-300 block mb-1">
                     Username / Prefix <span className="text-red-400">*</span>
                   </label>
                   <input
@@ -387,12 +468,12 @@ export default function AdminEmailPage() {
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="e.g. support or john"
-                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-accent-cyan"
+                    placeholder="support"
+                    className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-text-muted block mb-1">
+                  <label className="text-xs font-bold text-neutral-300 block mb-1">
                     Domain
                   </label>
                   <input
@@ -400,13 +481,13 @@ export default function AdminEmailPage() {
                     value={domain}
                     onChange={(e) => setDomain(e.target.value)}
                     placeholder="shanutechx.com"
-                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-accent-cyan"
+                    className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-text-muted block mb-1">
+                <label className="text-xs font-bold text-neutral-300 block mb-1">
                   Password <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -415,13 +496,13 @@ export default function AdminEmailPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Minimum 8 characters"
-                  className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-accent-cyan"
+                  className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-text-muted block mb-1">
+                  <label className="text-xs font-bold text-neutral-300 block mb-1">
                     Storage Quota (MB)
                   </label>
                   <input
@@ -429,11 +510,11 @@ export default function AdminEmailPage() {
                     value={storageQuotaMb}
                     onChange={(e) => setStorageQuotaMb(e.target.value)}
                     placeholder="5120"
-                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-accent-cyan"
+                    className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-text-muted block mb-1">
+                  <label className="text-xs font-bold text-neutral-300 block mb-1">
                     Daily Send Limit (emails/day)
                   </label>
                   <input
@@ -441,23 +522,26 @@ export default function AdminEmailPage() {
                     value={dailySendLimit}
                     onChange={(e) => setDailySendLimit(e.target.value)}
                     placeholder="1000"
-                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-accent-cyan"
+                    className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-white/30"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
-                <Button
+              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                <button
                   type="button"
-                  variant="secondary"
-                  size="sm"
                   onClick={() => setShowProvisionModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-medium text-neutral-400 hover:text-white hover:bg-white/5 transition-colors"
                 >
                   Cancel
-                </Button>
-                <Button type="submit" size="sm" loading={provisioning}>
-                  Provision Mailbox
-                </Button>
+                </button>
+                <button
+                  type="submit"
+                  disabled={provisioning}
+                  className="px-5 py-2 rounded-xl bg-white text-black hover:bg-neutral-200 text-xs font-bold shadow-md transition-colors disabled:opacity-50"
+                >
+                  {provisioning ? 'Provisioning...' : 'Provision Mailbox'}
+                </button>
               </div>
             </form>
           </div>

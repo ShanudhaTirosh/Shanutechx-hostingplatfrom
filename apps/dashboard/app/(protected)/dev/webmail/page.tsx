@@ -421,37 +421,33 @@ export default function DevWebmailControlCenterPage() {
 
       {/* Telemetry Summary Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5 bg-slate-900/60 border-slate-800/80 backdrop-blur-md relative overflow-hidden">
+        <div className="p-5 bg-[#141416] border border-white/10 rounded-2xl relative overflow-hidden shadow-lg space-y-2">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Mailboxes Active</p>
-              <h3 className="text-2xl font-bold text-slate-100 mt-1">{telemetry?.totalMailboxes ?? mailboxes.length}</h3>
-            </div>
-            <div className="p-3 bg-sky-500/10 rounded-xl text-sky-400">
-              <Mail className="w-6 h-6" />
+            <p className="text-xs text-neutral-400 font-medium uppercase tracking-wider">Mailboxes Active</p>
+            <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white">
+              <Mail className="w-4 h-4 text-white" />
             </div>
           </div>
-          <p className="text-[11px] text-slate-400 mt-3 flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Across all customer & dev accounts
+          <h3 className="text-2xl font-black text-white font-mono">{telemetry?.totalMailboxes ?? mailboxes.length}</h3>
+          <p className="text-[11px] text-neutral-400 flex items-center gap-1.5 pt-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Across all customer &amp; dev accounts
           </p>
-        </Card>
+        </div>
 
-        <Card className="p-5 bg-slate-900/60 border-slate-800/80 backdrop-blur-md relative overflow-hidden">
+        <div className="p-5 bg-[#141416] border border-white/10 rounded-2xl relative overflow-hidden shadow-lg space-y-2">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Storage Usage</p>
-              <h3 className="text-2xl font-bold text-slate-100 mt-1">
-                {((telemetry?.totalUsedStorageMb ?? 0) / 1024).toFixed(1)} GB
-              </h3>
-            </div>
-            <div className="p-3 bg-white/5 rounded-xl text-white">
-              <HardDrive className="w-6 h-6" />
+            <p className="text-xs text-neutral-400 font-medium uppercase tracking-wider">Storage Usage</p>
+            <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white">
+              <HardDrive className="w-4 h-4 text-white" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+          <h3 className="text-2xl font-black text-white font-mono">
+            {((telemetry?.totalUsedStorageMb ?? 0) / 1024).toFixed(1)} GB
+          </h3>
+          <div className="pt-1">
+            <div className="w-full bg-neutral-800 h-1.5 rounded-full overflow-hidden">
               <div
-                className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                className="bg-emerald-400 h-full rounded-full transition-all duration-500"
                 style={{
                   width: `${Math.min(
                     100,
@@ -460,97 +456,93 @@ export default function DevWebmailControlCenterPage() {
                 }}
               />
             </div>
-            <p className="text-[11px] text-slate-400 mt-1.5 flex justify-between">
-              <span>Used of {((telemetry?.totalStorageMb ?? 0) / 1024).toFixed(0)} GB quota</span>
-              <span className="font-semibold text-neutral-300">
+            <p className="text-[11px] text-neutral-400 mt-1.5 flex justify-between font-mono">
+              <span>{((telemetry?.totalStorageMb ?? 0) / 1024).toFixed(0)} GB quota</span>
+              <span className="font-semibold text-emerald-400">
                 {(((telemetry?.totalUsedStorageMb ?? 0) / Math.max(1, telemetry?.totalStorageMb ?? 1)) * 100).toFixed(0)}%
               </span>
             </p>
           </div>
-        </Card>
+        </div>
 
-        <Card className="p-5 bg-slate-900/60 border-slate-800/80 backdrop-blur-md relative overflow-hidden">
+        <div className="p-5 bg-[#141416] border border-white/10 rounded-2xl relative overflow-hidden shadow-lg space-y-2">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Target VPS Host Node</p>
-              <h3 className="text-lg font-bold text-slate-100 mt-1 truncate max-w-[160px]">
-                {telemetry?.assignedNode ? telemetry.assignedNode.label : 'Default Host Node'}
-              </h3>
-            </div>
-            <div className="p-3 bg-amber-500/10 rounded-xl text-amber-400">
-              <Server className="w-6 h-6" />
+            <p className="text-xs text-neutral-400 font-medium uppercase tracking-wider">Target VPS Host Node</p>
+            <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white">
+              <Server className="w-4 h-4 text-white" />
             </div>
           </div>
-          <p className="text-[11px] text-slate-400 mt-3 flex items-center gap-1 font-mono">
-            <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+          <h3 className="text-lg font-bold text-white truncate max-w-[180px] font-mono">
+            {telemetry?.assignedNode ? telemetry.assignedNode.label : 'Default Host Node'}
+          </h3>
+          <p className="text-[11px] text-neutral-400 flex items-center gap-1.5 font-mono pt-1">
+            <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
             {telemetry?.assignedNode ? telemetry.assignedNode.ip : 'Local Cluster Engine'}
           </p>
-        </Card>
+        </div>
 
-        <Card className="p-5 bg-slate-900/60 border-slate-800/80 backdrop-blur-md relative overflow-hidden">
+        <div className="p-5 bg-[#141416] border border-white/10 rounded-2xl relative overflow-hidden shadow-lg space-y-2">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">S3 Attachment Storage</p>
-              <div className="flex items-center gap-2 mt-1">
-                <span
-                  className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                    telemetry?.s3Configured
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                  }`}
-                >
-                  {telemetry?.s3Configured ? 'Attached' : 'Local Disk Only'}
-                </span>
-              </div>
-            </div>
-            <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-400">
-              <Database className="w-6 h-6" />
+            <p className="text-xs text-neutral-400 font-medium uppercase tracking-wider">Attachment Storage</p>
+            <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white">
+              <Database className="w-4 h-4 text-white" />
             </div>
           </div>
-          <p className="text-[11px] text-slate-400 mt-3 truncate">
-            {telemetry?.s3BucketName ? `Bucket: ${telemetry.s3BucketName}` : 'Attach Cloudflare R2 / S3 for external VPS'}
+          <div className="flex items-center gap-2 mt-1">
+            <span
+              className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider font-mono ${
+                telemetry?.s3Configured
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
+              }`}
+            >
+              {telemetry?.s3Configured ? 'S3 Attached' : 'Local Disk Only'}
+            </span>
+          </div>
+          <p className="text-[11px] text-neutral-400 truncate pt-1">
+            {telemetry?.s3BucketName ? `Bucket: ${telemetry.s3BucketName}` : 'Attach R2 / S3 for external VPS'}
           </p>
-        </Card>
+        </div>
       </div>
 
       {/* Main Tabbed Interface */}
-      <Card className="bg-slate-900/70 border-slate-800/80 backdrop-blur-xl overflow-hidden">
+      <div className="bg-[#141416] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
         {/* Navigation Tabs */}
-        <div className="flex items-center border-b border-slate-800/80 px-6 pt-4 gap-6">
+        <div className="flex items-center gap-2 border-b border-white/10 px-6 py-4 overflow-x-auto">
           <button
             onClick={() => setActiveTab('node_s3')}
-            className={`pb-4 font-semibold text-sm flex items-center gap-2 border-b-2 transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === 'node_s3'
-                ? 'border-sky-500 text-sky-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'bg-white text-black shadow-md'
+                : 'bg-white/5 text-neutral-400 hover:text-white hover:bg-white/10'
             }`}
           >
-            <Server className="w-4 h-4" />
-            VPS Node & S3 Storage Config
+            <Server className="w-3.5 h-3.5" />
+            <span>VPS Node &amp; S3 Storage Config</span>
           </button>
 
           <button
             onClick={() => setActiveTab('mailboxes')}
-            className={`pb-4 font-semibold text-sm flex items-center gap-2 border-b-2 transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === 'mailboxes'
-                ? 'border-sky-500 text-sky-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'bg-white text-black shadow-md'
+                : 'bg-white/5 text-neutral-400 hover:text-white hover:bg-white/10'
             }`}
           >
-            <Mail className="w-4 h-4" />
-            Mailboxes & Provisioning ({mailboxes.length})
+            <Mail className="w-3.5 h-3.5" />
+            <span>Mailboxes &amp; Accounts ({mailboxes.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('domains')}
-            className={`pb-4 font-semibold text-sm flex items-center gap-2 border-b-2 transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === 'domains'
-                ? 'border-sky-500 text-sky-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'bg-white text-black shadow-md'
+                : 'bg-white/5 text-neutral-400 hover:text-white hover:bg-white/10'
             }`}
           >
-            <Globe className="w-4 h-4" />
-            Domains & DNS Records ({domains.length})
+            <Globe className="w-3.5 h-3.5" />
+            <span>Domains &amp; DNS Records ({domains.length})</span>
           </button>
         </div>
 
@@ -560,12 +552,12 @@ export default function DevWebmailControlCenterPage() {
             {/* Section A: Target VPS Host Node Selection */}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <Server className="w-5 h-5 text-sky-400" />
-                <h3 className="text-base font-bold text-slate-100">Target VPS Host Node Selection</h3>
+                <Server className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">Target VPS Host Node Selection</h3>
               </div>
-              <p className="text-xs text-slate-400 mb-4 max-w-3xl">
-                Choose which registered VPS compute node hosts the Webmail stack (WildDuck IMAP/SMTP engine, Redis, & Webmail UI). 
-                If unselected, the platform defaults to running on the main system compute engine.
+              <p className="text-xs text-neutral-400 mb-4 max-w-3xl">
+                Choose which registered VPS compute node hosts the Webmail stack (WildDuck IMAP/SMTP engine, Redis, &amp; Webmail UI). 
+                If unselected, the platform defaults to running on the primary cluster API engine.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -573,13 +565,13 @@ export default function DevWebmailControlCenterPage() {
                   onClick={() => setConfig((prev) => ({ ...prev, mailNodeId: null }))}
                   className={`p-4 rounded-xl border cursor-pointer transition-all ${
                     config.mailNodeId === null
-                      ? 'bg-sky-500/10 border-sky-500 text-sky-200 shadow-md shadow-sky-500/10'
-                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                      ? 'bg-white/10 border-white text-white shadow-lg'
+                      : 'bg-[#0c0c0e] border-white/10 text-neutral-400 hover:border-white/20'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold text-sm text-slate-100">Default System Node</span>
-                    {config.mailNodeId === null && <CheckCircle2 className="w-4 h-4 text-sky-400" />}
+                    <span className="font-bold text-sm text-white">Default System Node</span>
+                    {config.mailNodeId === null && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
                   </div>
                   <p className="text-xs opacity-75">Run Webmail natively on the primary cluster API node</p>
                 </div>
@@ -590,18 +582,18 @@ export default function DevWebmailControlCenterPage() {
                     onClick={() => setConfig((prev) => ({ ...prev, mailNodeId: n.id }))}
                     className={`p-4 rounded-xl border cursor-pointer transition-all ${
                       config.mailNodeId === n.id
-                        ? 'bg-sky-500/10 border-sky-500 text-sky-200 shadow-md shadow-sky-500/10'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                        ? 'bg-white/10 border-white text-white shadow-lg'
+                        : 'bg-[#0c0c0e] border-white/10 text-neutral-400 hover:border-white/20'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-sm text-slate-100">{n.label}</span>
-                      {config.mailNodeId === n.id && <CheckCircle2 className="w-4 h-4 text-sky-400" />}
+                      <span className="font-bold text-sm text-white">{n.label}</span>
+                      {config.mailNodeId === n.id && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
                     </div>
-                    <p className="text-xs font-mono text-slate-400 mb-2">IP: {n.ip}</p>
+                    <p className="text-xs font-mono text-neutral-400 mb-2">IP: {n.ip}</p>
                     <span
-                      className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                        n.isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase font-mono ${
+                        n.isActive ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-neutral-800 text-neutral-500'
                       }`}
                     >
                       {n.isActive ? 'Active Node' : 'Offline'}
@@ -611,14 +603,14 @@ export default function DevWebmailControlCenterPage() {
               </div>
             </div>
 
-            <hr className="border-slate-800/80" />
+            <hr className="border-white/10" />
 
             {/* Section B: S3 / Cloudflare R2 Attachment Vault Storage */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <HardDrive className="w-5 h-5 text-emerald-400" />
-                  <h3 className="text-base font-bold text-slate-100">S3 / Cloudflare R2 Storage Attachment Extension</h3>
+                  <h3 className="text-base font-bold text-white">S3 / Cloudflare R2 Storage Attachment Extension</h3>
                 </div>
                 <Button
                   type="button"
@@ -631,14 +623,14 @@ export default function DevWebmailControlCenterPage() {
                   Verify S3 Connection
                 </Button>
               </div>
-              <p className="text-xs text-slate-400 mb-6 max-w-3xl">
+              <p className="text-xs text-neutral-400 mb-6 max-w-3xl">
                 Extend webmail attachment storage beyond VPS local storage limits by connecting Cloudflare R2, AWS S3, or any S3-compatible object store.
                 Credentials are encrypted using AES-256 GCM before storage.
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-2">
                     S3 Endpoint URL
                   </label>
                   <input
@@ -646,13 +638,13 @@ export default function DevWebmailControlCenterPage() {
                     value={config.s3Endpoint}
                     onChange={(e) => setConfig((prev) => ({ ...prev, s3Endpoint: e.target.value }))}
                     placeholder="https://<account-id>.r2.cloudflarestorage.com"
-                    className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-500 font-mono"
+                    className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-white/30 font-mono"
                   />
-                  <span className="text-[11px] text-slate-500 mt-1 block">Cloudflare R2 or AWS S3 endpoint hostname</span>
+                  <span className="text-[11px] text-neutral-500 mt-1 block">Cloudflare R2 or AWS S3 endpoint hostname</span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-2">
                     Bucket Name
                   </label>
                   <input
@@ -660,12 +652,12 @@ export default function DevWebmailControlCenterPage() {
                     value={config.s3BucketName}
                     onChange={(e) => setConfig((prev) => ({ ...prev, s3BucketName: e.target.value }))}
                     placeholder="shanutechx-webmail-attachments"
-                    className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-500 font-mono"
+                    className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-white/30 font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-2">
                     S3 Region
                   </label>
                   <input
@@ -673,12 +665,12 @@ export default function DevWebmailControlCenterPage() {
                     value={config.s3Region}
                     onChange={(e) => setConfig((prev) => ({ ...prev, s3Region: e.target.value }))}
                     placeholder="auto"
-                    className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-500 font-mono"
+                    className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-white/30 font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-2">
                     Access Key ID
                   </label>
                   <input
@@ -686,12 +678,12 @@ export default function DevWebmailControlCenterPage() {
                     value={config.s3AccessKeyId}
                     onChange={(e) => setConfig((prev) => ({ ...prev, s3AccessKeyId: e.target.value }))}
                     placeholder="AKIAIOSFODNN7EXAMPLE"
-                    className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-500 font-mono"
+                    className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-white/30 font-mono"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-2 flex items-center justify-between">
                     <span>Secret Access Key (Encrypted at Rest)</span>
                     {config.hasSecretAccessKey && (
                       <span className="text-[11px] text-emerald-400 font-normal flex items-center gap-1">
@@ -704,27 +696,27 @@ export default function DevWebmailControlCenterPage() {
                     value={s3SecretAccessKey}
                     onChange={(e) => setS3SecretAccessKey(e.target.value)}
                     placeholder={config.hasSecretAccessKey ? '•••••••••••••••• (Leave blank to keep current secret)' : 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'}
-                    className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-500 font-mono"
+                    className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-white/30 font-mono"
                   />
                 </div>
 
-                <div className="md:col-span-2 flex items-center gap-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                <div className="md:col-span-2 flex items-center gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
                   <input
                     type="checkbox"
                     id="autoSync"
                     checked={config.autoSyncAttachments}
                     onChange={(e) => setConfig((prev) => ({ ...prev, autoSyncAttachments: e.target.checked }))}
-                    className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-sky-500 focus:ring-sky-500"
+                    className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-emerald-400 focus:ring-emerald-500"
                   />
-                  <label htmlFor="autoSync" className="text-xs text-slate-300 cursor-pointer">
-                    <span className="font-bold text-slate-100 block">Auto-Sync Webmail Attachments to S3</span>
+                  <label htmlFor="autoSync" className="text-xs text-neutral-300 cursor-pointer">
+                    <span className="font-bold text-white block">Auto-Sync Webmail Attachments to S3</span>
                     Automatically stream incoming and outgoing email file attachments directly into the configured S3 bucket to save VPS local disk space.
                   </label>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-slate-800/80">
+            <div className="flex justify-end pt-4 border-t border-white/10">
               <Button type="submit" loading={savingConfig}>
                 Save Webmail Cluster Config
               </Button>
@@ -737,8 +729,8 @@ export default function DevWebmailControlCenterPage() {
           <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-slate-100">Provisioned Webmail Accounts</h3>
-                <p className="text-xs text-slate-400">View customer mailboxes, inspect resource usage, and provision staff or customer accounts.</p>
+                <h3 className="text-base font-bold text-white">Provisioned Webmail Accounts</h3>
+                <p className="text-xs text-neutral-400">View customer mailboxes, inspect resource usage, and provision staff or customer accounts.</p>
               </div>
               <Button size="sm" onClick={() => setShowProvisionModal(true)}>
                 <Plus className="w-4 h-4 mr-1" />
@@ -746,9 +738,9 @@ export default function DevWebmailControlCenterPage() {
               </Button>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-slate-800/80">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider text-[11px] border-b border-slate-800">
+            <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#0c0c0e]">
+              <table className="w-full text-left text-xs text-neutral-300">
+                <thead className="bg-white/5 text-neutral-400 font-bold uppercase tracking-wider text-[11px] border-b border-white/10">
                   <tr>
                     <th className="p-3.5">Mailbox Email</th>
                     <th className="p-3.5">Owner User</th>
@@ -758,19 +750,19 @@ export default function DevWebmailControlCenterPage() {
                     <th className="p-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 bg-slate-900/40">
+                <tbody className="divide-y divide-white/5">
                   {mailboxes.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-6 text-center text-slate-500">
+                      <td colSpan={6} className="p-8 text-center text-neutral-500">
                         No mailboxes provisioned yet.
                       </td>
                     </tr>
                   ) : (
                     mailboxes.map((mb) => (
-                      <tr key={mb.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="p-3.5 font-bold text-slate-100">
+                      <tr key={mb.id} className="hover:bg-white/5 transition-colors">
+                        <td className="p-3.5 font-bold text-white">
                           <div className="flex items-center gap-2">
-                            <Mail className="w-4 h-4 text-sky-400" />
+                            <Mail className="w-4 h-4 text-emerald-400" />
                             <span>{mb.email}</span>
                             {mb.isInternal && (
                               <span className="text-[10px] bg-white/10 text-neutral-300 border border-white/15 px-2 py-0.5 rounded-full font-semibold">
@@ -790,7 +782,7 @@ export default function DevWebmailControlCenterPage() {
                                   setCopiedPasswordId(mb.id);
                                   setTimeout(() => setCopiedPasswordId(null), 2000);
                                 }}
-                                className="text-[10px] text-slate-400 hover:text-white underline font-mono"
+                                className="text-[10px] text-neutral-400 hover:text-white underline font-mono"
                                 title="Copy Password"
                               >
                                 {copiedPasswordId === mb.id ? 'Copied!' : 'Copy'}
@@ -799,25 +791,25 @@ export default function DevWebmailControlCenterPage() {
                           )}
                         </td>
                         <td className="p-3.5">
-                          <span className="block text-slate-200">{mb.userEmail}</span>
-                          <span className="text-[10px] text-slate-500 font-mono">ID: {mb.userId}</span>
+                          <span className="block text-white font-medium">{mb.userEmail}</span>
+                          <span className="text-[10px] text-neutral-500 font-mono">ID: {mb.userId}</span>
                         </td>
                         <td className="p-3.5">
-                          <div className="font-semibold text-slate-200">
+                          <div className="font-semibold text-neutral-200">
                             {mb.storageUsedMb} MB / {mb.storageQuotaMb} MB
                           </div>
                         </td>
                         <td className="p-3.5">
-                          <div className="text-slate-300">
+                          <div className="text-neutral-300">
                             {mb.dailySendCount} / {mb.dailySendLimit} per day
                           </div>
                         </td>
                         <td className="p-3.5">
                           <span
-                            className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                            className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider font-mono ${
                               mb.status === 'active'
-                                ? 'bg-emerald-500/20 text-emerald-400'
-                                : 'bg-amber-500/20 text-amber-400'
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
                             }`}
                           >
                             {mb.status}
@@ -842,7 +834,7 @@ export default function DevWebmailControlCenterPage() {
                             {launchingSsoId === mb.id ? (
                               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                             ) : (
-                              <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
+                              <ExternalLink className="w-3.5 h-3.5 text-white" />
                             )}
                             <span className="ml-1 text-xs">SSO</span>
                           </Button>
@@ -870,7 +862,7 @@ export default function DevWebmailControlCenterPage() {
                 {Object.entries(revealedPasswords).map(([id, pass]) => {
                   const mb = mailboxes.find((m) => m.id === id);
                   return (
-                    <div key={id} className="text-xs font-mono text-slate-200 flex justify-between bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                    <div key={id} className="text-xs font-mono text-white flex justify-between bg-[#0c0c0e] p-2.5 rounded-lg border border-white/10">
                       <span>{mb?.email || id}:</span>
                       <span className="text-amber-400 font-bold">{pass}</span>
                     </div>
@@ -886,19 +878,19 @@ export default function DevWebmailControlCenterPage() {
           <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-slate-100">Custom Email Domains & DNS Verification</h3>
-                <p className="text-xs text-slate-400">Configure custom domain MX, SPF, DKIM, and DMARC records for corporate email delivery.</p>
+                <h3 className="text-base font-bold text-white">Custom Email Domains & DNS Verification</h3>
+                <p className="text-xs text-neutral-400">Configure custom domain MX, SPF, DKIM, and DMARC records for corporate email delivery.</p>
               </div>
             </div>
 
             {/* Add Domain Form */}
-            <form onSubmit={handleAddDomainSubmit} className="flex gap-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+            <form onSubmit={handleAddDomainSubmit} className="flex gap-3 bg-[#0c0c0e] p-4 rounded-xl border border-white/10">
               <input
                 type="text"
                 value={newDomainInput}
                 onChange={(e) => setNewDomainInput(e.target.value)}
                 placeholder="example.com"
-                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono"
+                className="flex-1 bg-[#141416] border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-white/30 font-mono"
               />
               <Button type="submit" loading={addingDomain}>
                 + Add Domain
@@ -907,22 +899,22 @@ export default function DevWebmailControlCenterPage() {
 
             <div className="space-y-4">
               {domains.map((dom) => (
-                <div key={dom.id} className="p-5 bg-slate-950/80 border border-slate-800 rounded-xl space-y-4">
+                <div key={dom.id} className="p-5 bg-[#0c0c0e] border border-white/10 rounded-xl space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Globe className="w-5 h-5 text-sky-400" />
+                      <Globe className="w-5 h-5 text-emerald-400" />
                       <div>
-                        <h4 className="text-sm font-bold text-slate-100 font-mono">{dom.domain}</h4>
-                        <span className="text-[11px] text-slate-400">Registered: {new Date(dom.createdAt).toLocaleDateString()}</span>
+                        <h4 className="text-sm font-bold text-white font-mono">{dom.domain}</h4>
+                        <span className="text-[11px] text-neutral-400">Registered: {new Date(dom.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3">
                       <span
-                        className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                        className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider font-mono ${
                           dom.status === 'verified'
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
                         }`}
                       >
                         {dom.status === 'verified' ? (
@@ -946,24 +938,24 @@ export default function DevWebmailControlCenterPage() {
 
                   {/* DNS Record Snippets */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
-                    <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-800">
-                      <span className="text-slate-400 block text-[10px] uppercase tracking-wider font-sans font-bold text-sky-400">MX Record</span>
-                      <p className="text-slate-200 mt-1 select-all">{dom.mxRecord}</p>
+                    <div className="p-3 bg-[#141416] rounded-lg border border-white/10">
+                      <span className="text-neutral-400 block text-[10px] uppercase tracking-wider font-sans font-bold text-emerald-400">MX Record</span>
+                      <p className="text-white mt-1 select-all">{dom.mxRecord}</p>
                     </div>
 
-                    <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-800">
-                      <span className="text-slate-400 block text-[10px] uppercase tracking-wider font-sans font-bold text-sky-400">SPF Record (TXT)</span>
-                      <p className="text-slate-200 mt-1 select-all">{dom.spfRecord}</p>
+                    <div className="p-3 bg-[#141416] rounded-lg border border-white/10">
+                      <span className="text-neutral-400 block text-[10px] uppercase tracking-wider font-sans font-bold text-emerald-400">SPF Record (TXT)</span>
+                      <p className="text-white mt-1 select-all">{dom.spfRecord}</p>
                     </div>
 
-                    <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-800">
-                      <span className="text-slate-400 block text-[10px] uppercase tracking-wider font-sans font-bold text-sky-400">DKIM Record (TXT)</span>
-                      <p className="text-slate-200 mt-1 truncate select-all">{dom.dkimRecord}</p>
+                    <div className="p-3 bg-[#141416] rounded-lg border border-white/10">
+                      <span className="text-neutral-400 block text-[10px] uppercase tracking-wider font-sans font-bold text-emerald-400">DKIM Record (TXT)</span>
+                      <p className="text-white mt-1 truncate select-all">{dom.dkimRecord}</p>
                     </div>
 
-                    <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-800">
-                      <span className="text-slate-400 block text-[10px] uppercase tracking-wider font-sans font-bold text-sky-400">DMARC Record (TXT)</span>
-                      <p className="text-slate-200 mt-1 select-all">{dom.dmarcRecord}</p>
+                    <div className="p-3 bg-[#141416] rounded-lg border border-white/10">
+                      <span className="text-neutral-400 block text-[10px] uppercase tracking-wider font-sans font-bold text-emerald-400">DMARC Record (TXT)</span>
+                      <p className="text-white mt-1 select-all">{dom.dmarcRecord}</p>
                     </div>
                   </div>
                 </div>
@@ -971,19 +963,19 @@ export default function DevWebmailControlCenterPage() {
             </div>
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Provisioning Modal */}
       {showProvisionModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl animate-fade-in">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                <Mail className="w-5 h-5 text-sky-400" /> Provision Corporate Mail Account
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#141416] border border-white/15 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Mail className="w-5 h-5 text-emerald-400" /> Provision Corporate Mail Account
               </h3>
               <button
                 onClick={() => setShowProvisionModal(false)}
-                className="text-slate-400 hover:text-slate-200 text-sm font-bold"
+                className="text-neutral-400 hover:text-white text-sm font-bold p-1 rounded-lg hover:bg-white/5 transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -991,16 +983,16 @@ export default function DevWebmailControlCenterPage() {
 
             <form onSubmit={handleProvisionSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-2">
                   Target Customer / Staff User
                 </label>
                 <select
                   value={targetUserId}
                   onChange={(e) => setTargetUserId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+                  className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-white/30"
                 >
                   {users.map((u) => (
-                    <option key={u.id} value={u.id}>
+                    <option key={u.id} value={u.id} className="bg-[#141416] text-white">
                       {u.displayName ? `${u.displayName} (${u.email})` : u.email} [{u.role}]
                     </option>
                   ))}
@@ -1009,7 +1001,7 @@ export default function DevWebmailControlCenterPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-2">
                     Username
                   </label>
                   <input
@@ -1018,11 +1010,11 @@ export default function DevWebmailControlCenterPage() {
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="support"
                     required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+                    className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-white/30"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-2">
                     Domain
                   </label>
                   <input
@@ -1030,13 +1022,13 @@ export default function DevWebmailControlCenterPage() {
                     value={domainStr}
                     onChange={(e) => setDomainStr(e.target.value)}
                     placeholder="shanutechx.com"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+                    className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-white/30"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-2">
                   Initial Account Password
                 </label>
                 <input
@@ -1045,49 +1037,49 @@ export default function DevWebmailControlCenterPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Minimum 8 characters"
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+                  className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-white/30"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-2">
                     Storage Quota (MB)
                   </label>
                   <input
                     type="number"
                     value={storageQuotaMb}
                     onChange={(e) => setStorageQuotaMb(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+                    className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-white/30"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-2">
                     Daily Send Limit
                   </label>
                   <input
                     type="number"
                     value={dailySendLimit}
                     onChange={(e) => setDailySendLimit(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+                    className="w-full bg-[#0c0c0e] border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-white/30"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <div className="flex items-center gap-3 bg-[#0c0c0e] p-3 rounded-xl border border-white/10">
                 <input
                   type="checkbox"
                   id="internalFlag"
                   checked={isInternal}
                   onChange={(e) => setIsInternal(e.target.checked)}
-                  className="w-4 h-4 rounded text-sky-500 bg-slate-900 border-slate-700"
+                  className="w-4 h-4 rounded text-emerald-400 bg-neutral-900 border-neutral-700 focus:ring-emerald-500"
                 />
-                <label htmlFor="internalFlag" className="text-xs text-slate-300 cursor-pointer font-medium">
+                <label htmlFor="internalFlag" className="text-xs text-neutral-300 cursor-pointer font-medium">
                   Mark as Permanent Free System / Staff Mailbox
                 </label>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
                 <Button type="button" variant="secondary" onClick={() => setShowProvisionModal(false)}>
                   Cancel
                 </Button>

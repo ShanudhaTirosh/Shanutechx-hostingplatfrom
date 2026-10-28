@@ -46,19 +46,10 @@ export function WebmailCredentialsModal({
   const loadCredentials = async () => {
     setLoading(true);
     try {
-      const res = await api.webmail.getCredentials();
+      const res = await api.webmail.getCredentials(selectedMailboxId);
       setCreds(res.credentials || null);
     } catch {
-      // Fallback credentials structure
-      setCreds({
-        imapHost: 'mail.shanutechx.com',
-        imapPort: 993,
-        smtpHost: 'mail.shanutechx.com',
-        smtpPort: 465,
-        smtpPortStartTls: 587,
-        email: 'user@shanutechx.com',
-        apiKey: 'stx_live_sk_948102948102948102948',
-      });
+      setCreds(null);
     } finally {
       setLoading(false);
     }
@@ -188,7 +179,7 @@ export async function POST(req: Request) {
   }
 }`;
 
-  const nodeCodeSnippet = `// Node.js (Nodemailer) Integration for ShanuTechX Webmail
+  const nodeCodeSnippet = `// Node.js (Nodemailer) Integration for STX Webmail
 import nodemailer from 'nodemailer';
 
 const transporter = nodemailer.createTransport({
@@ -203,10 +194,10 @@ const transporter = nodemailer.createTransport({
 
 async function sendMail() {
   const info = await transporter.sendMail({
-    from: '"ShanuTechX Service" <${userEmail}>',
+    from: '"STX Service" <${userEmail}>',
     to: 'client@example.com',
     subject: 'System Alert / Notification',
-    html: '<b>Hello from ShanuTechX Autonomous Platform</b>',
+    html: '<b>Hello from STX Autonomous Platform</b>',
   });
   console.log('Message dispatched:', info.messageId);
 }
@@ -254,7 +245,7 @@ try {
     echo "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
 }`;
 
-  const pythonCodeSnippet = `# Python (smtplib & requests) Integration for ShanuTechX Webmail
+  const pythonCodeSnippet = `# Python (smtplib & requests) Integration for STX Webmail
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
