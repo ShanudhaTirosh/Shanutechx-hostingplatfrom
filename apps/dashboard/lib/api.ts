@@ -305,6 +305,7 @@ export const api = {
     websiteConnect: (id: string) =>
       apiFetch(`/api/email/mailboxes/${id}/website-connect`).then((r) => asJson<any>(r)),
     planQuotas: () => apiFetch('/api/email/plan-quotas').then((r) => asJson<any>(r)),
+    plans: () => apiFetch('/api/email/plans').then((r) => asJson<{ ok: boolean; plans: any[] }>(r)),
     getMailboxAccess: (id: string) =>
       apiFetch(`/api/email/mailboxes/${id}/access`).then((r) =>
         asJson<{ ok: boolean; mailboxAcl: any[]; allowedAdminIds: string[]; staffUsers: any[] }>(r)
@@ -377,6 +378,10 @@ export const api = {
           dkimVerified?: boolean;
           dmarcVerified?: boolean;
         }>(r)
+      ),
+    deleteDomain: (idOrDomain: string) =>
+      apiFetch(`/api/email/domains/${encodeURIComponent(idOrDomain)}`, { method: 'DELETE' }).then((r) =>
+        asJson<{ success: boolean; message?: string }>(r)
       ),
     messages: (folder = 'inbox') => apiFetch(`/api/email/messages?folder=${folder}`).then((r) => asJson<{ messages: any[]; total: number }>(r)),
     send: (data: { from: string; to: string; subject: string; body: string }) =>
@@ -453,7 +458,7 @@ export const api = {
     getSsoTicket: (accountId: string) =>
       apiFetch('/api/webmail/auth/sso-ticket', {
         method: 'POST',
-        body: JSON.stringify({ accountId }),
+        body: JSON.stringify({ smtpAccountId: accountId, accountId }),
       }).then((r) => asJson<{ ssoToken: string; webmailUrl: string }>(r)),
     // Messages & Threads
     listMessages: (folder = 'inbox', search = '', smtpAccountId?: string) => {
@@ -611,9 +616,7 @@ export const api = {
     revokeAccountDelegate: (id: string) =>
       apiFetch(`/api/webmail/account/delegation/${id}`, { method: 'DELETE' }).then((r) => asJson<{ ok: boolean }>(r)),
     getCredentials: (id?: string) =>
-      id
-        ? apiFetch(`/api/email/mailboxes/${id}/credentials`).then((r) => asJson<{ credentials?: any; [k: string]: any }>(r))
-        : apiFetch('/api/webmail/account/credentials').then((r) => asJson<{ credentials: any }>(r)),
+      apiFetch(`/api/webmail/account/credentials${id ? `?mailboxId=${encodeURIComponent(id)}` : ''}`).then((r) => asJson<{ credentials: any }>(r)),
 
     // Security & Audit
     reportThreat: (data: { messageId: string; threatType?: string; comment?: string }) =>

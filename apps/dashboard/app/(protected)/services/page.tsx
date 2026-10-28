@@ -35,6 +35,8 @@ import {
   Bot,
   Package,
 } from 'lucide-react';
+import { ProductCard } from '@/components/ProductCard';
+import { ProductDetailsModal } from '@/components/ProductDetailsModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,6 +76,11 @@ export default function ServicesPage() {
   const [error, setError] = useState<string | null>(null);
   const [addingPlanId, setAddingPlanId] = useState<string | null>(null);
   const [filter, setFilter] = useState<ProductCategory | 'all'>('all');
+  const [selectedDetailPlan, setSelectedDetailPlan] = useState<{
+    product: Product;
+    plan: any;
+    features: string[];
+  } | null>(null);
   const { toast } = useToast();
 
   function load() {
@@ -269,7 +276,7 @@ export default function ServicesPage() {
 
         {/* Category Filter Pills */}
         {products && products.length > 0 && (
-          <div className="flex gap-2 flex-wrap mb-6">
+          <div className="flex gap-2.5 flex-wrap mb-8">
             <button
               type="button"
               onClick={() => setFilter('all')}
@@ -303,7 +310,7 @@ export default function ServicesPage() {
 
         {/* Loading Skeletons */}
         {products === null && (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
             {Array.from({ length: 6 }).map((_, i) => (
               <Card key={i} className="flex flex-col border border-white/[0.06] p-6 space-y-4">
                 <div className="flex items-center justify-between">
@@ -329,7 +336,7 @@ export default function ServicesPage() {
 
         {/* VPS Delivery Notice */}
         {(filter === 'vps' || filter === 'all') && (
-          <div className="p-3.5 bg-white/10 border border-white/20 rounded-2xl flex items-center gap-2.5 text-xs text-white">
+          <div className="my-8 p-4 bg-white/5 border border-white/15 rounded-2xl flex items-center gap-3 text-xs text-white shadow-lg">
             <Clock className="h-4 w-4 text-white shrink-0" />
             <span><strong>Notice:</strong> VPS servers are delivered within <strong>24 to 72 hours</strong>.</span>
           </div>
@@ -337,319 +344,279 @@ export default function ServicesPage() {
 
         {/* Flat Grid of Individual Product Plan Cards */}
         {products && planItems.length > 0 && (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
             {planItems.map(({ product, plan }) => {
-              const specs: any = plan.specsJson || {};
+              // Prices in DB are stored in cents (e.g. 450,000 cents = Rs 4,500). Normalize to rupees.
+              const displayPrice = plan.price >= 10000 ? Math.round(plan.price / 100) : plan.price;
+              const details = getPlanCardDetails(product, plan, displayPrice);
 
               return (
-                <div
+                <ProductCard
                   key={plan.id}
-                  className="flex flex-col justify-between rounded-2xl p-6 bg-gradient-to-b from-zinc-900/90 via-zinc-950/95 to-black border border-white/10 hover:border-white/30 backdrop-blur-2xl shadow-2xl hover:shadow-[0_0_35px_rgba(255,255,255,0.07)] transition-all duration-300 relative group overflow-hidden"
-                >
-                  {/* Top subtle highlight shimmer line */}
-                  <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-
-                  <div className="space-y-4">
-                    {/* Top Category Badge & Billing Label */}
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`text-[10px] font-mono font-bold uppercase tracking-wider px-3 py-1 rounded-full ${CATEGORY_COLOR[product.category]}`}>
-                        {CATEGORY_LABEL[product.category]}
-                      </span>
-                      <span className="text-[10px] font-mono text-white/70 uppercase tracking-wider bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
-                        {BILLING_LABEL[plan.billingType] ?? plan.billingType}
-                      </span>
-                    </div>
-
-                    {/* Product & Plan Header */}
-                    <div>
-                      <p className="text-[11px] font-semibold text-white/60 tracking-wider uppercase truncate mb-1">
-                        {product.name}
-                      </p>
-                      <h3 className="font-extrabold text-white text-xl tracking-tight">
-                        {plan.name}
-                      </h3>
-                      {product.description && (
-                        <p className="text-xs text-white/70 mt-1.5 line-clamp-2 leading-relaxed">
-                          {product.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Price Tag */}
-                    <div className="py-3 my-1 border-y border-white/10 flex items-baseline gap-1.5">
-                      <span className="text-3xl font-black font-mono text-white tracking-tight">
-                        {formatMoney(plan.price)}
-                      </span>
-                      <span className="text-xs text-white/70 font-mono">
-                        /{BILLING_LABEL[plan.billingType] ?? plan.billingType}
-                      </span>
-                    </div>
-
-                    {/* Specs Section with Clean SVG Icons & Pure White Text */}
-                    <div className="space-y-2.5 font-mono text-xs pt-1">
-                      {/* SMTP / Mail Hosting Specs */}
-                      {product.category === 'smtp' && (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Mail className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>
-                              {specs.mailboxesCount === -1 ? 'Unlimited' : (specs.mailboxesCount || 1)} Mailbox{(specs.mailboxesCount || 1) !== 1 ? 'es' : ''}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <HardDrive className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>
-                              {specs.storageLimitGb === -1 ? 'Unlimited Storage' : `${specs.storageLimitGb || 1} GB Storage`}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Zap className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>
-                              {specs.forwardingRules === -1 ? 'Unlimited' : (specs.forwardingRules || 1)} Forwarding Rule{(specs.forwardingRules || 1) !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Globe className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>
-                              {specs.maxAliases === -1 || specs.emailAliases === -1 ? 'Unlimited' : (specs.maxAliases || specs.emailAliases || 2)} Email Aliases
-                            </span>
-                          </div>
-                          <div className="pt-1">
-                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white font-mono bg-white/10 px-2.5 py-1 rounded-lg border border-white/20">
-                              <Lock className="h-3.5 w-3.5 text-white shrink-0" />
-                              Minimum 3-Month Commitment Required
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* VPS Specs */}
-                      {product.category === 'vps' && (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Cpu className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.cpuCores || 2} vCPU Cores</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Layers className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.ramGb || 4} GB RAM</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <HardDrive className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.storageGb || 50} GB NVMe Storage</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Zap className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.bandwidth || 'Unmetered'} Bandwidth</span>
-                          </div>
-                          <div className="pt-2 border-t border-white/10 text-[11px] font-mono">
-                            <div className="flex items-center gap-2 text-white bg-white/10 px-2.5 py-1.5 rounded-lg border border-white/20">
-                              <Clock className="h-3.5 w-3.5 text-white shrink-0" />
-                              <span>Delivered within 24 to 72 hours</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Web Hosting Specs */}
-                      {product.category === 'web_hosting' && (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <HardDrive className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.storageGb || 5} GB NVMe SSD Storage</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Zap className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.bandwidthGb ? `${specs.bandwidthGb} GB` : '100 GB'} Bandwidth</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Globe className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>
-                              {specs.domainsCount === -1 ? 'Unlimited Domains' : `${specs.domainsCount || 1} Custom Domain${(specs.domainsCount || 1) !== 1 ? 's' : ''}`}
-                            </span>
-                          </div>
-                          {specs.gitAutoDeploy && (
-                            <div className="flex items-center gap-2.5 text-white font-semibold">
-                              <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                                <CheckCircle2 className="h-3.5 w-3.5 text-white" />
-                              </div>
-                              <span>GitHub Auto-Deploy Included</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Managed Databases Specs */}
-                      {product.category === 'database' && (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Database className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>PostgreSQL 16 · MySQL 8 · Redis 7 · MongoDB</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Layers className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.ramMb ? (specs.ramMb >= 1024 ? `${specs.ramMb / 1024} GB` : `${specs.ramMb} MB`) : '512 MB'} Dedicated RAM</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <HardDrive className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.storageGb || 5} GB NVMe SSD Storage</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <CheckCircle2 className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>PgBouncer Pooling & Daily Auto-Backups</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* App Deployment Specs (GitHub & Containers) */}
-                      {product.category === 'app_deployment' && (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <GitBranch className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>GitHub Auto-Deploy on Push & Webhooks</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Cpu className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.cpuCores || 0.5} vCPU Cores Dedicated</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Layers className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.ramMb ? (specs.ramMb >= 1024 ? `${specs.ramMb / 1024} GB` : `${specs.ramMb} MB`) : '512 MB'} RAM</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Globe className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>Automatic SSL Routing & Custom Subdomain</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* App Catalog Specs */}
-                      {product.category === 'app_catalog' && (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Package className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>15+ One-Click Docker Compose Stacks</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Cpu className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.cpuCores || 0.5} vCPU Cores</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Layers className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.ramMb ? (specs.ramMb >= 1024 ? `${specs.ramMb / 1024} GB` : `${specs.ramMb} MB`) : '512 MB'} RAM</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Zap className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>Direct Port Exposure & Cloudflare DNS</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Bot Hosting Specs */}
-                      {product.category === 'bot_hosting' && (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Bot className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>24/7 Process Runner & Auto-Crash Recovery</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Cpu className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.cpuCores || 0.5} vCPU Dedicated</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <Layers className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>{specs.ramMb ? (specs.ramMb >= 1024 ? `${specs.ramMb / 1024} GB` : `${specs.ramMb} MB`) : '512 MB'} RAM</span>
-                          </div>
-                          <div className="flex items-center gap-2.5 text-white">
-                            <div className="h-6 w-6 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-                              <HardDrive className="h-3.5 w-3.5 text-white" />
-                            </div>
-                            <span>Persistent Session Storage (WhatsApp / Discord)</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Action Footer */}
-                  <div className="pt-5 mt-6 border-t border-white/10">
-                    <button
-                      type="button"
-                      onClick={() => handleAddToCart(plan.id, `${product.name} — ${plan.name}`)}
-                      disabled={addingPlanId === plan.id}
-                      className="w-full py-3.5 px-4 rounded-xl bg-white text-black hover:bg-neutral-200 active:scale-[0.98] font-bold text-xs uppercase tracking-wider font-mono transition-all duration-200 flex items-center justify-center gap-2 shadow-xl shadow-white/10 hover:shadow-white/20 cursor-pointer disabled:opacity-50"
-                    >
-                      {addingPlanId === plan.id ? (
-                        <>
-                          <span className="h-3.5 w-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                          Adding to Cart...
-                        </>
-                      ) : (
-                        <>
-                          <ShoppingCart className="h-4 w-4 text-black" />
-                          Add to Cart
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
+                  id={plan.id}
+                  name={`${product.name} — ${plan.name}`}
+                  category={product.category}
+                  categoryLabel={CATEGORY_LABEL[product.category]}
+                  billingType={BILLING_LABEL[plan.billingType] ?? plan.billingType}
+                  price={displayPrice}
+                  currency="Rs"
+                  tierChips={details.tierChips}
+                  features={details.features}
+                  logistics={details.logistics}
+                  termsNote={details.termsNote}
+                  inStock={true}
+                  buyLabel="Buy"
+                  buyLoading={addingPlanId === plan.id}
+                  onDetails={() =>
+                    setSelectedDetailPlan({
+                      product,
+                      plan: { ...plan, price: displayPrice },
+                      features: details.features.map((f) => f.text),
+                    })
+                  }
+                  onBuy={() => handleAddToCart(plan.id, `${product.name} — ${plan.name}`)}
+                />
               );
             })}
           </div>
         )}
       </div>
+
+      {/* Product Details Modal */}
+      {selectedDetailPlan && (
+        <ProductDetailsModal
+          isOpen={true}
+          onClose={() => setSelectedDetailPlan(null)}
+          productName={`${selectedDetailPlan.product.name} — ${selectedDetailPlan.plan.name}`}
+          category={CATEGORY_LABEL[selectedDetailPlan.product.category]}
+          price={selectedDetailPlan.plan.price}
+          currency="Rs"
+          specs={selectedDetailPlan.plan.specsJson || {}}
+          features={selectedDetailPlan.features}
+          buyLabel="Add to Cart"
+          onProceedToBuy={() => {
+            const planId = selectedDetailPlan.plan.id;
+            const planName = `${selectedDetailPlan.product.name} — ${selectedDetailPlan.plan.name}`;
+            handleAddToCart(planId, planName);
+          }}
+        />
+      )}
     </div>
   );
+}
+
+function getPlanCardDetails(product: Product, plan: any, displayPrice: number) {
+  const specs: any = plan.specsJson || {};
+  let features: Array<{ iconName?: string; text: string }> = [];
+  let tierChips: Array<{ label: string; priceText: string }> = [];
+  let logistics: Array<{ icon: 'truck' | 'clock' | 'box' | 'shield'; text: string }> = [
+    { icon: 'truck', text: 'Held for you; delivered when you ask' },
+    {
+      icon: 'clock',
+      text:
+        product.category === 'vps'
+          ? '24 to 72 hours provisioning'
+          : 'Instant auto-provisioning upon verification',
+    },
+    { icon: 'box', text: 'Ask for it within 7 days of buying' },
+  ];
+  let termsNote = 'Minimum 2 per order';
+
+  // If actual features are provided in DB specsJson, use them!
+  if (Array.isArray(specs.features) && specs.features.length > 0) {
+    features = specs.features.slice(0, 4).map((featText: string) => {
+      const lower = featText.toLowerCase();
+      let iconName = 'zap';
+      if (lower.includes('cpu') || lower.includes('core')) iconName = 'cpu';
+      else if (lower.includes('ram') || lower.includes('nvme') || lower.includes('ssd') || lower.includes('storage')) iconName = 'hard-drive';
+      else if (lower.includes('mail') || lower.includes('smtp') || lower.includes('inbox') || lower.includes('mailbox')) iconName = 'mail';
+      else if (lower.includes('domain') || lower.includes('bandwidth') || lower.includes('region')) iconName = 'globe';
+      else if (lower.includes('ssh') || lower.includes('root') || lower.includes('server')) iconName = 'server';
+      else if (lower.includes('ssl') || lower.includes('protect') || lower.includes('shield')) iconName = 'shield';
+      else if (lower.includes('database') || lower.includes('sql') || lower.includes('redis')) iconName = 'database';
+      else if (lower.includes('bot') || lower.includes('whatsapp') || lower.includes('discord')) iconName = 'bot';
+      else if (lower.includes('deploy') || lower.includes('git') || lower.includes('docker')) iconName = 'layers';
+      else if (lower.includes('catalog') || lower.includes('stack') || lower.includes('template')) iconName = 'package';
+
+      return { iconName, text: featText };
+    });
+  }
+
+  if (product.category === 'smtp') {
+    if (features.length === 0) {
+      features = [
+        { iconName: 'server', text: 'WildDuck Enterprise Engine' },
+        {
+          iconName: 'hard-drive',
+          text:
+            specs.storageLimitGb === -1
+              ? 'Unlimited NVMe Storage'
+              : `${specs.storageLimitGb || 1} GB Mailbox Storage`,
+        },
+        {
+          iconName: 'mail',
+          text: `${specs.mailboxesCount === -1 ? 'Unlimited' : specs.mailboxesCount || 1} Dedicated Mailbox${
+            (specs.mailboxesCount || 1) !== 1 ? 'es' : ''
+          }`,
+        },
+        {
+          iconName: 'globe',
+          text: `Up to ${specs.maxAliases || specs.emailAliases || 2} Aliases & Custom Routing`,
+        },
+      ];
+    }
+    tierChips = [
+      { label: 'Quarterly', priceText: `Rs ${displayPrice.toLocaleString()}` },
+      { label: 'Monthly Eqv', priceText: `Rs ${Math.round(displayPrice / 3).toLocaleString()}` },
+      { label: 'Multi-Domain', priceText: 'Included' },
+    ];
+    termsNote = 'Minimum 3-Month Commitment Required';
+  } else if (product.category === 'vps') {
+    if (features.length === 0) {
+      features = [
+        { iconName: 'cpu', text: `${specs.cpuCores || 2} vCPU Dedicated Cores` },
+        { iconName: 'hard-drive', text: `${specs.ramGb || 4} GB RAM & Dedicated KVM` },
+        { iconName: 'hard-drive', text: `${specs.storageGb || 50} GB High-Speed NVMe Storage` },
+        { iconName: 'globe', text: `${specs.bandwidth || 'Unmetered'} Global Bandwidth` },
+      ];
+    }
+    tierChips = [
+      { label: '10+', priceText: `Rs ${Math.round(displayPrice * 0.92).toLocaleString()}` },
+      { label: '25+', priceText: `Rs ${Math.round(displayPrice * 0.86).toLocaleString()}` },
+      { label: '50+', priceText: `Rs ${Math.round(displayPrice * 0.81).toLocaleString()}` },
+    ];
+    termsNote = 'Delivered within 24 to 72 hours';
+  } else if (product.category === 'web_hosting') {
+    if (features.length === 0) {
+      features = [
+        { iconName: 'hard-drive', text: `${specs.storageGb || 5} GB NVMe SSD Storage` },
+        { iconName: 'globe', text: `${specs.bandwidthGb ? `${specs.bandwidthGb} GB` : '100 GB'} Bandwidth` },
+        {
+          iconName: 'globe',
+          text:
+            specs.domainsCount === -1
+              ? 'Unlimited Domains'
+              : `${specs.domainsCount || 1} Custom Domain${(specs.domainsCount || 1) !== 1 ? 's' : ''}`,
+        },
+        { iconName: 'shield', text: 'Free SSL Certificates & Edge CDN' },
+      ];
+    }
+    tierChips = [
+      { label: 'Quarterly', priceText: `Rs ${displayPrice.toLocaleString()}` },
+      { label: 'Monthly Eqv', priceText: `Rs ${Math.round(displayPrice / 3).toLocaleString()}` },
+      { label: 'Git Deploy', priceText: 'Included' },
+    ];
+    termsNote = 'Instant deployment on order review';
+  } else if (product.category === 'database') {
+    if (features.length === 0) {
+      features = [
+        { iconName: 'database', text: 'PostgreSQL 16, MySQL 8, Redis 7, MongoDB' },
+        {
+          iconName: 'hard-drive',
+          text: `${
+            specs.ramMb
+              ? specs.ramMb >= 1024
+                ? `${specs.ramMb / 1024} GB`
+                : `${specs.ramMb} MB`
+              : '512 MB'
+          } Dedicated RAM`,
+        },
+        { iconName: 'hard-drive', text: `${specs.storageGb || 5} GB NVMe SSD Storage` },
+        { iconName: 'shield', text: 'PgBouncer Connection Pooling & Auto-Backups' },
+      ];
+    }
+    tierChips = [
+      { label: 'High Availability', priceText: '99.9%' },
+      { label: 'Daily Backups', priceText: 'Cloudflare R2' },
+      { label: 'SSL', priceText: 'Enforced' },
+    ];
+    termsNote = 'Dedicated database container instance';
+  } else if (product.category === 'app_deployment') {
+    if (features.length === 0) {
+      features = [
+        { iconName: 'layers', text: 'GitHub Auto-Deploy on Git Push' },
+        { iconName: 'cpu', text: `${specs.cpuCores || 0.5} vCPU Cores Dedicated` },
+        {
+          iconName: 'hard-drive',
+          text: `${
+            specs.ramMb
+              ? specs.ramMb >= 1024
+                ? `${specs.ramMb / 1024} GB`
+                : `${specs.ramMb} MB`
+              : '512 MB'
+          } RAM`,
+        },
+        { iconName: 'globe', text: 'Automatic SSL Routing & Custom Subdomain' },
+      ];
+    }
+    tierChips = [
+      { label: 'Continuous Delivery', priceText: 'Active' },
+      { label: 'Isolation', priceText: 'Docker' },
+      { label: 'SSL', priceText: 'Zero-Config' },
+    ];
+    termsNote = 'Continuous integration via webhooks';
+  } else if (product.category === 'app_catalog') {
+    if (features.length === 0) {
+      features = [
+        { iconName: 'package', text: '15+ One-Click Docker Compose Stacks' },
+        { iconName: 'cpu', text: `${specs.cpuCores || 0.5} vCPU Cores Allocation` },
+        {
+          iconName: 'hard-drive',
+          text: `${
+            specs.ramMb
+              ? specs.ramMb >= 1024
+                ? `${specs.ramMb / 1024} GB`
+                : `${specs.ramMb} MB`
+              : '512 MB'
+          } RAM`,
+        },
+        { iconName: 'globe', text: 'Direct Port Exposure & Cloudflare DNS' },
+      ];
+    }
+    tierChips = [
+      { label: '1-Click', priceText: 'Instant' },
+      { label: 'Compose', priceText: 'Verified' },
+      { label: 'Ports', priceText: 'Exposed' },
+    ];
+    termsNote = 'Deploy any template in under 60 seconds';
+  } else if (product.category === 'bot_hosting') {
+    if (features.length === 0) {
+      features = [
+        { iconName: 'bot', text: '24/7 Process Runner & Auto-Crash Recovery' },
+        { iconName: 'cpu', text: `${specs.cpuCores || 0.5} vCPU Dedicated Core` },
+        {
+          iconName: 'hard-drive',
+          text: `${
+            specs.ramMb
+              ? specs.ramMb >= 1024
+                ? `${specs.ramMb / 1024} GB`
+                : `${specs.ramMb} MB`
+              : '512 MB'
+          } RAM`,
+        },
+        { iconName: 'package', text: 'Persistent Session Storage (WhatsApp / Discord)' },
+      ];
+    }
+    tierChips = [
+      { label: 'Uptime', priceText: '24/7' },
+      { label: 'Daemon', priceText: 'Node/Python' },
+      { label: 'Logs', priceText: 'Realtime' },
+    ];
+    termsNote = 'WhatsApp Baileys & Discord.js ready';
+  } else {
+    if (features.length === 0) {
+      features = [
+        { iconName: 'zap', text: 'High-Performance Cloud Infrastructure' },
+        { iconName: 'shield', text: 'Automated Failover & Monitoring' },
+        { iconName: 'globe', text: 'Global Network & SSL Security' },
+      ];
+    }
+    tierChips = [
+      { label: 'Quarterly', priceText: `Rs ${displayPrice.toLocaleString()}` },
+      { label: 'SLA', priceText: '99.9%' },
+      { label: 'Cloud', priceText: 'Verified' },
+    ];
+  }
+
+  return { features, tierChips, logistics, termsNote };
 }
