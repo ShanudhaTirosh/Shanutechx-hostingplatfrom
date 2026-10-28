@@ -929,6 +929,11 @@ export const api = {
       apiFetch(`/api/deployments/${id}/launch-job`, { method: 'POST', body: JSON.stringify(data || {}) }).then((r) =>
         asJson<{ success: boolean; jobId: string; deploymentId: string; status: string }>(r)
       ),
+    rollback: (id: string, targetDeploymentId: string) =>
+      apiFetch(`/api/deployments/${id}/rollback`, {
+        method: 'POST',
+        body: JSON.stringify({ targetDeploymentId }),
+      }).then((r) => asJson<{ ok: boolean; activeDeploymentId: string; rollbackDurationMs: number }>(r)),
     launch: async (id: string, data?: Record<string, any>, onEvent?: (event: BuildEvent) => void): Promise<void> => {
       const res = await apiFetch(`/api/deployments/${id}/launch`, { method: 'POST', body: JSON.stringify(data || {}) });
       if (!res.ok) {
