@@ -248,29 +248,31 @@ export default function PricingPage() {
           </div>
 
           {/* Category Filter Pills */}
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5">
-            <span className="text-xs font-mono text-white/70 mr-2 flex items-center gap-1">
+          <div className="pt-4 border-t border-white/10 flex flex-col md:flex-row md:items-center gap-3">
+            <span className="text-xs font-mono text-white/70 flex items-center gap-1.5 shrink-0">
               <Filter className="h-3.5 w-3.5 text-white" /> Filter:
             </span>
-            {CATEGORY_KEYS.map((cat) => {
-              const Icon = cat.icon;
-              const active = selectedCategory === cat.id;
-              return (
-                <button
-                  type="button"
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 border cursor-pointer ${
-                    active
-                      ? 'bg-white text-black border-white shadow-lg shadow-white/10'
-                      : 'bg-white/5 border-white/15 text-white hover:bg-white/10 hover:border-white/30'
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span>{cat.label}</span>
-                </button>
-              );
-            })}
+            <div className="flex flex-wrap items-center gap-2">
+              {CATEGORY_KEYS.map((cat) => {
+                const Icon = cat.icon;
+                const active = selectedCategory === cat.id;
+                return (
+                  <button
+                    type="button"
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 border cursor-pointer ${
+                      active
+                        ? 'bg-white text-black border-white shadow-lg shadow-white/10'
+                        : 'bg-white/5 border-white/15 text-white hover:bg-white/10 hover:border-white/30'
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    <span>{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -278,7 +280,7 @@ export default function PricingPage() {
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="bg-[#08091c]/90 border border-white/10 rounded-3xl p-7 space-y-6 animate-pulse">
+              <div key={i} className="bg-[#08091c]/90 border border-purple-500/20 rounded-3xl p-7 space-y-6 animate-pulse">
                 <div className="h-4 w-28 bg-white/10 rounded" />
                 <div className="h-6 w-48 bg-white/10 rounded" />
                 <div className="h-16 w-full bg-white/5 rounded-xl" />
@@ -287,7 +289,7 @@ export default function PricingPage() {
             ))}
           </div>
         ) : filteredProducts.length === 0 ? (
-          <div className="bg-[#08091c] border border-white/10 rounded-3xl p-12 text-center space-y-3">
+          <div className="bg-[#08091c] border border-purple-500/20 rounded-3xl p-12 text-center space-y-3">
             <Package className="h-10 w-10 text-purple-400 mx-auto" />
             <p className="text-sm font-bold text-white">No products match your search or filter criteria</p>
             <p className="text-xs text-slate-400">Try clearing the search query or changing category filter.</p>
@@ -309,28 +311,28 @@ export default function PricingPage() {
               return (
                 <div
                   key={product.id}
-                  className="bg-gradient-to-b from-zinc-900/90 via-zinc-950/95 to-black border border-white/10 hover:border-white/30 rounded-3xl p-7 space-y-6 flex flex-col justify-between transition-all duration-300 shadow-2xl hover:shadow-[0_0_35px_rgba(255,255,255,0.06)] backdrop-blur-md relative overflow-hidden group"
+                  className="bg-gradient-to-b from-[#0e1030]/90 via-[#0a0c27]/95 to-[#060719] border border-purple-500/20 hover:border-purple-500/50 rounded-3xl p-7 space-y-6 flex flex-col justify-between transition-all duration-300 shadow-2xl hover:shadow-[0_0_35px_rgba(168,85,247,0.2)] backdrop-blur-md relative overflow-hidden group"
                 >
-                  <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+                  <div className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-purple-500/60 to-transparent" />
                   {product.isPopular && (
-                    <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-white text-black text-[10px] font-black uppercase tracking-wider shadow-md flex items-center gap-1 font-mono">
-                      <Sparkles className="h-3.5 w-3.5 text-black" /> {product.badge || 'Popular'}
+                    <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-black uppercase tracking-wider shadow-glow-violet flex items-center gap-1 font-mono border border-purple-400/40">
+                      <Sparkles className="h-3.5 w-3.5 text-purple-200" /> {product.badge || 'Popular'}
                     </div>
                   )}
 
                   {/* Top Header */}
                   <div className="space-y-4">
-                    <div className="flex items-start justify-between border-b border-white/10 pb-4 gap-3">
+                    <div className="flex items-start justify-between border-b border-purple-500/20 pb-4 gap-3">
                       <div>
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-white bg-white/10 border border-white/20 px-2.5 py-1 rounded-md">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-purple-300 bg-purple-500/15 border border-purple-500/30 px-2.5 py-1 rounded-md">
                           {product.category || 'Platform Service'}
                         </span>
                         <h3 className="font-extrabold text-xl text-white pt-2.5">{product.name}</h3>
                       </div>
                       {product.plans && product.plans.length > 0 && minPrice < 999999999 && (
                         <div className="text-right shrink-0">
-                          <span className="text-[10px] font-mono text-white/60 block uppercase">Starting from</span>
-                          <span className="text-base font-black text-white font-mono">
+                          <span className="text-[10px] font-mono text-purple-300/70 block uppercase">Starting from</span>
+                          <span className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-indigo-200 to-teal-200 font-mono">
                             {formatPrice(minPrice)}
                           </span>
                         </div>
@@ -338,26 +340,26 @@ export default function PricingPage() {
                     </div>
 
                     {product.description && (
-                      <p className="text-xs text-white/70 leading-relaxed">{product.description}</p>
+                      <p className="text-xs text-slate-300 leading-relaxed">{product.description}</p>
                     )}
 
                     {/* Plans List */}
                     {product.plans && product.plans.length > 0 && (
                       <div className="space-y-2.5 pt-2">
-                        <h4 className="text-[11px] font-mono font-bold text-white/60 uppercase tracking-wider">
+                        <h4 className="text-[11px] font-mono font-bold text-purple-300/80 uppercase tracking-wider">
                           Available Plans &amp; Cycles
                         </h4>
                         <div className="space-y-2">
                           {product.plans.map((plan) => (
                             <div
                               key={plan.id}
-                              className="flex justify-between items-center text-xs rounded-xl px-3.5 py-2.5 border border-white/10 bg-white/5 hover:border-white/25 transition-all"
+                              className="flex justify-between items-center text-xs rounded-xl px-3.5 py-2.5 border border-purple-500/20 bg-white/[0.03] hover:border-purple-500/50 hover:bg-purple-950/30 transition-all"
                             >
                               <div className="flex items-center gap-2 font-medium text-white">
-                                <Check className="h-3.5 w-3.5 text-white shrink-0" />
+                                <Check className="h-3.5 w-3.5 text-purple-400 shrink-0" />
                                 <span>{plan.name}</span>
                                 {plan.isPopular && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/15 text-white border border-white/20 font-mono">
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono">
                                     {plan.badge || 'Popular'}
                                   </span>
                                 )}
@@ -365,7 +367,7 @@ export default function PricingPage() {
                               <div className="flex items-center gap-3">
                                 <div className="text-right font-mono">
                                   <span className="text-white font-extrabold">{formatPrice(plan.price)}</span>
-                                  <span className="text-[10px] text-white/60 ml-1">
+                                  <span className="text-[10px] text-slate-400 ml-1">
                                     {BILLING_LABEL[plan.billingType] ?? plan.billingType}
                                   </span>
                                 </div>
@@ -381,10 +383,10 @@ export default function PricingPage() {
                                       billingType: plan.billingType || 'monthly',
                                     })
                                   }
-                                  className="p-1.5 rounded-lg bg-white text-black hover:bg-neutral-200 transition-all cursor-pointer shadow-sm"
+                                  className="p-1.5 rounded-lg bg-purple-600/30 border border-purple-500/40 text-purple-200 hover:bg-purple-600 hover:text-white transition-all cursor-pointer shadow-sm"
                                   title="Add plan to cart"
                                 >
-                                  <ShoppingCart className="h-3.5 w-3.5 text-black" />
+                                  <ShoppingCart className="h-3.5 w-3.5" />
                                 </button>
                               </div>
                             </div>
@@ -395,7 +397,7 @@ export default function PricingPage() {
                   </div>
 
                   {/* Order Button CTA */}
-                  <div className="pt-4 border-t border-white/10 flex gap-2">
+                  <div className="pt-4 border-t border-purple-500/20 flex gap-2">
                     {product.plans && product.plans.length > 0 ? (
                       <button
                         type="button"
@@ -410,16 +412,16 @@ export default function PricingPage() {
                             billingType: primaryPlan.billingType || 'monthly',
                           });
                         }}
-                        className="w-full py-3.5 rounded-xl bg-white text-black hover:bg-neutral-200 active:scale-[0.98] font-bold text-xs uppercase tracking-wider font-mono transition-all flex items-center justify-center gap-2 shadow-xl shadow-white/10 hover:shadow-white/20 cursor-pointer"
+                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98] font-bold text-xs uppercase tracking-wider font-mono text-white transition-all flex items-center justify-center gap-2 shadow-glow-violet cursor-pointer"
                       >
-                        <ShoppingCart className="h-4 w-4 text-black" /> Add to Cart — {product.name}
+                        <ShoppingCart className="h-4 w-4 text-white" /> Add to Cart — {product.name}
                       </button>
                     ) : (
                       <a
                         href={`${dashboardUrl}/catalog`}
-                        className="w-full py-3.5 rounded-xl bg-white text-black hover:bg-neutral-200 active:scale-[0.98] font-bold text-xs uppercase tracking-wider font-mono transition-all flex items-center justify-center gap-2 shadow-xl shadow-white/10"
+                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98] font-bold text-xs uppercase tracking-wider font-mono text-white transition-all flex items-center justify-center gap-2 shadow-glow-violet"
                       >
-                        Order {product.name} <ArrowRight className="h-4 w-4 text-black" />
+                        Order {product.name} <ArrowRight className="h-4 w-4 text-white" />
                       </a>
                     )}
                   </div>
