@@ -13,6 +13,7 @@ import { logger } from '../lib/logger';
 import { createSubdomainRecord, deleteSubdomainRecord } from '../lib/cloudflare';
 import { evacuateNodeWorkloads } from '../lib/failoverEngine';
 import { notifyDiscordChannel } from '../lib/discordWebhooks';
+import { dispatchJob } from '../lib/jobQueue';
 
 export const nodesRouter = Router();
 
@@ -866,6 +867,215 @@ nodesRouter.get('/nodes/:id/failover-status', async (req: AuthedRequest, res: Re
   });
 
   res.json({ logs });
+});
+
+/**
+ * POST /api/nodes/enroll-job
+ * Asynchronous node enrollment via the infrastructure job engine.
+ */
+nodesRouter.post('/nodes/enroll-job', async (req: AuthedRequest, res: Response) => {
+  if (req.user!.role !== 'dev' && req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Only administrators can enroll infrastructure nodes' });
+  }
+
+  const schema = z.object({
+    label: z.string().min(1),
+    ip: z.string().min(1),
+    sshPort: z.number().int().default(22),
+    os: z.string().optional().default('Ubuntu 24.04 LTS'),
+    provider: z.string().optional().default('Custom VPS'),
+    region: z.string().optional().default('Default'),
+    username: z.string().default('root'),
+    authMethod: z.enum(['password', 'privateKey']).default('password'),
+    credential: z.string().min(1),
+    roleTags: z.array(z.string()).optional().default(['web-hosting', 'node-hosting', 'python-hosting']),
+    cpuCores: z.number().int().optional().default(2),
+    ramMb: z.number().int().optional().default(2048),
+    diskGb: z.number().int().optional().default(40),
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { label, ip, sshPort, os, provider, region, username, authMethod, credential, roleTags, cpuCores, ramMb, diskGb } = parsed.data;
+
+  // Vault the credential
+  const sshKeyRef = buildSshKeyRef({
+    privateKey: authMethod === 'privateKey' ? credential : undefined,
+    password: authMethod === 'password' ? credential : undefined,
+    username,
+    ip,
+    port: sshPort,
+  });
+
+  // Create or update node in 'pending' status
+  const node = await prisma.$transaction(async (tx) => {
+    const existing = await tx.node.findFirst({
+      where: { OR: [{ ip }, { label }] },
+    });
+    if (existing) {
+      return tx.node.update({
+        where: { id: existing.id },
+        data: {
+          label,
+          ip,
+          sshPort,
+          os,
+          provider,
+          region,
+          sshKeyRef,
+          status: 'pending',
+          statusMessage: 'Enrollment queued',
+          cpuCores,
+          ramMb,
+          diskGb,
+          roleTags,
+          isActive: true,
+        },
+      });
+    }
+    return tx.node.create({
+      data: {
+        label,
+        ip,
+        sshPort,
+        os,
+        provider,
+        region,
+        sshKeyRef,
+        status: 'pending',
+        statusMessage: 'Enrollment queued',
+        cpuCores,
+        ramMb,
+        diskGb,
+        roleTags,
+        isActive: true,
+      },
+    });
+  });
+
+  // Dispatch async enrollment job
+  const job = await dispatchJob({
+    type: 'node_enroll',
+    payload: {
+      nodeId: node.id,
+      ip,
+      sshPort,
+      username,
+      authMethod,
+      credential,
+      label,
+      roleTags,
+    },
+    nodeId: node.id,
+    userId: req.user!.id,
+    resourceType: 'node',
+    resourceId: node.id,
+  });
+
+  res.status(202).json({
+    ok: true,
+    message: 'Node enrollment job dispatched',
+    node,
+    jobId: job.id,
+  });
+});
+
+/**
+ * POST /api/nodes/:id/cordon
+ * Mark node in maintenance and disable scheduling of new workloads.
+ */
+nodesRouter.post('/nodes/:id/cordon', async (req: AuthedRequest, res: Response) => {
+  if (req.user!.role !== 'admin' && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const node = await prisma.node.findUnique({ where: { id: req.params.id } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+
+  const updated = await prisma.node.update({
+    where: { id: node.id },
+    data: {
+      isDraining: true,
+      status: 'maintenance',
+      maintenanceReason: req.body.reason || 'Manually cordoned by administrator',
+    },
+  });
+
+  res.json({ ok: true, node: updated });
+});
+
+/**
+ * POST /api/nodes/:id/uncordon
+ * Restore node to active scheduling.
+ */
+nodesRouter.post('/nodes/:id/uncordon', async (req: AuthedRequest, res: Response) => {
+  if (req.user!.role !== 'admin' && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const node = await prisma.node.findUnique({ where: { id: req.params.id } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+
+  const updated = await prisma.node.update({
+    where: { id: node.id },
+    data: {
+      isDraining: false,
+      status: 'online',
+      maintenanceReason: null,
+    },
+  });
+
+  res.json({ ok: true, node: updated });
+});
+
+/**
+ * DELETE /api/nodes/:id
+ * Safely delete an infrastructure node, protecting customer workloads.
+ */
+nodesRouter.delete('/nodes/:id', async (req: AuthedRequest, res: Response) => {
+  if (req.user!.role !== 'admin' && req.user!.role !== 'dev') {
+    return res.status(403).json({ error: 'Only administrators can delete infrastructure nodes' });
+  }
+
+  const nodeId = req.params.id;
+  const node = await prisma.node.findUnique({ where: { id: nodeId } });
+  if (!node) return res.status(404).json({ error: 'Node not found' });
+
+  const force = req.query.force === 'true';
+
+  // Check active customer workloads
+  const [activeDeployments, activeDatabases, activeSupabase] = await Promise.all([
+    prisma.deployment.count({ where: { nodeId, status: { notIn: ['deleted', 'failed'] } } }),
+    prisma.managedDatabase.count({ where: { nodeId, status: { notIn: ['stopped', 'failed'] } } }),
+    prisma.supabaseClientProject.count({ where: { nodeId, status: { notIn: ['STOPPED', 'FAILED'] } } }),
+  ]);
+
+  const totalActive = activeDeployments + activeDatabases + activeSupabase;
+
+  if (totalActive > 0 && !force) {
+    return res.status(409).json({
+      error: `Cannot delete node with ${totalActive} active customer services (${activeDeployments} deployments, ${activeDatabases} databases, ${activeSupabase} Supabase projects). Please evacuate or terminate workloads first, or specify ?force=true to override.`,
+      activeServices: {
+        deployments: activeDeployments,
+        databases: activeDatabases,
+        supabase: activeSupabase,
+      },
+    });
+  }
+
+  // Safe deletion
+  await prisma.node.delete({ where: { id: nodeId } });
+
+  await prisma.auditLog.create({
+    data: {
+      adminId: req.user!.id,
+      action: 'node.delete',
+      target: `${node.label} (${node.ip})`,
+    },
+  });
+
+  res.json({ ok: true, message: `Node ${node.label} deleted successfully` });
 });
 
 // ── BUG-10 FIX: Sanitize provisioning logs to remove cluster secret values ──

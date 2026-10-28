@@ -59,9 +59,10 @@ function SubscriptionsIcon() {
 }
 
 const QUICK_ACTIONS = [
-  { href: '/services', label: 'Browse catalog', hint: 'Order static, Node.js/Python hosting, VPS or Bot plans' },
-  { href: '/deployments', label: 'Deploy Repository', hint: 'Deploy a code repository instantly via automated build pipeline' },
-  { href: '/tickets', label: 'Get support', hint: 'Open a support ticket or talk to our engineers via live chat' },
+  { href: '/deployments', label: 'Deploy Application', hint: 'Deploy Git repositories with Railpack / Nixpacks automatic detection' },
+  { href: '/supabase', label: 'Launch Supabase Project', hint: 'Provision isolated backend stack, PostgreSQL, Auth & Supabase Studio' },
+  { href: '/email', label: 'Email Hosting (WildDuck)', hint: 'Create custom domain mailboxes with DKIM/SPF/DMARC and Webmail' },
+  { href: '/services', label: 'Browse Hosting Catalog', hint: 'Order VPS compute instances, bot hosting, and managed databases' },
 ];
 
 export default function DashboardPage() {
@@ -72,6 +73,7 @@ export default function DashboardPage() {
   // Dashboard Stats States
   const [stats, setStats] = useState({
     deployments: 0,
+    supabase: 0,
     subscriptions: 0,
     orders: 0,
     tickets: 0,
@@ -89,20 +91,23 @@ export default function DashboardPage() {
     // Use Promise.allSettled to handle partial failures gracefully
     Promise.allSettled([
       api.deployments.list(),
+      api.devSupabase.listProjects(),
       api.billing.subscriptions(),
       api.orders.list(),
       api.tickets.list(),
     ])
       .then((results) => {
-        const [deploysResult, subsResult, ordsResult, tcksResult] = results;
+        const [deploysResult, supaResult, subsResult, ordsResult, tcksResult] = results;
         
         const deploys = deploysResult.status === 'fulfilled' ? deploysResult.value : { deployments: [] };
+        const supa = supaResult.status === 'fulfilled' ? supaResult.value : { projects: [] };
         const subs = subsResult.status === 'fulfilled' ? subsResult.value : { subscriptions: [] };
         const ords = ordsResult.status === 'fulfilled' ? ordsResult.value : { orders: [] };
         const tcks = tcksResult.status === 'fulfilled' ? tcksResult.value : { tickets: [] };
         
         setStats({
           deployments: deploys.deployments?.length ?? 0,
+          supabase: supa.projects?.length ?? 0,
           subscriptions: subs.subscriptions?.length ?? 0,
           orders: ords.orders?.length ?? 0,
           tickets: tcks.tickets?.length ?? 0,
@@ -149,16 +154,16 @@ export default function DashboardPage() {
             className="bg-[#0c0d12] border-white/10"
           />
           <StatCard
-            label="Subscriptions"
-            value={stats.subscriptions}
+            label="Supabase Projects"
+            value={stats.supabase}
             icon={<SubscriptionsIcon />}
             color="accent"
             className="bg-[#0c0d12] border-white/10"
           />
           <StatCard
-            label="Total Invoices"
-            value={stats.orders}
-            icon={<InvoicesIcon />}
+            label="Subscriptions"
+            value={stats.subscriptions}
+            icon={<SubscriptionsIcon />}
             color="green"
             className="bg-[#0c0d12] border-white/10"
           />
@@ -175,7 +180,7 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <div>
         <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-4">Quick Actions</h2>
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-4 gap-4">
           {QUICK_ACTIONS.map((action) => (
             <Link key={action.href} href={action.href}>
               <div className="p-5 rounded-2xl bg-[#0c0d12] border border-white/10 hover:border-white/20 hover:bg-white/[0.04] transition-all cursor-pointer h-full space-y-1 group shadow-md">

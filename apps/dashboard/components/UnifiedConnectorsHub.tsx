@@ -22,6 +22,7 @@ import {
   ConfirmDialog,
 } from '@/components/ui';
 import { NodeEngineControlPanel } from '@/components/NodeEngineControlPanel';
+import { JobProgressBar } from '@/components/jobs/JobProgressBar';
 
 const SshTerminal = dynamic(
   () => import('@/components/SshTerminal').then((m) => m.SshTerminal),
@@ -346,7 +347,7 @@ function NodesTabView({
 
         <div className="grid md:grid-cols-2 gap-4">
           {nodes?.map((node) => (
-            <NodeCard key={node.id} node={node} onSelectTab={onSelectTab} />
+            <NodeCard key={node.id} node={node} onSelectTab={onSelectTab} onRefresh={loadNodes} />
           ))}
         </div>
       </div>
@@ -357,14 +358,20 @@ function NodesTabView({
 function NodeCard({
   node,
   onSelectTab,
+  onRefresh,
 }: {
   node: Node;
   onSelectTab: (nodeId: string, tab: ConnectorTab) => void;
+  onRefresh?: () => void;
 }) {
   const stale = !node.lastSeenAt || Date.now() - new Date(node.lastSeenAt).getTime() > 5 * 60 * 1000;
   const [showNodeEngine, setShowNodeEngine] = useState(false);
   const [failoverBusy, setFailoverBusy] = useState(false);
+  const [cordonBusy, setCordonBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const { toast } = useToast();
+
+  const isCordoned = node.status === 'maintenance' || node.isSchedulable === false;
 
   async function handleFailover() {
     if (!confirm(`Are you sure you want to evacuate node "${node.label}"? All containers and databases will be migrated to healthy target nodes in real-time.`)) {
@@ -382,6 +389,89 @@ function NodeCard({
     }
   }
 
+  async function handleToggleCordon() {
+    setCordonBusy(true);
+    try {
+      if (isCordoned) {
+        await api.nodes.uncordon(node.id);
+        toast(`Node "${node.label}" uncordoned and ready for scheduling`, 'success');
+      } else {
+        await api.nodes.cordon(node.id, 'Manual administrative cordon');
+        toast(`Node "${node.label}" cordoned (maintenance mode)`, 'success');
+      }
+      onRefresh?.();
+    } catch (err: any) {
+      toast(err.message || 'Failed to toggle cordon status', 'error');
+    } finally {
+      setCordonBusy(false);
+    }
+  }
+
+  async function handleDeleteNode() {
+    if (!confirm(`Are you sure you want to remove node "${node.label}" from cluster? Deletion will be blocked if active customer workloads exist on this node.`)) {
+      return;
+    }
+    setDeleteBusy(true);
+    try {
+      await api.nodes.deleteNode(node.id);
+      toast(`Node "${node.label}" deleted successfully`, 'success');
+      onRefresh?.();
+    } catch (err: any) {
+      toast(err.message || 'Cannot delete node: active customer workloads exist', 'error');
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+  const getNodeStatusBadge = () => {
+    const status = node.status || (node.isActive && !stale ? 'online' : 'offline');
+    switch (status) {
+      case 'online':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Online
+          </span>
+        );
+      case 'installing':
+      case 'pending':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+            {status}
+          </span>
+        );
+      case 'maintenance':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-purple-500/10 text-purple-300 border border-purple-500/20">
+            <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
+            Cordoned
+          </span>
+        );
+      case 'degraded':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+            Degraded
+          </span>
+        );
+      case 'error':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/20">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+            Error
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-white/5 text-text-muted border border-white/10">
+            <span className="h-1.5 w-1.5 rounded-full bg-text-muted" />
+            Offline
+          </span>
+        );
+    }
+  };
+
   return (
     <Card className="border border-white/[0.06] hover:border-white/12 transition-all flex flex-col justify-between space-y-4">
       <div>
@@ -390,16 +480,25 @@ function NodeCard({
             <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${node.isActive && !stale ? 'bg-emerald-500/10 text-emerald-400' : 'bg-white/5 text-text-muted'}`}>
               <ServerIcon />
             </div>
-            <h3 className="font-semibold text-text-primary text-sm">{node.label}</h3>
+            <div>
+              <h3 className="font-semibold text-text-primary text-sm flex items-center gap-2">
+                {node.label}
+                {isCordoned && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 bg-amber-500/10 text-amber-300 rounded border border-amber-500/20">
+                    MAINTENANCE
+                  </span>
+                )}
+              </h3>
+              <div className="flex items-center gap-2 text-[10px] text-text-muted mt-0.5">
+                <span>{node.provider || 'VPS Node'}</span>
+                <span>•</span>
+                <span>{node.region || 'Default Region'}</span>
+                <span>•</span>
+                <span>{node.os || 'Linux'}</span>
+              </div>
+            </div>
           </div>
-          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-            node.isActive && !stale
-              ? 'bg-emerald-500/10 text-emerald-400'
-              : 'bg-white/5 text-text-muted'
-          }`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${node.isActive && !stale ? 'bg-emerald-400 animate-pulse' : 'bg-text-muted'}`} />
-            {node.isActive && !stale ? 'Online' : 'Offline'}
-          </span>
+          {getNodeStatusBadge()}
         </div>
 
         <p className="text-text-muted font-mono text-xs mb-3 bg-white/[0.02] inline-block px-2.5 py-1 rounded-lg border border-white/[0.04]">{node.ip}</p>
@@ -449,14 +548,40 @@ function NodeCard({
 
         <div className="flex justify-between items-center pt-1">
           <span className="text-[10px] text-text-faint font-mono">ID: {node.id.slice(0, 8)}...</span>
-          <Button size="xs" variant="secondary" loading={failoverBusy} onClick={handleFailover} className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10 text-[11px]">
-            <span className="flex items-center gap-1">
-              <svg className="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Evacuate
-            </span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="xs"
+              variant={isCordoned ? 'primary' : 'secondary'}
+              loading={cordonBusy}
+              onClick={handleToggleCordon}
+              className="text-[11px]"
+            >
+              {isCordoned ? 'Uncordon' : 'Cordon'}
+            </Button>
+            <Button
+              size="xs"
+              variant="secondary"
+              loading={failoverBusy}
+              onClick={handleFailover}
+              className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10 text-[11px]"
+            >
+              <span className="flex items-center gap-1">
+                <svg className="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Evacuate
+              </span>
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              loading={deleteBusy}
+              onClick={handleDeleteNode}
+              className="text-red-400 hover:text-red-300 text-[11px]"
+            >
+              Delete
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -506,6 +631,12 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
   const [nodeLabel, setNodeLabel] = useState<string>('node-singapore-1');
   const [roleTags, setRoleTags] = useState<string[]>(['web-hosting', 'node-hosting']);
   
+  // Cloud Provider & Node Metadata
+  const [nodeProvider, setNodeProvider] = useState('Hetzner');
+  const [nodeRegion, setNodeRegion] = useState('eu-central-1 (Nuremberg)');
+  const [nodeOs, setNodeOs] = useState('Ubuntu 24.04 LTS');
+  const [activeEnrollJobId, setActiveEnrollJobId] = useState<string | null>(null);
+
   // SSH state
   const [sshIp, setSshIp] = useState('');
   const [sshPort, setSshPort] = useState('22');
@@ -548,6 +679,37 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
       provisionLogRef.current.scrollTop = provisionLogRef.current.scrollHeight;
     }
   }, [provisionLog]);
+
+  async function handleAsyncEnroll(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sshIp) {
+      setSshError('Please enter the target VPS IP Address');
+      return;
+    }
+    setSshBusy(true);
+    setSshError(null);
+    try {
+      const res = await api.nodes.enrollJob({
+        label: nodeLabel,
+        ip: sshIp,
+        sshPort: Number(sshPort),
+        username: sshUser,
+        password: authType === 'password' ? sshPassword : undefined,
+        privateKey: authType === 'key' ? sshKey : undefined,
+        provider: nodeProvider,
+        region: nodeRegion,
+        os: nodeOs,
+        roleTags,
+      });
+      setActiveEnrollJobId(res.jobId);
+      toast('Node enrollment job dispatched to worker queue!', 'success');
+    } catch (err: any) {
+      setSshError(err.message || 'Failed to dispatch node enrollment job');
+      toast('Failed to dispatch enrollment job', 'error');
+    } finally {
+      setSshBusy(false);
+    }
+  }
 
   async function handleSshConnect(e: React.FormEvent) {
     e.preventDefault();
@@ -681,12 +843,35 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
         <label className="text-xs font-semibold text-text-muted uppercase tracking-wider block mb-2">
           1. Node Label &amp; Workload Capability Tags
         </label>
-        <div className="grid md:grid-cols-2 gap-4 mb-3">
+        <div className="grid md:grid-cols-3 gap-4 mb-3">
           <Input
             label="Node Identifier Label"
             placeholder="e.g. node-singapore-1"
             value={nodeLabel}
             onChange={(e) => setNodeLabel(e.target.value)}
+          />
+          <div>
+            <label className="text-xs font-semibold text-text-muted block mb-1">VPS Provider</label>
+            <select
+              value={nodeProvider}
+              onChange={(e) => setNodeProvider(e.target.value)}
+              className="w-full bg-surface-raised border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-accent-violet"
+            >
+              <option value="Hetzner">Hetzner Cloud</option>
+              <option value="OVH">OVHcloud</option>
+              <option value="DigitalOcean">DigitalOcean</option>
+              <option value="Linode">Linode / Akamai</option>
+              <option value="AWS">Amazon Lightsail / EC2</option>
+              <option value="Contabo">Contabo</option>
+              <option value="Vultr">Vultr</option>
+              <option value="Custom">Other / Bare-Metal</option>
+            </select>
+          </div>
+          <Input
+            label="Datacenter / Region"
+            placeholder="e.g. fsn1, eu-central-1, sgp1"
+            value={nodeRegion}
+            onChange={(e) => setNodeRegion(e.target.value)}
           />
         </div>
         <div className="flex flex-wrap gap-2">
@@ -804,19 +989,49 @@ function NodeOnboardingSection({ onCreated }: { onCreated: () => void }) {
               </pre>
             </div>
 
-            <div className="pt-2">
-              <Button type="submit" size="lg" loading={sshBusy} disabled={sshBusy || !sshIp} className="w-full justify-center">
+            <div className="pt-2 grid md:grid-cols-2 gap-3">
+              <Button type="submit" size="lg" loading={sshBusy} disabled={sshBusy || !sshIp} className="justify-center">
                 {sshBusy ? (
                   <span className="flex items-center gap-2">
                     <Spinner /> Provisioning Server via SSH...
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
-                    <KeyIcon /> Connect SSH &amp; Run 1-Line Script Automatically
+                    <KeyIcon /> Connect SSH &amp; Run Direct
                   </span>
                 )}
               </Button>
+              <Button
+                type="button"
+                size="lg"
+                variant="secondary"
+                loading={sshBusy}
+                disabled={sshBusy || !sshIp}
+                onClick={handleAsyncEnroll}
+                className="justify-center border-accent-cyan/30 text-accent-cyan hover:bg-accent-cyan/10"
+              >
+                <span className="flex items-center gap-2">
+                  <ServerIcon /> Enroll via Background Job
+                </span>
+              </Button>
             </div>
+
+            {activeEnrollJobId && (
+              <div className="mt-4">
+                <JobProgressBar
+                  jobId={activeEnrollJobId}
+                  title={`Enrolling ${nodeLabel} (${sshIp})`}
+                  onComplete={() => {
+                    toast('Node enrolled successfully and online!', 'success');
+                    onCreated();
+                    setActiveEnrollJobId(null);
+                  }}
+                  onError={(err?: string) => {
+                    toast(`Enrollment failed: ${err || 'Unknown error'}`, 'error');
+                  }}
+                />
+              </div>
+            )}
 
             {provisionLog.length > 0 && (
               <div className="mt-4 space-y-2">

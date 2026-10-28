@@ -167,7 +167,7 @@ export const supabaseAdmin = {
 
     create: (data: { name: string; clientEmail: string; region?: string; nodeId?: string }) =>
       apiFetch('/api/supabase/projects', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
-        asJson<{ project: ClientSupabaseProject }>(r)
+        asJson<{ project: ClientSupabaseProject; jobId?: string; ok?: boolean }>(r)
       ),
 
     delete: (id: string) =>

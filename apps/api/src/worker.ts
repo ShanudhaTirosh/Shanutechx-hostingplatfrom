@@ -31,6 +31,29 @@ import { executeWebmailSweepJob } from './jobs/webmail-sweep';
 import { executeAnnouncementSweepJob } from './jobs/announcement-sweep';
 import { executeBackupSweepJob } from './jobs/backup-sweep';
 import { logger } from './lib/logger';
+import { InfrastructureJobPayload } from './lib/jobQueue';
+import { processInfrastructureJob } from './jobs/infrastructure-job-processor';
+
+// Infrastructure Operations Job Worker
+export const infrastructureWorker = new Worker<InfrastructureJobPayload>(
+  'infrastructure-jobs',
+  async (job) => {
+    logger.info({ jobId: job.id, type: job.data.type }, 'Starting infrastructure job processing');
+    await processInfrastructureJob(job);
+  },
+  {
+    connection: redisConnectionOptions,
+    concurrency: 5,
+  }
+);
+
+infrastructureWorker.on('completed', (job) => {
+  logger.info({ jobId: job.id }, 'Infrastructure job completed successfully');
+});
+
+infrastructureWorker.on('failed', (job, err) => {
+  logger.error({ jobId: job?.id, err: err.message }, 'Infrastructure job failed');
+});
 
 
 // SSL Certificate Renewal Worker
@@ -251,7 +274,7 @@ webmailSweepWorker.on('failed', (job, err) => {
   }
 })();
 
-[sslRenewalWorker, workspaceCleanupWorker, billingSweepWorker, uptimeSweepWorker, nodeFailoverWorker, backupSweepWorker, pushReceiptWorker, webmailSweepWorker, announcementSweepWorker].forEach((w) => {
+[sslRenewalWorker, workspaceCleanupWorker, billingSweepWorker, uptimeSweepWorker, nodeFailoverWorker, backupSweepWorker, pushReceiptWorker, webmailSweepWorker, announcementSweepWorker, infrastructureWorker].forEach((w) => {
   w.on('error', (err) => {
     logger.warn({ err: err.message, worker: w.name }, 'Worker Redis connection error caught');
   });
@@ -297,6 +320,7 @@ async function gracefulWorkerShutdown(signal: string) {
       nodeFailoverWorker.close(),
       backupSweepWorker.close(),
       pushReceiptWorker.close(),
+      infrastructureWorker.close(),
     ]);
     logger.info('All BullMQ workers shut down gracefully.');
     process.exit(0);

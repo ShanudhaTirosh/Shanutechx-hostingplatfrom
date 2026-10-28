@@ -206,10 +206,20 @@ export interface BotHostingDeployInput {
   nixpacksConfig?: NixpacksConfig;
 }
 
+export type NodeStatus = 'pending' | 'installing' | 'online' | 'degraded' | 'offline' | 'maintenance' | 'error';
+
 export interface Node {
   id: string;
   label: string;
   ip: string;
+  sshPort?: number;
+  os?: string | null;
+  provider?: string | null;
+  agentVersion?: string | null;
+  maintenanceReason?: string | null;
+  statusMessage?: string | null;
+  status?: NodeStatus;
+  isSchedulable?: boolean;
   cpuCores: number;
   ramMb: number;
   diskGb: number;
@@ -220,6 +230,28 @@ export interface Node {
   diskUsedGb: number | null;
   lastSeenAt: string | null;
   region?: string | null;
+  metadata?: any;
+}
+
+export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type JobType = 'node_enroll' | 'node_maintenance' | 'app_deploy' | 'supabase_provision' | 'mailbox_provision' | 'backup_create' | 'backup_restore';
+
+export interface InfrastructureJob {
+  id: string;
+  type: JobType;
+  status: JobStatus;
+  progress: number;
+  currentStep?: string | null;
+  error?: string | null;
+  logs?: Array<{ timestamp: string; level: string; message: string }>;
+  nodeId?: string | null;
+  userId?: string | null;
+  payload?: any;
+  result?: any;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface BuildEvent {

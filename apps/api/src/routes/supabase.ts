@@ -12,6 +12,7 @@ import { verifySmtpConnection, sendSmtpEmail } from '../lib/smtpDispatcher';
 import { createSubdomainRecord, deleteSubdomainRecord } from '../lib/cloudflare';
 import { callNodeAgent } from '../lib/nodeAgentClient';
 import { INFRASTRUCTURE_PORTS } from '../lib/portExposure';
+import { dispatchJob } from '../lib/jobQueue';
 
 export const supabaseRouter = Router();
 
@@ -829,53 +830,25 @@ supabaseRouter.post('/supabase/projects', requireAuth, async (req: AuthedRequest
     let allocatedPorts = { apiPort: 8001, studioPort: 8000, dbPort: 5432 };
     if (selectedNode?.id && selectedNode?.ip) {
       allocatedPorts = await autoExposeSupabaseProjectPorts(selectedNode.id, selectedNode.ip, cleanSlug, name);
-
-      // Deploy full Supabase 8-container stack on the selected node via node-agent
-      const rootDomain = env.rootDomain || 'shanutechx.com';
-      const studioUrl = `https://supabase-${cleanSlug}-studio.${rootDomain}`;
-      const apiUrl = `https://supabase-${cleanSlug}.${rootDomain}`;
-      const kongConfigYaml = buildKongConfigYaml(anonKey, serviceKey);
-      const composeYaml = buildSupabaseComposeYaml({
-        cleanSlug,
-        projectName: name,
-        dbPassword,
-        jwtSecret: projJwtSecret,
-        dbPort: allocatedPorts.dbPort,
-        apiPort: allocatedPorts.apiPort,
-        studioPort: allocatedPorts.studioPort,
-        studioUrl,
-        apiUrl,
-        anonKey,
-        serviceKey,
-      });
-
-      await callNodeAgent(selectedNode, '/agent/compose/up', 'POST', {
-        projectName: `supa-${cleanSlug}`,
-        composeYaml,
-        configFiles: {
-          'kong.yml': kongConfigYaml,
-        },
-        envVars: {
-          CONTAINER_NAME: `supa-${cleanSlug}`,
-          POSTGRES_PASSWORD: dbPassword,
-          PORT: String(allocatedPorts.studioPort),
-          API_PORT: String(allocatedPorts.apiPort),
-          DB_PORT: String(allocatedPorts.dbPort),
-        },
-      }).catch((err: any) => {
-        logger.warn({ err, nodeId: selectedNode.id }, `Node agent compose up notice for Supabase project "${name}"`);
-      });
     }
 
     newProject = await prisma.supabaseClientProject.update({
       where: { id },
       data: {
-        status: 'ACTIVE',
-        errorMessage: null,
         studioPort: allocatedPorts.studioPort,
         apiPort: allocatedPorts.apiPort,
         dbPort: allocatedPorts.dbPort,
       } as any,
+    });
+
+    // Enqueue asynchronous provisioning job
+    const job = await dispatchJob({
+      type: 'supabase_provision',
+      payload: { projectId: newProject.id },
+      nodeId: selectedNode?.id || undefined,
+      userId: req.user?.id,
+      resourceType: 'supabase',
+      resourceId: newProject.id,
     });
 
     if (req.user) {
@@ -883,16 +856,23 @@ supabaseRouter.post('/supabase/projects', requireAuth, async (req: AuthedRequest
         data: {
           adminId: req.user.id,
           action: 'supabase.project_created',
-          target: `Project "${name}" (${id}) provisioned on node ${selectedNode?.label || 'localhost'} (${selectedNode?.ip || '127.0.0.1'}) with ports Studio:${allocatedPorts.studioPort}/API:${allocatedPorts.apiPort}/DB:${allocatedPorts.dbPort}`,
+          target: `Project "${name}" (${id}) queued on node ${selectedNode?.label || 'default'} (job: ${job.id})`,
         },
       }).catch(() => {});
     }
+
+    res.status(202).json({
+      ok: true,
+      message: 'Supabase project provisioning started',
+      project: serializeProject({ ...newProject, node: selectedNode }),
+      jobId: job.id,
+    });
   } catch (err: any) {
     newProject = await prisma.supabaseClientProject.update({
       where: { id },
       data: {
         status: 'FAILED',
-        errorMessage: err?.message || 'Provisioning failed during DNS or node container assignment',
+        errorMessage: err?.message || 'Provisioning failed during port allocation or job dispatch',
       } as any,
     });
 
@@ -905,9 +885,13 @@ supabaseRouter.post('/supabase/projects', requireAuth, async (req: AuthedRequest
         },
       }).catch(() => {});
     }
-  }
 
-  res.status(201).json({ project: serializeProject({ ...newProject, node: selectedNode }) });
+    res.status(500).json({
+      error: 'Failed to provision Supabase project',
+      detail: err?.message,
+      project: serializeProject({ ...newProject, node: selectedNode }),
+    });
+  }
 });
 
 supabaseRouter.get('/supabase/projects/:id', requireAuth, async (req: AuthedRequest, res: Response) => {

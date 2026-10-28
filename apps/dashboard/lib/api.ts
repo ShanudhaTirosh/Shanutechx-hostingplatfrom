@@ -925,6 +925,10 @@ export const api = {
         }
       }
     },
+    launchJob: (id: string, data?: Record<string, any>) =>
+      apiFetch(`/api/deployments/${id}/launch-job`, { method: 'POST', body: JSON.stringify(data || {}) }).then((r) =>
+        asJson<{ success: boolean; jobId: string; deploymentId: string; status: string }>(r)
+      ),
     launch: async (id: string, data?: Record<string, any>, onEvent?: (event: BuildEvent) => void): Promise<void> => {
       const res = await apiFetch(`/api/deployments/${id}/launch`, { method: 'POST', body: JSON.stringify(data || {}) });
       if (!res.ok) {
@@ -1231,6 +1235,52 @@ export const api = {
       apiFetch(`/api/nodes/${nodeId}/failover-status`).then((r) => asJson<{ logs: any[] }>(r)),
     update: (nodeId: string, data: { isActive?: boolean; isDraining?: boolean; label?: string; roleTags?: string[]; monthlyBandwidthGb?: number }) =>
       apiFetch(`/api/nodes/${nodeId}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) => asJson<{ node: Node }>(r)),
+    enrollJob: (data: {
+      label: string;
+      ip: string;
+      sshPort?: number;
+      username?: string;
+      password?: string;
+      privateKey?: string;
+      provider?: string;
+      region?: string;
+      os?: string;
+      cpuCores?: number;
+      ramMb?: number;
+      diskGb?: number;
+      roleTags?: string[];
+    }) =>
+      apiFetch('/api/nodes/enroll-job', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+        asJson<{ success: boolean; jobId: string; node: Node; message: string }>(r)
+      ),
+    cordon: (id: string, reason?: string) =>
+      apiFetch(`/api/nodes/${id}/cordon`, { method: 'POST', body: JSON.stringify({ reason }) }).then((r) =>
+        asJson<{ success: boolean; node: Node }>(r)
+      ),
+    uncordon: (id: string) =>
+      apiFetch(`/api/nodes/${id}/uncordon`, { method: 'POST' }).then((r) =>
+        asJson<{ success: boolean; node: Node }>(r)
+      ),
+    deleteNode: (id: string, force?: boolean) =>
+      apiFetch(`/api/nodes/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }).then((r) =>
+        asJson<{ success: boolean; message: string }>(r)
+      ),
+  },
+
+  jobs: {
+    list: (params?: { type?: string; status?: string; nodeId?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.type) q.set('type', params.type);
+      if (params?.status) q.set('status', params.status);
+      if (params?.nodeId) q.set('nodeId', params.nodeId);
+      const qs = q.toString() ? `?${q.toString()}` : '';
+      return apiFetch(`/api/jobs${qs}`).then((r) => asJson<{ jobs: any[] }>(r));
+    },
+    get: (id: string) =>
+      apiFetch(`/api/jobs/${id}`).then((r) => asJson<{ job: any }>(r)),
+    cancel: (id: string) =>
+      apiFetch(`/api/jobs/${id}/cancel`, { method: 'POST' }).then((r) => asJson<{ success: boolean; job: any }>(r)),
+    streamUrl: (id: string) => `/api/jobs/${id}/stream`,
   },
 
   containers: {

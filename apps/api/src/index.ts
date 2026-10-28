@@ -184,6 +184,7 @@ app.use(csrfProtection);
 import { previewToolbarRouter } from './routes/previewToolbar';
 import { edgeConfigRouter } from './routes/edgeConfig';
 import { speedInsightsRouter } from './routes/speedInsights';
+import { jobsRouter } from './routes/jobs';
 
 app.use('/api', healthRouter);
 app.use('/api', productsRouter);
@@ -256,6 +257,7 @@ app.use('/api', notificationsRouter);
 app.use('/api', previewToolbarRouter);
 app.use('/api', edgeConfigRouter);
 app.use('/api', speedInsightsRouter);
+app.use('/api', jobsRouter);
 
 // Prevent search crawlers and bots from indexing the API
 app.get('/robots.txt', (_req, res) => {

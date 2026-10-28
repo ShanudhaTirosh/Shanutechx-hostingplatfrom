@@ -19,6 +19,40 @@ enum Role {
   dev
 }
 
+enum NodeStatus {
+  pending
+  installing
+  online
+  degraded
+  offline
+  maintenance
+  error
+}
+
+enum JobStatus {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+}
+
+enum JobType {
+  node_enroll
+  node_maintenance
+  node_remove
+  app_deploy
+  app_rebuild
+  supabase_provision
+  supabase_deprovision
+  supabase_backup
+  supabase_restore
+  mailbox_provision
+  mailbox_deprovision
+  vps_provision
+  vps_power_action
+}
+
 enum ServiceType {
   web_hosting
   node_hosting
@@ -202,6 +236,7 @@ model User {
   claimedTickets        Ticket[]               @relation("ClaimedTickets")
   createdAnnouncements  Announcement[]         @relation("CreatedAnnouncements")
   supabaseProjects      SupabaseClientProject[]
+  infrastructureJobs    InfrastructureJob[]
 
   @@index([assignedAdminId])
 }
@@ -228,18 +263,26 @@ model PushToken {
 }
 
 model Node {
-  id                 String   @id @default(cuid())
+  id                 String     @id @default(cuid())
   label              String
   ip                 String
-  sshKeyRef          String // reference into the secrets vault, never the raw key
+  sshPort            Int        @default(22)
+  sshKeyRef          String     // reference into the secrets vault, never the raw key
+  os                 String?    // e.g. "Ubuntu 24.04 LTS"
+  provider           String?    // e.g. "Hetzner", "OVH", "DigitalOcean", "Contabo", "AWS", "Custom"
+  region             String?    // e.g. "fsn1", "us-east-1", "sgp1"
+  status             NodeStatus @default(pending)
+  statusMessage      String?
+  agentVersion       String?
+  maintenanceReason  String?
   cpuCores           Int
   ramMb              Int
   diskGb             Int
-  roleTags           String[] // e.g. ["web-hosting", "node-hosting", "python-hosting"]
-  isActive           Boolean  @default(true)
-  isDraining         Boolean  @default(false)
-  monthlyBandwidthGb Int      @default(30000)
-  createdAt          DateTime @default(now())
+  roleTags           String[]   // e.g. ["web-hosting", "node-hosting", "python-hosting"]
+  isActive           Boolean    @default(true)
+  isDraining         Boolean    @default(false)
+  monthlyBandwidthGb Int        @default(30000)
+  createdAt          DateTime   @default(now())
 
   // Live utilization, updated by the node stats collector
   cpuUsedPct Float?
@@ -247,11 +290,12 @@ model Node {
   diskUsedGb Int?
   lastSeenAt DateTime?
 
-  services         Service[]
-  deployments      Deployment[]
-  managedDatabases ManagedDatabase[]
-  portExposures    NodePortExposure[]
-  supabaseProjects SupabaseClientProject[]
+  services           Service[]
+  deployments        Deployment[]
+  managedDatabases   ManagedDatabase[]
+  portExposures      NodePortExposure[]
+  supabaseProjects   SupabaseClientProject[]
+  infrastructureJobs InfrastructureJob[]
 
   // Set when this Node IS a VPS the admin/dev bought manually through
   // Leaseweb's portal and then linked here via the "import as a node" flow
@@ -262,6 +306,35 @@ model Node {
   // depends on this field.
   leasewebVpsId String?
   projects      Project[]
+}
+
+model InfrastructureJob {
+  id             String    @id @default(cuid())
+  type           JobType
+  status         JobStatus @default(queued)
+  progress       Int       @default(0) // 0-100%
+  currentStep    String?
+  payload        Json      // Request parameters
+  result         Json?     // Output data on success
+  error          String?   // Detailed diagnostic on failure
+  logs           String[]  @default([])
+  idempotencyKey String?   @unique
+  timeoutSec     Int       @default(900) // Default 15 min
+
+  userId         String?
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  nodeId         String?
+  node           Node?     @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  resourceType   String?   // "deployment" | "supabase" | "mailbox" | "vps"
+  resourceId     String?
+
+  createdAt      DateTime  @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  @@index([status, type])
+  @@index([userId])
+  @@index([nodeId])
 }
 
 // LEGACY — superseded by Product/Plan below. Left in place (read-only,

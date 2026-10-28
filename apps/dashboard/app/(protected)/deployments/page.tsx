@@ -23,6 +23,7 @@ import { DomainManagement } from "@/components/DomainManagement";
 import { useAppUser } from "@/lib/AppUserContext";
 import Link from "next/link";
 import { VercelDeployModal } from "@/components/VercelDeployModal";
+import { JobProgressBar } from "@/components/jobs/JobProgressBar";
 
 export const dynamic = "force-dynamic";
 
@@ -140,8 +141,23 @@ function DeploymentRow({
   const [redeploying, setRedeploying] = useState(false);
   const [redeployLog, setRedeployLog] = useState<string[]>([]);
   const [downloadingLogs, setDownloadingLogs] = useState(false);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [launchingJob, setLaunchingJob] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+
+  async function handleLaunchJob() {
+    setLaunchingJob(true);
+    try {
+      const res = await api.deployments.launchJob(deployment.id);
+      setActiveJobId(res.jobId);
+      toast("Build job enqueued to worker queue!", "success");
+    } catch (e: any) {
+      toast(e.message || "Failed to enqueue deployment job", "error");
+    } finally {
+      setLaunchingJob(false);
+    }
+  }
 
   async function handleToggleLogs() {
     if (!showLogs) {
@@ -254,6 +270,11 @@ function DeploymentRow({
                         : "SSL Proxy"}
               </span>
             )}
+            {deployment.builder && (
+              <span className="text-[10px] rounded-full px-2 py-0.5 bg-violet-500/10 text-violet-300 border border-violet-500/20 font-mono">
+                {deployment.builder}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 text-text-faint text-xs mt-1 font-mono flex-wrap">
             <span>
@@ -292,14 +313,25 @@ function DeploymentRow({
             </Button>
           )}
           {deployment.repoUrl && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleRedeploy}
-              disabled={redeploying}
-            >
-              {redeploying ? "Redeploying..." : "Redeploy"}
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleRedeploy}
+                disabled={redeploying}
+              >
+                {redeploying ? "Redeploying..." : "Redeploy"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleLaunchJob}
+                disabled={launchingJob}
+                className="border-accent-cyan/30 text-accent-cyan hover:bg-accent-cyan/10"
+              >
+                {launchingJob ? "Queueing..." : "Background Build"}
+              </Button>
+            </>
           )}
           {deployment.status === "running" && (
             <Button
@@ -347,6 +379,24 @@ function DeploymentRow({
           <pre className="bg-black/60 rounded-xl p-4 text-xs font-mono text-yellow-400 max-h-96 overflow-y-auto whitespace-pre-wrap border border-white/[0.04]">
             {redeployLog.slice(-1000).join("\n")}
           </pre>
+        </div>
+      )}
+
+      {activeJobId && (
+        <div className="mt-4">
+          <JobProgressBar
+            jobId={activeJobId}
+            title={`Build & Deploy: ${deployment.subdomain || deployment.id}`}
+            onComplete={() => {
+              toast("Deployment succeeded and container running!", "success");
+              onChanged();
+              setActiveJobId(null);
+            }}
+            onError={(err?: string) => {
+              toast(`Deployment build failed: ${err || "Unknown error"}`, "error");
+              onChanged();
+            }}
+          />
         </div>
       )}
 

@@ -24,6 +24,7 @@ import { deploymentCreateLimiter } from '../middleware/rateLimit';
 
 import { scanTextForAbuse, banUserAndTeardownResources } from '../lib/abuseDetector';
 import { claimDeploymentSlot, getAvailableDeploymentSlots } from '../lib/deploymentSlots';
+import { dispatchJob } from '../lib/jobQueue';
 
 export const deploymentsRouter = Router();
 
@@ -435,6 +436,47 @@ deploymentsRouter.post('/deployments/:id/launch', async (req: AuthedRequest, res
     res.write(JSON.stringify({ phase: 'error', message: err?.message || 'Deployment launch failed' }) + '\n');
     res.end();
   }
+});
+
+/**
+ * POST /api/deployments/:id/launch-job
+ * Dispatches an asynchronous app deployment job through BullMQ.
+ * Returns { ok: true, jobId } for real-time progress tracking.
+ */
+deploymentsRouter.post('/deployments/:id/launch-job', async (req: AuthedRequest, res) => {
+  const deployment = await loadOwnedDeployment(req, req.params.id);
+  if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
+
+  const repoUrl = req.body.repoUrl || deployment.repoUrl;
+  if (!repoUrl) return res.status(400).json({ error: 'repoUrl is required' });
+
+  const builder = req.body.builder || (deployment.nixpacksConfig as any)?.builder || 'AUTO';
+
+  await prisma.deployment.update({
+    where: { id: deployment.id },
+    data: { status: 'building' },
+  });
+
+  const job = await dispatchJob({
+    type: 'app_deploy',
+    payload: {
+      deploymentId: deployment.id,
+      repoUrl,
+      branch: req.body.branch || deployment.branch || 'main',
+      builder,
+    },
+    nodeId: deployment.nodeId,
+    userId: req.user!.id,
+    resourceType: 'deployment',
+    resourceId: deployment.id,
+  });
+
+  res.status(202).json({
+    ok: true,
+    message: 'Deployment job queued',
+    jobId: job.id,
+    deploymentId: deployment.id,
+  });
 });
 
 

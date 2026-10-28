@@ -5,6 +5,7 @@ import { X, Play, Square, RotateCcw, RefreshCw, Trash2, Plus, ExternalLink, Aler
 import { supabaseAdmin, ClientSupabaseProject } from '@/lib/supabaseAdmin';
 import { ProjectConfigModal } from './ProjectConfigModal';
 import { useToast } from '@/components/ui';
+import { JobProgressBar } from '@/components/jobs/JobProgressBar';
 
 interface ProjectSwitcherProps {
   activeProject: ClientSupabaseProject | null;
@@ -44,6 +45,7 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
   const [name, setName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [creating, setCreating] = useState(false);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
   const { toast } = useToast();
 
@@ -116,6 +118,9 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
         setShowModal(false);
         setProjects((prev) => [res.project, ...prev]);
         onSelectProject(res.project);
+        if (res.jobId) {
+          setActiveJobId(res.jobId);
+        }
         toast(`Project "${res.project.name}" provisioning started`, 'success');
       })
       .catch((err) => toast(err.message, 'error'))
@@ -367,6 +372,25 @@ export function ProjectSwitcher({ activeProject, onSelectProject }: ProjectSwitc
                 Region: <span className="text-text-muted">{activeProject.region}</span>
               </span>
             )}
+          </div>
+        )}
+
+        {/* Real-time Job Progress for Supabase Provisioning */}
+        {activeJobId && (
+          <div className="p-3 bg-black/40 border-t border-white/[0.04]">
+            <JobProgressBar
+              jobId={activeJobId}
+              title={`Provisioning Supabase Stack: ${activeProject?.name || 'New Project'}`}
+              onComplete={() => {
+                toast('Supabase cluster healthy & operational!', 'success');
+                fetchProjects();
+                setActiveJobId(null);
+              }}
+              onError={(err?: string) => {
+                toast(`Supabase provisioning failed: ${err || 'Unknown error'}`, 'error');
+                fetchProjects();
+              }}
+            />
           </div>
         )}
       </div>
