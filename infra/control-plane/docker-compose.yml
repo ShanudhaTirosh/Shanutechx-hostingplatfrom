@@ -488,6 +488,10 @@ services:
       API_JWT_SECRET: ${JWT_SECRET}
       SECRET_KEY_BASE: ${SUPABASE_REALTIME_SECRET}
       ERL_AFLAGS: -proto_dist inet_tcp
+      RLIMIT_NOFILE: "65536"
+      APP_NAME: realtime
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
       DNS_NODES: "''"
     networks: [shanutechx-internal]
 
@@ -549,12 +553,14 @@ services:
   supabase-kong-config:
     image: supabase/kong:2.8.1
     container_name: shanutechx-supabase-kong-config
+    user: "0:0"
     entrypoint:
       - /bin/sh
       - -c
       - >-
         apk add --no-cache gettext > /dev/null 2>&1 || true &&
         envsubst < /kong-src/kong.yml > /kong-out/kong.yml &&
+        chmod 777 /kong-out/kong.yml &&
         echo 'Kong config generated.'
     environment:
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
@@ -603,6 +609,7 @@ services:
     restart: unless-stopped
     depends_on: [supabase-kong]
     environment:
+      HOSTNAME: "0.0.0.0"
       STUDIO_PG_META_URL: http://supabase-meta:8080
       POSTGRES_PASSWORD: ${SUPABASE_DB_PASSWORD}
       DEFAULT_ORGANIZATION_NAME: ShanuTechX
@@ -627,6 +634,10 @@ services:
     depends_on:
       supabase-db:
         condition: service_healthy
+    command:
+      - start
+      - --main-service
+      - /home/deno/functions/main
     environment:
       JWT_SECRET: ${JWT_SECRET}
       SUPABASE_URL: http://supabase-kong:8000

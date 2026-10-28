@@ -33,4 +33,4 @@ COPY --from=builder /repo/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /repo/apps/web/public ./apps/web/public
 
 EXPOSE 3000
-CMD ["sh", "-c", "if [ -f server.js ]; then node server.js; else node apps/web/server.js; fi"]
+CMD ["node", "apps/web/server.js"]
