@@ -107,6 +107,7 @@ app.use(
       'x-api-key',
       'x-impersonate-user-id',
       'x-webmail-token',
+      'X-Webmail-Token',
       'x-user-email',
       'x-project-id',
       'x-project-ref',

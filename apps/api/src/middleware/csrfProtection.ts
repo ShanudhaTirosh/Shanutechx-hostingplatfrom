@@ -23,11 +23,23 @@ const ALLOWED_ORIGINS = [
   'https://app.shanutechx.com',
   'https://shanutechx.com',
   'https://www.shanutechx.com',
+  'https://mail.shanutechx.com',
+  'https://webmail.shanutechx.com',
+  'https://status.shanutechx.com',
 
   // Development/local origins — excluded in production to avoid expanding the attack surface.
   // Set NODE_ENV=production on all production servers.
   ...(process.env.NODE_ENV !== 'production'
-    ? ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000']
+    ? [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3002',
+        'http://localhost:3003',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3001',
+        'http://127.0.0.1:3002',
+        'http://127.0.0.1:3003',
+      ]
     : []),
 
   ...extraOrigins,
@@ -41,6 +53,13 @@ const ALLOWED_ORIGINS = [
  * middleware instead of maintaining two divergent origin checks.
  */
 export function isOriginAllowed(origin: string): boolean {
+  if (process.env.NODE_ENV !== 'production') {
+    // In dev, permit any localhost or 127.0.0.1 origin regardless of port
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return true;
+    }
+  }
+
   // Exact-match production/development origins, or any production (HTTPS)
   // first-party subdomain of shanutechx.com. The wildcard is TLS-gated so an
   const TRUSTED_SUBDOMAINS = ['app', 'admin', 'api', 'status', 'mail', 'webmail', 'dashboard', 'web'];

@@ -48,7 +48,7 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     } else {
       await prisma.product.update({
         where: { id: vpsProduct.id },
-        data: { name: 'VPS Hosting', slug: 'vps-hosting', category: 'vps' },
+        data: { name: 'VPS Hosting', slug: 'vps-hosting', category: 'vps', isActive: true },
       });
     }
 
@@ -169,7 +169,7 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     } else {
       await prisma.product.update({
         where: { id: smtpProduct.id },
-        data: { name: 'SMTP & Email', slug: 'smtp-email', category: 'smtp' },
+        data: { name: 'SMTP & Email', slug: 'smtp-email', category: 'smtp', isActive: true },
       });
     }
 
@@ -306,7 +306,7 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     } else {
       await prisma.product.update({
         where: { id: webHostingProduct.id },
-        data: { name: 'Web Hosting', slug: 'web-hosting', category: 'web_hosting' },
+        data: { name: 'Web Hosting', slug: 'web-hosting', category: 'web_hosting', isActive: true },
       });
     }
 
@@ -365,7 +365,7 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     } else {
       await prisma.product.update({
         where: { id: dbProduct.id },
-        data: { name: 'Managed Databases', slug: 'managed-databases', category: 'database' },
+        data: { name: 'Managed Databases', slug: 'managed-databases', category: 'database', isActive: true },
       });
     }
 
@@ -423,7 +423,7 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     } else {
       await prisma.product.update({
         where: { id: catalogProduct.id },
-        data: { name: 'App Catalog', slug: 'app-catalog', category: 'app_catalog' },
+        data: { name: 'App Catalog', slug: 'app-catalog', category: 'app_catalog', isActive: true },
       });
     }
 
@@ -482,7 +482,7 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     } else {
       await prisma.product.update({
         where: { id: botProduct.id },
-        data: { name: 'Bot Hosting', slug: 'bot-hosting', category: 'bot_hosting' },
+        data: { name: 'Bot Hosting', slug: 'bot-hosting', category: 'bot_hosting', isActive: true },
       });
     }
 
@@ -542,7 +542,7 @@ export async function ensureDefaultProductsSeeded(): Promise<void> {
     } else {
       await prisma.product.update({
         where: { id: appDeployProduct.id },
-        data: { name: 'App Deployment', slug: 'app-deployment', category: 'app_deployment' },
+        data: { name: 'App Deployment', slug: 'app-deployment', category: 'app_deployment', isActive: true },
       });
     }
 
