@@ -24,7 +24,10 @@ const ssoExchangeSchema = z.object({
 
 const ssoTicketSchema = z.object({
   smtpAccountId: z.string().optional(),
-});
+  accountId: z.string().optional(),
+}).transform((data) => ({
+  smtpAccountId: data.smtpAccountId || data.accountId,
+}));
 
 function omitCredentialRef<T extends { credentialRef: string }>(account: T) {
   const { credentialRef, ...rest } = account;
@@ -57,11 +60,15 @@ webmailAuthRouter.post('/webmail/auth/login', authRateLimiter, async (req: Reque
         { aliases: { has: inputClean } },
       ],
     },
-    include: { user: { select: { id: true, email: true, displayName: true } } },
+    include: { user: { select: { id: true, email: true, displayName: true, role: true } } },
   });
 
   if (!account || !account.credentialRef) {
     return res.status(401).json({ error: 'Invalid email address or password' });
+  }
+
+  if (account.user?.role === 'admin') {
+    return res.status(403).json({ error: 'Access Denied: Admin users do not have access to Webmail.' });
   }
 
   if (account.isSuspended) {
@@ -111,6 +118,10 @@ webmailAuthRouter.post('/webmail/auth/sso-ticket', requireAuth, async (req: Auth
   const requestedAccountId = parsed.success ? parsed.data.smtpAccountId : undefined;
   const userId = req.user!.id;
   const role = req.user!.role;
+
+  if (role === 'admin') {
+    return res.status(403).json({ error: 'Access Denied: Admin users do not have access to Webmail.' });
+  }
 
   let account: any = null;
   if (requestedAccountId) {
@@ -190,6 +201,10 @@ webmailAuthRouter.post('/webmail/auth/sso-exchange', async (req: Request, res: R
 
     const sessionUserId = payload.userId || state.userId || account.userId;
     const sessionRole = payload.role || state.role;
+
+    if (sessionRole === 'admin') {
+      return res.status(403).json({ error: 'Access Denied: Admin users do not have access to Webmail.' });
+    }
 
     const token = jwt.sign(
       {

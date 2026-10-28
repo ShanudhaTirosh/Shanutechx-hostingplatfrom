@@ -38,6 +38,65 @@ export const emailRouter = Router();
 useForOwnRoutes(emailRouter, requireAuth);
 
 /**
+ * GET /api/email/plans
+ * Returns active paid email/SMTP plans from PostgreSQL.
+ * Real plans with storage quotas, send quotas, and LKR pricing.
+ */
+emailRouter.get('/email/plans', async (req: AuthedRequest, res) => {
+  try {
+    const plans = await prisma.plan.findMany({
+      where: {
+        product: { category: 'smtp' },
+        isActive: true,
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            category: true,
+          },
+        },
+      },
+      orderBy: { price: 'asc' },
+    });
+
+    const formattedPlans = plans.map((p) => {
+      let specs: Record<string, any> = {};
+      try {
+        specs = typeof p.specsJson === 'string' ? JSON.parse(p.specsJson) : (p.specsJson || {});
+      } catch {
+        specs = {};
+      }
+
+      const priceLkr = Math.round(p.price / 100);
+      const monthlyEquivalentLkr = p.billingType === 'quarterly' ? Math.round(priceLkr / 3) : priceLkr;
+
+      return {
+        id: p.id,
+        productId: p.productId,
+        name: p.name,
+        price: p.price,
+        priceLkr,
+        monthlyEquivalentLkr,
+        currency: p.currency,
+        billingType: p.billingType,
+        storageQuotaMb: specs.storageQuotaMb ?? specs.storage_mb ?? 1024,
+        dailyQuota: specs.dailyQuota ?? specs.daily_quota ?? 500,
+        maxAliases: specs.maxAliases ?? specs.max_aliases ?? 5,
+        specs,
+      };
+    });
+
+    res.json({ ok: true, plans: formattedPlans });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to fetch email plans');
+    res.status(500).json({ error: 'Failed to fetch email plans' });
+  }
+});
+
+/**
  * GET /api/email/mailboxes
  * List customer provisioned SMTP accounts from real SmtpAccount records.
  * Customers see only their own accounts. Admins/devs see all.
@@ -517,6 +576,41 @@ emailRouter.post('/admin/email/provision', async (req: AuthedRequest, res) => {
       },
     });
 
+    // Populate initial welcome email with IMAP/SMTP setup parameters
+    await prisma.webmailMessage.create({
+      data: {
+        userId: targetUserId,
+        smtpAccountId: newAccount.id,
+        folder: 'inbox',
+        threadId: `thread-welcome-${newAccount.id}`,
+        senderName: 'STX Postmaster',
+        senderEmail: `postmaster@${domainStr}`,
+        recipientEmail: `${username}@${domainStr}`,
+        subject: `Welcome to STX Webmail (${username}@${domainStr})`,
+        snippet: 'Your business mailbox is provisioned and ready for use. Connection settings included...',
+        htmlBody: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #111;">
+            <h2 style="color: #000; border-bottom: 2px solid #eaeaea; padding-bottom: 8px;">Welcome to STX Webmail</h2>
+            <p>Your secure corporate mailbox <strong>${username}@${domainStr}</strong> is active.</p>
+            <h3 style="margin-top: 24px; color: #222;">Connection Credentials</h3>
+            <table style="border-collapse: collapse; width: 100%; max-width: 500px; margin: 12px 0;">
+              <tr><td style="padding: 6px; border: 1px solid #ddd; font-weight: bold;">Email / Username:</td><td style="padding: 6px; border: 1px solid #ddd;">${username}@${domainStr}</td></tr>
+              <tr><td style="padding: 6px; border: 1px solid #ddd; font-weight: bold;">SMTP Host (Outbound):</td><td style="padding: 6px; border: 1px solid #ddd;">${smtpHost} (Port 587 TLS / 465 SSL)</td></tr>
+              <tr><td style="padding: 6px; border: 1px solid #ddd; font-weight: bold;">IMAP Host (Inbound):</td><td style="padding: 6px; border: 1px solid #ddd;">${smtpHost.replace(/^mail\./, 'imap.')} (Port 993 SSL)</td></tr>
+              <tr><td style="padding: 6px; border: 1px solid #ddd; font-weight: bold;">Storage Quota:</td><td style="padding: 6px; border: 1px solid #ddd;">${isInternal ? 'Unlimited' : `${storageQuotaMb} MB`}</td></tr>
+            </table>
+            <p style="margin-top: 20px; font-size: 13px; color: #666;">Launch Webmail directly with 1-Click SSO from your Business Email & Domains control panel.</p>
+          </div>
+        `,
+        isRead: false,
+        isStarred: true,
+        hasAttachments: false,
+        labels: ['inbox', 'important'],
+      },
+    }).catch((err) => {
+      logger.warn({ err: err.message }, 'Failed to seed initial welcome email for dev-provisioned mailbox');
+    });
+
     await prisma.auditLog.create({
       data: {
         adminId: req.user!.id,
@@ -654,6 +748,41 @@ emailRouter.post('/email/mailboxes', async (req: AuthedRequest, res) => {
         storageUsedMb: 0,
         dailySendCount: 0,
       },
+    });
+
+    // Populate initial welcome email with IMAP/SMTP setup parameters
+    await prisma.webmailMessage.create({
+      data: {
+        userId: req.user!.id,
+        smtpAccountId: newAccount.id,
+        folder: 'inbox',
+        threadId: `thread-welcome-${newAccount.id}`,
+        senderName: 'STX Postmaster',
+        senderEmail: `postmaster@${domainStr}`,
+        recipientEmail: email,
+        subject: `Welcome to STX Webmail (${email})`,
+        snippet: 'Your business mailbox is provisioned and ready for use. Connection settings included...',
+        htmlBody: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #111;">
+            <h2 style="color: #000; border-bottom: 2px solid #eaeaea; padding-bottom: 8px;">Welcome to STX Webmail</h2>
+            <p>Your secure corporate mailbox <strong>${email}</strong> is active.</p>
+            <h3 style="margin-top: 24px; color: #222;">Connection Credentials</h3>
+            <table style="border-collapse: collapse; width: 100%; max-width: 500px; margin: 12px 0;">
+              <tr><td style="padding: 6px; border: 1px solid #ddd; font-weight: bold;">Email / Username:</td><td style="padding: 6px; border: 1px solid #ddd;">${email}</td></tr>
+              <tr><td style="padding: 6px; border: 1px solid #ddd; font-weight: bold;">SMTP Host (Outbound):</td><td style="padding: 6px; border: 1px solid #ddd;">${smtpHost} (Port 587 TLS / 465 SSL)</td></tr>
+              <tr><td style="padding: 6px; border: 1px solid #ddd; font-weight: bold;">IMAP Host (Inbound):</td><td style="padding: 6px; border: 1px solid #ddd;">${smtpHost.replace(/^mail\./, 'imap.')} (Port 993 SSL)</td></tr>
+              <tr><td style="padding: 6px; border: 1px solid #ddd; font-weight: bold;">Storage Quota:</td><td style="padding: 6px; border: 1px solid #ddd;">${storageQuotaMb} MB</td></tr>
+            </table>
+            <p style="margin-top: 20px; font-size: 13px; color: #666;">Launch Webmail directly with 1-Click SSO from your Business Email & Domains control panel.</p>
+          </div>
+        `,
+        isRead: false,
+        isStarred: true,
+        hasAttachments: false,
+        labels: ['inbox', 'important'],
+      },
+    }).catch((err) => {
+      logger.warn({ err: err.message }, 'Failed to seed initial welcome email for customer mailbox');
     });
 
     logger.info({ userId: req.user!.id, email, storageQuotaMb }, 'Mailbox account created and quota allocated');
@@ -1596,6 +1725,40 @@ emailRouter.post('/email/domains/:id/verify', async (req: AuthedRequest, res) =>
   } catch (err: any) {
     logger.error({ err }, 'Failed to verify domain DNS');
     res.status(500).json({ error: err.message || 'Failed to verify domain' });
+  }
+});
+
+/**
+ * DELETE /api/email/domains/:id
+ * Disconnect/delete a custom email domain (owner or admin/dev).
+ */
+emailRouter.delete('/email/domains/:id', async (req: AuthedRequest, res) => {
+  try {
+    const domainRecord = await prisma.emailDomain.findFirst({
+      where: req.user!.role === 'dev' || req.user!.role === 'admin'
+        ? { OR: [{ id: req.params.id }, { domain: req.params.id.toLowerCase() }] }
+        : { userId: req.user!.id, OR: [{ id: req.params.id }, { domain: req.params.id.toLowerCase() }] },
+    });
+    if (!domainRecord) return res.status(404).json({ error: 'Domain not found' });
+
+    const inUse = await prisma.smtpAccount.count({
+      where: { customDomain: domainRecord.domain },
+    });
+    if (inUse > 0) {
+      return res.status(409).json({
+        error: `Cannot remove domain ${domainRecord.domain}: ${inUse} active mailbox(es) are configured under it. Please remove or update those mailboxes first.`,
+      });
+    }
+
+    await prisma.emailDomain.delete({ where: { id: domainRecord.id } });
+    try {
+      await wildduckClient.deleteDomain(domainRecord.domain);
+    } catch (_) {}
+
+    res.json({ success: true, message: `Domain ${domainRecord.domain} disconnected successfully` });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to delete email domain');
+    res.status(500).json({ error: err.message || 'Failed to delete domain' });
   }
 });
 

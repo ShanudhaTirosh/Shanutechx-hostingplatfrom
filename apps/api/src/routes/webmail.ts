@@ -26,6 +26,73 @@ export const webmailRouter = Router();
 
 useForOwnRoutes(webmailRouter, requireAuth);
 
+// Admin role is strictly forbidden from accessing Webmail
+webmailRouter.use((req: AuthedRequest, res: Response, next) => {
+  if (req.user?.role === 'admin') {
+    return res.status(403).json({ error: 'Access Denied: Admin users do not have access to Webmail.' });
+  }
+  next();
+});
+
+/**
+ * GET /api/webmail/plans
+ * Returns all active paid email plans from the database.
+ * No free plans are returned.
+ */
+webmailRouter.get('/webmail/plans', async (req: AuthedRequest, res: Response) => {
+  try {
+    const plans = await prisma.plan.findMany({
+      where: {
+        product: { category: 'smtp' },
+        isActive: true,
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            category: true,
+          },
+        },
+      },
+      orderBy: { price: 'asc' },
+    });
+
+    const formattedPlans = plans.map((p) => {
+      let specs: Record<string, any> = {};
+      try {
+        specs = typeof p.specsJson === 'string' ? JSON.parse(p.specsJson) : (p.specsJson || {});
+      } catch {
+        specs = {};
+      }
+
+      const priceLkr = Math.round(p.price / 100);
+      const monthlyEquivalentLkr = p.billingType === 'quarterly' ? Math.round(priceLkr / 3) : priceLkr;
+
+      return {
+        id: p.id,
+        productId: p.productId,
+        name: p.name,
+        price: p.price, // cents
+        priceLkr,
+        monthlyEquivalentLkr,
+        currency: p.currency,
+        billingType: p.billingType,
+        storageQuotaMb: specs.storageQuotaMb ?? specs.storage_mb ?? 1024,
+        dailyQuota: specs.dailyQuota ?? specs.daily_quota ?? 500,
+        maxAliases: specs.maxAliases ?? specs.max_aliases ?? 5,
+        specs,
+      };
+    });
+
+    res.json({ ok: true, plans: formattedPlans });
+  } catch (err: any) {
+    logger.error({ err }, 'Failed to fetch webmail plans');
+    res.status(500).json({ error: 'Failed to fetch email plans' });
+  }
+});
+
 const FOLDERS = ['inbox', 'starred', 'drafts', 'sent', 'spam', 'trash', 'archive', 'snoozed', 'all_mail', 'important'] as const;
 
 /**
@@ -700,6 +767,50 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
   });
 
   if (!isScheduled) {
+    let localDeliverySuccess = false;
+    // Check if recipient is a local mailbox on ShanuTechX platform
+    const normalizedRecipient = recipientEmail.trim().toLowerCase();
+    const recipientUserPart = normalizedRecipient.includes('@') ? normalizedRecipient.split('@')[0] : normalizedRecipient;
+    try {
+      const localRecipientAccount = await prisma.smtpAccount.findFirst({
+        where: {
+          OR: [
+            { smtpUsername: normalizedRecipient },
+            { smtpUsername: recipientUserPart },
+            { aliases: { has: normalizedRecipient } },
+            { aliases: { has: recipientUserPart } },
+          ],
+        },
+      });
+
+      if (localRecipientAccount) {
+        await prisma.webmailMessage.create({
+          data: {
+            userId: localRecipientAccount.userId,
+            smtpAccountId: localRecipientAccount.id,
+            folder: 'inbox',
+            threadId: generatedThreadId,
+            inReplyTo,
+            senderName,
+            senderEmail,
+            recipientEmail,
+            subject,
+            snippet: htmlBody.replace(/<[^>]+>/g, '').slice(0, 100) + '...',
+            htmlBody,
+            isRead: false,
+            isStarred: false,
+            hasAttachments: Array.isArray(attachments) && attachments.length > 0,
+            attachmentsJson: attachments ? JSON.parse(JSON.stringify(attachments)) : undefined,
+            labels: ['inbox'],
+          },
+        });
+        localDeliverySuccess = true;
+        logger.info({ recipientEmail, localRecipientAccountId: localRecipientAccount.id }, 'Delivered local webmail message copy to recipient inbox');
+      }
+    } catch (localErr: any) {
+      logger.warn({ err: localErr.message }, 'Failed to deliver internal inbox copy to recipient');
+    }
+
     try {
       const validAttachments = attachments?.filter((a) => a.content).map((a) => ({
         filename: a.filename,
@@ -751,11 +862,15 @@ webmailRouter.post('/webmail/send', async (req: AuthedRequest, res: Response) =>
         }).catch(() => {});
       }
     } catch (err: any) {
-      logger.error({ err: err.message, recipientEmail }, 'Webmail email delivery failed');
-      return res.status(502).json({
-        error: 'Message was saved, but delivery failed: ' + (err.message || 'Mail server error'),
-        message,
-      });
+      if (localDeliverySuccess) {
+        logger.warn({ err: err.message, recipientEmail }, 'External SMTP relay failed, but internal platform mailbox delivery succeeded');
+      } else {
+        logger.error({ err: err.message, recipientEmail }, 'Webmail email delivery failed');
+        return res.status(502).json({
+          error: 'Message was saved, but delivery failed: ' + (err.message || 'Mail server error'),
+          message,
+        });
+      }
     }
   }
 
@@ -2036,13 +2151,44 @@ webmailRouter.delete('/webmail/account/delegation/:id', async (req: AuthedReques
 webmailRouter.get('/webmail/account/credentials', async (req: AuthedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const smtpAcc = await prisma.smtpAccount.findFirst({ where: { userId } });
+    const role = req.user!.role;
+    const mailboxId = (req.query.mailboxId || req.query.smtpAccountId) as string | undefined;
+
+    let smtpAcc: any = null;
+    if (mailboxId) {
+      smtpAcc = await prisma.smtpAccount.findFirst({
+        where: role === 'dev' ? { id: mailboxId } : { id: mailboxId, OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+      });
+    }
+
+    if (!smtpAcc) {
+      smtpAcc = await prisma.smtpAccount.findFirst({
+        where: role === 'dev' ? {} : { OR: [{ userId }, { allowedAdminIds: { has: userId } }] },
+        orderBy: { createdAt: 'asc' },
+      });
+    }
+
     const rootDomain = env.rootDomain || 'shanutechx.com';
+    let decryptedPassword = '';
+    if (smtpAcc?.credentialRef) {
+      try {
+        decryptedPassword = decryptSecret(smtpAcc.credentialRef, env.secretsEncryptionKey);
+      } catch {
+        decryptedPassword = '';
+      }
+    }
+
+    const domain = smtpAcc?.customDomain || smtpAcc?.smtpHost?.replace(/^mail\./, '') || rootDomain;
+    const rawUsername = smtpAcc?.smtpUsername || req.user?.email || `user@${domain}`;
+    const fullEmail = rawUsername.includes('@') ? rawUsername : `${rawUsername}@${domain}`;
 
     return res.json({
       credentials: {
-        email: smtpAcc ? `${smtpAcc.smtpUsername}@${smtpAcc.customDomain || rootDomain}` : req.user!.email,
-        imapHost: `imap.${rootDomain}`,
+        mailboxId: smtpAcc?.id || null,
+        email: fullEmail,
+        username: fullEmail,
+        password: decryptedPassword || undefined,
+        imapHost: smtpAcc?.smtpHost ? smtpAcc.smtpHost.replace(/^mail\./, 'imap.') : `imap.${rootDomain}`,
         imapPort: 993,
         smtpHost: smtpAcc?.smtpHost || `smtp.${rootDomain}`,
         smtpPort: 465,
