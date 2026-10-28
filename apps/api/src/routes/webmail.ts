@@ -24,15 +24,15 @@ import {
 import { useForOwnRoutes } from '../lib/routerGuard';
 export const webmailRouter = Router();
 
-useForOwnRoutes(webmailRouter, requireAuth);
-
 // Admin role is strictly forbidden from accessing Webmail
-webmailRouter.use((req: AuthedRequest, res: Response, next) => {
+const blockAdminFromWebmail = (req: AuthedRequest, res: Response, next: any) => {
   if (req.user?.role === 'admin') {
     return res.status(403).json({ error: 'Access Denied: Admin users do not have access to Webmail.' });
   }
   next();
-});
+};
+
+useForOwnRoutes(webmailRouter, requireAuth, blockAdminFromWebmail);
 
 /**
  * GET /api/webmail/plans
