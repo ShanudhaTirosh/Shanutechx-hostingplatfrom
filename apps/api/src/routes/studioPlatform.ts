@@ -4,7 +4,6 @@ import { env } from '../env';
 import { logger } from '../lib/logger';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { decryptSecret } from '../lib/secretsVault';
-import undici from 'undici';
 
 export const studioPlatformRouter = Router();
 
@@ -370,11 +369,11 @@ studioPlatformRouter.all(['/pg-meta/:ref', '/pg-meta/:ref/*'], async (req: Reque
       fetchOptions.body = JSON.stringify(req.body);
     }
 
-    const proxyRes = await undici.fetch(targetUrl, fetchOptions);
+    const proxyRes = await fetch(targetUrl, fetchOptions);
     const data = await proxyRes.text();
 
     res.status(proxyRes.status);
-    proxyRes.headers.forEach((val, key) => {
+    proxyRes.headers.forEach((val: any, key: any) => {
       res.setHeader(key, val);
     });
 

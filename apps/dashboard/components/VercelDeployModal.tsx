@@ -218,12 +218,20 @@ export function VercelDeployModal({ isOpen, onClose, onDeployed }: Props) {
   }
 
   function handleRepoUrlChange(url: string) {
-    setRepoUrl(url);
-    if (!url.trim()) return;
+    let effectiveUrl = url;
+    if (url.includes('/tree/')) {
+      const treeMatch = url.match(/\/tree\/([^\/\s\?\#]+)/);
+      if (treeMatch) {
+        setBranch(treeMatch[1]);
+        effectiveUrl = url.replace(/\/tree\/.*$/, '');
+      }
+    }
+    setRepoUrl(effectiveUrl);
+    if (!effectiveUrl.trim()) return;
 
     // Auto-detect project name and runtime/port from repo url
     try {
-      const clean = url.trim().replace(/\.git$/, '');
+      const clean = effectiveUrl.trim().replace(/\.git$/, '').replace(/\/+$/, '');
       const parts = clean.split('/');
       const repo = parts[parts.length - 1];
       if (repo && (!projectName || projectName === 'my-app')) {
@@ -231,12 +239,12 @@ export function VercelDeployModal({ isOpen, onClose, onDeployed }: Props) {
         setProjectName(sanitized);
         const rand = crypto.randomUUID().slice(0, 4);
         setCustomSubdomain(`${sanitized.slice(0, 20)}-${rand}`);
-        detectRuntimeAndPort(url, sanitized, envVars);
+        detectRuntimeAndPort(effectiveUrl, sanitized, envVars);
       } else {
-        detectRuntimeAndPort(url, projectName, envVars);
+        detectRuntimeAndPort(effectiveUrl, projectName, envVars);
       }
     } catch {
-      detectRuntimeAndPort(url, projectName, envVars);
+      detectRuntimeAndPort(effectiveUrl, projectName, envVars);
     }
   }
 

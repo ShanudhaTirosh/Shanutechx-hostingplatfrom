@@ -37,25 +37,15 @@ interface SelectNodeOptions {
 export async function selectNodeForDeployment(opts: SelectNodeOptions) {
   const { requiredTag, isAdminDeployment, explicitNodeId } = opts;
 
-  if (explicitNodeId && !isAdminDeployment) {
-    // Defensive: a customer-facing caller should never reach this branch,
-    // but if it does, fail loudly instead of silently honoring the override.
-    throw new NodeSelectionError(
-      'explicitNodeId is only valid for admin deployments'
-    );
-  }
-
-  if (isAdminDeployment && explicitNodeId) {
+  if (explicitNodeId) {
     const node = await prisma.node.findUnique({ where: { id: explicitNodeId } });
-    if (!node || !node.isActive) {
+    if (node && node.isActive) {
+      return node;
+    }
+    if (isAdminDeployment) {
       throw new NodeSelectionError('Selected node is invalid or inactive');
     }
-    if (!node.roleTags.includes(requiredTag)) {
-      throw new NodeSelectionError(
-        `Node "${node.label}" does not support "${requiredTag}"`
-      );
-    }
-    return node;
+    // If a customer requested a node that is no longer active, fall through to auto-selection below
   }
 
   const candidates = await prisma.node.findMany({

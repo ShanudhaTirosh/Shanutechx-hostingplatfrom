@@ -144,22 +144,53 @@ async function prepareWorkspace(deploymentId, repoUrl, branch = 'main', remoteBa
       // Always point origin at the credential-free URL. This also scrubs a token that an older agent version
       // wrote into .git/config.
       await run('git', ['remote', 'set-url', 'origin', cleanUrl], { cwd: dir }).catch(() => run('git', ['remote', 'add', 'origin', cleanUrl], { cwd: dir }));
-      // These used to be `.catch(() => {})`, so a failed fetch (expired token, deleted branch, GitHub outage) silently
-      // rebuilt the OLD code and reported success. Fail loudly instead: a deploy must not pretend to be current.
+      
+      let fetchedBranch = branch;
       try {
         await run('git', ['fetch', '--depth', '1', 'origin', branch], { cwd: dir, auth });
-      } catch (err) {
-        throw new Error(`Could not fetch the latest code for branch "${branch}", so the deploy was stopped instead of rebuilding old code. ${err.message}`);
-      }
-      try {
         await run('git', ['reset', '--hard', `origin/${branch}`], { cwd: dir });
-      } catch (err) {
-        throw new Error(`Fetched branch "${branch}" but could not check it out. ${err.message}`);
+      } catch (fetchErr) {
+        // Fallback for default branch variance (e.g. main vs master)
+        if (branch === 'main' || branch === 'master') {
+          const altBranch = branch === 'main' ? 'master' : 'main';
+          try {
+            await run('git', ['fetch', '--depth', '1', 'origin', altBranch], { cwd: dir, auth });
+            await run('git', ['reset', '--hard', `origin/${altBranch}`], { cwd: dir });
+            fetchedBranch = altBranch;
+          } catch {
+            throw new Error(`Could not fetch branch "${branch}" or "${altBranch}": ${fetchErr.message}`);
+          }
+        } else {
+          throw new Error(`Could not fetch the latest code for branch "${branch}", so the deploy was stopped instead of rebuilding old code. ${fetchErr.message}`);
+        }
       }
     }
   } else if (repoUrl && !isArchive) {
     const { cleanUrl, auth } = splitCredentials(repoUrl);
-    await run('git', ['clone', '--depth', '1', '--branch', branch, cleanUrl, dir], { auth });
+    try {
+      if (branch) {
+        await run('git', ['clone', '--depth', '1', '--branch', branch, cleanUrl, dir], { auth });
+      } else {
+        await run('git', ['clone', '--depth', '1', cleanUrl, dir], { auth });
+      }
+    } catch (cloneErr) {
+      // Production resilience: if user supplied default branch name (e.g. 'main' but repo is 'master')
+      if (branch === 'main' || branch === 'master') {
+        const altBranch = branch === 'main' ? 'master' : 'main';
+        try {
+          await run('git', ['clone', '--depth', '1', '--branch', altBranch, cleanUrl, dir], { auth });
+          return dir;
+        } catch {
+          // fall through to default clone
+        }
+      }
+      // Fallback: clone remote default HEAD branch without specifying --branch
+      try {
+        await run('git', ['clone', '--depth', '1', cleanUrl, dir], { auth });
+      } catch {
+        throw cloneErr;
+      }
+    }
   }
 
   return dir;

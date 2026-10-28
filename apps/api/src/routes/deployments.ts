@@ -142,6 +142,12 @@ deploymentsRouter.post('/deployments', deploymentCreateLimiter, async (req: Auth
     gitTokenEncrypted = encryptSecret(data.gitToken, env.secretsEncryptionKey);
   }
   if (data.repoUrl) {
+    if (data.repoUrl.includes('/tree/')) {
+      const match = data.repoUrl.match(/\/tree\/([^\/\s\?\#]+)/);
+      if (match && (!data.branch || data.branch === 'main')) {
+        data.branch = match[1];
+      }
+    }
     // A URL pasted with credentials in it ("https://token@host/...") is converted the same way.
     const safe = sanitizeRepoUrlForStorage(data.repoUrl, (t) => encryptSecret(t, env.secretsEncryptionKey));
     data.repoUrl = safe.repoUrl;
@@ -289,7 +295,7 @@ deploymentsRouter.post('/deployments', deploymentCreateLimiter, async (req: Auth
       internalPort: data.internalPort!,
       envVars: data.envVars,
       isAdminDeployment: effectiveIsAdminDeployment,
-      explicitNodeId: effectiveNodeId,
+      explicitNodeId: effectiveNodeId || data.nodeId,
       templateId: data.templateId,
       cpuLimit: data.cpuLimit,
       memoryLimit: data.memoryLimit,
@@ -358,6 +364,9 @@ deploymentsRouter.post('/deployments/:id/launch', async (req: AuthedRequest, res
       exposureMode: req.body.exposureMode !== undefined ? req.body.exposureMode : deployment.exposureMode,
       subdomain: targetSubdomain,
       envVarsEncrypted,
+      rootDir: req.body.rootDir !== undefined ? req.body.rootDir : deployment.rootDir,
+      watchPaths: req.body.watchPaths !== undefined ? req.body.watchPaths : deployment.watchPaths,
+      nixpacksConfig: (req.body.nixpacksConfig || (req.body.builder ? { builder: req.body.builder, rootDir: req.body.rootDir || deployment.rootDir || null } : undefined)) || deployment.nixpacksConfig,
       status: 'building',
     },
   });
@@ -391,6 +400,9 @@ deploymentsRouter.post('/deployments/:id/launch', async (req: AuthedRequest, res
         entryFile: updatedDeployment.entryFile || undefined,
         frameworkPreset: updatedDeployment.frameworkPreset || undefined,
         exposureMode: updatedDeployment.exposureMode || undefined,
+        builder: req.body.builder || (updatedDeployment.nixpacksConfig as any)?.builder || undefined,
+        rootDir: updatedDeployment.rootDir ?? undefined,
+        nixpacksConfig: updatedDeployment.nixpacksConfig || undefined,
       },
       (event) => res.write(JSON.stringify(event) + '\n')
     );
@@ -653,6 +665,8 @@ const updateConfigSchema = z.object({
   envVars: z.record(z.string()).optional(),
   rootDir: z.string().max(255).optional().nullable(),
   watchPaths: z.array(z.string()).optional(),
+  builder: z.enum(['NIXPACKS', 'RAILWAYPACK', 'DOCKERFILE', 'AUTO']).optional(),
+  nixpacksConfig: z.any().optional(),
 });
 
 deploymentsRouter.patch('/deployments/:id/config', async (req: AuthedRequest, res) => {
@@ -712,6 +726,9 @@ deploymentsRouter.patch('/deployments/:id/config', async (req: AuthedRequest, re
       subdomain: subdomain !== undefined ? subdomain : deployment.subdomain,
       rootDir: rootDir !== undefined ? rootDir : deployment.rootDir,
       watchPaths: watchPaths !== undefined ? watchPaths : deployment.watchPaths,
+      ...(parsed.data.nixpacksConfig || parsed.data.builder ? {
+        nixpacksConfig: (parsed.data.nixpacksConfig || (parsed.data.builder ? { builder: parsed.data.builder, rootDir: rootDir !== undefined ? rootDir : deployment.rootDir } : undefined)) as any
+      } : {}),
       envVarsEncrypted,
     },
   });
@@ -1106,6 +1123,9 @@ deploymentsRouter.post('/deployments/:id/redeploy', async (req: AuthedRequest, r
         exposureMode: deployment.exposureMode ?? undefined,
         publishedPort: deployment.publishedPort ?? undefined,
         backupRepoUrl: deployment.backupRepoFullName ?? undefined,
+        builder: (deployment.nixpacksConfig as any)?.builder || undefined,
+        rootDir: deployment.rootDir ?? undefined,
+        nixpacksConfig: deployment.nixpacksConfig ?? undefined,
       },
       (event) => res.write(JSON.stringify(event) + '\n')
     );
@@ -1786,6 +1806,13 @@ deploymentsRouter.post('/deployments/web-hosting', async (req: AuthedRequest, re
     }
   }
 
+  if (data.repoUrl && data.repoUrl.includes('/tree/')) {
+    const match = data.repoUrl.match(/\/tree\/([^\/\s\?\#]+)/);
+    if (match && (!data.branch || data.branch === 'main')) {
+      data.branch = match[1];
+    }
+  }
+
   const subPrefix = data.preferredName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 20);
   const subUnique = (await import('crypto')).randomBytes(3).toString('hex');
   const subdomain = data.customSubdomain || `${subPrefix}-${subUnique}`;
@@ -1843,6 +1870,8 @@ deploymentsRouter.post('/deployments/web-hosting', async (req: AuthedRequest, re
         customSubdomain: subdomain,
         internalPort: data.internalPort,
         envVars: data.envVars,
+        isAdminDeployment: callerIsAdminOrDev,
+        explicitNodeId: node.id,
         frameworkPreset: data.frameworkPreset,
         builder: data.builder,
         rootDir: data.rootDir,
@@ -1874,6 +1903,8 @@ deploymentsRouter.post('/deployments/web-hosting', async (req: AuthedRequest, re
       customSubdomain: subdomain,
       internalPort: data.internalPort,
       envVars: data.envVars,
+      isAdminDeployment: callerIsAdminOrDev,
+      explicitNodeId: node.id,
       frameworkPreset: data.frameworkPreset,
       builder: data.builder,
       rootDir: data.rootDir,

@@ -256,6 +256,9 @@ const handleArchiveUpload = async (req: AuthedRequest, res: any) => {
         entryFile: deployment.entryFile ?? undefined,
         frameworkPreset: deployment.frameworkPreset ?? 'auto',
         exposureMode: deployment.exposureMode ?? 'ssl_with_proxy',
+        builder: (deployment.nixpacksConfig as any)?.builder || undefined,
+        rootDir: deployment.rootDir ?? undefined,
+        nixpacksConfig: deployment.nixpacksConfig ?? undefined,
       },
       (event) => res.write(JSON.stringify(event) + '\n')
     );

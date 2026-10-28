@@ -56,7 +56,10 @@ backupRouter.get('/admin/backup/history', requireAuth, requireAdmin, async (_req
  */
 backupRouter.get('/admin/backup/export-zip', requireAuth, requireAdmin, async (req: AuthedRequest, res) => {
   try {
-    const archiver = (await import('archiver')).default;
+    // Dynamically load optional archiver module if installed
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const archiverModule: any = (eval('require') as any)('archiver');
+    const archiver = archiverModule.default || archiverModule;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `shanutechx-platform-backup-${timestamp}.zip`;
 

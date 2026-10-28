@@ -256,6 +256,28 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
   const commitHash = headCommit?.id ? String(headCommit.id).slice(0, 7) : undefined;
   const commitMessage = headCommit?.message ? String(headCommit.message).split('\n')[0].slice(0, 255) : undefined;
 
+  // Check monorepo watchPaths if configured
+  if (deployment.watchPaths && Array.isArray(deployment.watchPaths) && deployment.watchPaths.length > 0) {
+    const commits = req.body?.commits || (headCommit ? [headCommit] : []);
+    const modifiedFiles = new Set<string>();
+    for (const c of commits) {
+      if (Array.isArray(c.added)) c.added.forEach((f: string) => modifiedFiles.add(f));
+      if (Array.isArray(c.modified)) c.modified.forEach((f: string) => modifiedFiles.add(f));
+      if (Array.isArray(c.removed)) c.removed.forEach((f: string) => modifiedFiles.add(f));
+    }
+
+    if (modifiedFiles.size > 0) {
+      const matches = deployment.watchPaths.some((wp: string) => {
+        const prefix = wp.replace(/\*.*$/, '');
+        return Array.from(modifiedFiles).some((file) => file.startsWith(prefix));
+      });
+      if (!matches) {
+        logger.info({ deploymentId: deployment.id, watchPaths: deployment.watchPaths }, 'Skipping push webhook redeploy: modified files do not match watchPaths');
+        return res.status(200).json({ accepted: false, reason: 'No modified files match deployment watchPaths' });
+      }
+    }
+  }
+
   // Ack immediately — GitHub/GitLab expect a fast 2xx and will retry/flag
   // the webhook as failing if the build (which can take a while) blocks
   // the response.
@@ -283,6 +305,9 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
           exposureMode: deployment.exposureMode ?? undefined,
           publishedPort: deployment.publishedPort ?? undefined,
           backupRepoUrl: deployment.backupRepoFullName ?? undefined,
+          builder: (deployment.nixpacksConfig as any)?.builder || undefined,
+          rootDir: deployment.rootDir ?? undefined,
+          nixpacksConfig: deployment.nixpacksConfig ?? undefined,
         },
         () => {} // no streaming listener for a background webhook-triggered build
       );

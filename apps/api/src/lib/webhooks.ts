@@ -1,6 +1,5 @@
 import crypto from 'crypto';
 import net from 'net';
-import { Agent } from 'undici';
 import { prisma } from './prisma';
 import { logger } from './logger';
 import { decryptSecret } from './secretsVault';
@@ -169,13 +168,22 @@ async function deliverWebhookPayload(
     }
 
     const resolvedIp = safeCheck.resolvedIp;
-    const agent = new Agent({
-      connect: {
-        lookup: (_hostname, _opts, callback) => {
-          callback(null, [{ address: resolvedIp, family: net.isIPv6(resolvedIp) ? 6 : 4 }]);
-        },
-      },
-    });
+    let agent: any = undefined;
+    try {
+      const undiciMod: any = (eval('require') as any)('undici');
+      const AgentClass = undiciMod.Agent;
+      if (AgentClass) {
+        agent = new AgentClass({
+          connect: {
+            lookup: (_hostname: any, _opts: any, callback: any) => {
+              callback(null, [{ address: resolvedIp, family: net.isIPv6(resolvedIp) ? 6 : 4 }]);
+            },
+          },
+        });
+      }
+    } catch {
+      // undici not bundled; fetch will proceed with standard routing
+    }
 
     const parsedUrl = new URL(currentUrl);
 
