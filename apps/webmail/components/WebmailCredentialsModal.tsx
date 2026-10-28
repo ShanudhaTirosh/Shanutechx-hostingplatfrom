@@ -34,20 +34,10 @@ export function WebmailCredentialsModal({
   const loadCredentials = async () => {
     setLoading(true);
     try {
-      const res = await api.webmail.getCredentials();
+      const res = await api.webmail.getCredentials(selectedMailboxId);
       setCreds(res.credentials || null);
     } catch {
-      // Graceful fallback credentials structure
-      setCreds({
-        imapHost: 'mail.shanutechx.com',
-        imapPort: 993,
-        pop3Port: 995,
-        smtpHost: 'mail.shanutechx.com',
-        smtpPort: 465,
-        smtpPortStartTls: 587,
-        email: 'user@shanutechx.com',
-        apiKey: 'stx_live_sk_credentials',
-      });
+      setCreds(null);
     } finally {
       setLoading(false);
     }
@@ -62,9 +52,9 @@ export function WebmailCredentialsModal({
   };
 
   const smtpHost = creds?.smtpHost || 'mail.shanutechx.com';
-  const imapHost = creds?.imapHost || 'mail.shanutechx.com';
-  const userEmail = creds?.email || 'user@shanutechx.com';
-  const apiKey = creds?.apiKey || 'stx_live_sk_auth_token';
+  const imapHost = creds?.imapHost || 'imap.shanutechx.com';
+  const userEmail = creds?.email || '';
+  const apiKey = creds?.password || '';
 
   const wpSnippet = `// WordPress (WP Mail SMTP / FluentSMTP / wp_mail) Settings
 // SMTP Host: ${smtpHost}
@@ -84,7 +74,7 @@ define('WP_MAIL_SMTP_AUTH', true);
 define('WP_MAIL_SMTP_USER', '${userEmail}');
 define('WP_MAIL_SMTP_PASS', '<YOUR_MAILBOX_PASSWORD>');`;
 
-  const resendApiSnippet = `// ShanuTechX Email REST API
+  const resendApiSnippet = `// STX Email REST API
 // POST https://${smtpHost}/api/v1/emails
 // Header: Authorization: Bearer ${apiKey}
 // Header: Content-Type: application/json
@@ -164,7 +154,7 @@ async function sendMail() {
     from: '"My App" <${userEmail}>',
     to: 'recipient@example.com',
     subject: 'Notification',
-    html: '<b>Hello from ShanuTechX Webmail</b>',
+    html: '<b>Hello from STX Webmail</b>',
   });
   console.log('Message ID:', info.messageId);
 }
@@ -224,7 +214,7 @@ msg = MIMEMultipart("alternative")
 msg["Subject"] = "System Notification"
 msg["From"] = USERNAME
 msg["To"] = "recipient@example.com"
-msg.attach(MIMEText("<h1>Hello from ShanuTechX</h1>", "html"))
+msg.attach(MIMEText("<h1>Hello from STX Webmail</h1>", "html"))
 
 with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
     server.login(USERNAME, PASSWORD)
@@ -247,10 +237,10 @@ print("Dispatched!")`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="bg-[#0a0a0c] border border-white/10 rounded-2xl max-w-2xl w-full p-6 text-slate-100 shadow-2xl relative space-y-6">
+      <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl max-w-2xl w-full p-6 text-neutral-100 shadow-2xl relative space-y-6">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+          className="absolute top-4 right-4 p-1.5 text-neutral-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -261,7 +251,7 @@ print("Dispatched!")`;
           </div>
           <div>
             <h3 className="text-base font-semibold text-white">Client Setup & Credentials</h3>
-            <p className="text-xs text-slate-400 font-mono mt-0.5">{userEmail}</p>
+            <p className="text-xs text-neutral-400 font-mono mt-0.5">{userEmail}</p>
           </div>
         </div>
 
@@ -293,67 +283,67 @@ print("Dispatched!")`;
 
         {activeTab === 'desktop' ? (
           <div className="space-y-4">
-            <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-slate-300 flex items-start gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-neutral-300 flex items-start gap-2">
+              <ShieldCheck className="w-4 h-4 text-white shrink-0 mt-0.5" />
               <span>Use these connection parameters to sync your mailbox with Apple Mail, Outlook, Thunderbird, iOS Mail, or Android.</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* IMAP Card */}
-              <div className="p-4 bg-[#121216] border border-white/10 rounded-xl space-y-3">
+              <div className="p-4 bg-[#171717] border border-white/10 rounded-xl space-y-3">
                 <div className="flex items-center justify-between border-b border-white/10 pb-2">
                   <span className="text-xs font-bold text-white uppercase tracking-wider">Inbound (IMAP)</span>
-                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">SSL/TLS</span>
+                  <span className="text-[10px] font-mono text-white bg-white/10 px-2 py-0.5 rounded border border-white/20">SSL/TLS</span>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div>
-                    <span className="text-slate-400 text-[11px] block">Server Hostname</span>
-                    <div className="flex items-center justify-between bg-black/40 px-2.5 py-1.5 rounded border border-white/5 font-mono text-slate-200 mt-1">
+                    <span className="text-neutral-400 text-[11px] block">Server Hostname</span>
+                    <div className="flex items-center justify-between bg-black/40 px-2.5 py-1.5 rounded border border-white/5 font-mono text-neutral-200 mt-1">
                       <span>{imapHost}</span>
-                      <button onClick={() => copyToClipboard(imapHost, 'imapHost')} className="text-slate-400 hover:text-white">
-                        {copiedField === 'imapHost' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <button onClick={() => copyToClipboard(imapHost, 'imapHost')} className="text-neutral-400 hover:text-white">
+                        {copiedField === 'imapHost' ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3" />}
                       </button>
                     </div>
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[11px] block">Port</span>
+                    <span className="text-neutral-400 text-[11px] block">Port</span>
                     <span className="font-mono text-white">993</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[11px] block">Username</span>
+                    <span className="text-neutral-400 text-[11px] block">Username</span>
                     <span className="font-mono text-white truncate block">{userEmail}</span>
                   </div>
                 </div>
               </div>
 
               {/* SMTP Card */}
-              <div className="p-4 bg-[#121216] border border-white/10 rounded-xl space-y-3">
+              <div className="p-4 bg-[#171717] border border-white/10 rounded-xl space-y-3">
                 <div className="flex items-center justify-between border-b border-white/10 pb-2">
                   <span className="text-xs font-bold text-white uppercase tracking-wider">Outbound (SMTP)</span>
-                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">SSL / STARTTLS</span>
+                  <span className="text-[10px] font-mono text-white bg-white/10 px-2 py-0.5 rounded border border-white/20">SSL / STARTTLS</span>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div>
-                    <span className="text-slate-400 text-[11px] block">Server Hostname</span>
-                    <div className="flex items-center justify-between bg-black/40 px-2.5 py-1.5 rounded border border-white/5 font-mono text-slate-200 mt-1">
+                    <span className="text-neutral-400 text-[11px] block">Server Hostname</span>
+                    <div className="flex items-center justify-between bg-black/40 px-2.5 py-1.5 rounded border border-white/5 font-mono text-neutral-200 mt-1">
                       <span>{smtpHost}</span>
-                      <button onClick={() => copyToClipboard(smtpHost, 'smtpHost')} className="text-slate-400 hover:text-white">
-                        {copiedField === 'smtpHost' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <button onClick={() => copyToClipboard(smtpHost, 'smtpHost')} className="text-neutral-400 hover:text-white">
+                        {copiedField === 'smtpHost' ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3" />}
                       </button>
                     </div>
                   </div>
                   <div className="flex justify-between">
                     <div>
-                      <span className="text-slate-400 text-[11px] block">SSL Port</span>
+                      <span className="text-neutral-400 text-[11px] block">SSL Port</span>
                       <span className="font-mono text-white">465</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[11px] block">STARTTLS Port</span>
+                      <span className="text-neutral-400 text-[11px] block">STARTTLS Port</span>
                       <span className="font-mono text-white">587</span>
                     </div>
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[11px] block">Username</span>
+                    <span className="text-neutral-400 text-[11px] block">Username</span>
                     <span className="font-mono text-white truncate block">{userEmail}</span>
                   </div>
                 </div>
@@ -378,7 +368,7 @@ print("Dispatched!")`;
                   className={`px-3 py-1 rounded-lg text-xs font-mono transition-colors ${
                     codeLanguage === lang.id
                       ? 'bg-white text-black font-bold'
-                      : 'bg-[#121216] border border-white/10 text-slate-400 hover:text-white'
+                      : 'bg-[#171717] border border-white/10 text-slate-400 hover:text-white'
                   }`}
                 >
                   {lang.label}
@@ -387,14 +377,14 @@ print("Dispatched!")`;
             </div>
 
             <div className="relative">
-              <pre className="p-4 bg-black/60 border border-white/10 rounded-xl text-xs font-mono text-slate-200 overflow-x-auto max-h-64 leading-relaxed">
+              <pre className="p-4 bg-black/60 border border-white/10 rounded-xl text-xs font-mono text-neutral-200 overflow-x-auto max-h-64 leading-relaxed">
                 {getActiveSnippet()}
               </pre>
               <button
                 onClick={() => copyToClipboard(getActiveSnippet(), 'snippet')}
-                className="absolute top-3 right-3 p-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 rounded-md border border-white/10 transition-colors text-xs flex items-center gap-1"
+                className="absolute top-3 right-3 p-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-md border border-white/10 transition-colors text-xs flex items-center gap-1"
               >
-                {copiedField === 'snippet' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedField === 'snippet' ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copiedField === 'snippet' ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
@@ -404,7 +394,7 @@ print("Dispatched!")`;
         <div className="flex justify-end pt-2 border-t border-white/10">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/5 transition-colors"
+            className="px-4 py-2 rounded-xl text-xs font-medium text-neutral-300 hover:text-white hover:bg-white/5 transition-colors"
           >
             Close
           </button>

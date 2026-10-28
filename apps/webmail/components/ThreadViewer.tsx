@@ -99,7 +99,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
 
   if (!messages || messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-slate-500 text-xs">
+      <div className="flex-1 flex items-center justify-center text-neutral-500 text-xs">
         Select a message to display contents
       </div>
     );
@@ -130,24 +130,24 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden print:bg-white print:text-black">
+    <div className="flex-1 flex flex-col h-full bg-black overflow-hidden print:bg-white print:text-black">
       {/* Top Action Toolbar (Hidden during print) */}
-      <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-slate-800 bg-slate-900/60 gap-2 shrink-0 print:hidden">
+      <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-white/10 bg-[#0a0a0a] gap-2 shrink-0 print:hidden">
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={onBack}
-            className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1 text-xs"
+            className="p-1.5 hover:bg-white/10 rounded-lg text-neutral-400 hover:text-white transition-colors flex items-center gap-1 text-xs"
             title="Back to List"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="hidden sm:inline font-medium">Back</span>
           </button>
-          <div className="h-4 w-px bg-slate-800 mx-0.5" />
+          <div className="h-4 w-px bg-white/10 mx-0.5" />
 
           {/* Reply */}
           <button
             onClick={() => onReply(latestMsg.senderEmail, `Re: ${subject}`, latestMsg.id)}
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded-lg text-xs font-semibold border border-indigo-500/30 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white hover:bg-neutral-200 text-black rounded-lg text-xs font-bold shadow transition-colors"
             title="Reply to Sender"
           >
             <Reply className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Reply</span>
@@ -157,7 +157,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
           {onReplyAll && (
             <button
               onClick={() => onReplyAll(latestMsg.senderEmail, latestMsg.recipientEmail, `Re: ${subject}`, latestMsg.id)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium border border-slate-800 transition-colors hidden sm:flex"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-white/10 text-neutral-300 hover:text-white rounded-lg text-xs font-medium border border-white/10 transition-colors hidden sm:flex"
               title="Reply to All Participants"
             >
               <ReplyAll className="w-3.5 h-3.5" /> <span>Reply All</span>
@@ -167,7 +167,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
           {/* Forward */}
           <button
             onClick={() => onForward(`Fwd: ${subject}`, latestMsg.htmlBody)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-slate-800 text-slate-300 rounded-lg text-xs font-medium border border-slate-800 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-white/10 text-neutral-300 hover:text-white rounded-lg text-xs font-medium border border-white/10 transition-colors"
             title="Forward Message"
           >
             <Forward className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Forward</span>
@@ -177,7 +177,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
           {onForwardAsAttachment && (
             <button
               onClick={() => onForwardAsAttachment(`Fwd: ${subject}`, latestMsg)}
-              className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg text-xs transition-colors hidden md:flex"
+              className="p-1.5 hover:bg-white/10 text-neutral-400 hover:text-white rounded-lg text-xs transition-colors hidden md:flex"
               title="Forward as EML Attachment"
             >
               <FileCode className="w-4 h-4" />
@@ -189,12 +189,12 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
           {/* Star Toggle */}
           <button
             onClick={() => onStar(latestMsg.id, !!latestMsg.isStarred)}
-            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-amber-400 transition-colors"
+            className="p-2 hover:bg-white/10 rounded-lg text-neutral-400 hover:text-white transition-colors"
             title={latestMsg.isStarred ? 'Unstar' : 'Star'}
           >
             <Star
               className={`w-4 h-4 ${
-                latestMsg.isStarred ? 'fill-amber-400 text-amber-400' : ''
+                latestMsg.isStarred ? 'fill-white text-white' : ''
               }`}
             />
           </button>
@@ -203,12 +203,12 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
           {onToggleImportant && (
             <button
               onClick={() => onToggleImportant(latestMsg.id, isImportant)}
-              className={`p-2 hover:bg-slate-800 rounded-lg transition-colors ${
-                isImportant ? 'text-amber-500 fill-amber-500' : 'text-slate-400 hover:text-amber-400'
+              className={`p-2 hover:bg-white/10 rounded-lg transition-colors ${
+                isImportant ? 'text-white fill-white' : 'text-neutral-400 hover:text-white'
               }`}
               title={isImportant ? 'Remove Importance' : 'Mark as Important'}
             >
-              <Bookmark className={`w-4 h-4 ${isImportant ? 'fill-amber-500' : ''}`} />
+              <Bookmark className={`w-4 h-4 ${isImportant ? 'fill-white' : ''}`} />
             </button>
           )}
 
@@ -216,7 +216,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
           {onMarkUnread && (
             <button
               onClick={() => onMarkUnread(latestMsg.id)}
-              className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors hidden sm:flex"
+              className="p-2 hover:bg-white/10 rounded-lg text-neutral-400 hover:text-white transition-colors hidden sm:flex"
               title="Mark as Unread"
             >
               <Mail className="w-4 h-4" />
@@ -228,7 +228,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowMoveMenu(!showMoveMenu)}
-                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
+                className="p-2 hover:bg-white/10 rounded-lg text-neutral-400 hover:text-white transition-colors"
                 title="Move to Folder"
               >
                 <FolderInput className="w-4 h-4" />
@@ -236,14 +236,14 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
               {showMoveMenu && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setShowMoveMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-44 bg-slate-900 border border-slate-800 rounded-lg shadow-xl z-40 py-1 text-xs">
-                    <p className="px-3 py-1 text-[10px] uppercase font-semibold text-slate-500">Move to...</p>
+                  <div className="absolute right-0 top-full mt-1 w-44 bg-[#171717] border border-white/10 rounded-xl shadow-2xl z-40 py-1 text-xs backdrop-blur-xl">
+                    <p className="px-3 py-1 text-[10px] uppercase font-semibold text-neutral-500">Move to...</p>
                     <button
                       onClick={() => {
                         onMoveFolder(latestMsg.id, 'inbox');
                         setShowMoveMenu(false);
                       }}
-                      className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-indigo-400"
+                      className="w-full text-left px-3 py-1.5 text-neutral-300 hover:bg-white/10 hover:text-white"
                     >
                       Inbox
                     </button>
@@ -252,7 +252,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
                         onMoveFolder(latestMsg.id, 'archive');
                         setShowMoveMenu(false);
                       }}
-                      className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-indigo-400"
+                      className="w-full text-left px-3 py-1.5 text-neutral-300 hover:bg-white/10 hover:text-white"
                     >
                       Archive
                     </button>
@@ -261,7 +261,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
                         onMoveFolder(latestMsg.id, 'spam');
                         setShowMoveMenu(false);
                       }}
-                      className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-rose-400"
+                      className="w-full text-left px-3 py-1.5 text-neutral-300 hover:bg-white/10 hover:text-rose-400"
                     >
                       Spam
                     </button>
@@ -272,7 +272,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
                           onMoveFolder(latestMsg.id, f.name);
                           setShowMoveMenu(false);
                         }}
-                        className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-indigo-400 truncate"
+                        className="w-full text-left px-3 py-1.5 text-neutral-300 hover:bg-white/10 hover:text-white truncate"
                       >
                         {f.name}
                       </button>
@@ -286,7 +286,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
           {/* Print */}
           <button
             onClick={handlePrint}
-            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors hidden sm:flex"
+            className="p-2 hover:bg-white/10 rounded-lg text-neutral-400 hover:text-white transition-colors hidden sm:flex"
             title="Print Conversation"
           >
             <Printer className="w-4 h-4" />
@@ -296,7 +296,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
           {isTrash && onRestore ? (
             <button
               onClick={() => onRestore(latestMsg.id)}
-              className="p-2 hover:bg-emerald-500/10 rounded-lg text-emerald-400 transition-colors"
+              className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors"
               title="Restore to Inbox"
             >
               <RotateCcw className="w-4 h-4" />
@@ -304,7 +304,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
           ) : (
             <button
               onClick={() => onDelete(latestMsg.id)}
-              className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-rose-400 transition-colors"
+              className="p-2 hover:bg-white/10 rounded-lg text-neutral-400 hover:text-rose-400 transition-colors"
               title="Move to Trash"
             >
               <Trash2 className="w-4 h-4" />
@@ -315,7 +315,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
           <div className="relative">
             <button
               onClick={() => setShowMoreMenu(!showMoreMenu)}
-              className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
+              className="p-2 hover:bg-white/10 rounded-lg text-neutral-400 hover:text-white transition-colors"
               title="More Actions"
             >
               <MoreVertical className="w-4 h-4" />
@@ -324,14 +324,14 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
             {showMoreMenu && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setShowMoreMenu(false)} />
-                <div className="absolute right-0 top-full mt-1 w-52 bg-slate-900 border border-slate-800 rounded-lg shadow-xl z-40 py-1 text-xs">
+                <div className="absolute right-0 top-full mt-1 w-52 bg-[#171717] border border-white/10 rounded-xl shadow-2xl z-40 py-1 text-xs backdrop-blur-xl">
                   {onMuteThread && (
                     <button
                       onClick={() => {
                         onMuteThread(latestMsg.threadId || latestMsg.id);
                         setShowMoreMenu(false);
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-indigo-400"
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-neutral-300 hover:bg-white/10 hover:text-white"
                     >
                       <VolumeX className="w-3.5 h-3.5" /> Mute Conversation
                     </button>
@@ -342,7 +342,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
                         onBlockSender(latestMsg.senderEmail);
                         setShowMoreMenu(false);
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-rose-400"
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-neutral-300 hover:bg-white/10 hover:text-rose-400"
                     >
                       <Ban className="w-3.5 h-3.5" /> Block Sender
                     </button>
@@ -354,7 +354,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
                           onReportThreat(latestMsg.id, 'spam');
                           setShowMoreMenu(false);
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-amber-400"
+                        className="w-full flex items-center gap-2 px-3 py-1.5 text-neutral-300 hover:bg-white/10 hover:text-amber-400"
                       >
                         <AlertOctagon className="w-3.5 h-3.5" /> Report Spam
                       </button>
@@ -369,13 +369,13 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
                       </button>
                     </>
                   )}
-                  <div className="my-1 border-t border-slate-800" />
+                  <div className="my-1 border-t border-white/[0.08]" />
                   <button
                     onClick={() => {
                       handlePrint();
                       setShowMoreMenu(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-300 hover:bg-slate-800 sm:hidden"
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-neutral-300 hover:bg-white/10 sm:hidden"
                   >
                     <Printer className="w-3.5 h-3.5" /> Print
                   </button>
@@ -389,27 +389,27 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
       {/* Main Conversation Container */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 print:p-0 print:overflow-visible">
         {/* Subject Header */}
-        <div className="pb-4 border-b border-slate-800/80 print:border-black">
+        <div className="pb-4 border-b border-white/10 print:border-black">
           <div className="flex items-start justify-between gap-4">
-            <h1 className="text-lg sm:text-xl font-bold text-slate-100 print:text-black flex items-center gap-2">
+            <h1 className="text-lg sm:text-xl font-bold text-white print:text-black flex items-center gap-2">
               {subject}
-              <span className="text-xs font-normal text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full print:border-black print:text-black">
+              <span className="text-xs font-normal text-neutral-400 bg-neutral-900 border border-white/10 px-2 py-0.5 rounded-full print:border-black print:text-black">
                 {messages.length} message{messages.length === 1 ? '' : 's'}
               </span>
             </h1>
             {isImportant && (
-              <span className="text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full shrink-0">
+              <span className="text-xs font-semibold bg-white/10 text-white border border-white/20 px-2 py-0.5 rounded-full shrink-0">
                 Important
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-2 mt-2 text-xs text-slate-400 print:hidden">
-            <span className="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 text-[11px]">
-              <Lock className="w-3 h-3" /> Encrypted (TLS/AES-256)
+          <div className="flex items-center gap-2 mt-2 text-xs text-neutral-400 print:hidden">
+            <span className="flex items-center gap-1 text-white bg-white/10 px-2 py-0.5 rounded border border-white/15 text-[11px]">
+              <Lock className="w-3 h-3 text-white" /> Encrypted (TLS/AES-256)
             </span>
-            <span className="flex items-center gap-1 text-slate-400 text-[11px]">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" /> SPF & DKIM Verified
+            <span className="flex items-center gap-1 text-neutral-400 text-[11px]">
+              <ShieldCheck className="w-3.5 h-3.5 text-white" /> SPF & DKIM Verified
             </span>
           </div>
         </div>
@@ -422,41 +422,41 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
           return (
             <div
               key={msg.id}
-              className={`bg-slate-900/70 border rounded-xl transition-all print:border-black print:bg-transparent ${
-                isLatest ? 'border-slate-800 shadow-xl' : 'border-slate-800/50'
+              className={`bg-[#171717] border border-white/10 rounded-2xl transition-all print:border-black print:bg-transparent ${
+                isLatest ? 'border-white/20 shadow-xl' : 'shadow-sm'
               }`}
             >
               {/* Card Header */}
               <div
                 onClick={() => toggleExpand(msg.id)}
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-800/40 rounded-t-xl select-none print:hover:bg-transparent"
+                className="flex items-center justify-between p-4 cursor-pointer hover:bg-white/5 rounded-t-2xl select-none print:hover:bg-transparent"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white text-xs font-bold shadow-md shrink-0 print:border print:border-black print:text-black">
+                  <div className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center text-xs font-bold shadow-md shrink-0 print:border print:border-black print:text-black">
                     {msg.senderName ? msg.senderName.charAt(0).toUpperCase() : 'M'}
                   </div>
                   <div className="min-w-0 flex flex-col">
-                    <span className="text-xs font-bold text-slate-200 print:text-black truncate">
+                    <span className="text-xs font-bold text-white print:text-black truncate">
                       {msg.senderName}{' '}
-                      <span className="text-slate-400 print:text-slate-700 font-normal">
+                      <span className="text-neutral-400 print:text-neutral-700 font-normal">
                         &lt;{msg.senderEmail}&gt;
                       </span>
                     </span>
-                    <span className="text-[11px] text-slate-400 print:text-slate-600 truncate">
+                    <span className="text-[11px] text-neutral-400 print:text-neutral-600 truncate">
                       to {msg.recipientEmail}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-xs text-slate-400 print:text-slate-700 font-mono">
+                  <span className="text-xs text-neutral-400 print:text-neutral-700 font-mono">
                     {new Date(msg.createdAt).toLocaleString()}
                   </span>
                   <div className="print:hidden">
                     {isExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-slate-400" />
+                      <ChevronUp className="w-4 h-4 text-neutral-400" />
                     ) : (
-                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                      <ChevronDown className="w-4 h-4 text-neutral-400" />
                     )}
                   </div>
                 </div>
@@ -464,10 +464,10 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
 
               {/* Card Expanded Content */}
               {(isExpanded || typeof window !== 'undefined') && (
-                <div className={`px-4 pb-4 pt-2 border-t border-slate-800/60 print:border-black space-y-4 ${isExpanded ? 'block' : 'hidden print:block'}`}>
+                <div className={`px-4 pb-4 pt-2 border-t border-white/[0.08] print:border-black space-y-4 ${isExpanded ? 'block' : 'hidden print:block'}`}>
                   {/* HTML Body Render (Sanitized with DOMPurify to prevent XSS) */}
                   <div
-                    className="prose prose-invert print:prose max-w-none text-xs leading-relaxed text-slate-200 print:text-black overflow-x-auto"
+                    className="prose prose-invert print:prose max-w-none text-xs leading-relaxed text-neutral-200 print:text-black overflow-x-auto"
                     dangerouslySetInnerHTML={{
                       __html: DOMPurify.sanitize(msg.htmlBody || `<p>${msg.snippet}</p>`, {
                         ADD_ATTR: ['target', 'rel', 'style', 'class'],
@@ -478,9 +478,9 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
 
                   {/* Attachments Section */}
                   {msg.attachmentsJson && msg.attachmentsJson.length > 0 && (
-                    <div className="pt-3 border-t border-slate-800/60 print:border-black">
-                      <p className="text-[11px] font-semibold text-slate-400 print:text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                        <Paperclip className="w-3 h-3 text-indigo-400" /> Attachments ({msg.attachmentsJson.length})
+                    <div className="pt-3 border-t border-white/[0.08] print:border-black">
+                      <p className="text-[11px] font-semibold text-neutral-400 print:text-neutral-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Paperclip className="w-3 h-3 text-white" /> Attachments ({msg.attachmentsJson.length})
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {msg.attachmentsJson.map((att, i) => (
@@ -490,11 +490,11 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
                             target="_blank"
                             download={att.filename}
                             rel="noreferrer"
-                            className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-xs text-slate-200 transition-colors print:border-black print:text-black"
+                            className="flex items-center gap-2 bg-[#0a0a0a] hover:bg-black px-3 py-1.5 rounded-xl border border-white/10 text-xs text-white transition-colors print:border-black print:text-black shadow-sm"
                           >
-                            <Download className="w-3.5 h-3.5 text-indigo-400" />
+                            <Download className="w-3.5 h-3.5 text-white" />
                             <span className="truncate max-w-[160px] font-medium">{att.filename}</span>
-                            <span className="text-[10px] text-slate-400">({att.sizeStr})</span>
+                            <span className="text-[10px] text-neutral-400">({att.sizeStr})</span>
                           </a>
                         ))}
                       </div>
@@ -502,24 +502,24 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
                   )}
 
                   {/* Quick Action Footer for Card */}
-                  <div className="pt-2 flex items-center gap-2 border-t border-slate-800/40 text-xs print:hidden">
+                  <div className="pt-2 flex items-center gap-2 border-t border-white/[0.08] text-xs print:hidden">
                     <button
                       onClick={() => onReply(msg.senderEmail, `Re: ${subject}`, msg.id)}
-                      className="flex items-center gap-1 text-slate-400 hover:text-indigo-300 font-medium px-2 py-1 rounded hover:bg-slate-800"
+                      className="flex items-center gap-1 text-neutral-400 hover:text-white font-medium px-2 py-1 rounded hover:bg-white/10"
                     >
                       <Reply className="w-3.5 h-3.5" /> Reply
                     </button>
                     {onReplyAll && (
                       <button
                         onClick={() => onReplyAll(msg.senderEmail, msg.recipientEmail, `Re: ${subject}`, msg.id)}
-                        className="flex items-center gap-1 text-slate-400 hover:text-indigo-300 font-medium px-2 py-1 rounded hover:bg-slate-800"
+                        className="flex items-center gap-1 text-neutral-400 hover:text-white font-medium px-2 py-1 rounded hover:bg-white/10"
                       >
                         <ReplyAll className="w-3.5 h-3.5" /> Reply All
                       </button>
                     )}
                     <button
                       onClick={() => onForward(`Fwd: ${subject}`, msg.htmlBody)}
-                      className="flex items-center gap-1 text-slate-400 hover:text-slate-200 font-medium px-2 py-1 rounded hover:bg-slate-800"
+                      className="flex items-center gap-1 text-neutral-400 hover:text-white font-medium px-2 py-1 rounded hover:bg-white/10"
                     >
                       <Forward className="w-3.5 h-3.5" /> Forward
                     </button>
@@ -531,22 +531,22 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
         })}
 
         {/* Quick Inline Reply Container (Hidden during print) */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-3 mt-6 print:hidden">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
-            <Reply className="w-3.5 h-3.5 text-indigo-400" /> Quick Reply to {latestMsg.senderEmail}
+        <div className="bg-[#171717] border border-white/10 rounded-2xl p-4 sm:p-5 space-y-3 mt-6 print:hidden shadow-lg">
+          <div className="flex items-center gap-2 text-xs font-semibold text-white">
+            <Reply className="w-3.5 h-3.5 text-white" /> Quick Reply to {latestMsg.senderEmail}
           </div>
           <textarea
             value={quickReplyText}
             onChange={(e) => setQuickReplyText(e.target.value)}
             placeholder="Type your response here..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 resize-none h-24"
+            className="w-full bg-black border border-white/10 rounded-xl p-3 text-xs text-white placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-white/20 resize-none h-24 shadow-inner"
           />
           <div className="flex items-center justify-between">
             <button
               onClick={() => {
                 onReply(latestMsg.senderEmail, `Re: ${subject}`, latestMsg.id);
               }}
-              className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
+              className="text-xs text-neutral-400 hover:text-white font-medium"
             >
               Open Full Composer
             </button>
@@ -569,7 +569,7 @@ export const ThreadViewer: React.FC<ThreadViewerProps> = ({
                 }
               }}
               disabled={!quickReplyText.trim() || isSendingQuickReply}
-              className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-md transition-all"
+              className="flex items-center gap-2 px-4 py-1.5 bg-white hover:bg-neutral-200 disabled:opacity-50 text-black text-xs font-bold rounded-xl shadow transition-all active:scale-[0.98]"
             >
               <Send className="w-3.5 h-3.5" /> {isSendingQuickReply ? 'Sending...' : 'Send Reply'}
             </button>

@@ -62,6 +62,7 @@ export const api = {
     credentials: (id: string) => request<any>(`/email/mailboxes/${id}/credentials`),
     websiteConnect: (id: string) => request<any>(`/email/mailboxes/${id}/website-connect`),
     planQuotas: () => request<any>('/email/plan-quotas'),
+    plans: () => request<{ ok: boolean; plans: any[] }>('/email/plans'),
     getMailboxAccess: (id: string) => request<any>(`/email/mailboxes/${id}/access`),
     grantMailboxAccess: (id: string, data: { userId: string; permissions: string[] }) =>
       request<any>(`/email/mailboxes/${id}/access`, { method: 'POST', body: JSON.stringify(data) }),
@@ -78,6 +79,15 @@ export const api = {
     removeMailboxAvatar: (id: string) =>
       request<any>(`/email/mailboxes/${id}/avatar`, { method: 'DELETE' }),
     updateQuota: (id: string, storageQuotaMb: number) => request<any>(`/email/mailboxes/${id}/quota`, { method: 'PATCH', body: JSON.stringify({ storageQuotaMb }) }),
+    addAlias: (id: string, prefix: string) =>
+      request<any>(`/email/mailboxes/${id}/aliases`, {
+        method: 'POST',
+        body: JSON.stringify({ prefix }),
+      }),
+    removeAlias: (id: string, prefix: string) =>
+      request<any>(`/email/mailboxes/${id}/aliases/${encodeURIComponent(prefix)}`, {
+        method: 'DELETE',
+      }),
     sendTransactional: (data: any) => request<any>('/v1/emails', { method: 'POST', body: JSON.stringify(data) }),
     domains: () => request<any>('/email/domains'),
     contacts: () => request<any>('/email/contacts'),
@@ -93,8 +103,10 @@ export const api = {
   },
 
   webmail: {
-    getCredentials: () => request<any>('/webmail/account/credentials'),
+    getCredentials: (mailboxId?: string) =>
+      request<any>(`/webmail/account/credentials${mailboxId ? `?mailboxId=${encodeURIComponent(mailboxId)}` : ''}`),
     planUsage: () => request<any>('/webmail/plan-usage'),
+    plans: () => request<{ ok: boolean; plans: any[] }>('/webmail/plans'),
     listMessages: (folder = 'inbox', search = '', smtpAccountId?: string, category?: string) => {
       const q = new URLSearchParams({ folder });
       if (search) q.append('search', search);

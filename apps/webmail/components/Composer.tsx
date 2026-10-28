@@ -334,11 +334,11 @@ export const Composer: React.FC<ComposerProps> = ({
   if (isMinimized) {
     return (
       <div
-        className="fixed bottom-0 right-2 sm:right-6 z-50 w-64 sm:w-72 bg-slate-900 border border-slate-700 rounded-t-xl shadow-2xl flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 text-slate-200 cursor-pointer"
+        className="fixed bottom-0 right-2 sm:right-6 z-50 w-64 sm:w-72 bg-[#171717] border border-white/20 rounded-t-xl shadow-2xl flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 text-white cursor-pointer"
         onClick={() => setIsMinimized(false)}
       >
         <div className="flex items-center gap-2 truncate text-sm font-semibold">
-          <FileText className="w-4 h-4 text-indigo-400" />
+          <FileText className="w-4 h-4 text-white" />
           <span className="truncate">{subject || 'New Message'}</span>
         </div>
         <div className="flex items-center gap-1">
@@ -348,7 +348,7 @@ export const Composer: React.FC<ComposerProps> = ({
               setIsMinimized(false);
               setIsMaximized(true);
             }}
-            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200"
+            className="p-1 hover:bg-white/10 rounded text-neutral-400 hover:text-white"
           >
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
@@ -357,7 +357,7 @@ export const Composer: React.FC<ComposerProps> = ({
               e.stopPropagation();
               onClose();
             }}
-            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200"
+            className="p-1 hover:bg-white/10 rounded text-neutral-400 hover:text-white"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -371,7 +371,7 @@ export const Composer: React.FC<ComposerProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`fixed z-50 transition-all duration-200 shadow-2xl flex flex-col bg-slate-900 border border-slate-800 overflow-hidden ${
+      className={`fixed z-50 transition-all duration-200 shadow-2xl flex flex-col bg-[#171717] border border-white/15 overflow-hidden ${
         isMaximized
           ? 'inset-0 sm:inset-6 md:inset-10 sm:rounded-xl'
           : 'inset-0 sm:inset-auto sm:bottom-0 sm:right-6 sm:w-full sm:max-w-2xl sm:h-[620px] sm:rounded-t-xl sm:rounded-b-none sm:border-b-0'
@@ -379,21 +379,21 @@ export const Composer: React.FC<ComposerProps> = ({
     >
       {/* Drag & Drop Overlay */}
       {isDraggingFile && (
-        <div className="absolute inset-0 bg-indigo-600/20 backdrop-blur-sm z-50 border-2 border-dashed border-indigo-400 flex flex-col items-center justify-center space-y-2 pointer-events-none">
-          <UploadCloud className="w-10 h-10 text-indigo-300 animate-bounce" />
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 border-2 border-dashed border-white flex flex-col items-center justify-center space-y-2 pointer-events-none">
+          <UploadCloud className="w-10 h-10 text-white animate-bounce" />
           <p className="text-sm font-bold text-white">Drop files to attach to email</p>
         </div>
       )}
 
       {/* Top Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-slate-950 border-b border-slate-800 text-slate-200 select-none">
+      <div className="flex items-center justify-between px-4 py-3 bg-black border-b border-white/10 text-white select-none">
         <div className="flex items-center gap-2">
-          <Send className="w-4 h-4 text-indigo-400" />
+          <Send className="w-4 h-4 text-white" />
           <span className="text-sm font-semibold">
             {inReplyTo ? 'Reply to Thread' : 'New Email Message'}
           </span>
           {draftStatus && (
-            <span className="text-[10px] text-slate-500 font-normal ml-2">
+            <span className="text-[10px] text-neutral-500 font-normal ml-2">
               {draftStatus}
             </span>
           )}
@@ -401,21 +401,21 @@ export const Composer: React.FC<ComposerProps> = ({
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setIsMinimized(true)}
-            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors hidden sm:inline-flex"
+            className="p-1 hover:bg-white/10 rounded text-neutral-400 hover:text-white transition-colors hidden sm:inline-flex"
             title="Minimize"
           >
             <Minimize2 className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => setIsMaximized(!isMaximized)}
-            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors hidden sm:inline-flex"
+            className="p-1 hover:bg-white/10 rounded text-neutral-400 hover:text-white transition-colors hidden sm:inline-flex"
             title={isMaximized ? 'Restore' : 'Maximize'}
           >
             {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 transition-colors"
+            className="p-1 hover:bg-white/10 rounded text-neutral-400 hover:text-white transition-colors"
             title="Close"
           >
             <X className="w-4 h-4" />
@@ -435,15 +435,15 @@ export const Composer: React.FC<ComposerProps> = ({
       )}
 
       {/* Recipient & From Fields */}
-      <div className="p-3 border-b border-slate-800/80 space-y-2 text-xs bg-slate-900/50 relative">
+      <div className="p-3 border-b border-white/10 space-y-2 text-xs bg-[#0a0a0a] relative">
         {/* From Identity Selector (if aliases exist) */}
         {availableSenders.length > 1 && (
           <div className="flex items-center gap-2">
-            <span className="w-14 text-slate-400 font-medium">From:</span>
+            <span className="w-14 text-neutral-400 font-medium">From:</span>
             <select
               value={selectedFromEmail}
               onChange={(e) => setSelectedFromEmail(e.target.value)}
-              className="flex-1 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+              className="flex-1 bg-black border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-white"
             >
               {availableSenders.map((s) => (
                 <option key={s.email} value={s.email}>
@@ -456,7 +456,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
         {/* To Field with Autocomplete */}
         <div className="flex items-center gap-2 relative">
-          <span className="w-14 text-slate-400 font-medium">To:</span>
+          <span className="w-14 text-neutral-400 font-medium">To:</span>
           <input
             type="email"
             value={recipient}
@@ -465,12 +465,12 @@ export const Composer: React.FC<ComposerProps> = ({
               handleQuerySuggestions(e.target.value, 'to');
             }}
             placeholder="recipient@example.com"
-            className="flex-1 bg-transparent text-slate-100 placeholder-slate-500 border-none focus:outline-none focus:ring-0 text-xs"
+            className="flex-1 bg-transparent text-white placeholder-neutral-500 border-none focus:outline-none focus:ring-0 text-xs"
           />
           {!showCc && (
             <button
               onClick={() => setShowCc(true)}
-              className="text-slate-400 hover:text-indigo-400 text-[11px] font-medium transition-colors"
+              className="text-neutral-400 hover:text-white text-[11px] font-medium transition-colors"
             >
               Cc / Bcc
             </button>
@@ -478,15 +478,15 @@ export const Composer: React.FC<ComposerProps> = ({
 
           {/* Autocomplete Suggestions Menu */}
           {activeField === 'to' && contactSuggestions.length > 0 && (
-            <div className="absolute left-16 top-full mt-1 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-2xl z-50 py-1 text-xs">
+            <div className="absolute left-16 top-full mt-1 w-64 bg-[#171717] border border-white/15 rounded-lg shadow-2xl z-50 py-1 text-xs">
               {contactSuggestions.map((c, i) => (
                 <button
                   key={i}
                   onMouseDown={() => handleSelectSuggestion(c.email)}
-                  className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-slate-800 text-left"
+                  className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-white/10 text-left"
                 >
-                  <span className="font-semibold text-slate-200 truncate">{c.name}</span>
-                  <span className="text-[10px] text-slate-400 truncate">{c.email}</span>
+                  <span className="font-semibold text-white truncate">{c.name}</span>
+                  <span className="text-[10px] text-neutral-400 truncate">{c.email}</span>
                 </button>
               ))}
             </div>
@@ -495,8 +495,8 @@ export const Composer: React.FC<ComposerProps> = ({
 
         {showCc && (
           <>
-            <div className="flex items-center gap-2 border-t border-slate-800/50 pt-1.5 relative">
-              <span className="w-14 text-slate-400 font-medium">Cc:</span>
+            <div className="flex items-center gap-2 border-t border-white/5 pt-1.5 relative">
+              <span className="w-14 text-neutral-400 font-medium">Cc:</span>
               <input
                 type="text"
                 value={cc}
@@ -505,26 +505,26 @@ export const Composer: React.FC<ComposerProps> = ({
                   handleQuerySuggestions(e.target.value, 'cc');
                 }}
                 placeholder="cc@example.com"
-                className="flex-1 bg-transparent text-slate-100 placeholder-slate-500 focus:outline-none text-xs"
+                className="flex-1 bg-transparent text-white placeholder-neutral-500 focus:outline-none text-xs"
               />
               {activeField === 'cc' && contactSuggestions.length > 0 && (
-                <div className="absolute left-16 top-full mt-1 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-2xl z-50 py-1 text-xs">
+                <div className="absolute left-16 top-full mt-1 w-64 bg-[#171717] border border-white/15 rounded-lg shadow-2xl z-50 py-1 text-xs">
                   {contactSuggestions.map((c, i) => (
                     <button
                       key={i}
                       onMouseDown={() => handleSelectSuggestion(c.email)}
-                      className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-slate-800 text-left"
+                      className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-white/10 text-left"
                     >
-                      <span className="font-semibold text-slate-200 truncate">{c.name}</span>
-                      <span className="text-[10px] text-slate-400 truncate">{c.email}</span>
+                      <span className="font-semibold text-white truncate">{c.name}</span>
+                      <span className="text-[10px] text-neutral-400 truncate">{c.email}</span>
                     </button>
                   ))}
                 </div>
               )}
             </div>
 
-            <div className="flex items-center gap-2 border-t border-slate-800/50 pt-1.5 relative">
-              <span className="w-14 text-slate-400 font-medium">Bcc:</span>
+            <div className="flex items-center gap-2 border-t border-white/5 pt-1.5 relative">
+              <span className="w-14 text-neutral-400 font-medium">Bcc:</span>
               <input
                 type="text"
                 value={bcc}
@@ -533,18 +533,18 @@ export const Composer: React.FC<ComposerProps> = ({
                   handleQuerySuggestions(e.target.value, 'bcc');
                 }}
                 placeholder="bcc@example.com"
-                className="flex-1 bg-transparent text-slate-100 placeholder-slate-500 focus:outline-none text-xs"
+                className="flex-1 bg-transparent text-white placeholder-neutral-500 focus:outline-none text-xs"
               />
               {activeField === 'bcc' && contactSuggestions.length > 0 && (
-                <div className="absolute left-16 top-full mt-1 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-2xl z-50 py-1 text-xs">
+                <div className="absolute left-16 top-full mt-1 w-64 bg-[#171717] border border-white/15 rounded-lg shadow-2xl z-50 py-1 text-xs">
                   {contactSuggestions.map((c, i) => (
                     <button
                       key={i}
                       onMouseDown={() => handleSelectSuggestion(c.email)}
-                      className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-slate-800 text-left"
+                      className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-white/10 text-left"
                     >
-                      <span className="font-semibold text-slate-200 truncate">{c.name}</span>
-                      <span className="text-[10px] text-slate-400 truncate">{c.email}</span>
+                      <span className="font-semibold text-white truncate">{c.name}</span>
+                      <span className="text-[10px] text-neutral-400 truncate">{c.email}</span>
                     </button>
                   ))}
                 </div>
@@ -553,54 +553,54 @@ export const Composer: React.FC<ComposerProps> = ({
           </>
         )}
 
-        <div className="flex items-center gap-2 border-t border-slate-800/50 pt-2">
-          <span className="w-14 text-slate-400 font-medium">Subject:</span>
+        <div className="flex items-center gap-2 border-t border-white/10 pt-2">
+          <span className="w-14 text-neutral-400 font-medium">Subject:</span>
           <input
             type="text"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="Subject line"
-            className="flex-1 bg-transparent text-slate-100 placeholder-slate-500 font-medium border-none focus:outline-none focus:ring-0 text-xs"
+            className="flex-1 bg-transparent text-white placeholder-neutral-500 font-medium border-none focus:outline-none focus:ring-0 text-xs"
           />
         </div>
       </div>
 
       {/* Formatting & Template Toolbar */}
-      <div className="px-3 py-1.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between text-slate-400 text-xs">
+      <div className="px-3 py-1.5 bg-black border-b border-white/10 flex items-center justify-between text-neutral-400 text-xs">
         <div className="flex items-center gap-1">
           <button
             onClick={() => insertFormat('b')}
             title="Bold"
-            className="p-1 hover:bg-slate-800 rounded hover:text-slate-200"
+            className="p-1 hover:bg-white/10 rounded hover:text-white"
           >
             <Bold className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => insertFormat('i')}
             title="Italic"
-            className="p-1 hover:bg-slate-800 rounded hover:text-slate-200"
+            className="p-1 hover:bg-white/10 rounded hover:text-white"
           >
             <Italic className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => insertFormat('u')}
             title="Underline"
-            className="p-1 hover:bg-slate-800 rounded hover:text-slate-200"
+            className="p-1 hover:bg-white/10 rounded hover:text-white"
           >
             <Underline className="w-3.5 h-3.5" />
           </button>
-          <div className="w-px h-4 bg-slate-800 mx-1" />
+          <div className="w-px h-4 bg-white/10 mx-1" />
           <button
             onClick={() => insertFormat('ul')}
             title="Bullet List"
-            className="p-1 hover:bg-slate-800 rounded hover:text-slate-200"
+            className="p-1 hover:bg-white/10 rounded hover:text-white"
           >
             <List className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => insertFormat('ol')}
             title="Numbered List"
-            className="p-1 hover:bg-slate-800 rounded hover:text-slate-200"
+            className="p-1 hover:bg-white/10 rounded hover:text-white"
           >
             <ListOrdered className="w-3.5 h-3.5" />
           </button>
@@ -612,8 +612,8 @@ export const Composer: React.FC<ComposerProps> = ({
             onClick={() => setIsConfidential(!isConfidential)}
             className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded transition-colors ${
               isConfidential
-                ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'bg-white text-black font-bold border border-white'
+                : 'text-neutral-400 hover:text-white hover:bg-white/10'
             }`}
             title="Toggle Confidential Mode"
           >
@@ -625,14 +625,14 @@ export const Composer: React.FC<ComposerProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowTemplates(!showTemplates)}
-                className="text-[11px] text-slate-400 hover:text-indigo-300 flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-800"
+                className="text-[11px] text-neutral-400 hover:text-white flex items-center gap-1 px-2 py-0.5 rounded hover:bg-white/10"
               >
                 <FileText className="w-3 h-3" /> Canned Response
               </button>
               {showTemplates && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowTemplates(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-56 bg-slate-900 border border-slate-800 rounded-lg shadow-xl z-50 py-1">
+                  <div className="absolute right-0 top-full mt-1 w-56 bg-[#171717] border border-white/15 rounded-lg shadow-xl z-50 py-1">
                     {templates.map((tpl) => (
                       <button
                         key={tpl.id}
@@ -641,7 +641,7 @@ export const Composer: React.FC<ComposerProps> = ({
                           if (tpl.subject && !subject) setSubject(tpl.subject);
                           setShowTemplates(false);
                         }}
-                        className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 truncate"
+                        className="w-full text-left px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/10 hover:text-white truncate"
                       >
                         {tpl.name}
                       </button>
@@ -655,29 +655,29 @@ export const Composer: React.FC<ComposerProps> = ({
       </div>
 
       {/* Editor Area */}
-      <div className="flex-1 p-3 flex flex-col min-h-0 bg-slate-900">
+      <div className="flex-1 p-3 flex flex-col min-h-0 bg-[#171717]">
         <textarea
           ref={bodyRef}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Compose your message here..."
-          className="flex-1 w-full bg-transparent text-slate-200 placeholder-slate-600 border-none resize-none focus:outline-none focus:ring-0 text-xs leading-relaxed font-sans"
+          className="flex-1 w-full bg-transparent text-white placeholder-neutral-600 border-none resize-none focus:outline-none focus:ring-0 text-xs leading-relaxed font-sans"
         />
 
         {/* Attachments List */}
         {attachments.length > 0 && (
-          <div className="pt-2 border-t border-slate-800/80 flex flex-wrap gap-2">
+          <div className="pt-2 border-t border-white/10 flex flex-wrap gap-2">
             {attachments.map((att, idx) => (
               <div
                 key={idx}
-                className="flex items-center gap-2 bg-slate-800 px-2.5 py-1 rounded-md text-[11px] text-slate-300 border border-slate-700"
+                className="flex items-center gap-2 bg-neutral-900 px-2.5 py-1 rounded-md text-[11px] text-neutral-200 border border-white/10"
               >
-                <File className="w-3 h-3 text-indigo-400" />
+                <File className="w-3 h-3 text-white" />
                 <span className="truncate max-w-[140px]">{att.filename}</span>
-                <span className="text-slate-500">({att.sizeStr})</span>
+                <span className="text-neutral-500">({att.sizeStr})</span>
                 <button
                   onClick={() => setAttachments((prev) => prev.filter((_, i) => i !== idx))}
-                  className="text-slate-400 hover:text-rose-400"
+                  className="text-neutral-400 hover:text-rose-400"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -688,12 +688,12 @@ export const Composer: React.FC<ComposerProps> = ({
       </div>
 
       {/* Bottom Action Footer */}
-      <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
+      <div className="p-3 bg-black border-t border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             onClick={handleSend}
             disabled={isSending}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-lg shadow-indigo-600/20 transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-neutral-200 disabled:opacity-50 text-black rounded-lg text-xs font-bold shadow transition-all"
           >
             {isSending ? (
               <>Sending...</>
@@ -705,7 +705,7 @@ export const Composer: React.FC<ComposerProps> = ({
           </button>
 
           <label
-            className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
+            className="p-2 text-neutral-400 hover:text-white hover:bg-white/10 rounded-lg cursor-pointer transition-colors"
             title="Attach file"
           >
             <Paperclip className="w-4 h-4" />
@@ -715,7 +715,7 @@ export const Composer: React.FC<ComposerProps> = ({
           <button
             onClick={() => setShowSchedule(!showSchedule)}
             className={`p-2 rounded-lg transition-colors ${
-              scheduledDate ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              scheduledDate ? 'text-white bg-white/10' : 'text-neutral-400 hover:text-white hover:bg-white/10'
             }`}
             title="Schedule Send"
           >
@@ -725,20 +725,20 @@ export const Composer: React.FC<ComposerProps> = ({
 
         <div className="flex items-center gap-3 text-xs">
           {showSchedule && (
-            <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2 py-1 rounded-lg">
-              <span className="text-[11px] text-slate-400">Schedule:</span>
+            <div className="flex items-center gap-1.5 bg-black border border-white/15 px-2 py-1 rounded-lg">
+              <span className="text-[11px] text-neutral-400">Schedule:</span>
               <input
                 type="datetime-local"
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                className="bg-transparent text-slate-200 text-xs border-none focus:outline-none"
+                className="bg-transparent text-white text-xs border-none focus:outline-none"
               />
             </div>
           )}
 
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+            className="p-2 text-neutral-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
             title="Discard"
           >
             <Trash2 className="w-4 h-4" />

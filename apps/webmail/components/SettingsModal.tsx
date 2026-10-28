@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
 import {
   Settings, FileSignature, FileText, Sun, Ban, X, Trash2, Plus, Zap, HardDrive,
   MailCheck, ArrowUpCircle, CheckCircle2, ExternalLink, Globe, ShieldCheck, User,
   Check, RefreshCw, Layers, Key, Upload, Image, Camera, Code, Copy, Send, Eye, EyeOff, Server,
-  Briefcase, Building, Phone, UserCircle, AlertCircle, Sparkles, SlidersHorizontal, Columns, Rows, Bell, Monitor
+  Briefcase, Building, Phone, UserCircle, AlertCircle, Sparkles, SlidersHorizontal, Columns, Rows, Bell, Monitor,
+  ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Maximize2, Minimize2
 } from 'lucide-react';
 
 export interface WebmailSettingsModalProps {
@@ -19,6 +20,19 @@ export interface WebmailSettingsModalProps {
   onDensityChange?: (d: 'comfortable' | 'default' | 'compact') => void;
   readingPane?: 'right' | 'bottom' | 'off';
   onReadingPaneChange?: (rp: 'right' | 'bottom' | 'off') => void;
+  userRole?: string;
+}
+
+export interface SettingsTabItem {
+  id: 'general' | 'profile' | 'connect' | 'dns' | 'signatures' | 'templates' | 'autoreply' | 'blocklist' | 'upgrade';
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  desc: string;
+}
+
+export interface SettingsCategory {
+  category: string;
+  tabs: SettingsTabItem[];
 }
 
 export function WebmailSettingsModal({
@@ -31,9 +45,132 @@ export function WebmailSettingsModal({
   onDensityChange,
   readingPane = 'right',
   onReadingPaneChange,
+  userRole = 'customer',
 }: WebmailSettingsModalProps) {
+  const isDev = userRole === 'dev';
   const [activeSubTab, setActiveSubTab] = useState<'general' | 'profile' | 'connect' | 'dns' | 'signatures' | 'templates' | 'autoreply' | 'blocklist' | 'upgrade'>('general');
+
+  useEffect(() => {
+    if (isDev && activeSubTab === 'upgrade') {
+      setActiveSubTab('general');
+    }
+  }, [isDev, activeSubTab]);
   const [notificationStatus, setNotificationStatus] = useState<'default' | 'granted' | 'denied'>('default');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
+  const [settingsSidebarWidth, setSettingsSidebarWidth] = useState<number>(240);
+  const [isDraggingSidebar, setIsDraggingSidebar] = useState<boolean>(false);
+  const settingsSidebarRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('webmail_settings_sidebar_collapsed');
+      if (saved !== null) {
+        setIsSidebarCollapsed(saved === 'true');
+      }
+    }
+  }, []);
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('webmail_settings_sidebar_collapsed', String(next));
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!isDraggingSidebar) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!settingsSidebarRef.current) return;
+      const rect = settingsSidebarRef.current.getBoundingClientRect();
+      const newWidth = e.clientX - rect.left;
+      const minWidth = 180;
+      const maxWidth = 380;
+      const clamped = Math.max(minWidth, Math.min(newWidth, maxWidth));
+      setSettingsSidebarWidth(clamped);
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingSidebar(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isDraggingSidebar]);
+
+  const startSidebarResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDraggingSidebar(true);
+  };
+
+  const resetSidebarWidth = () => {
+    setSettingsSidebarWidth(240);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === '[' || e.key === '\\')) {
+        e.preventDefault();
+        toggleSidebar();
+      }
+      if (e.altKey && (e.key === 'm' || e.key === 'M')) {
+        e.preventDefault();
+        setIsMaximized(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  const SETTINGS_CATEGORIES: SettingsCategory[] = [
+    {
+      category: 'Preferences',
+      tabs: [
+        { id: 'general', label: 'General & View', icon: SlidersHorizontal, desc: 'Display density, reading pane placement & system alerts' },
+        { id: 'profile', label: 'Mailbox Profile', icon: User, desc: 'Sender identity, profile picture, company & contact card' },
+      ],
+    },
+    {
+      category: 'Mail & Integration',
+      tabs: [
+        { id: 'connect', label: 'Website Connect', icon: Code, desc: 'SMTP credentials, code snippets for WordPress, Next.js & API integrations' },
+        { id: 'dns', label: 'DNS & Aliases', icon: Globe, desc: 'Custom domain DNS verification (SPF, DKIM, DMARC, MX) and email aliases' },
+        { id: 'signatures', label: 'Signatures', icon: FileSignature, desc: 'Personalized HTML and rich-text email signatures' },
+        { id: 'templates', label: 'Templates', icon: FileText, desc: 'Reusable canned response email templates' },
+        { id: 'autoreply', label: 'Vacation Reply', icon: Sun, desc: 'Automated out-of-office autoreply schedule and message' },
+      ],
+    },
+    {
+      category: 'Security & Plan',
+      tabs: [
+        { id: 'blocklist', label: 'Blocklist', icon: Ban, desc: 'Spam protection, blocked sender addresses and blocked domain rules' },
+        ...(!isDev ? [{ id: 'upgrade' as const, label: 'Upgrade & Plan', icon: Zap, desc: 'Storage quota, mailbox tier and subscription management' }] : []),
+      ],
+    },
+  ];
+
+  const allTabs: SettingsTabItem[] = SETTINGS_CATEGORIES.flatMap(c => c.tabs);
+  const currentTabInfo: SettingsTabItem = allTabs.find(t => t.id === activeSubTab) || allTabs[0];
+  const ActiveTabIcon = currentTabInfo.icon;
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -107,11 +244,27 @@ export function WebmailSettingsModal({
 
   const [blockInput, setBlockInput] = useState('');
   const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
+  const [isLoadingPlans, setIsLoadingPlans] = useState(false);
 
   const toast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToastMessage({ message, type });
     setTimeout(() => setToastMessage(null), 4000);
   };
+
+  useEffect(() => {
+    if (isOpen && !isDev) {
+      setIsLoadingPlans(true);
+      api.webmail.plans()
+        .then((res: any) => {
+          if (res?.plans) {
+            setAvailablePlans(res.plans);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setIsLoadingPlans(false));
+    }
+  }, [isOpen, isDev]);
 
   useEffect(() => {
     if (isOpen) {
@@ -215,7 +368,7 @@ export function WebmailSettingsModal({
         from: mailboxInfo?.email || 'user@shanutechx.com',
         to: testTo.trim(),
         subject: testSubject.trim() || 'Website Connection Test Email',
-        html: `<h3>Test Email from ShanuTechX Webmail</h3><p>Your website connection is verified and operational! Sent at ${new Date().toISOString()}.</p>`,
+        html: `<h3>Test Email from STX Webmail</h3><p>Your website connection is verified and operational! Sent at ${new Date().toISOString()}.</p>`,
       });
       setTestSendResult({ success: true, message: `Dispatched successfully! Message ID: ${res.id || 'ok'}` });
       toast('Test email delivered successfully!', 'success');
@@ -342,15 +495,10 @@ export function WebmailSettingsModal({
     e.preventDefault();
     if (!newAliasPrefix.trim() || !mailboxInfo?.id) return;
     try {
-      const res = await api.post(`/smtp-accounts/${mailboxInfo.id}/aliases`, { prefix: newAliasPrefix.trim() }).catch(async () => {
-        return await api.webmail.createAlias({
-          smtpAccountId: mailboxInfo.id,
-          aliasEmail: `${newAliasPrefix.trim()}@${customDomainInput}`,
-        });
-      });
+      const res = await api.email.addAlias(mailboxInfo.id, newAliasPrefix.trim());
       setAliases(res.aliases || [...aliases, `${newAliasPrefix.trim()}@${customDomainInput}`]);
       setNewAliasPrefix('');
-      toast(`Alias added successfully!`, 'success');
+      toast('Alias added successfully!', 'success');
       onRefreshData?.();
     } catch (err: any) {
       toast(err.message || 'Failed to add alias', 'error');
@@ -361,9 +509,7 @@ export function WebmailSettingsModal({
     if (!mailboxInfo?.id) return;
     const prefix = aliasEmail.split('@')[0];
     try {
-      const res = await api.delete(`/smtp-accounts/${mailboxInfo.id}/aliases/${prefix}`).catch(async () => {
-        return await api.webmail.deleteAlias({ smtpAccountId: mailboxInfo.id, aliasEmail });
-      });
+      const res = await api.email.removeAlias(mailboxInfo.id, prefix);
       setAliases(res.aliases || aliases.filter((a) => a !== aliasEmail));
       toast(`Alias ${aliasEmail} removed!`, 'info');
       onRefreshData?.();
@@ -425,71 +571,230 @@ export function WebmailSettingsModal({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-3xl w-full space-y-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <Settings className="h-4 w-4 text-indigo-400" />
-            <span>Webmail Studio Settings & Preferences</span>
-          </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white p-1">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    <div className={`fixed inset-0 z-50 bg-black/85 flex items-center justify-center ${isMaximized ? 'p-0' : 'p-2 sm:p-4 md:p-6'} backdrop-blur-md animate-fade-in`}>
+      <div className={`bg-[#0a0a0a] ${isMaximized ? 'w-full h-full rounded-none border-none' : 'border border-white/15 rounded-2xl sm:rounded-3xl max-w-5xl w-full h-[90vh] max-h-[840px] shadow-2xl'} overflow-hidden flex flex-col transition-all duration-200`}>
+        {/* Full-width Modal Window Header with Double-Click Maximize */}
+        <div
+          onDoubleClick={() => setIsMaximized((prev) => !prev)}
+          className="h-14 shrink-0 bg-[#0a0a0a] border-b border-white/10 px-4 sm:px-6 flex items-center justify-between select-none cursor-default"
+        >
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+              title={isSidebarCollapsed ? "Expand settings sidebar (Ctrl+[)" : "Collapse settings sidebar (Ctrl+[)"}
+            >
+              {isSidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+            </button>
 
-        {toastMessage && (
-          <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-150 ${
-            toastMessage.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' :
-            toastMessage.type === 'error' ? 'bg-rose-500/10 border-rose-500/20 text-rose-300' :
-            'bg-indigo-500/10 border-indigo-500/20 text-indigo-300'
-          }`}>
-            <CheckCircle2 className="w-4 h-4" />
-            <span>{toastMessage.message}</span>
-          </div>
-        )}
+            <div className="h-4 w-px bg-white/10" />
 
-        {/* SUB TABS */}
-        <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto">
-          {[
-            { id: 'general', label: 'General & View', icon: SlidersHorizontal },
-            { id: 'profile', label: 'Profile', icon: User },
-            { id: 'connect', label: 'Website Connect', icon: Code },
-            { id: 'dns', label: 'DNS & Aliases', icon: Globe },
-            { id: 'signatures', label: 'Signatures', icon: FileSignature },
-            { id: 'templates', label: 'Templates', icon: FileText },
-            { id: 'autoreply', label: 'Vacation Reply', icon: Sun },
-            { id: 'blocklist', label: 'Blocklist', icon: Ban },
-            { id: 'upgrade', label: 'Upgrade & Plan', icon: Zap },
-          ].map((tab) => {
-            const IconComp = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveSubTab(tab.id as any)}
-                className={`flex-1 min-w-[72px] py-2 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${
-                  activeSubTab === tab.id
-                    ? tab.id === 'upgrade' ? 'bg-amber-500 text-white shadow' : 'bg-indigo-600 text-white shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <IconComp className="h-3.5 w-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* TAB: GENERAL & VIEW PREFERENCES */}
-        {activeSubTab === 'general' && (
-          <div className="space-y-5 text-xs max-h-[65vh] overflow-y-auto pr-1">
-            {/* Display Density */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center">
+                <Settings className="h-4 w-4 text-white" />
+              </div>
               <div>
-                <h4 className="font-bold text-slate-100 flex items-center gap-2">
-                  <SlidersHorizontal className="w-4 h-4 text-indigo-400" /> Display Density
+                <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
+                  <span>STX Webmail</span>
+                  <span className="text-neutral-500 font-normal">/</span>
+                  <span className="text-neutral-300 font-medium">Settings & Preferences</span>
+                </h3>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            {toastMessage && (
+              <div className={`px-3 py-1 rounded-full border text-[11px] font-semibold flex items-center gap-1.5 animate-in fade-in ${
+                toastMessage.type === 'success' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' :
+                toastMessage.type === 'error' ? 'bg-rose-500/15 border-rose-500/30 text-rose-300' :
+                'bg-white/15 border-white/30 text-white'
+              }`}>
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{toastMessage.message}</span>
+              </div>
+            )}
+
+            {/* Maximize / Restore Window Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsMaximized((prev) => !prev)}
+              className="p-1.5 text-neutral-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1.5 text-xs"
+              title={isMaximized ? "Restore window size (Alt+M)" : "Maximize window (Alt+M)"}
+            >
+              {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </button>
+
+            <button
+              onClick={onClose}
+              className="p-1.5 text-neutral-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1.5 text-xs"
+              title="Close Settings (Esc)"
+            >
+              <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-white/5 border border-white/10 rounded text-neutral-400">Esc</kbd>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Modal Split View Body */}
+        <div className="flex-1 flex min-h-0 overflow-hidden">
+          {/* Collapsible Left Settings Sidebar */}
+          <aside
+            ref={settingsSidebarRef}
+            style={{
+              width: isSidebarCollapsed ? '4rem' : `${settingsSidebarWidth}px`,
+            }}
+            className={`shrink-0 bg-[#0a0a0a] border-r border-white/10 flex flex-col justify-between transition-[width] duration-200 ease-in-out`}
+          >
+            {/* Category Groups & Tab Navigation */}
+            <div className="flex-1 overflow-y-auto no-scrollbar p-2.5 space-y-4">
+              {SETTINGS_CATEGORIES.map((cat) => (
+                <div key={cat.category} className="space-y-1">
+                  {!isSidebarCollapsed && (
+                    <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-neutral-500 flex items-center justify-between">
+                      <span>{cat.category}</span>
+                    </div>
+                  )}
+                  {cat.tabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = activeSubTab === tab.id;
+
+                    if (isSidebarCollapsed) {
+                      return (
+                        <div key={tab.id} className="relative group flex justify-center py-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setActiveSubTab(tab.id)}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                              isActive
+                                ? 'bg-white text-black shadow-lg font-bold'
+                                : 'text-neutral-400 hover:text-white hover:bg-white/10'
+                            }`}
+                            title={tab.label}
+                          >
+                            <Icon className="w-4 h-4 shrink-0" />
+                          </button>
+                          {/* Floating Tooltip */}
+                          <div className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-[#171717] border border-white/20 text-white text-xs font-semibold rounded-lg shadow-2xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                            {tab.label}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveSubTab(tab.id)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all group ${
+                          isActive
+                            ? 'bg-white text-black shadow-md font-bold'
+                            : 'text-neutral-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 truncate">
+                          <Icon className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-110 ${isActive ? 'text-black' : 'text-neutral-400 group-hover:text-white'}`} />
+                          <span className="truncate">{tab.label}</span>
+                        </div>
+                        {isActive && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-black shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+
+            {/* Sidebar Footer: Active Mailbox Card & Collapse Button */}
+            <div className="p-2 border-t border-white/10 space-y-1.5 shrink-0 bg-[#0a0a0a]">
+              {!isSidebarCollapsed && mailboxInfo?.email && (
+                <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Mailbox</span>
+                  </div>
+                  <p className="text-[11px] font-mono text-neutral-200 truncate font-medium">
+                    {mailboxInfo.email}
+                  </p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className={`w-full flex items-center ${
+                  isSidebarCollapsed ? 'justify-center p-2' : 'justify-between px-3 py-2'
+                } text-xs text-neutral-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors`}
+                title={isSidebarCollapsed ? "Expand Sidebar (Ctrl+[)" : "Collapse Sidebar (Ctrl+[)"}
+              >
+                <span className="flex items-center gap-2">
+                  {isSidebarCollapsed ? (
+                    <ChevronRight className="w-4 h-4 text-white" />
+                  ) : (
+                    <>
+                      <ChevronLeft className="w-4 h-4 text-neutral-400" />
+                      <span className="text-[11px] font-medium">Collapse</span>
+                    </>
+                  )}
+                </span>
+                {!isSidebarCollapsed && (
+                  <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-white/5 border border-white/10 rounded text-neutral-500">Ctrl+[</kbd>
+                )}
+              </button>
+            </div>
+          </aside>
+
+          {/* Draggable Resizer Handle between Settings Sidebar and Content Area */}
+          {!isSidebarCollapsed && (
+            <div
+              onMouseDown={startSidebarResize}
+              onDoubleClick={resetSidebarWidth}
+              className={`hidden sm:flex items-center justify-center w-2 -ml-1 -mr-1 z-20 cursor-col-resize group select-none relative transition-colors ${
+                isDraggingSidebar ? 'bg-white/20' : 'hover:bg-white/10'
+              }`}
+              title="Drag to resize sidebar width (Double-click to reset)"
+            >
+              <div
+                className={`w-0.5 rounded-full transition-all ${
+                  isDraggingSidebar
+                    ? 'bg-white h-12 shadow-[0_0_8px_rgba(255,255,255,0.8)]'
+                    : 'bg-white/20 group-hover:bg-white/70 h-6 group-hover:h-10'
+                }`}
+              />
+            </div>
+          )}
+
+          {/* Right Main Content Area */}
+          <main className="flex-1 bg-[black] flex flex-col min-w-0 overflow-hidden">
+            {/* Content Top Pane Header */}
+            <div className="px-6 py-3.5 border-b border-white/10 bg-[#0a0a0a]/80 backdrop-blur-sm shrink-0 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                  <ActiveTabIcon className="w-4 h-4 text-white" />
+                  <span>{currentTabInfo.label}</span>
                 </h4>
-                <p className="text-[11px] text-slate-400">Choose how compact or spacious message list rows appear in your inbox</p>
+                <p className="text-[11px] sm:text-xs text-neutral-400 mt-0.5">{currentTabInfo.desc}</p>
+              </div>
+            </div>
+
+            {/* Content Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-7 space-y-6 custom-scrollbar">
+              {/* TAB: GENERAL & VIEW PREFERENCES */}
+              {activeSubTab === 'general' && (
+                <div className="space-y-6 text-xs">
+            {/* Display Density */}
+            <div className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-3">
+              <div>
+                <h4 className="font-bold text-white flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-white" /> Display Density
+                </h4>
+                <p className="text-[11px] text-neutral-400">Choose how compact or spacious message list rows appear in your inbox</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {[
@@ -503,24 +808,24 @@ export function WebmailSettingsModal({
                     onClick={() => onDensityChange?.(d.id as any)}
                     className={`p-3 rounded-xl border text-left transition-all ${
                       density === d.id
-                        ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-md'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                        ? 'bg-white/15 border-white text-white shadow-md'
+                        : 'bg-[#0a0a0a] border-white/10 text-neutral-400 hover:text-white hover:border-white/20'
                     }`}
                   >
                     <span className="font-bold text-xs block">{d.label}</span>
-                    <span className="text-[10px] text-slate-500 block mt-0.5">{d.desc}</span>
+                    <span className="text-[10px] text-neutral-500 block mt-0.5">{d.desc}</span>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Reading Pane Layout */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+            <div className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-3">
               <div>
-                <h4 className="font-bold text-slate-100 flex items-center gap-2">
-                  <Columns className="w-4 h-4 text-indigo-400" /> Reading Pane Placement
+                <h4 className="font-bold text-white flex items-center gap-2">
+                  <Columns className="w-4 h-4 text-white" /> Reading Pane Placement
                 </h4>
-                <p className="text-[11px] text-slate-400">Configure how message contents are displayed alongside the mailbox list</p>
+                <p className="text-[11px] text-neutral-400">Configure how message contents are displayed alongside the mailbox list</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {[
@@ -536,15 +841,15 @@ export function WebmailSettingsModal({
                       onClick={() => onReadingPaneChange?.(rp.id as any)}
                       className={`p-3 rounded-xl border text-left transition-all ${
                         readingPane === rp.id
-                          ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-md'
-                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                          ? 'bg-white/15 border-white text-white shadow-md'
+                          : 'bg-[#0a0a0a] border-white/10 text-neutral-400 hover:text-white hover:border-white/20'
                       }`}
                     >
                       <div className="flex items-center gap-1.5 mb-1">
-                        <Icon className="w-3.5 h-3.5 text-indigo-400" />
+                        <Icon className="w-3.5 h-3.5 text-white" />
                         <span className="font-bold text-xs">{rp.label}</span>
                       </div>
-                      <span className="text-[10px] text-slate-500 block">{rp.desc}</span>
+                      <span className="text-[10px] text-neutral-500 block">{rp.desc}</span>
                     </button>
                   );
                 })}
@@ -552,23 +857,23 @@ export function WebmailSettingsModal({
             </div>
 
             {/* Desktop Notifications */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+            <div className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-bold text-slate-100 flex items-center gap-2">
-                    <Bell className="w-4 h-4 text-indigo-400" /> Desktop & Push Alerts
+                  <h4 className="font-bold text-white flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-white" /> Desktop & Push Alerts
                   </h4>
-                  <p className="text-[11px] text-slate-400">Receive instant operating system notifications when new messages arrive</p>
+                  <p className="text-[11px] text-neutral-400">Receive instant operating system notifications when new messages arrive</p>
                 </div>
                 {notificationStatus === 'granted' ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/10 text-white border border-white/20">
                     <CheckCircle2 className="w-3 h-3" /> Notifications Active
                   </span>
                 ) : (
                   <button
                     type="button"
                     onClick={requestNotificationPermission}
-                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors shadow-sm"
+                    className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-neutral-200 text-black font-semibold text-xs transition-colors shadow-sm"
                   >
                     Enable Notifications
                   </button>
@@ -577,12 +882,12 @@ export function WebmailSettingsModal({
             </div>
 
             {/* Keyboard Shortcuts Reference */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
-              <h4 className="font-bold text-slate-100 flex items-center gap-2">
-                <Monitor className="w-4 h-4 text-indigo-400" /> Keyboard Shortcuts Support
+            <div className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-2">
+              <h4 className="font-bold text-white flex items-center gap-2">
+                <Monitor className="w-4 h-4 text-white" /> Keyboard Shortcuts Support
               </h4>
-              <p className="text-[11px] text-slate-400">
-                Press <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px] text-indigo-300">?</kbd> at any time in the mailbox to view all navigation shortcuts, <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px] text-indigo-300">c</kbd> to compose, <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px] text-indigo-300">/</kbd> to search, <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px] text-indigo-300">r</kbd> to reply, <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px] text-indigo-300">e</kbd> to archive, <kbd className="px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded font-mono text-[10px] text-indigo-300">#</kbd> to delete.
+              <p className="text-[11px] text-neutral-400">
+                Press <kbd className="px-1.5 py-0.5 bg-black border border-white/20 rounded font-mono text-[10px] text-white">?</kbd> at any time in the mailbox to view all navigation shortcuts, <kbd className="px-1.5 py-0.5 bg-black border border-white/20 rounded font-mono text-[10px] text-white">c</kbd> to compose, <kbd className="px-1.5 py-0.5 bg-black border border-white/20 rounded font-mono text-[10px] text-white">/</kbd> to search, <kbd className="px-1.5 py-0.5 bg-black border border-white/20 rounded font-mono text-[10px] text-white">r</kbd> to reply, <kbd className="px-1.5 py-0.5 bg-black border border-white/20 rounded font-mono text-[10px] text-white">e</kbd> to archive, <kbd className="px-1.5 py-0.5 bg-black border border-white/20 rounded font-mono text-[10px] text-white">#</kbd> to delete.
               </p>
             </div>
           </div>
@@ -590,12 +895,12 @@ export function WebmailSettingsModal({
 
         {/* TAB 0: PROFILE & AVATAR */}
         {activeSubTab === 'profile' && (
-          <form onSubmit={handleSaveProfile} className="space-y-5 text-xs max-h-[65vh] overflow-y-auto pr-1">
+          <form onSubmit={handleSaveProfile} className="space-y-6 text-xs">
             {/* Mailbox Selector */}
             {allMailboxes.length > 1 && (
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
-                <label className="text-slate-300 font-bold block flex items-center gap-1.5">
-                  <UserCircle className="w-3.5 h-3.5 text-indigo-400" />
+              <div className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-2">
+                <label className="text-neutral-300 font-bold block flex items-center gap-1.5">
+                  <UserCircle className="w-3.5 h-3.5 text-white" />
                   <span>Configuring Mailbox Profile</span>
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -606,17 +911,17 @@ export function WebmailSettingsModal({
                       onClick={() => handleSelectProfileMailbox(mb.id)}
                       className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
                         profileMailboxId === mb.id
-                          ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-md'
-                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                          ? 'bg-white/15 border-white text-white shadow-md'
+                          : 'bg-[#0a0a0a] border-white/10 text-neutral-400 hover:text-white hover:border-white/20'
                       }`}
                     >
                       <div className="min-w-0 pr-2">
                         <span className="font-mono font-bold text-xs block truncate">{mb.email}</span>
-                        <span className="text-[10px] text-slate-400 block truncate">
+                        <span className="text-[10px] text-neutral-400 block truncate">
                           {mb.profile?.displayName || mb.username}
                         </span>
                       </div>
-                      {profileMailboxId === mb.id && <Check className="w-4 h-4 text-indigo-400 shrink-0" />}
+                      {profileMailboxId === mb.id && <Check className="w-4 h-4 text-white shrink-0" />}
                     </button>
                   ))}
                 </div>
@@ -624,24 +929,24 @@ export function WebmailSettingsModal({
             )}
 
             {/* Profile Avatar Card */}
-            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+            <div className="bg-[#171717] p-5 rounded-xl border border-white/10 space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-indigo-400 flex items-center gap-2">
+                <h4 className="font-bold text-white flex items-center gap-2">
                   <User className="h-4 w-4" /> Mailbox Profile Picture & Branding
                 </h4>
-                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                <span className="text-[10px] text-white bg-white/10 border border-white/20 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3" />
                   <span>Magic Byte Verification</span>
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">
-                Configure your custom avatar picture and contact information for <span className="font-mono text-indigo-300 font-bold">{mailboxInfo?.email || 'this mailbox'}</span>. Outbound emails will use this display name and branding.
+              <p className="text-[11px] text-neutral-400">
+                Configure your custom avatar picture and contact information for <span className="font-mono text-white font-bold">{mailboxInfo?.email || 'this mailbox'}</span>. Outbound emails will use this display name and branding.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 pt-1">
                 {/* Avatar Display */}
                 <div className="relative group shrink-0">
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white text-2xl font-black shadow-xl border-2 border-indigo-500/40 overflow-hidden">
+                  <div className="w-20 h-20 rounded-2xl bg-white text-black flex items-center justify-center text-2xl font-black shadow-xl border-2 border-white/20 overflow-hidden">
                     {avatarUrl ? (
                       <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
@@ -649,8 +954,8 @@ export function WebmailSettingsModal({
                     )}
                   </div>
                   {isUploadingAvatar && (
-                    <div className="absolute inset-0 bg-slate-950/80 rounded-2xl flex items-center justify-center">
-                      <RefreshCw className="w-6 h-6 text-indigo-400 animate-spin" />
+                    <div className="absolute inset-0 bg-black/80 rounded-2xl flex items-center justify-center">
+                      <RefreshCw className="w-6 h-6 text-white animate-spin" />
                     </div>
                   )}
                 </div>
@@ -658,7 +963,7 @@ export function WebmailSettingsModal({
                 {/* Upload & Security Controls */}
                 <div className="flex-1 space-y-3 w-full">
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <label className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md flex items-center gap-2">
+                    <label className="px-4 py-2 bg-white hover:bg-neutral-200 text-black rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md flex items-center gap-2">
                       {isUploadingAvatar ? (
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       ) : (
@@ -686,12 +991,12 @@ export function WebmailSettingsModal({
                     )}
                   </div>
 
-                  <div className="bg-slate-900/80 border border-slate-800/80 rounded-xl p-2.5 text-[11px] text-slate-400 space-y-1">
-                    <div className="flex items-center gap-1.5 text-slate-300 font-semibold">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-2.5 text-[11px] text-neutral-400 space-y-1">
+                    <div className="flex items-center gap-1.5 text-neutral-300 font-semibold">
+                      <ShieldCheck className="w-3.5 h-3.5 text-white" />
                       <span>Security & Integrity Guard</span>
                     </div>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-[10px] text-neutral-500">
                       Files are cryptographically sanitized and validated via binary magic bytes (JPEG, PNG, WebP, GIF only). Executables, shell scripts, SVGs, and files exceeding 5MB are strictly rejected.
                     </p>
                   </div>
@@ -700,30 +1005,30 @@ export function WebmailSettingsModal({
             </div>
 
             {/* Profile Fields Grid */}
-            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
-              <h4 className="font-bold text-slate-200 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-purple-400" /> Profile Information & RFC 5322 From Header
+            <div className="bg-[#171717] p-5 rounded-xl border border-white/10 space-y-4">
+              <h4 className="font-bold text-white flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-white" /> Profile Information & RFC 5322 From Header
               </h4>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Display Name */}
                 <div className="sm:col-span-2">
-                  <label className="text-slate-300 font-bold block mb-1">
-                    Display Name <span className="text-indigo-400 font-normal">(Sender name seen by email recipients)</span>
+                  <label className="text-neutral-300 font-bold block mb-1">
+                    Display Name <span className="text-neutral-400 font-normal">(Sender name seen by email recipients)</span>
                   </label>
                   <input
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="e.g. Sarah Connor"
-                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
+                    className="w-full bg-[#0a0a0a] border border-white/10 focus:border-white rounded-xl p-2.5 text-xs text-white placeholder-neutral-500 outline-none transition-all"
                   />
                 </div>
 
                 {/* Job Title */}
                 <div>
-                  <label className="text-slate-300 font-bold block mb-1 flex items-center gap-1">
-                    <Briefcase className="w-3.5 h-3.5 text-slate-400" />
+                  <label className="text-neutral-300 font-bold block mb-1 flex items-center gap-1">
+                    <Briefcase className="w-3.5 h-3.5 text-neutral-400" />
                     <span>Job Title / Designation</span>
                   </label>
                   <input
@@ -731,29 +1036,29 @@ export function WebmailSettingsModal({
                     value={jobTitle}
                     onChange={(e) => setJobTitle(e.target.value)}
                     placeholder="e.g. Principal Cloud Architect"
-                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
+                    className="w-full bg-[#0a0a0a] border border-white/10 focus:border-white rounded-xl p-2.5 text-xs text-white placeholder-neutral-500 outline-none transition-all"
                   />
                 </div>
 
                 {/* Company */}
                 <div>
-                  <label className="text-slate-300 font-bold block mb-1 flex items-center gap-1">
-                    <Building className="w-3.5 h-3.5 text-slate-400" />
+                  <label className="text-neutral-300 font-bold block mb-1 flex items-center gap-1">
+                    <Building className="w-3.5 h-3.5 text-neutral-400" />
                     <span>Company / Organization</span>
                   </label>
                   <input
                     type="text"
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
-                    placeholder="e.g. ShanuTechX Global Corp"
-                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
+                    placeholder="e.g. STX Global Corp"
+                    className="w-full bg-[#0a0a0a] border border-white/10 focus:border-white rounded-xl p-2.5 text-xs text-white placeholder-neutral-500 outline-none transition-all"
                   />
                 </div>
 
                 {/* Phone */}
                 <div>
-                  <label className="text-slate-300 font-bold block mb-1 flex items-center gap-1">
-                    <Phone className="w-3.5 h-3.5 text-slate-400" />
+                  <label className="text-neutral-300 font-bold block mb-1 flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5 text-neutral-400" />
                     <span>Direct Phone Number</span>
                   </label>
                   <input
@@ -761,14 +1066,14 @@ export function WebmailSettingsModal({
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="e.g. +1 555-0199"
-                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
+                    className="w-full bg-[#0a0a0a] border border-white/10 focus:border-white rounded-xl p-2.5 text-xs text-white placeholder-neutral-500 outline-none transition-all"
                   />
                 </div>
 
                 {/* Website */}
                 <div>
-                  <label className="text-slate-300 font-bold block mb-1 flex items-center gap-1">
-                    <Globe className="w-3.5 h-3.5 text-slate-400" />
+                  <label className="text-neutral-300 font-bold block mb-1 flex items-center gap-1">
+                    <Globe className="w-3.5 h-3.5 text-neutral-400" />
                     <span>Website URL</span>
                   </label>
                   <input
@@ -776,14 +1081,14 @@ export function WebmailSettingsModal({
                     value={website}
                     onChange={(e) => setWebsite(e.target.value)}
                     placeholder="e.g. https://shanutechx.com"
-                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
+                    className="w-full bg-[#0a0a0a] border border-white/10 focus:border-white rounded-xl p-2.5 text-xs text-white placeholder-neutral-500 outline-none transition-all"
                   />
                 </div>
 
                 {/* Bio / Signature Note */}
                 <div className="sm:col-span-2">
-                  <label className="text-slate-300 font-bold block mb-1 flex items-center gap-1">
-                    <FileText className="w-3.5 h-3.5 text-slate-400" />
+                  <label className="text-neutral-300 font-bold block mb-1 flex items-center gap-1">
+                    <FileText className="w-3.5 h-3.5 text-neutral-400" />
                     <span>Bio / Professional Tagline</span>
                   </label>
                   <textarea
@@ -791,21 +1096,21 @@ export function WebmailSettingsModal({
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                     placeholder="e.g. Leading enterprise cloud modernization & resilient container orchestration."
-                    className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
+                    className="w-full bg-[#0a0a0a] border border-white/10 focus:border-white rounded-xl p-2.5 text-xs text-white placeholder-neutral-500 outline-none transition-all"
                   />
                 </div>
               </div>
             </div>
 
             {/* Live Recipient Email Header Preview */}
-            <div className="bg-gradient-to-r from-slate-950 to-indigo-950/40 p-4 rounded-2xl border border-indigo-500/30 space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400 block flex items-center gap-1.5">
+            <div className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block flex items-center gap-1.5">
                 <Eye className="w-3 h-3" />
                 <span>Live Recipient Email Header Preview</span>
               </span>
 
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden shrink-0 border border-indigo-500/30 shadow">
+              <div className="bg-black border border-white/10 rounded-xl p-3 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center text-xs font-bold overflow-hidden shrink-0 border border-white/20 shadow">
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
@@ -818,12 +1123,12 @@ export function WebmailSettingsModal({
                     <span className="font-bold text-xs text-white truncate">
                       {displayName || mailboxInfo?.username || 'Sender Display Name'}
                     </span>
-                    <span className="font-mono text-[11px] text-slate-400 truncate">
+                    <span className="font-mono text-[11px] text-neutral-400 truncate">
                       &lt;{mailboxInfo?.email || 'user@shanutechx.com'}&gt;
                     </span>
                   </div>
                   {(jobTitle || company) && (
-                    <span className="text-[10px] text-indigo-300 block truncate mt-0.5">
+                    <span className="text-[10px] text-neutral-400 block truncate mt-0.5">
                       {jobTitle} {company ? `• ${company}` : ''}
                     </span>
                   )}
@@ -836,7 +1141,7 @@ export function WebmailSettingsModal({
               <button
                 type="submit"
                 disabled={isSavingProfile}
-                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/20 flex items-center gap-2 disabled:opacity-50 transition-all text-xs"
+                className="px-6 py-2.5 bg-white hover:bg-neutral-200 text-black font-bold rounded-xl shadow-lg flex items-center gap-2 disabled:opacity-50 transition-all text-xs"
               >
                 {isSavingProfile ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 <span>Save Mailbox Profile Preferences</span>
@@ -847,64 +1152,64 @@ export function WebmailSettingsModal({
 
         {/* TAB 1: WEBSITE CONNECT & API */}
         {activeSubTab === 'connect' && (
-          <div className="space-y-4 text-xs max-h-[60vh] overflow-y-auto pr-1">
+          <div className="space-y-6 text-xs">
             {/* Mailbox SMTP & REST API Credentials Overview */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+            <div className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-indigo-400 flex items-center gap-2">
-                  <Server className="h-4 w-4" /> Mailbox SMTP & API Credentials
+                <h4 className="font-bold text-white flex items-center gap-2">
+                  <Server className="h-4 w-4 text-white" /> Mailbox SMTP & API Credentials
                 </h4>
-                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold">
+                <span className="text-[10px] text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded-full font-semibold">
                   Autonomous Cluster Ready
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-neutral-400">
                 Connect external websites, WordPress, WooCommerce, webhooks, or automated backend services using these dedicated mailbox credentials.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
-                  <span className="text-[10px] text-slate-500 uppercase font-semibold">SMTP Server Host</span>
+                <div className="p-3 bg-[#0a0a0a] border border-white/10 rounded-xl space-y-1">
+                  <span className="text-[10px] text-neutral-500 uppercase font-semibold">SMTP Server Host</span>
                   <div className="flex items-center justify-between font-mono text-white text-xs">
                     <span>{websiteConnectData?.credentials?.smtpHost || 'mail.shanutechx.com'}</span>
                     <button
                       type="button"
                       onClick={() => copyConnectText(websiteConnectData?.credentials?.smtpHost || 'mail.shanutechx.com', 'smtpHost')}
-                      className="text-slate-400 hover:text-indigo-400"
+                      className="text-neutral-400 hover:text-white"
                     >
-                      {copiedConnectField === 'smtpHost' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedConnectField === 'smtpHost' ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 </div>
 
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
-                  <span className="text-[10px] text-slate-500 uppercase font-semibold">Port & Encryption</span>
+                <div className="p-3 bg-[#0a0a0a] border border-white/10 rounded-xl space-y-1">
+                  <span className="text-[10px] text-neutral-500 uppercase font-semibold">Port & Encryption</span>
                   <div className="font-mono text-white text-xs">
                     465 (SSL/TLS) • 587 (STARTTLS)
                   </div>
                 </div>
 
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
-                  <span className="text-[10px] text-slate-500 uppercase font-semibold">SMTP Username</span>
+                <div className="p-3 bg-[#0a0a0a] border border-white/10 rounded-xl space-y-1">
+                  <span className="text-[10px] text-neutral-500 uppercase font-semibold">SMTP Username</span>
                   <div className="flex items-center justify-between font-mono text-white text-xs">
                     <span className="truncate">{mailboxInfo?.email || 'user@shanutechx.com'}</span>
                     <button
                       type="button"
                       onClick={() => copyConnectText(mailboxInfo?.email || 'user@shanutechx.com', 'username')}
-                      className="text-slate-400 hover:text-indigo-400 ml-1"
+                      className="text-neutral-400 hover:text-white ml-1"
                     >
-                      {copiedConnectField === 'username' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedConnectField === 'username' ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 </div>
 
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
+                <div className="p-3 bg-[#0a0a0a] border border-white/10 rounded-xl space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500 uppercase font-semibold">SMTP Password</span>
+                    <span className="text-[10px] text-neutral-500 uppercase font-semibold">SMTP Password</span>
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="text-slate-400 hover:text-slate-200 text-[10px] flex items-center gap-1"
+                      className="text-neutral-400 hover:text-white text-[10px] flex items-center gap-1"
                     >
                       {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                       <span>{showPassword ? 'Hide' : 'Reveal'}</span>
@@ -919,9 +1224,9 @@ export function WebmailSettingsModal({
                     <button
                       type="button"
                       onClick={() => copyConnectText(websiteConnectData?.credentials?.password || mailboxInfo?.smtpPassword || '', 'password')}
-                      className="text-slate-400 hover:text-indigo-400"
+                      className="text-neutral-400 hover:text-white"
                     >
-                      {copiedConnectField === 'password' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedConnectField === 'password' ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 </div>
@@ -929,12 +1234,12 @@ export function WebmailSettingsModal({
             </div>
 
             {/* Quick Integration Guides & Code Snippets */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+            <div className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <h4 className="font-bold text-indigo-400 flex items-center gap-2">
-                  <Code className="h-4 w-4" /> Ready-to-Use Website & API Code
+                <h4 className="font-bold text-white flex items-center gap-2">
+                  <Code className="h-4 w-4 text-white" /> Ready-to-Use Website & API Code
                 </h4>
-                <div className="flex flex-wrap gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-[10px]">
+                <div className="flex flex-wrap gap-1 bg-black p-1 rounded-xl border border-white/10 text-[10px]">
                   {[
                     { id: 'wordpress', label: 'WordPress' },
                     { id: 'resend_api', label: 'Resend API' },
@@ -950,8 +1255,8 @@ export function WebmailSettingsModal({
                       onClick={() => setConnectLang(item.id as any)}
                       className={`px-2 py-1 rounded-lg font-mono transition-all ${
                         connectLang === item.id
-                          ? 'bg-indigo-600 text-white font-bold shadow'
-                          : 'text-slate-400 hover:text-slate-200'
+                          ? 'bg-white text-black font-bold shadow'
+                          : 'text-neutral-400 hover:text-white'
                       }`}
                     >
                       {item.label}
@@ -961,7 +1266,7 @@ export function WebmailSettingsModal({
               </div>
 
               {/* Code Snippet Box */}
-              <div className="relative bg-slate-900 border border-slate-800 rounded-xl p-3 font-mono text-[11px] text-indigo-300 overflow-x-auto max-h-56">
+              <div className="relative bg-black border border-white/10 rounded-xl p-3 font-mono text-[11px] text-neutral-300 overflow-x-auto max-h-56">
                 <button
                   type="button"
                   onClick={() => {
@@ -976,9 +1281,9 @@ export function WebmailSettingsModal({
                     const textToCopy = typeof snippet === 'object' ? (snippet.curl || JSON.stringify(snippet, null, 2)) : (snippet || '');
                     copyConnectText(textToCopy, 'activeSnippet');
                   }}
-                  className="absolute top-2.5 right-2.5 p-1.5 bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 rounded-lg text-slate-300 hover:text-white transition-colors flex items-center gap-1 text-[10px]"
+                  className="absolute top-2.5 right-2.5 p-1.5 bg-neutral-900 hover:bg-neutral-800 border border-white/10 rounded-lg text-neutral-300 hover:text-white transition-colors flex items-center gap-1 text-[10px]"
                 >
-                  {copiedConnectField === 'activeSnippet' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedConnectField === 'activeSnippet' ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copiedConnectField === 'activeSnippet' ? 'Copied' : 'Copy'}</span>
                 </button>
                 <pre className="whitespace-pre">
@@ -1023,36 +1328,36 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
             </div>
 
             {/* Live Test Send */}
-            <form onSubmit={handleTestSend} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+            <form onSubmit={handleTestSend} className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-emerald-400 flex items-center gap-2">
-                  <Send className="h-4 w-4" /> Live Website Email Dispatch Test
+                <h4 className="font-bold text-white flex items-center gap-2">
+                  <Send className="h-4 w-4 text-white" /> Live Website Email Dispatch Test
                 </h4>
-                <span className="text-[10px] text-slate-500">Test actual outbound delivery</span>
+                <span className="text-[10px] text-neutral-400">Test actual outbound delivery</span>
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-neutral-400">
                 Send a real test email through your mailbox cluster to confirm your website and SMTP credentials are authenticated.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block text-[10px] mb-1">Recipient Email</label>
+                  <label className="text-neutral-400 block text-[10px] mb-1">Recipient Email</label>
                   <input
                     type="email"
                     placeholder="recipient@example.com"
                     value={testTo}
                     onChange={(e) => setTestTo(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
+                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-2.5 text-xs text-white"
                     required
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block text-[10px] mb-1">Subject</label>
+                  <label className="text-neutral-400 block text-[10px] mb-1">Subject</label>
                   <input
                     type="text"
                     value={testSubject}
                     onChange={(e) => setTestSubject(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
+                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-2.5 text-xs text-white"
                     required
                   />
                 </div>
@@ -1060,7 +1365,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
 
               {testSendResult && (
                 <div className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
-                  testSendResult.success ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+                  testSendResult.success ? 'bg-white/10 border-white/20 text-white' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
                 }`}>
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
                   <span>{testSendResult.message}</span>
@@ -1070,7 +1375,7 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
               <button
                 type="submit"
                 disabled={isTestingSend}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow flex items-center gap-2 disabled:opacity-50 transition-all text-xs"
+                className="px-4 py-2 bg-white hover:bg-neutral-200 text-black font-bold rounded-xl shadow flex items-center gap-2 disabled:opacity-50 transition-all text-xs"
               >
                 {isTestingSend ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 <span>{isTestingSend ? 'Sending Test Email...' : 'Send Live Test Email'}</span>
@@ -1083,15 +1388,15 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
         {activeSubTab === 'dns' && (
           <div className="space-y-4 text-xs">
             {/* Domain DNS Verification */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+            <div className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-indigo-400 flex items-center gap-2">
-                  <Globe className="h-4 w-4" /> Domain DNS Record Verification
+                <h4 className="font-bold text-white flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-white" /> Domain DNS Record Verification
                 </h4>
                 <button
                   onClick={handleVerifyDns}
                   disabled={isVerifyingDns}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-xl flex items-center gap-1.5 transition-all disabled:opacity-50"
+                  className="px-3 py-1.5 bg-white hover:bg-neutral-200 text-black text-[11px] font-bold rounded-xl flex items-center gap-1.5 transition-all disabled:opacity-50"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${isVerifyingDns ? 'animate-spin' : ''}`} />
                   Verify DNS Now
@@ -1103,43 +1408,43 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
                 value={customDomainInput}
                 onChange={(e) => setCustomDomainInput(e.target.value)}
                 placeholder="Enter domain (e.g. mycompany.com)"
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-2.5 text-xs text-white font-mono"
               />
 
               {dnsResults && (
-                <div className="space-y-2 pt-2 border-t border-slate-800">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Required DNS Records for {dnsResults.domain}</span>
+                <div className="space-y-2 pt-2 border-t border-white/10">
+                  <span className="text-[10px] uppercase font-bold text-neutral-400">Required DNS Records for {dnsResults.domain}</span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div className={`p-2.5 rounded-xl border flex items-center justify-between ${dnsResults.verification?.mx ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
+                    <div className={`p-2.5 rounded-xl border flex items-center justify-between ${dnsResults.verification?.mx ? 'bg-white/10 border-white/20 text-white' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
                       <div>
                         <span className="font-bold text-xs block">MX Record</span>
                         <span className="text-[10px] font-mono opacity-80">10 mail.shanutechx.com</span>
                       </div>
-                      {dnsResults.verification?.mx ? <CheckCircle2 className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                      {dnsResults.verification?.mx ? <CheckCircle2 className="h-4 w-4 text-white" /> : <X className="h-4 w-4" />}
                     </div>
 
-                    <div className={`p-2.5 rounded-xl border flex items-center justify-between ${dnsResults.verification?.spf ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
+                    <div className={`p-2.5 rounded-xl border flex items-center justify-between ${dnsResults.verification?.spf ? 'bg-white/10 border-white/20 text-white' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
                       <div>
                         <span className="font-bold text-xs block">SPF Record</span>
                         <span className="text-[10px] font-mono opacity-80">v=spf1 include:shanutechx.com ~all</span>
                       </div>
-                      {dnsResults.verification?.spf ? <CheckCircle2 className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                      {dnsResults.verification?.spf ? <CheckCircle2 className="h-4 w-4 text-white" /> : <X className="h-4 w-4" />}
                     </div>
 
-                    <div className={`p-2.5 rounded-xl border flex items-center justify-between ${dnsResults.verification?.dkim ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
+                    <div className={`p-2.5 rounded-xl border flex items-center justify-between ${dnsResults.verification?.dkim ? 'bg-white/10 border-white/20 text-white' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
                       <div>
                         <span className="font-bold text-xs block">DKIM Record</span>
                         <span className="text-[10px] font-mono opacity-80">wildduck._domainkey</span>
                       </div>
-                      {dnsResults.verification?.dkim ? <CheckCircle2 className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                      {dnsResults.verification?.dkim ? <CheckCircle2 className="h-4 w-4 text-white" /> : <X className="h-4 w-4" />}
                     </div>
 
-                    <div className={`p-2.5 rounded-xl border flex items-center justify-between ${dnsResults.verification?.dmarc ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
+                    <div className={`p-2.5 rounded-xl border flex items-center justify-between ${dnsResults.verification?.dmarc ? 'bg-white/10 border-white/20 text-white' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
                       <div>
                         <span className="font-bold text-xs block">DMARC Record</span>
                         <span className="text-[10px] font-mono opacity-80">v=DMARC1; p=quarantine</span>
                       </div>
-                      {dnsResults.verification?.dmarc ? <CheckCircle2 className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                      {dnsResults.verification?.dmarc ? <CheckCircle2 className="h-4 w-4 text-white" /> : <X className="h-4 w-4" />}
                     </div>
                   </div>
                 </div>
@@ -1147,13 +1452,13 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
             </div>
 
             {/* Aliases Config */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
-              <h4 className="font-bold text-indigo-400 flex items-center gap-2">
-                <Layers className="h-4 w-4" /> Mailbox Custom Aliases
+            <div className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-3">
+              <h4 className="font-bold text-white flex items-center gap-2">
+                <Layers className="h-4 w-4 text-white" /> Mailbox Custom Aliases
               </h4>
 
               <form onSubmit={handleAddAlias} className="flex gap-2">
-                <div className="flex-1 flex items-center bg-slate-900 border border-slate-800 rounded-xl px-3 py-1 text-xs">
+                <div className="flex-1 flex items-center bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-1 text-xs">
                   <input
                     type="text"
                     placeholder="alias-name"
@@ -1162,25 +1467,25 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
                     className="flex-1 bg-transparent text-white outline-none py-1.5"
                     required
                   />
-                  <span className="text-slate-500 font-mono text-[11px]">@{customDomainInput}</span>
+                  <span className="text-neutral-500 font-mono text-[11px]">@{customDomainInput}</span>
                 </div>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow">
+                <button type="submit" className="px-4 py-2 bg-white hover:bg-neutral-200 text-black font-bold rounded-xl shadow">
                   Add Alias
                 </button>
               </form>
 
               <div className="space-y-1.5 pt-2">
                 {aliases.map((al) => (
-                  <div key={al} className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between font-mono text-[11px]">
-                    <span className="text-indigo-300">{al}</span>
+                  <div key={al} className="p-2.5 bg-[#0a0a0a] border border-white/10 rounded-xl flex items-center justify-between font-mono text-[11px]">
+                    <span className="text-neutral-200">{al}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded-full">
                         Active Alias
                       </span>
                       <button
                         type="button"
                         onClick={() => handleDeleteAlias(al)}
-                        className="p-1 hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 rounded transition-colors"
+                        className="p-1 hover:bg-rose-500/10 text-neutral-500 hover:text-rose-400 rounded transition-colors"
                         title={`Remove alias ${al}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1196,25 +1501,25 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
         {/* TAB 2: SIGNATURES */}
         {activeSubTab === 'signatures' && (
           <div className="space-y-4 text-xs">
-            <form onSubmit={handleSaveSignature} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
-              <h4 className="font-bold text-indigo-400">Add New HTML Signature</h4>
+            <form onSubmit={handleSaveSignature} className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-3">
+              <h4 className="font-bold text-white">Add New HTML Signature</h4>
               <input
                 type="text"
                 placeholder="Signature Label (e.g. Official Corporate)"
                 value={sigName}
                 onChange={(e) => setSigName(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-2.5 text-xs text-white"
                 required
               />
               <textarea
                 rows={3}
-                placeholder="HTML Signature (e.g. Best regards,<br/><b>Mike Robertson</b><br/>ShanuTechX Cloud)"
+                placeholder="HTML Signature (e.g. Best regards,<br/><b>Mike Robertson</b><br/>STX Cloud)"
                 value={sigHtml}
                 onChange={(e) => setSigHtml(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white resize-none font-mono"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-2.5 text-xs text-white resize-none font-mono"
                 required
               />
-              <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow flex items-center gap-1.5">
+              <button type="submit" className="px-4 py-2 bg-white hover:bg-neutral-200 text-black font-bold rounded-xl shadow flex items-center gap-1.5">
                 <Plus className="h-3.5 w-3.5" />
                 <span>Save Signature</span>
               </button>
@@ -1222,12 +1527,12 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
 
             <div className="space-y-2 max-h-36 overflow-y-auto">
               {signatures.map((s) => (
-                <div key={s.id} className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex justify-between items-start">
+                <div key={s.id} className="p-3 bg-[#171717] border border-white/10 rounded-xl flex justify-between items-start">
                   <div>
-                    <span className="font-bold text-white">{s.name}</span> {s.isDefault && <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded ml-2">Default</span>}
-                    <div className="text-[11px] text-slate-400 mt-1 whitespace-pre-wrap">{s.htmlContent}</div>
+                    <span className="font-bold text-white">{s.name}</span> {s.isDefault && <span className="text-[10px] bg-white/20 text-white px-1.5 py-0.5 rounded ml-2">Default</span>}
+                    <div className="text-[11px] text-neutral-400 mt-1 whitespace-pre-wrap">{s.htmlContent}</div>
                   </div>
-                  <button onClick={() => api.webmail.signatures.delete(s.id).then(fetchAllSettings)} className="text-slate-500 hover:text-rose-400 p-1">
+                  <button onClick={() => api.webmail.signatures.delete(s.id).then(fetchAllSettings)} className="text-neutral-500 hover:text-rose-400 p-1">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -1239,14 +1544,14 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
         {/* TAB 3: TEMPLATES */}
         {activeSubTab === 'templates' && (
           <div className="space-y-4 text-xs">
-            <form onSubmit={handleSaveTemplate} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
-              <h4 className="font-bold text-indigo-400">Create Canned Response / Template</h4>
+            <form onSubmit={handleSaveTemplate} className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-3">
+              <h4 className="font-bold text-white">Create Canned Response / Template</h4>
               <input
                 type="text"
                 placeholder="Template Title (e.g. Sales Inquiry Response)"
                 value={tempName}
                 onChange={(e) => setTempName(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-2.5 text-xs text-white"
                 required
               />
               <input
@@ -1254,17 +1559,17 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
                 placeholder="Default Subject Line"
                 value={tempSubject}
                 onChange={(e) => setTempSubject(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-2.5 text-xs text-white"
               />
               <textarea
                 rows={3}
                 placeholder="Template body..."
                 value={tempBody}
                 onChange={(e) => setTempBody(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white resize-none"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-2.5 text-xs text-white resize-none"
                 required
               />
-              <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow flex items-center gap-1.5">
+              <button type="submit" className="px-4 py-2 bg-white hover:bg-neutral-200 text-black font-bold rounded-xl shadow flex items-center gap-1.5">
                 <Plus className="h-3.5 w-3.5" />
                 <span>Save Template</span>
               </button>
@@ -1272,12 +1577,12 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
 
             <div className="space-y-2 max-h-36 overflow-y-auto">
               {templates.map((t) => (
-                <div key={t.id} className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex justify-between items-start">
+                <div key={t.id} className="p-3 bg-[#171717] border border-white/10 rounded-xl flex justify-between items-start">
                   <div>
                     <span className="font-bold text-white">{t.name}</span>
-                    <p className="text-[11px] text-slate-400 truncate">{t.body}</p>
+                    <p className="text-[11px] text-neutral-400 truncate">{t.body}</p>
                   </div>
-                  <button onClick={() => api.webmail.templates.delete(t.id).then(fetchAllSettings)} className="text-slate-500 hover:text-rose-400 p-1">
+                  <button onClick={() => api.webmail.templates.delete(t.id).then(fetchAllSettings)} className="text-neutral-500 hover:text-rose-400 p-1">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -1289,38 +1594,38 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
         {/* TAB 4: VACATION AUTO-REPLY */}
         {activeSubTab === 'autoreply' && (
           <form onSubmit={handleSaveAutoReply} className="space-y-4 text-xs">
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+            <div className="bg-[#171717] p-4 rounded-xl border border-white/10 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-white">Enable Out of Office Auto-Reply</span>
                 <input
                   type="checkbox"
                   checked={autoEnabled}
                   onChange={(e) => setAutoEnabled(e.target.checked)}
-                  className="rounded border-slate-700 bg-slate-800 text-indigo-600 h-4 w-4 cursor-pointer"
+                  className="rounded border-white/20 bg-black text-white h-4 w-4 cursor-pointer accent-white"
                 />
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">Subject Line:</label>
+                <label className="text-neutral-400 block mb-1">Subject Line:</label>
                 <input
                   type="text"
                   value={autoSubject}
                   onChange={(e) => setAutoSubject(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-2.5 text-xs text-white"
                 />
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">Auto-Reply Message Body:</label>
+                <label className="text-neutral-400 block mb-1">Auto-Reply Message Body:</label>
                 <textarea
                   rows={4}
                   value={autoBody}
                   onChange={(e) => setAutoBody(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white resize-none"
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-2.5 text-xs text-white resize-none"
                 />
               </div>
 
-              <button type="submit" className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow">
+              <button type="submit" className="px-5 py-2 bg-white hover:bg-neutral-200 text-black font-bold rounded-xl shadow">
                 Save Auto-Reply Settings
               </button>
             </div>
@@ -1330,16 +1635,16 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
         {/* TAB 5: BLOCKLIST */}
         {activeSubTab === 'blocklist' && (
           <div className="space-y-4 text-xs">
-            <form onSubmit={handleAddBlockedSender} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex gap-2">
+            <form onSubmit={handleAddBlockedSender} className="bg-[#171717] p-4 rounded-xl border border-white/10 flex gap-2">
               <input
                 type="text"
                 placeholder="Block email or domain (e.g. spammer@domain.com or @badspammer.com)"
                 value={blockInput}
                 onChange={(e) => setBlockInput(e.target.value)}
-                className="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white"
+                className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl p-2.5 text-xs text-white"
                 required
               />
-              <button type="submit" className="px-4 py-2 bg-rose-600 text-white font-bold rounded-xl shadow flex items-center gap-1.5">
+              <button type="submit" className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow flex items-center gap-1.5">
                 <Ban className="h-3.5 w-3.5" />
                 <span>Block Sender</span>
               </button>
@@ -1347,9 +1652,9 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
 
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {blockedSenders.map((b) => (
-                <div key={b.id} className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+                <div key={b.id} className="p-2.5 bg-[#171717] border border-white/10 rounded-xl flex items-center justify-between">
                   <span className="font-mono text-rose-300 font-bold">{b.emailOrDomain}</span>
-                  <button onClick={() => api.webmail.blockedSenders.delete(b.id).then(fetchAllSettings)} className="text-slate-500 hover:text-white text-xs p-1">
+                  <button onClick={() => api.webmail.blockedSenders.delete(b.id).then(fetchAllSettings)} className="text-neutral-400 hover:text-white text-xs p-1">
                     Unblock
                   </button>
                 </div>
@@ -1362,119 +1667,167 @@ curl -X POST https://${websiteConnectData?.credentials?.smtpHost || 'mail.shanut
         {activeSubTab === 'upgrade' && (
           <div className="space-y-5 text-xs">
             {/* Current usage summary */}
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
-              <h4 className="font-bold text-amber-400 flex items-center gap-1.5">
-                <HardDrive className="h-3.5 w-3.5" />
+            <div className="bg-[#171717] border border-white/10 rounded-xl p-4 space-y-3">
+              <h4 className="font-bold text-white flex items-center gap-1.5">
+                <HardDrive className="h-3.5 w-3.5 text-white" />
                 Current Mailbox Usage
               </h4>
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-                  <span className="text-slate-400 block text-[10px] mb-1">Storage Quota</span>
+                <div className="p-3 bg-[#0a0a0a] rounded-xl border border-white/10">
+                  <span className="text-neutral-400 block text-[10px] mb-1">Storage Quota</span>
                   <span className="font-extrabold text-white text-sm">
                     {mailboxInfo?.storageQuotaMb ? `${mailboxInfo.storageQuotaMb} MB` : '10,240 MB'}
                   </span>
                 </div>
-                <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-                  <span className="text-slate-400 block text-[10px] mb-1">Daily Send Limit</span>
+                <div className="p-3 bg-[#0a0a0a] rounded-xl border border-white/10">
+                  <span className="text-neutral-400 block text-[10px] mb-1">Daily Send Limit</span>
                   <span className="font-extrabold text-white text-sm">
                     {mailboxInfo?.dailySendLimit ?? 2000} emails/day
                   </span>
                 </div>
               </div>
-              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 flex items-center gap-2">
-                <MailCheck className="h-4 w-4 text-indigo-400" />
-                <span className="text-slate-300">
+              <div className="p-3 bg-[#0a0a0a] rounded-xl border border-white/10 flex items-center gap-2">
+                <MailCheck className="h-4 w-4 text-white" />
+                <span className="text-neutral-300">
                   <span className="font-bold text-white">{mailboxInfo?.email || 'user@shanutechx.com'}</span>
-                  {' '}&mdash; <span className="text-emerald-400 font-bold">Active Service</span>
+                  {' '}&mdash; <span className="text-white font-bold">Active Service</span>
                 </span>
               </div>
             </div>
 
             {/* Upgrade plan cards */}
             <div className="space-y-2">
-              <h4 className="font-bold text-slate-300 uppercase tracking-wider text-[10px]">Available Upgrade Plans</h4>
-              {[
-                {
-                  name: 'Starter',
-                  storage: '2 GB',
-                  sends: 500,
-                  price: 'Free',
-                  features: ['IMAP/SMTP Access', 'Basic Filters', '1 Alias'],
-                  color: 'border-slate-700',
-                  badge: 'text-slate-400 bg-slate-800',
-                  current: !mailboxInfo?.storageQuotaMb || mailboxInfo.storageQuotaMb <= 2048,
-                },
-                {
-                  name: 'Professional',
-                  storage: '10 GB',
-                  sends: 2000,
-                  price: '$4/mo',
-                  features: ['Everything in Starter', 'AI Drafts & Summarise', '5 Aliases', 'Priority Support'],
-                  color: 'border-indigo-500/40',
-                  badge: 'text-indigo-300 bg-indigo-500/20',
-                  current: mailboxInfo?.storageQuotaMb > 2048 && mailboxInfo?.storageQuotaMb <= 10240,
-                },
-                {
-                  name: 'Business',
-                  storage: '50 GB',
-                  sends: 10000,
-                  price: '$12/mo',
-                  features: ['Everything in Pro', 'Custom Domain', '20 Aliases', 'Delegated Admin', 'SLA 99.9%'],
-                  color: 'border-amber-500/40',
-                  badge: 'text-amber-300 bg-amber-500/20',
-                  current: mailboxInfo?.storageQuotaMb > 10240,
-                },
-              ].map((plan) => (
-                <div
-                  key={plan.name}
-                  className={`p-4 rounded-2xl border ${plan.color} bg-slate-950 flex items-start justify-between gap-3`}
-                >
-                  <div className="space-y-1.5 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${plan.badge}`}>{plan.name}</span>
-                      {plan.current && (
-                        <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-0.5">
-                          <CheckCircle2 className="h-3 w-3" /> Current
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-[11px] text-slate-300">
-                      <span><HardDrive className="h-3 w-3 inline mr-1 text-slate-500" />{plan.storage}</span>
-                      <span><MailCheck className="h-3 w-3 inline mr-1 text-slate-500" />{plan.sends.toLocaleString()} sends/day</span>
-                    </div>
-                    <ul className="space-y-0.5 text-[11px] text-slate-400">
-                      {plan.features.map((f) => (
-                        <li key={f} className="flex items-center gap-1.5">
-                          <span className="w-1 h-1 rounded-full bg-slate-600 shrink-0" />{f}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-extrabold text-white">{plan.price}</p>
-                    {!plan.current && (
-                      <a
-                        href={`${process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001'}/billing`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] rounded-xl transition-all"
-                      >
-                        <ArrowUpCircle className="h-3 w-3" />
-                        Upgrade
-                        <ExternalLink className="h-2.5 w-2.5" />
-                      </a>
-                    )}
-                  </div>
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-neutral-300 uppercase tracking-wider text-[10px]">Available Paid Plans</h4>
+                {isLoadingPlans && <span className="text-[10px] text-neutral-400">Loading catalog...</span>}
+              </div>
+
+              {availablePlans.length === 0 && !isLoadingPlans ? (
+                <div className="p-6 rounded-2xl border border-white/10 bg-[#0c0c0e] text-center text-neutral-400 text-xs">
+                  No upgrade plans currently found in the catalog.
                 </div>
-              ))}
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {availablePlans.map((plan) => {
+                    const isCurrent =
+                      mailboxInfo?.storageQuotaMb &&
+                      Math.abs(mailboxInfo.storageQuotaMb - plan.storageQuotaMb) < 50;
+                    const formattedStorage =
+                      plan.storageQuotaMb >= 1024
+                        ? `${(plan.storageQuotaMb / 1024).toFixed(0)} GB`
+                        : `${plan.storageQuotaMb} MB`;
+                    const retailPrice = Math.round(plan.priceLkr * 1.35);
+
+                    return (
+                      <div
+                        key={plan.id}
+                        className={`p-5 rounded-2xl border ${
+                          isCurrent ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-white/10 bg-[#141416]'
+                        } flex flex-col justify-between space-y-4 hover:border-white/20 transition-all shadow-xl`}
+                      >
+                        {/* Header with Squircle Icon */}
+                        <div className="flex items-start gap-3.5">
+                          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20">
+                            <Sparkles className="w-6 h-6 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-white text-sm leading-tight truncate">
+                              {plan.name}
+                            </h3>
+                            <div className="flex items-baseline gap-2 mt-1.5 flex-wrap">
+                              <span className="font-black text-white text-base font-mono">
+                                Rs {plan.priceLkr.toLocaleString()}
+                              </span>
+                              <span className="text-[11px] text-neutral-400 line-through font-mono">
+                                retail Rs {retailPrice.toLocaleString()}
+                              </span>
+                              <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                                27% under retail
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Tier Chips */}
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className="text-[10px] font-mono font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                            {formattedStorage} Storage
+                          </span>
+                          <span className="text-[10px] font-mono font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                            {plan.dailyQuota.toLocaleString()} sends/day
+                          </span>
+                          <span className="text-[10px] font-mono font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                            {plan.maxAliases} aliases
+                          </span>
+                        </div>
+
+                        {/* Feature Bullets */}
+                        <div className="space-y-1.5 text-xs text-neutral-300">
+                          <div className="flex items-center gap-2">
+                            <span className="text-emerald-400 text-xs">✓</span>
+                            <span>💾 {formattedStorage} NVMe SSD Storage</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-emerald-400 text-xs">✓</span>
+                            <span>⚡ {plan.dailyQuota.toLocaleString()} Outbound Sends/Day</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-emerald-400 text-xs">✓</span>
+                            <span>🛡️ Spamhaus &amp; TLS 1.3 Security</span>
+                          </div>
+                        </div>
+
+                        {/* Logistics */}
+                        <div className="pt-2 border-t border-white/5 space-y-1 text-[11px] text-neutral-400">
+                          <p className="flex items-center gap-1.5">
+                            <Zap className="w-3.5 h-3.5 text-neutral-500" /> Instant provisioning upon approval
+                          </p>
+                          <p className="flex items-center gap-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5 text-neutral-500" /> Dedicated enterprise mail cluster
+                          </p>
+                        </div>
+
+                        {/* Card Footer */}
+                        <div className="pt-3 border-t border-white/10 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="text-xs font-semibold text-emerald-400">
+                              {isCurrent ? 'Current Plan' : 'In stock'}
+                            </span>
+                          </div>
+
+                          {!isCurrent ? (
+                            <a
+                              href={`${process.env.NEXT_PUBLIC_DASHBOARD_URL || 'http://localhost:3001'}/orders?planId=${plan.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-4 py-1.5 rounded-xl bg-white text-black hover:bg-neutral-200 font-bold text-xs transition-all flex items-center gap-1 shadow-md hover:scale-[1.02]"
+                            >
+                              Upgrade
+                              <ExternalLink className="w-3 h-3 ml-0.5" />
+                            </a>
+                          ) : (
+                            <span className="px-3 py-1 rounded-xl bg-white/10 text-neutral-400 font-bold text-xs font-mono">
+                              Active Tier
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            <p className="text-center text-[10px] text-slate-600">
+            <p className="text-center text-[10px] text-neutral-600">
               To change your mailbox plan or renew subscriptions, visit the Billing section of your dashboard.
               Upgrades apply immediately after payment approval.
             </p>
           </div>
         )}
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );

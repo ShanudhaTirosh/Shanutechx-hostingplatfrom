@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'ShanuTechX Enterprise Webmail',
-  description: 'Autonomous Business Email Client & Mailbox Management',
+  title: 'STX Webmail',
+  description: 'STX Webmail - Autonomous Business Email Client & Mailbox Studio',
   icons: {
     icon: [
       { url: '/favicon.png', type: 'image/png' },
@@ -33,7 +33,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className="bg-[#0a0a0a] text-white font-sans antialiased">
+      <body className="bg-black text-white font-sans antialiased">
         {children}
       </body>
     </html>
