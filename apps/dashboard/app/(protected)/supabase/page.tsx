@@ -89,11 +89,14 @@ export default function SupabaseOverviewPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    supabaseAdmin.health()
-      .then((h) => setHealth(h))
+    supabaseAdmin.health(activeProject?.id)
+      .then((h) => {
+        setHealth(h);
+        setError(null);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [activeProject?.id]);
 
   // Fetch telemetry whenever active project changes
   useEffect(() => {

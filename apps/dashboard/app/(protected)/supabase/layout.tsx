@@ -19,6 +19,10 @@ import {
   Key,
   ExternalLink,
   Search,
+  Shield,
+  LineChart,
+  FileText,
+  Puzzle,
 } from 'lucide-react';
 
 const STATUS_PILLS: Record<string, { bg: string; dot: string }> = {
@@ -102,6 +106,30 @@ function SupabaseStudioLayoutInner({ children }: { children: React.ReactNode }) 
       href: '/supabase?view=api',
       viewKey: 'api',
       icon: <Key className="w-4 h-4 shrink-0" />,
+    },
+    {
+      label: 'Advisors & Security',
+      href: '/supabase/advisors',
+      viewKey: 'advisors',
+      icon: <Shield className="w-4 h-4 shrink-0" />,
+    },
+    {
+      label: 'Observability',
+      href: '/supabase/observability',
+      viewKey: 'observability',
+      icon: <LineChart className="w-4 h-4 shrink-0" />,
+    },
+    {
+      label: 'Logs Stream',
+      href: '/supabase/logs',
+      viewKey: 'logs',
+      icon: <FileText className="w-4 h-4 shrink-0" />,
+    },
+    {
+      label: 'Integrations',
+      href: '/supabase/integrations',
+      viewKey: 'integrations',
+      icon: <Puzzle className="w-4 h-4 shrink-0" />,
     },
   ];
 

@@ -2478,7 +2478,21 @@ export const api = {
         }>(r)
       ),
     getLogs: (id: string) =>
-      apiFetch(`/api/managed-databases/${id}/logs`).then((r) => asJson<{ logs: Array<{ timestamp: string; message: string }> }>(r)),
+      apiFetch(`/api/managed-databases/${id}/logs`)
+        .then((r) => asJson<{ logs: any; raw?: string }>(r))
+        .then((res) => {
+          if (Array.isArray(res.logs)) {
+            return { logs: res.logs as Array<{ timestamp: string; message: string }> };
+          }
+          if (typeof res.logs === 'string') {
+            const lines = res.logs.split('\n').filter(Boolean).map((line) => {
+              const match = line.match(/^(\d{4}-\d{2}-\d{2}T[^\s]+)\s+(.*)$/);
+              return match ? { timestamp: match[1], message: match[2] } : { timestamp: new Date().toISOString(), message: line };
+            });
+            return { logs: lines };
+          }
+          return { logs: [] };
+        }),
     migrate: (id: string, targetNodeId?: string) =>
       apiFetch(`/api/managed-databases/${id}/migrate`, { method: 'POST', body: JSON.stringify({ targetNodeId }) }).then((r) =>
         asJson<{ ok: boolean; message: string; database: ManagedDatabase }>(r)

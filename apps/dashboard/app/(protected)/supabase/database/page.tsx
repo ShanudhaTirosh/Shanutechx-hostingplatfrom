@@ -95,7 +95,7 @@ export default function SupabaseDatabasePage() {
       const cols = keys.map((k) => `"${k}"`).join(', ');
       const vals = keys.map((k) => `'${newRowData[k].replace(/'/g, "''")}'`).join(', ');
       const q = `INSERT INTO public."${selectedTable}" (${cols}) VALUES (${vals});`;
-      await supabaseAdmin.db.query(q);
+      await supabaseAdmin.db.query(q, activeProject?.id);
       toast(`Inserted record into ${selectedTable}!`, 'success');
       setShowInsertRowModal(false);
       setNewRowData({});

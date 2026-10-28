@@ -6,7 +6,7 @@ import { useAppUser } from '@/lib/AppUserContext';
 import { ManagedDatabase, ManagedDatabaseUser, Node } from '@/lib/types';
 import { IconLock } from '@/components/Icons';
 
-type ActiveTab = 'overview' | 'query' | 'scaling' | 'backups' | 'migration' | 'security' | 'connection';
+type ActiveTab = 'overview' | 'query' | 'scaling' | 'backups' | 'migration' | 'security' | 'connection' | 'logs';
 
 interface BackupItem {
   backupId: string;
@@ -101,6 +101,22 @@ export default function ManagedDatabasesPage() {
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
   const [isRestoringBackup, setIsRestoringBackup] = useState<string | null>(null);
 
+  // Engine Logs State
+  const [dbLogs, setDbLogs] = useState<Array<{ timestamp: string; message: string }>>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  async function fetchDbLogs(id: string) {
+    setLoadingLogs(true);
+    try {
+      const res = await api.managedDatabases.getLogs(id);
+      setDbLogs(res.logs || []);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setLoadingLogs(false);
+    }
+  }
+
   // Resource Scaling State
   const [scaleCpu, setScaleCpu] = useState<number>(1);
   const [scaleRamMb, setScaleRamMb] = useState<number>(2048);
@@ -193,6 +209,7 @@ export default function ManagedDatabasesPage() {
     setLoadingConn(true);
     setLoadingUsers(true);
     setLoadingBackups(true);
+    fetchDbLogs(id);
     try {
       const [connRes, usersRes, backupRes] = await Promise.all([
         api.managedDatabases.getConnection(id).catch(() => null),
@@ -583,6 +600,7 @@ export default function ManagedDatabasesPage() {
                     { id: 'migration', label: isDevUser ? 'Node Migration' : 'Node Migration (Dev Only)' },
                     { id: 'security', label: 'Access & Security' },
                     { id: 'connection', label: 'Connections' },
+                    { id: 'logs', label: 'Engine Logs' },
                   ].map((tab) => (
                     <button
                       key={tab.id}
@@ -1058,12 +1076,26 @@ export default function ManagedDatabasesPage() {
                               ? connDetails.connectionString
                               : connDetails.connectionString.replace(encodeURIComponent(connDetails.password || ''), '••••••••')}
                           </span>
-                          <button
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="px-2 py-1 text-[10px] bg-white/10 text-white rounded hover:bg-white/20"
-                          >
-                            {showPassword ? 'Hide' : 'Reveal'}
-                          </button>
+                          <div className="flex items-center gap-1.5 shrink-0 ml-3">
+                            <button
+                              onClick={() => {
+                                const str = showPassword
+                                  ? connDetails.connectionString
+                                  : connDetails.connectionString.replace(encodeURIComponent(connDetails.password || ''), connDetails.password || '');
+                                navigator.clipboard.writeText(str);
+                                alert('Connection URI copied to clipboard!');
+                              }}
+                              className="px-2.5 py-1 text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded hover:bg-emerald-500/30 transition-colors"
+                            >
+                              Copy URI
+                            </button>
+                            <button
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="px-2 py-1 text-[10px] bg-white/10 text-white rounded hover:bg-white/20 transition-colors"
+                            >
+                              {showPassword ? 'Hide' : 'Reveal'}
+                            </button>
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs bg-white/[0.02] p-3 rounded-xl border border-white/[0.06]">
@@ -1086,6 +1118,42 @@ export default function ManagedDatabasesPage() {
                         </div>
                       </div>
                     ) : null}
+                  </div>
+                )}
+
+                {/* TAB 8: ENGINE LOGS */}
+                {activeTab === 'logs' && (
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-white">Container Runtime & Engine Logs</h4>
+                        <p className="text-[11px] text-text-muted">Real-time container stdout/stderr log stream for {selectedDb.dbName || selectedDb.type}.</p>
+                      </div>
+                      <button
+                        onClick={() => fetchDbLogs(selectedDb.id)}
+                        disabled={loadingLogs}
+                        className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-semibold text-white transition-all disabled:opacity-50"
+                      >
+                        {loadingLogs ? 'Refreshing...' : 'Refresh Logs'}
+                      </button>
+                    </div>
+
+                    <div className="bg-black/90 border border-white/10 rounded-xl p-4 font-mono text-xs max-h-96 overflow-y-auto space-y-1">
+                      {loadingLogs ? (
+                        <div className="text-text-muted animate-pulse">Streaming database logs...</div>
+                      ) : dbLogs.length === 0 ? (
+                        <div className="text-text-muted">No logs recorded yet for this container.</div>
+                      ) : (
+                        dbLogs.map((log, i) => (
+                          <div key={i} className="flex items-start gap-2 hover:bg-white/[0.02] p-0.5 rounded transition-colors">
+                            <span className="text-[10px] text-emerald-400/80 shrink-0 select-none">
+                              {log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '--:--:--'}
+                            </span>
+                            <span className="text-emerald-300 select-all break-all">{log.message}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

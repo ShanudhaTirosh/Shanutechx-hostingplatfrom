@@ -152,7 +152,10 @@ export function getCentralStudioUrl(project?: ClientSupabaseProject | null, subp
 }
 
 export const supabaseAdmin = {
-  health: () => apiFetch('/api/supabase/health').then((r) => asJson<SupabaseHealth>(r)),
+  health: (projectId?: string) => {
+    const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    return apiFetch(`/api/supabase/health${q}`).then((r) => asJson<SupabaseHealth>(r));
+  },
 
   projects: {
     list: () =>
@@ -318,41 +321,52 @@ export const supabaseAdmin = {
   },
 
   functions: {
-    list: () =>
-      apiFetch('/api/supabase/functions').then((r) =>
+    list: (projectId?: string) => {
+      const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+      return apiFetch(`/api/supabase/functions${q}`).then((r) =>
         asJson<{ functions: SupabaseEdgeFunction[] }>(r)
-      ),
-    create: (data: { name: string; code?: string }) =>
-      apiFetch('/api/supabase/functions', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+      );
+    },
+    create: (data: { name: string; code?: string; projectId?: string }, projectId?: string) => {
+      const payload = { ...data, projectId: projectId || data.projectId };
+      return apiFetch('/api/supabase/functions', { method: 'POST', body: JSON.stringify(payload) }).then((r) =>
         asJson<{ function: SupabaseEdgeFunction }>(r)
-      ),
-    invoke: (name: string, payload: any) =>
-      apiFetch(`/api/supabase/functions/${name}/invoke`, {
+      );
+    },
+    invoke: (name: string, payload: any, projectId?: string) => {
+      const body = { ...(payload || {}), ...(projectId ? { projectId } : {}) };
+      return apiFetch(`/api/supabase/functions/${name}/invoke`, {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(body),
       }).then((r) =>
         asJson<{ status: number; ok: boolean; executionTimeMs: number; response: any }>(r)
-      ),
+      );
+    },
   },
 
   realtime: {
-    broadcast: (data: { channel: string; event: string; payload: any }) =>
-      apiFetch('/api/supabase/realtime/broadcast', { method: 'POST', body: JSON.stringify(data) }).then((r) =>
+    broadcast: (data: { channel: string; event: string; payload: any; projectId?: string }, projectId?: string) => {
+      const payload = { ...data, projectId: projectId || data.projectId };
+      return apiFetch('/api/supabase/realtime/broadcast', { method: 'POST', body: JSON.stringify(payload) }).then((r) =>
         asJson<{ ok: boolean; channel: string; event: string; dispatchedAt: string }>(r)
-      ),
+      );
+    },
   },
 
-  advisors: () =>
-    apiFetch('/api/supabase/advisors').then((r) =>
+  advisors: (projectId?: string) => {
+    const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    return apiFetch(`/api/supabase/advisors${q}`).then((r) =>
       asJson<{
         security: Array<{ id: string; title: string; category: string; severity: string; description: string; remediation: string }>;
         performance: Array<{ id: string; title: string; category: string; severity: string; description: string; remediation: string }>;
         scannedAt: string;
       }>(r)
-    ),
+    );
+  },
 
-  observability: () =>
-    apiFetch('/api/supabase/observability').then((r) =>
+  observability: (projectId?: string) => {
+    const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    return apiFetch(`/api/supabase/observability${q}`).then((r) =>
       asJson<{
         metrics: {
           cpuUsagePercent: number;
@@ -366,24 +380,31 @@ export const supabaseAdmin = {
         };
         timestamp: string;
       }>(r)
-    ),
+    );
+  },
 
-  logs: (service = 'all') =>
-    apiFetch(`/api/supabase/logs?service=${service}`).then((r) =>
+  logs: (service = 'all', projectId?: string) => {
+    const q = `?service=${encodeURIComponent(service)}${projectId ? `&projectId=${encodeURIComponent(projectId)}` : ''}`;
+    return apiFetch(`/api/supabase/logs${q}`).then((r) =>
       asJson<{ logs: Array<{ id: string; timestamp: string; service: string; level: string; message: string }> }>(r)
-    ),
+    );
+  },
 
-  integrations: () =>
-    apiFetch('/api/supabase/integrations').then((r) =>
+  integrations: (projectId?: string) => {
+    const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    return apiFetch(`/api/supabase/integrations${q}`).then((r) =>
       asJson<{
         webhooks: Array<{ id: string; name: string; table: string; events: string[]; url: string; status: string }>;
         vaultSecrets: Array<{ id: string; name: string; keyName: string; description: string; updatedAt: string }>;
         fdw: Array<{ id: string; name: string; wrapper: string; serverName: string; status: string }>;
       }>(r)
-    ),
+    );
+  },
 
-  config: () =>
-    apiFetch('/api/supabase/config').then((r) =>
+  config: (projectId?: string) => {
+    const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    return apiFetch(`/api/supabase/config${q}`).then((r) =>
       asJson<{ supabaseUrl: string; anonKey: string; serviceRoleKey: string; studioUrl: string; smtpConfigured: boolean }>(r)
-    ),
+    );
+  },
 };

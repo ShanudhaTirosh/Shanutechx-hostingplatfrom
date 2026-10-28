@@ -3,21 +3,23 @@
 import React, { useEffect, useState } from 'react';
 import { PageHeader, Card, Button, Spinner } from '@/components/ui';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { useSupabaseProject } from '@/lib/SupabaseProjectContext';
 
 export default function SupabaseIntegrationsPage() {
+  const { activeProject } = useSupabaseProject();
   const [activeTab, setActiveTab] = useState<'webhooks' | 'vault' | 'fdw'>('webhooks');
   const [integrationsData, setIntegrationsData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     supabaseAdmin
-      .integrations()
+      .integrations(activeProject?.id)
       .then((res) => {
         setIntegrationsData(res);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [activeProject?.id]);
 
   if (loading) return <Spinner label="Loading database webhooks, vault secrets, and FDW wrappers..." />;
 

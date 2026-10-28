@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { PageHeader, Card, Button, useToast, Spinner } from '@/components/ui';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { useSupabaseProject } from '@/lib/SupabaseProjectContext';
 
 interface AdvisorItem {
   id: string;
@@ -14,6 +15,7 @@ interface AdvisorItem {
 }
 
 export default function SupabaseAdvisorsPage() {
+  const { activeProject } = useSupabaseProject();
   const [activeTab, setActiveTab] = useState<'security' | 'performance'>('security');
   const [securityLints, setSecurityLints] = useState<AdvisorItem[]>([]);
   const [performanceLints, setPerformanceLints] = useState<AdvisorItem[]>([]);
@@ -24,7 +26,7 @@ export default function SupabaseAdvisorsPage() {
   const fetchAdvisors = () => {
     setLoading(true);
     supabaseAdmin
-      .advisors()
+      .advisors(activeProject?.id)
       .then((res) => {
         setSecurityLints(res.security || []);
         setPerformanceLints(res.performance || []);
@@ -35,7 +37,7 @@ export default function SupabaseAdvisorsPage() {
 
   useEffect(() => {
     fetchAdvisors();
-  }, []);
+  }, [activeProject?.id]);
 
   const handleRunLinter = () => {
     setScanning(true);

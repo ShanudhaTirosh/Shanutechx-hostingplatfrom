@@ -26,6 +26,7 @@ useForOwnRoutes(managedDatabasesRouter, requireAuth);
 const createDbSchema = z.object({
   userId: z.string().optional(),
   projectId: z.string().optional(),
+  nodeId: z.string().optional(),
   name: z.string().optional(),
   type: z.enum(['postgres', 'mysql', 'redis', 'mongodb']),
   dbName: z.string().optional(),
@@ -75,11 +76,18 @@ managedDatabasesRouter.post('/managed-databases', async (req: AuthedRequest, res
   }
 
   let node;
-  try {
-    node = await selectNodeForDeployment({ requiredTag: 'node-hosting', isAdminDeployment: true });
-  } catch (err) {
-    if (err instanceof NodeSelectionError) return res.status(409).json({ error: err.message });
-    throw err;
+  if (parsed.data.nodeId) {
+    node = await prisma.node.findUnique({ where: { id: parsed.data.nodeId } });
+    if (!node || !node.isActive) {
+      return res.status(400).json({ error: 'Selected node is not active or does not exist' });
+    }
+  } else {
+    try {
+      node = await selectNodeForDeployment({ requiredTag: 'node-hosting', isAdminDeployment: true });
+    } catch (err) {
+      if (err instanceof NodeSelectionError) return res.status(409).json({ error: err.message });
+      throw err;
+    }
   }
 
   const rawPassword = parsed.data.masterPassword || crypto.randomBytes(16).toString('hex');
@@ -1592,13 +1600,25 @@ managedDatabasesRouter.get('/managed-databases/:id/logs', async (req: AuthedRequ
   if (!(await canAccessResource(db.userId, req))) return res.status(404).json({ error: 'Not found' });
 
   if (!db.containerId || !db.node || db.status !== 'running') {
-    return res.json({ logs: `[${new Date().toISOString()}] Database instance status: ${db.status}` });
+    const fallbackMsg = `[${new Date().toISOString()}] Database instance status: ${db.status}`;
+    return res.json({
+      logs: [{ timestamp: new Date().toISOString(), message: fallbackMsg }],
+      raw: fallbackMsg,
+    });
   }
 
   try {
     const { getContainerLogs } = await import('../lib/nodeAgentClient');
-    const logs = await getContainerLogs(db.node, db.containerId, 300);
-    res.json({ logs });
+    const rawLogs = await getContainerLogs(db.node, db.containerId, 300);
+    const logLines = typeof rawLogs === 'string'
+      ? rawLogs.split('\n').filter(Boolean).map((line) => {
+          const match = line.match(/^(\d{4}-\d{2}-\d{2}T[^\s]+)\s+(.*)$/);
+          return match
+            ? { timestamp: match[1], message: match[2] }
+            : { timestamp: new Date().toISOString(), message: line };
+        })
+      : [];
+    res.json({ logs: logLines, raw: rawLogs });
   } catch (err: any) {
     res.status(502).json({ error: err.message || 'Failed to fetch database logs' });
   }

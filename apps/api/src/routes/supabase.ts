@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { requireAuth, requireDev, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
-import { canAccessResource } from '../middleware/rbac';
+import { canAccessResource, accessActionForRequest } from '../middleware/rbac';
 import { logger } from '../lib/logger';
 import { prisma } from '../lib/prisma';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
@@ -169,12 +169,24 @@ export interface SmtpDeliveryLog {
 }
 
 
-async function resolveProjectContext(req: AuthedRequest): Promise<{
+async function resolveProjectContext(req: AuthedRequest, optional: true): Promise<{
   project: any;
   metaUrl: string;
   kongUrl: string;
   serviceKey: string;
-}> {
+} | null>;
+async function resolveProjectContext(req: AuthedRequest, optional?: false): Promise<{
+  project: any;
+  metaUrl: string;
+  kongUrl: string;
+  serviceKey: string;
+}>;
+async function resolveProjectContext(req: AuthedRequest, optional = false): Promise<{
+  project: any;
+  metaUrl: string;
+  kongUrl: string;
+  serviceKey: string;
+} | null> {
   const projectId =
     (req.query.projectId as string) ||
     (req.body?.projectId as string) ||
@@ -194,6 +206,7 @@ async function resolveProjectContext(req: AuthedRequest): Promise<{
   }
 
   if (!project) {
+    if (optional) return null;
     const err: any = new Error('No Supabase project found. Please create or specify a project.');
     err.status = 400;
     throw err;
@@ -201,7 +214,7 @@ async function resolveProjectContext(req: AuthedRequest): Promise<{
 
   // Multi-tenant RBAC check
   if (project.userId && req.user) {
-    const allowed = await canAccessResource(project.userId, req, 'project', project.id, 'read');
+    const allowed = await canAccessResource(project.userId, req, 'project', project.id, accessActionForRequest(req));
     if (!allowed) {
       const err: any = new Error('Access denied to Supabase project');
       err.status = 403;
@@ -253,8 +266,31 @@ async function fetchJson(url: string, options: RequestInit = {}, serviceKeyOverr
 }
 
 // 1. Service Health & Status
-supabaseRouter.get('/supabase/health', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
-  const ctx = await resolveProjectContext(req);
+supabaseRouter.get('/supabase/health', requireAuth, async (req: AuthedRequest, res: Response) => {
+  const ctx = await resolveProjectContext(req, true);
+  if (!ctx || !ctx.project) {
+    return res.json({
+      status: 'healthy',
+      empty: true,
+      services: {
+        kong: 'healthy',
+        gotrue: 'healthy',
+        postgrest: 'healthy',
+        postgres: 'healthy',
+        storage: 'healthy',
+        realtime: 'healthy',
+        functions: 'healthy',
+        studio: 'healthy',
+      },
+      urls: {
+        kong: SUPABASE_KONG_URL,
+        studioUrl: process.env.SUPABASE_STUDIO_URL || 'http://localhost:8000',
+        meta: SUPABASE_META_URL,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   const [kongRes, metaRes, realtimeRes] = await Promise.all([
     fetchJson(`${ctx.kongUrl}/health`, {}, ctx.serviceKey),
     fetchJson(`${ctx.metaUrl}/health`, {}, ctx.serviceKey),
@@ -276,9 +312,9 @@ supabaseRouter.get('/supabase/health', requireAuth, requireDev, async (req: Auth
     status: Object.values(services).every((s) => s === 'healthy') ? 'healthy' : 'degraded',
     services,
     urls: {
-      kong: SUPABASE_KONG_URL,
-      studioUrl: process.env.SUPABASE_STUDIO_URL || 'http://localhost:8000',
-      meta: SUPABASE_META_URL,
+      kong: ctx.kongUrl || SUPABASE_KONG_URL,
+      studioUrl: serializeProject(ctx.project).studioUrl || process.env.SUPABASE_STUDIO_URL || 'http://localhost:8000',
+      meta: ctx.metaUrl || SUPABASE_META_URL,
     },
     timestamp: new Date().toISOString(),
   });
@@ -1283,7 +1319,7 @@ supabaseRouter.get('/supabase/projects/:id/logs', requireAuth, async (req: Authe
   res.json({ logs: agentLogs });
 });
 
-supabaseRouter.delete('/supabase/projects/:id', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.delete('/supabase/projects/:id', requireAuth, async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   if (id === 'proj_default') {
     return res.status(400).json({ error: 'Cannot delete default project' });
@@ -1291,6 +1327,13 @@ supabaseRouter.delete('/supabase/projects/:id', requireAuth, requireDev, async (
   const existing = await prisma.supabaseClientProject.findUnique({ where: { id } });
   if (!existing) {
     return res.status(404).json({ error: 'Project not found' });
+  }
+
+  if (existing.userId && req.user) {
+    const allowed = await canAccessResource(existing.userId, req, 'project', existing.id, 'write');
+    if (!allowed) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
   }
 
   const cleanSlug = existing.name ? existing.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '') : '';
@@ -1335,7 +1378,7 @@ supabaseRouter.delete('/supabase/projects/:id', requireAuth, requireDev, async (
   res.json({ ok: true, deletedId: id });
 });
 
-supabaseRouter.patch('/supabase/projects/:id/config', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.patch('/supabase/projects/:id/config', requireAuth, async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   const {
     name,
@@ -1352,6 +1395,13 @@ supabaseRouter.patch('/supabase/projects/:id/config', requireAuth, requireDev, a
 
   const existing = await prisma.supabaseClientProject.findUnique({ where: { id } });
   if (!existing) return res.status(404).json({ error: 'Project not found' });
+
+  if (existing.userId && req.user) {
+    const allowed = await canAccessResource(existing.userId, req, 'project', existing.id, 'write');
+    if (!allowed) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+  }
 
   const dataToUpdate: any = {};
   if (name && typeof name === 'string' && name.trim()) dataToUpdate.name = name.trim();
@@ -1514,7 +1564,7 @@ supabaseRouter.get('/supabase/smtp/logs', requireAuth, requireDev, async (_req: 
 });
 
 // 7. GoTrue Auth User Management Endpoints
-supabaseRouter.get('/supabase/auth/users', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/auth/users', requireAuth, async (req: AuthedRequest, res: Response) => {
   const ctx = await resolveProjectContext(req);
   const result = await fetchJson(`${ctx.kongUrl}/auth/v1/admin/users`, {}, ctx.serviceKey);
   if (!result.ok) {
@@ -1537,7 +1587,7 @@ supabaseRouter.get('/supabase/auth/users', requireAuth, requireDev, async (req: 
   res.json({ users: usersList, total: usersList.length });
 });
 
-supabaseRouter.post('/supabase/auth/users', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/auth/users', requireAuth, async (req: AuthedRequest, res: Response) => {
   const { email, password, user_metadata } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
@@ -1558,7 +1608,7 @@ supabaseRouter.post('/supabase/auth/users', requireAuth, requireDev, async (req:
   res.status(201).json(result.data);
 });
 
-supabaseRouter.delete('/supabase/auth/users/:id', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.delete('/supabase/auth/users/:id', requireAuth, async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   if (!id) return res.status(400).json({ error: 'User ID is required' });
 
@@ -1573,7 +1623,7 @@ supabaseRouter.delete('/supabase/auth/users/:id', requireAuth, requireDev, async
   res.json({ ok: true, deletedId: id });
 });
 
-supabaseRouter.post('/supabase/auth/users/:id/reset-password', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/auth/users/:id/reset-password', requireAuth, async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   const { email } = req.body;
   const ctx = await resolveProjectContext(req);
@@ -1609,7 +1659,7 @@ supabaseRouter.post('/supabase/auth/users/:id/reset-password', requireAuth, requ
   res.json({ ok: true, message: `Password reset instructions dispatched to user.` });
 });
 
-supabaseRouter.patch('/supabase/auth/users/:id', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.patch('/supabase/auth/users/:id', requireAuth, async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
   const { banned, role, user_metadata } = req.body;
   const ctx = await resolveProjectContext(req);
@@ -1632,7 +1682,7 @@ supabaseRouter.patch('/supabase/auth/users/:id', requireAuth, requireDev, async 
 });
 
 // 8. Database Studio endpoints
-supabaseRouter.get('/supabase/db/schemas', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/db/schemas', requireAuth, async (req: AuthedRequest, res: Response) => {
   const ctx = await resolveProjectContext(req);
   const result = await fetchJson(`${ctx.metaUrl}/schemas`, {}, ctx.serviceKey);
   if (!result.ok) {
@@ -1641,7 +1691,7 @@ supabaseRouter.get('/supabase/db/schemas', requireAuth, requireDev, async (req: 
   res.json({ schemas: result.data });
 });
 
-supabaseRouter.get('/supabase/db/tables', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/db/tables', requireAuth, async (req: AuthedRequest, res: Response) => {
   const ctx = await resolveProjectContext(req);
   const result = await fetchJson(`${ctx.metaUrl}/tables`, {}, ctx.serviceKey);
   if (!result.ok) {
@@ -1650,7 +1700,7 @@ supabaseRouter.get('/supabase/db/tables', requireAuth, requireDev, async (req: A
   res.json({ tables: result.data });
 });
 
-supabaseRouter.post('/supabase/db/query', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/db/query', requireAuth, async (req: AuthedRequest, res: Response) => {
   const { sql } = req.body;
   if (!sql) return res.status(400).json({ error: 'SQL query parameter is required' });
 
@@ -1677,7 +1727,7 @@ supabaseRouter.post('/supabase/db/query', requireAuth, requireDev, async (req: A
 });
 
 // 9. Storage Buckets endpoints
-supabaseRouter.get('/supabase/storage/buckets', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/storage/buckets', requireAuth, async (req: AuthedRequest, res: Response) => {
   const ctx = await resolveProjectContext(req);
   const result = await fetchJson(`${ctx.kongUrl}/storage/v1/bucket`, {}, ctx.serviceKey);
   if (!result.ok) {
@@ -1687,7 +1737,7 @@ supabaseRouter.get('/supabase/storage/buckets', requireAuth, requireDev, async (
   res.json({ buckets: bucketList });
 });
 
-supabaseRouter.post('/supabase/storage/buckets', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/storage/buckets', requireAuth, async (req: AuthedRequest, res: Response) => {
   const { id, name, isPublic } = req.body;
   if (!id || !name) {
     return res.status(400).json({ error: 'Bucket ID and name are required' });
@@ -1706,7 +1756,7 @@ supabaseRouter.post('/supabase/storage/buckets', requireAuth, requireDev, async 
 });
 
 // 10. Edge Functions & Realtime Endpoints
-supabaseRouter.get('/supabase/functions', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/functions', requireAuth, async (_req: AuthedRequest, res: Response) => {
   res.json({
     functions: [
       { id: 'func_01', name: 'hello-world', status: 'ACTIVE', version: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
@@ -1715,7 +1765,7 @@ supabaseRouter.get('/supabase/functions', requireAuth, requireDev, async (_req: 
   });
 });
 
-supabaseRouter.post('/supabase/functions', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/functions', requireAuth, async (req: AuthedRequest, res: Response) => {
   const { name, code } = req.body;
   if (!name) return res.status(400).json({ error: 'Function name is required' });
 
@@ -1732,7 +1782,7 @@ supabaseRouter.post('/supabase/functions', requireAuth, requireDev, async (req: 
   res.status(201).json({ function: fn });
 });
 
-supabaseRouter.post('/supabase/functions/:name/invoke', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/functions/:name/invoke', requireAuth, async (req: AuthedRequest, res: Response) => {
   const { name } = req.params;
   const payload = req.body || {};
   const start = Date.now();
@@ -1767,7 +1817,7 @@ supabaseRouter.post('/supabase/functions/:name/invoke', requireAuth, requireDev,
   });
 });
 
-supabaseRouter.post('/supabase/realtime/broadcast', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.post('/supabase/realtime/broadcast', requireAuth, async (req: AuthedRequest, res: Response) => {
   const { channel, event, payload } = req.body;
   if (!channel || !event) {
     return res.status(400).json({ error: 'Channel name and event type are required' });
@@ -1796,7 +1846,7 @@ supabaseRouter.post('/supabase/realtime/broadcast', requireAuth, requireDev, asy
 });
 
 // 11. Security & Performance Advisors Linter Endpoint
-supabaseRouter.get('/supabase/advisors', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/advisors', requireAuth, async (req: AuthedRequest, res: Response) => {
   let securityLints = [
     {
       id: 'sec_rls_01',
@@ -1818,29 +1868,31 @@ supabaseRouter.get('/supabase/advisors', requireAuth, requireDev, async (req: Au
   let isFallback = true;
 
   try {
-    const ctx = await resolveProjectContext(req);
-    const metaRes = await fetchJson(
-      `${ctx.metaUrl}/query`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ query: `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND rowsecurity = false;` }),
-      },
-      ctx.serviceKey
-    );
-    const unsecureTables = metaRes.ok && Array.isArray(metaRes.data) ? metaRes.data : null;
-    if (Array.isArray(unsecureTables)) {
-      isFallback = false;
-      if (unsecureTables.length > 0) {
-        securityLints = unsecureTables.map((t: any, i: number) => ({
-          id: `sec_rls_${i}`,
-          title: `Row Level Security (RLS) disabled on public."${t.tablename}"`,
-          category: 'SECURITY',
-          severity: 'HIGH',
-          description: `Table "${t.tablename}" is publicly readable/writable because RLS is disabled.`,
-          remediation: `ALTER TABLE public."${t.tablename}" ENABLE ROW LEVEL SECURITY;`,
-        }));
-      } else {
-        securityLints = [];
+    const ctx = await resolveProjectContext(req, true);
+    if (ctx) {
+      const metaRes = await fetchJson(
+        `${ctx.metaUrl}/query`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ query: `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND rowsecurity = false;` }),
+        },
+        ctx.serviceKey
+      );
+      const unsecureTables = metaRes.ok && Array.isArray(metaRes.data) ? metaRes.data : null;
+      if (Array.isArray(unsecureTables)) {
+        isFallback = false;
+        if (unsecureTables.length > 0) {
+          securityLints = unsecureTables.map((t: any, i: number) => ({
+            id: `sec_rls_${i}`,
+            title: `Row Level Security (RLS) disabled on public."${t.tablename}"`,
+            category: 'SECURITY',
+            severity: 'HIGH',
+            description: `Table "${t.tablename}" is publicly readable/writable because RLS is disabled.`,
+            remediation: `ALTER TABLE public."${t.tablename}" ENABLE ROW LEVEL SECURITY;`,
+          }));
+        } else {
+          securityLints = [];
+        }
       }
     }
   } catch {}
@@ -1866,7 +1918,7 @@ supabaseRouter.get('/supabase/advisors', requireAuth, requireDev, async (req: Au
 
 
 // 12. Observability Metrics Endpoint
-supabaseRouter.get('/supabase/observability', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/observability', requireAuth, async (_req: AuthedRequest, res: Response) => {
   const mem = process.memoryUsage();
   const dbCount = await prisma.supabaseClientProject.count().catch(() => 1);
 
@@ -1875,23 +1927,25 @@ supabaseRouter.get('/supabase/observability', requireAuth, requireDev, async (_r
   let isFallback = true;
 
   try {
-    const ctx = await resolveProjectContext(_req);
-    const statsRes = await fetchJson(
-      `${ctx.metaUrl}/query`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ query: `SELECT numbackends, blks_hit, blks_read FROM pg_stat_database WHERE datname = current_database();` }),
-      },
-      ctx.serviceKey
-    );
-    const stats = statsRes.ok && Array.isArray(statsRes.data) ? statsRes.data : null;
-    if (Array.isArray(stats) && stats[0]) {
-      isFallback = false;
-      activeConns = Number(stats[0].numbackends) || activeConns;
-      const hit = Number(stats[0].blks_hit) || 0;
-      const read = Number(stats[0].blks_read) || 0;
-      if (hit + read > 0) {
-        cacheHitRate = Number(((hit / (hit + read)) * 100).toFixed(1));
+    const ctx = await resolveProjectContext(_req, true);
+    if (ctx) {
+      const statsRes = await fetchJson(
+        `${ctx.metaUrl}/query`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ query: `SELECT numbackends, blks_hit, blks_read FROM pg_stat_database WHERE datname = current_database();` }),
+        },
+        ctx.serviceKey
+      );
+      const stats = statsRes.ok && Array.isArray(statsRes.data) ? statsRes.data : null;
+      if (Array.isArray(stats) && stats[0]) {
+        isFallback = false;
+        activeConns = Number(stats[0].numbackends) || activeConns;
+        const hit = Number(stats[0].blks_hit) || 0;
+        const read = Number(stats[0].blks_read) || 0;
+        if (hit + read > 0) {
+          cacheHitRate = Number(((hit / (hit + read)) * 100).toFixed(1));
+        }
       }
     }
   } catch {}
@@ -1913,7 +1967,7 @@ supabaseRouter.get('/supabase/observability', requireAuth, requireDev, async (_r
 });
 
 // 13. System & API Log Stream Endpoint
-supabaseRouter.get('/supabase/logs', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/logs', requireAuth, async (req: AuthedRequest, res: Response) => {
   const service = (req.query.service as string) || 'all';
 
   const logs = [
@@ -1928,7 +1982,7 @@ supabaseRouter.get('/supabase/logs', requireAuth, requireDev, async (req: Authed
 });
 
 // 14. Integrations (Webhooks, Vault, FDW) Endpoint
-supabaseRouter.get('/supabase/integrations', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/integrations', requireAuth, async (_req: AuthedRequest, res: Response) => {
   res.json({
     webhooks: [
       { id: 'wh_01', name: 'Order Created Webhook', table: 'public.orders', events: ['INSERT'], url: 'https://api.shanutechx.com/webhooks/orders', status: 'ACTIVE' }
@@ -1946,7 +2000,7 @@ supabaseRouter.get('/supabase/integrations', requireAuth, requireDev, async (_re
 });
 
 // 15. System Config & Environment Credentials Endpoint
-supabaseRouter.get('/supabase/config', requireAuth, requireDev, async (_req: AuthedRequest, res: Response) => {
+supabaseRouter.get('/supabase/config', requireAuth, async (_req: AuthedRequest, res: Response) => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.API_BASE_URL || '';
   const anonKey = process.env.SUPABASE_ANON_KEY || '';
   const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || '';
@@ -1963,7 +2017,7 @@ supabaseRouter.get('/supabase/config', requireAuth, requireDev, async (_req: Aut
 });
 
 // 16. Dynamic PG-Meta Proxy for Studio UI (/supabase/pg-meta/:projectRef/*)
-supabaseRouter.all('/supabase/pg-meta/:projectRef/*', requireAuth, requireDev, async (req: AuthedRequest, res: Response) => {
+supabaseRouter.all('/supabase/pg-meta/:projectRef/*', requireAuth, async (req: AuthedRequest, res: Response) => {
   const { projectRef } = req.params;
   const subPath = req.params[0] || '';
 

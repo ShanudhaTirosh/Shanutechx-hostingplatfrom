@@ -3,21 +3,23 @@
 import React, { useEffect, useState } from 'react';
 import { PageHeader, Card, StatCard, Spinner } from '@/components/ui';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { useSupabaseProject } from '@/lib/SupabaseProjectContext';
 
 export default function SupabaseObservabilityPage() {
+  const { activeProject } = useSupabaseProject();
   const [timeRange, setTimeRange] = useState<'1h' | '24h' | '7d'>('24h');
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     supabaseAdmin
-      .observability()
+      .observability(activeProject?.id)
       .then((res) => {
         setMetrics(res.metrics);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [timeRange]);
+  }, [timeRange, activeProject?.id]);
 
   if (loading) return <Spinner label="Loading real-time infrastructure telemetry metrics..." />;
 
