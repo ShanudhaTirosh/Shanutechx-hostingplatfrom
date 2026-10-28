@@ -58,11 +58,11 @@ authRouter.post('/auth/login', authRateLimiter, async (req, res) => {
 
   // Enforce allowed OAuth SSO providers
   const signInProvider = decoded.firebase?.sign_in_provider;
-  const allowedProviders = ['google.com', 'github.com', 'oidc.discord', 'custom'];
+  const allowedProviders = ['google.com', 'github.com', 'oidc.discord', 'custom', 'password'];
   if (signInProvider && !allowedProviders.includes(signInProvider)) {
     return res.status(403).json({
       error: 'Unauthorized OAuth Provider',
-      message: 'ShanuTechX Cloud strictly enforces Google, GitHub & Discord OAuth SSO.',
+      message: 'ShanuTechX Cloud enforces Google, GitHub, Discord, and Email/Password authentication.',
     });
   }
 
