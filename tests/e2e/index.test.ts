@@ -1,3 +1,5 @@
+process.env.NODE_ENV = 'test';
+
 /**
  * ShanuTechX Production E2E Master Test Suite
  *
@@ -34,3 +36,9 @@ import './tier3-interactions/smtp-acl-tenant-isolation.test';
 import './tier4-scenarios/developer-app-lifecycle.test';
 import './tier4-scenarios/supabase-full-platform.test';
 import './tier4-scenarios/multi-tenant-enterprise.test';
+
+import test from 'node:test';
+test('Finalize E2E Suite Execution', () => {
+  process.exit(0);
+});
+

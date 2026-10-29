@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { memoryDb } from '../../unit/helpers/memoryDb';
 import { E2EApiClient, TestUser } from './client';
 import * as realAuthMiddleware from '../../../apps/api/src/middleware/auth';
+import { redis } from '../../../apps/api/src/lib/redis';
+import { closeAllQueues } from '../../../apps/api/src/lib/queue';
 
 export interface TestServerInstance {
   url: string;
@@ -142,6 +144,8 @@ function createInMemoryDb(initialSeed: Record<string, any[]> = {}) {
     user: Object.values(TEST_USERS),
     node: [DEFAULT_NODE],
     deployment: [],
+    deploymentRelease: [],
+    deploymentPointer: [],
     deploymentVolume: [],
     managedDatabase: [],
     supabaseClientProject: [],
@@ -227,6 +231,10 @@ export async function createTestServer(initialSeed: Record<string, any[]> = {}):
 
   const webhooksMod = loadRouterWithStubs('deployWebhooks', db);
   app.use('/api', webhooksMod.deployWebhooksRouter);
+  app.use(webhooksMod.deployWebhooksRouter);
+
+  const deploymentsMod = loadRouterWithStubs('deployments', db);
+  app.use('/api', deploymentsMod.deploymentsRouter);
 
   // Node Agent Mock / Interface Endpoints
   const activeBuilds = new Map<string, any>();
@@ -298,6 +306,7 @@ export async function createTestServer(initialSeed: Record<string, any[]> = {}):
   });
 
   const port = (server!.address() as AddressInfo).port;
+  process.env.NODE_AGENT_PORT = String(port);
   const url = `http://127.0.0.1:${port}`;
   const client = new E2EApiClient(url);
 
@@ -305,10 +314,18 @@ export async function createTestServer(initialSeed: Record<string, any[]> = {}):
     url,
     client,
     db,
-    stop: () =>
-      new Promise<void>((resolve, reject) => {
+    stop: async () => {
+      if (typeof (server as any).closeAllConnections === 'function') {
+        (server as any).closeAllConnections();
+      }
+      await new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
-      }),
+      });
+      try {
+        await closeAllQueues().catch(() => {});
+        redis.disconnect();
+      } catch {}
+    },
     reset: () => {
       activeBuilds.clear();
       nodeVolumes.clear();

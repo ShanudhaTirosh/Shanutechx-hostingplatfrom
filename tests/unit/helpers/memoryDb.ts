@@ -8,8 +8,11 @@ export function memoryDb(seed: Record<string, any[]>) {
       const val = row[k];
       if (v && typeof v === 'object' && !(v instanceof Date)) {
         if ('lte' in v) return val != null && val <= v.lte;
+        if ('gte' in v) return val != null && val >= v.gte;
         if ('not' in v) return val !== v.not;
         if ('has' in v) return Array.isArray(val) && val.includes(v.has);
+        if ('contains' in v) return typeof val === 'string' && val.includes(v.contains);
+        if ('in' in v) return Array.isArray(v.in) && v.in.includes(val);
       }
       return val === v;
     });
@@ -31,6 +34,17 @@ export function memoryDb(seed: Record<string, any[]>) {
     },
     updateMany: async ({ where, data }: any) => { const rows = t[name].filter((r) => matches(r, where)); rows.forEach((r) => apply(r, data)); return { count: rows.length }; },
     update: async ({ where, data }: any) => { const r = t[name].find((x) => matches(x, where)); if (!r) throw new Error('not found'); apply(r, data); return structuredClone(r); },
+    upsert: async ({ where, create, update }: any) => {
+      let r = t[name].find((x) => matches(x, where));
+      if (r) {
+        apply(r, update);
+        return structuredClone(r);
+      } else {
+        r = { id: `new${++n}`, ...create };
+        t[name].push(r);
+        return structuredClone(r);
+      }
+    },
     delete: async ({ where }: any) => { const i = t[name].findIndex((x) => matches(x, where)); if (i < 0) throw new Error('not found'); return t[name].splice(i, 1)[0]; },
     create: async ({ data }: any) => { const r = { id: `new${++n}`, ...data }; t[name].push(r); return structuredClone(r); },
   });

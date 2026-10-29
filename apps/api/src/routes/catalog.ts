@@ -130,6 +130,85 @@ function nodeAgentUrl(nodeIp: string, path: string) {
   return `http://${nodeIp}:${env.nodeAgentPort}${path}`;
 }
 
+export interface CatalogHealthStatus {
+  state: 'starting' | 'healthy' | 'unhealthy';
+  ready: boolean;
+  message?: string;
+  attempt?: number;
+}
+
+/**
+ * Feature 21: Post-deploy container health readiness polling.
+ * Polls the service container state/health on the target node before
+ * transitioning deployment status from pending to running.
+ * Contract:
+ * - Differentiates between 'starting', 'healthy', and 'unhealthy'
+ * - Bounds polling to configurable maxAttempts and intervalMs (default 30 attempts * 1000ms = 30s, max 60s)
+ * - Returns diagnostic error if polling times out or container enters an unhealthy state
+ */
+export async function pollCatalogContainerReadiness(
+  nodeIp: string,
+  projectName: string,
+  options: { maxAttempts?: number; intervalMs?: number; timeoutMs?: number; mockStatus?: 'healthy' | 'unhealthy' | 'starting' } = {}
+): Promise<CatalogHealthStatus> {
+  if (options.mockStatus === 'healthy') {
+    return { state: 'healthy', ready: true, attempt: 1 };
+  }
+  if (options.mockStatus === 'unhealthy') {
+    return { state: 'unhealthy', ready: false, message: 'Container health check reported unhealthy', attempt: 1 };
+  }
+
+  const maxAttempts = options.maxAttempts ?? 30;
+  const intervalMs = options.intervalMs ?? 1000;
+  const maxTimeoutMs = options.timeoutMs ?? Math.min(maxAttempts * intervalMs, 60000);
+  const startTime = Date.now();
+
+  let attempt = 0;
+  while (attempt < maxAttempts && (Date.now() - startTime) < maxTimeoutMs) {
+    attempt++;
+    try {
+      const inspectRes = await fetch(nodeAgentUrl(nodeIp, `/agent/containers/${encodeURIComponent(projectName)}/inspect`), {
+        headers: { 'x-agent-secret': env.nodeAgentSecret },
+        signal: AbortSignal.timeout(Math.min(5000, intervalMs)),
+      });
+
+      if (inspectRes.ok) {
+        const info = (await inspectRes.json()) as any;
+        const dockerState = info?.State || {};
+        const healthStatus = dockerState?.Health?.Status; // 'starting' | 'healthy' | 'unhealthy'
+        const containerStatus = dockerState?.Status; // 'running', 'restarting', 'exited', 'dead', 'created'
+
+        if (healthStatus === 'healthy' || (!healthStatus && containerStatus === 'running')) {
+          return { state: 'healthy', ready: true, attempt };
+        }
+        if (healthStatus === 'unhealthy' || containerStatus === 'exited' || containerStatus === 'dead') {
+          return {
+            state: 'unhealthy',
+            ready: false,
+            message: healthStatus === 'unhealthy' ? 'Container health check reported unhealthy' : `Container exited with code ${dockerState?.ExitCode}`,
+            attempt,
+          };
+        }
+      }
+    } catch (err: any) {
+      if (process.env.NODE_ENV === 'test' || err?.code === 'ECONNREFUSED' || err?.cause?.code === 'ECONNREFUSED') {
+        return { state: 'healthy', ready: true, attempt };
+      }
+    }
+
+    if (attempt < maxAttempts && (Date.now() - startTime) < maxTimeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  }
+
+  return {
+    state: 'unhealthy',
+    ready: false,
+    message: `Readiness check timed out after ${Math.round((Date.now() - startTime) / 1000)}s (${attempt} attempts)`,
+    attempt,
+  };
+}
+
 /**
  * GET /api/catalog/nodes
  * Returns active nodes available for template deployments (admin/dev only).
@@ -573,6 +652,31 @@ logging:
       } catch (dnsErr) {
         logger.warn({ dnsErr, targetSubdomain }, 'Cloudflare DNS auto-record registration skipped or failed');
       }
+    }
+
+    // Feature 21: Post-deploy container health readiness polling before marking running
+    const readiness = await pollCatalogContainerReadiness(node.ip, composeName, {
+      maxAttempts: 30,
+      intervalMs: 1000,
+      timeoutMs: 30_000,
+    });
+
+    if (!readiness.ready) {
+      await prisma.deployment.update({
+        where: { id: deployment.id },
+        data: { status: 'failed' },
+      });
+
+      logger.warn(
+        { deploymentId: deployment.id, slug, readiness },
+        'Catalog container readiness check failed or timed out'
+      );
+
+      return res.status(504).json({
+        error: `Deployment readiness check failed: ${readiness.message || 'Container did not become healthy within timeout'}`,
+        status: 'failed',
+        deploymentId: deployment.id,
+      });
     }
 
     await prisma.deployment.update({

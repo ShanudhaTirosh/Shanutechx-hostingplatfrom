@@ -52,11 +52,11 @@
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
 | M1 | Core Platform Integrity & Test Baseline | Features 1-6: Fix `@shanutechx/catalog`, `requireDev`, `mailboxAcl`, `repo.js`, doc files, 100% unit tests pass | none | DONE |
-| M2 | Container Management & Build System | Features 7-11: Real Docker volume provisioning, `run-image` route, build secrets protection, build cancellation, container metrics | M1 | IN_PROGRESS |
-| M3 | Self-Hosted Supabase & Managed Databases | Features 12-19: Supabase persistent volumes, meta routing, real health checks, MariaDB engine, DB volume binds, real DB stats, backup/restore jobs | M2 | PLANNED |
-| M4 | Application Deployments & Service Catalog | Features 20-22: Immutable release history & commit rollback, catalog readiness polling, git build pipelines | M2 | PLANNED |
-| M5 | Reverse Proxy, TLS, Remote Infra & Email | Features 23-27: Traefik resolver reconciliation, shared dynamic volume, real Traefik status, WildDuck email provisioning, RBAC audit | M3, M4 | PLANNED |
-| M6 | Final Verification & Adversarial Hardening | Features 29-30: Pass 100% E2E tests (Tiers 1-4), Tier 5 adversarial hardening | M5, E2E Track | PLANNED |
+| M2 | Container Management & Build System | Features 7-11: Real Docker volume provisioning, `run-image` route, build secrets protection, build cancellation, container metrics | M1 | DONE |
+| M3 | Self-Hosted Supabase & Managed Databases | Features 12-19: Supabase persistent volumes, meta routing, real health checks, MariaDB engine, DB volume binds, real DB stats, backup/restore jobs | M2 | DONE |
+| M4 | Application Deployments & Service Catalog | Features 20-22: Immutable release history & commit rollback, catalog readiness polling, git build pipelines | M2 | DONE |
+| M5 | Reverse Proxy, TLS, Remote Infra & Email | Features 23-27: Traefik resolver reconciliation, shared dynamic volume, real Traefik status, WildDuck email provisioning, RBAC audit | M3, M4 | DONE |
+| M6 | Final Verification & Adversarial Hardening | Features 29-30: Pass 100% E2E tests (Tiers 1-4), Tier 5 adversarial hardening | M5, E2E Track | DONE |
 
 ## Parallel Dual Track: E2E Testing
 - **E2E Testing Orchestrator**: Runs in parallel with Implementation Milestones M1-M5.

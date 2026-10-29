@@ -1,6 +1,6 @@
 // ─── Managed Database Types ───────────────────────────────────────────────
 
-export type DbEngine = 'postgresql' | 'mysql' | 'mongodb' | 'redis';
+export type DbEngine = 'postgresql' | 'mysql' | 'mongodb' | 'redis' | 'mariadb';
 
 export type DbStatus = 'provisioning' | 'running' | 'stopped' | 'error';
 

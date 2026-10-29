@@ -9,6 +9,7 @@ const IMAGES = {
   // and exposed at the API layer, but never actually provisionable here —
   // requesting a mongodb database silently threw "Unknown database type".
   mongodb: 'mongo:7',
+  mariadb: 'mariadb:11',
 };
 
 const DEFAULT_PORTS = {
@@ -16,6 +17,15 @@ const DEFAULT_PORTS = {
   mysql: 3306,
   redis: 6379,
   mongodb: 27017,
+  mariadb: 3306,
+};
+
+const DATA_DIRS = {
+  postgres: '/var/lib/postgresql/data',
+  mysql: '/var/lib/mysql',
+  redis: '/data',
+  mongodb: '/data/db',
+  mariadb: '/var/lib/mysql',
 };
 
 /**
@@ -26,13 +36,16 @@ async function provisionDatabase({ databaseId, type, password, publicAccess = fa
   const image = IMAGES[type];
   if (!image) throw new Error(`Unknown database type: ${type}`);
 
-  const containerName = `db-${databaseId}`;
+  const cleanDbId = String(databaseId).replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!cleanDbId) throw new Error('Invalid databaseId provided');
+
+  const containerName = `db-${cleanDbId}`;
   const internalPort = DEFAULT_PORTS[type];
 
   const env =
     type === 'postgres'
       ? [`POSTGRES_PASSWORD=${password}`, 'POSTGRES_USER=app', 'POSTGRES_DB=app']
-      : type === 'mysql'
+      : type === 'mysql' || type === 'mariadb'
         ? [`MYSQL_ROOT_PASSWORD=${password}`, 'MYSQL_DATABASE=app']
         : type === 'mongodb'
           ? [`MONGO_INITDB_ROOT_USERNAME=app`, `MONGO_INITDB_ROOT_PASSWORD=${password}`, 'MONGO_INITDB_DATABASE=app']
@@ -49,6 +62,8 @@ async function provisionDatabase({ databaseId, type, password, publicAccess = fa
     portBindings[portKey] = [{ HostPort: String(hostPort) }];
   }
 
+  const containerDataDir = DATA_DIRS[type] || '/var/lib/data';
+
   const container = await docker.createContainer({
     Image: image,
     name: containerName,
@@ -59,6 +74,7 @@ async function provisionDatabase({ databaseId, type, password, publicAccess = fa
       NetworkMode: 'shanutechx-internal',
       RestartPolicy: { Name: 'unless-stopped' },
       SecurityOpt: ['no-new-privileges:true'],
+      Binds: [`db-${cleanDbId}-data:${containerDataDir}:rw`],
       ...(Object.keys(portBindings).length > 0 ? { PortBindings: portBindings } : {}),
     },
   });
@@ -100,7 +116,7 @@ async function rotateDatabasePassword({ containerId, type, oldPassword, newPassw
   if (type === 'postgres') {
     const pgUser = cleanUsername || 'postgres';
     cmd = ['psql', '-U', pgUser, '-c', `ALTER USER "${pgUser}" WITH PASSWORD '${escapeSql(newPassword)}';` ];
-  } else if (type === 'mysql') {
+  } else if (type === 'mysql' || type === 'mariadb') {
     const mysqlUser = cleanUsername || 'root';
     cmd = ['mysql', `-u${mysqlUser}`, `-p${oldPassword}`, '-e', `ALTER USER '${mysqlUser}'@'%' IDENTIFIED BY '${escapeSql(newPassword)}'; FLUSH PRIVILEGES;` ];
   } else if (type === 'redis') {
@@ -159,7 +175,7 @@ async function manageDatabaseUser({ containerId, type, action, username, passwor
       if (role) parts.push(role === 'admin' ? 'SUPERUSER' : 'NOSUPERUSER');
       cmd = ['psql', '-U', pgAdmin, '-c', `ALTER USER "${cleanUser}" WITH ${parts.join(' ')};` ];
     }
-  } else if (type === 'mysql') {
+  } else if (type === 'mysql' || type === 'mariadb') {
     const mysqlPass = masterPassword ? `-p${masterPassword}` : '-proot';
     if (action === 'create') {
       const grant = role === 'read_only' ? 'SELECT' : 'ALL PRIVILEGES';
@@ -236,7 +252,7 @@ async function executeDatabaseQuery({ containerId, type, query, masterPassword, 
   if (type === 'postgres') {
     const targetDb = (dbName && String(dbName).replace(/[^a-zA-Z0-9_-]/g, '')) || 'postgres';
     cmd = ['psql', '-U', 'postgres', '-d', targetDb, '-c', query];
-  } else if (type === 'mysql') {
+  } else if (type === 'mysql' || type === 'mariadb') {
     const mysqlPass = masterPassword ? `-p${masterPassword}` : '-proot';
     const targetDb = dbName ? ['-D', String(dbName).replace(/[^a-zA-Z0-9_-]/g, '')] : [];
     cmd = ['mysql', '-uroot', mysqlPass, ...targetDb, '-e', query];
@@ -285,9 +301,12 @@ async function executeDatabaseQuery({ containerId, type, query, masterPassword, 
  */
 async function backupDatabase({ containerId, type, databaseId, masterPassword }) {
   ensureBackupDir();
+  const cleanDbId = String(databaseId).replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!cleanDbId) throw new Error('Invalid databaseId provided');
+
   const container = docker.getContainer(containerId);
   const timestamp = Date.now();
-  const backupId = `snap_${databaseId}_${timestamp}`;
+  const backupId = `snap_${cleanDbId}_${timestamp}`;
   const filename = `${backupId}.dump`;
   const filePath = path.join(BACKUP_DIR, filename);
 
@@ -311,7 +330,7 @@ async function backupDatabase({ containerId, type, databaseId, masterPassword })
     let cmd = [];
     if (type === 'postgres') {
       cmd = ['pg_dumpall', '-U', 'postgres'];
-    } else if (type === 'mysql') {
+    } else if (type === 'mysql' || type === 'mariadb') {
       const mysqlPass = masterPassword ? `-p${masterPassword}` : '-proot';
       cmd = ['mysqldump', '-uroot', mysqlPass, '--all-databases'];
     } else if (type === 'mongodb') {
@@ -356,7 +375,8 @@ async function backupDatabase({ containerId, type, databaseId, masterPassword })
  */
 async function listDatabaseBackups({ databaseId }) {
   ensureBackupDir();
-  const prefix = `snap_${databaseId}_`;
+  const cleanDbId = String(databaseId).replace(/[^a-zA-Z0-9_-]/g, '');
+  const prefix = `snap_${cleanDbId}_`;
   const files = fs.readdirSync(BACKUP_DIR).filter((f) => f.startsWith(prefix) && f.endsWith('.dump'));
 
   return files.map((filename) => {
@@ -367,7 +387,7 @@ async function listDatabaseBackups({ databaseId }) {
     const timestamp = parseInt(timestampStr, 10) || stats.mtimeMs;
     return {
       backupId,
-      databaseId,
+      databaseId: cleanDbId,
       filename,
       sizeBytes: stats.size,
       createdAt: new Date(timestamp).toISOString(),
@@ -380,7 +400,8 @@ async function listDatabaseBackups({ databaseId }) {
  */
 async function restoreDatabase({ containerId, type, databaseId, backupId, masterPassword }) {
   ensureBackupDir();
-  const safeBackupId = path.basename(backupId);
+  const cleanDbId = String(databaseId).replace(/[^a-zA-Z0-9_-]/g, '');
+  const safeBackupId = path.basename(backupId).replace(/[^a-zA-Z0-9_.-]/g, '');
   const filename = safeBackupId.endsWith('.dump') ? safeBackupId : `${safeBackupId}.dump`;
   const filePath = path.join(BACKUP_DIR, filename);
 
@@ -419,7 +440,7 @@ async function restoreDatabase({ containerId, type, databaseId, backupId, master
   let cmd = [];
   if (type === 'postgres') {
     cmd = ['psql', '-U', 'postgres', '-d', 'postgres'];
-  } else if (type === 'mysql') {
+  } else if (type === 'mysql' || type === 'mariadb') {
     const mysqlPass = masterPassword ? `-p${masterPassword}` : '-proot';
     cmd = ['mysql', '-uroot', mysqlPass];
   } else if (type === 'mongodb') {
@@ -472,6 +493,9 @@ async function pingDatabase({ containerId, type, masterPassword, dbName }) {
 }
 
 module.exports = {
+  IMAGES,
+  DEFAULT_PORTS,
+  DATA_DIRS,
   provisionDatabase,
   scaleDatabase,
   rotateDatabasePassword,

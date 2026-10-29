@@ -333,6 +333,28 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
           ...(commitMessage ? { gitCommitMessage: commitMessage } : {}),
         },
       });
+
+      // Record immutable release in ledger
+      const releaseSha = commitHash || crypto.createHash('sha1').update(`${deployment.id}-${Date.now()}`).digest('hex');
+      await prisma.deploymentRelease.updateMany({
+        where: { deploymentId: deployment.id, isCurrent: true },
+        data: { isCurrent: false },
+      }).catch(() => {});
+
+      await prisma.deploymentRelease.create({
+        data: {
+          deploymentId: deployment.id,
+          gitSha: releaseSha && releaseSha.length >= 40 ? releaseSha : releaseSha.padEnd(40, '0'),
+          commitMessage: commitMessage || 'Deploy on git push webhook',
+          imageTag: `shanutechx/${deployment.id}:${releaseSha.slice(0, 7)}`,
+          config: {
+            internalPort: deployment.internalPort,
+            startCommand: deployment.startCommand,
+          },
+          isCurrent: true,
+          deployedAt: new Date(),
+        },
+      }).catch(() => {});
     } catch (err: any) {
       logger.error({ err, deploymentId: deployment.id }, 'Webhook-triggered redeploy failed');
       await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'failed' } }).catch(() => null);
@@ -341,6 +363,164 @@ deployWebhooksRouter.post('/deploy-webhooks/:deploymentId', async (req, res) => 
         Branch: pushedBranch ?? '(default)',
         Error: err.message,
       });
+    }
+  })();
+});
+
+/**
+ * Feature 22: POST /webhooks/github and POST /deploy-webhooks/github
+ * Central GitHub webhook handler (push, ping) supporting repository and org level webhooks.
+ * Hardened HMAC SHA-256 signature validation with timing-safe comparison.
+ */
+deployWebhooksRouter.post(['/webhooks/github', '/deploy-webhooks/github'], async (req, res) => {
+  const event = req.headers['x-github-event'] as string | undefined;
+  const githubSignature = req.headers['x-hub-signature-256'] as string | undefined;
+  const payload = req.body || {};
+
+  if (event === 'ping') {
+    return res.status(200).json({ ok: true, message: 'pong' });
+  }
+
+  const repoFullName = payload.repository?.full_name;
+  const cloneUrl = payload.repository?.clone_url || payload.repository?.html_url;
+  const ref = typeof payload.ref === 'string' ? payload.ref : undefined;
+  const pushedBranch = ref?.replace('refs/heads/', '');
+
+  if (!repoFullName && !cloneUrl) {
+    return res.status(400).json({ error: 'Missing repository information in GitHub webhook payload' });
+  }
+
+  // Find all deployments matching this repository
+  const deployments = await prisma.deployment.findMany({
+    where: {
+      autoDeploy: true,
+      OR: [
+        ...(repoFullName ? [{ repoUrl: { contains: repoFullName } }] : []),
+        ...(cloneUrl ? [{ repoUrl: cloneUrl }] : []),
+      ],
+    },
+    include: { node: true },
+  });
+
+  if (deployments.length === 0) {
+    return res.status(200).json({ accepted: false, reason: 'No matching auto-deploy deployments found' });
+  }
+
+  const rawBody = (req as any).rawBody;
+  const rawPayload = rawBody
+    ? (Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(String(rawBody), 'utf8'))
+    : Buffer.from(JSON.stringify(payload), 'utf8');
+
+  let verified = false;
+  let matchingDeployment = null;
+
+  for (const dep of deployments) {
+    let secret = dep.deployWebhookSecret;
+    if (secret) {
+      try {
+        secret = decryptSecret(secret, env.secretsEncryptionKey);
+      } catch {}
+    }
+    const candidateSecret = secret || process.env.GITHUB_WEBHOOK_SECRET || env.prWebhookSecret;
+    if (candidateSecret && githubSignature) {
+      const expected = 'sha256=' + crypto.createHmac('sha256', candidateSecret).update(rawPayload).digest('hex');
+      try {
+        if (expected.length === githubSignature.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(githubSignature))) {
+          verified = true;
+          matchingDeployment = dep;
+          break;
+        }
+      } catch {}
+    }
+  }
+
+  if (!verified) {
+    logger.warn({ repoFullName, event }, 'GitHub webhook signature verification failed');
+    return res.status(401).json({ error: 'Invalid webhook signature' });
+  }
+
+  const deployment = matchingDeployment!;
+  if (deployment.branch && pushedBranch && pushedBranch !== deployment.branch) {
+    return res.status(200).json({
+      accepted: false,
+      reason: `Ignored push to branch '${pushedBranch}'; deployment tracks '${deployment.branch}'`,
+    });
+  }
+
+  const headCommit = payload.head_commit || (Array.isArray(payload.commits) ? payload.commits[0] : null);
+  const commitHash = headCommit?.id ? String(headCommit.id).slice(0, 7) : undefined;
+  const commitMessage = headCommit?.message ? String(headCommit.message).split('\n')[0].slice(0, 255) : undefined;
+
+  res.status(202).json({
+    accepted: true,
+    deploymentId: deployment.id,
+    branch: pushedBranch ?? '(default)',
+    commitHash,
+  });
+
+  void (async () => {
+    try {
+      await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'building' } });
+      const result = await buildAndRun(
+        deployment.node,
+        {
+          deploymentId: deployment.id,
+          repoUrl: deployment.repoUrl!,
+          branch: pushedBranch || deployment.branch || undefined,
+          subdomain: deployment.subdomain ?? undefined,
+          internalPort: deployment.internalPort!,
+          envVars: getDecryptedEnvVars(deployment),
+          startCommand: deployment.startCommand ?? undefined,
+          entryFile: deployment.entryFile ?? undefined,
+          frameworkPreset: deployment.frameworkPreset ?? undefined,
+          cpuLimit: deployment.cpuLimit ?? undefined,
+          memoryLimit: deployment.memoryLimit ?? undefined,
+          storageLimit: deployment.storageLimit ?? undefined,
+          exposureMode: deployment.exposureMode ?? undefined,
+          publishedPort: deployment.publishedPort ?? undefined,
+        },
+        () => {}
+      );
+
+      if (result.phase === 'error') {
+        await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'failed' } });
+        return;
+      }
+
+      await prisma.deployment.update({
+        where: { id: deployment.id },
+        data: {
+          status: 'running',
+          containerId: result.containerId,
+          lastDeployAt: new Date(),
+          ...(commitHash ? { gitCommitHash: commitHash } : {}),
+          ...(commitMessage ? { gitCommitMessage: commitMessage } : {}),
+        },
+      });
+
+      const releaseSha = commitHash || crypto.createHash('sha1').update(`${deployment.id}-${Date.now()}`).digest('hex');
+      await prisma.deploymentRelease.updateMany({
+        where: { deploymentId: deployment.id, isCurrent: true },
+        data: { isCurrent: false },
+      }).catch(() => {});
+
+      await prisma.deploymentRelease.create({
+        data: {
+          deploymentId: deployment.id,
+          gitSha: releaseSha && releaseSha.length >= 40 ? releaseSha : releaseSha.padEnd(40, '0'),
+          commitMessage: commitMessage || 'Deploy on git push webhook',
+          imageTag: `shanutechx/${deployment.id}:${releaseSha.slice(0, 7)}`,
+          config: {
+            internalPort: deployment.internalPort,
+            startCommand: deployment.startCommand,
+          },
+          isCurrent: true,
+          deployedAt: new Date(),
+        },
+      }).catch(() => {});
+    } catch (err: any) {
+      logger.error({ err, deploymentId: deployment.id }, 'GitHub webhook build trigger failed');
+      await prisma.deployment.update({ where: { id: deployment.id }, data: { status: 'failed' } }).catch(() => {});
     }
   })();
 });

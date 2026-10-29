@@ -426,6 +426,20 @@ deploymentsRouter.post('/deployments/:id/launch', async (req: AuthedRequest, res
       },
     });
 
+    const releaseSha = updatedDeployment.gitCommitHash || crypto.createHash('sha1').update(`${updatedDeployment.id}-${Date.now()}`).digest('hex');
+    await recordDeploymentRelease({
+      deploymentId: updatedDeployment.id,
+      gitSha: releaseSha,
+      commitMessage: updatedDeployment.gitCommitMessage || 'Initial deployment',
+      imageTag: `shanutechx/${updatedDeployment.id}:${releaseSha.slice(0, 7)}`,
+      config: {
+        internalPort,
+        startCommand: updatedDeployment.startCommand,
+        exposureMode: updatedDeployment.exposureMode,
+      },
+      deployedBy: req.user!.id,
+    }).catch(() => {});
+
     res.write(JSON.stringify({ phase: 'complete', deploymentId: updatedDeployment.id, subdomain: updatedDeployment.subdomain }) + '\n');
     res.end();
   } catch (err: any) {
@@ -1183,6 +1197,20 @@ deploymentsRouter.post('/deployments/:id/redeploy', async (req: AuthedRequest, r
       data: { status: 'running', containerId: result.containerId, lastDeployAt: new Date() },
     });
 
+    const redeploySha = deployment.gitCommitHash || crypto.createHash('sha1').update(`${deployment.id}-${Date.now()}`).digest('hex');
+    await recordDeploymentRelease({
+      deploymentId: deployment.id,
+      gitSha: redeploySha,
+      commitMessage: deployment.gitCommitMessage || 'Redeployment',
+      imageTag: `shanutechx/${deployment.id}:${redeploySha.slice(0, 7)}`,
+      config: {
+        internalPort: deployment.internalPort,
+        startCommand: deployment.startCommand,
+        exposureMode: deployment.exposureMode,
+      },
+      deployedBy: req.user!.id,
+    }).catch(() => {});
+
     res.write(JSON.stringify({ phase: 'complete', deploymentId: deployment.id }) + '\n');
     res.end();
   } catch (err) {
@@ -1236,6 +1264,19 @@ deploymentsRouter.post('/deployments/:id/sync-git', async (req: AuthedRequest, r
       lastDeployAt: new Date(),
     },
   });
+
+  await recordDeploymentRelease({
+    deploymentId: deployment.id,
+    gitSha: commitHash,
+    commitMessage,
+    imageTag: `shanutechx/${deployment.id}:${commitHash.slice(0, 7)}`,
+    config: {
+      internalPort: deployment.internalPort,
+      startCommand: deployment.startCommand,
+      exposureMode: deployment.exposureMode,
+    },
+    deployedBy: req.user!.id,
+  }).catch(() => {});
 
   res.json({
     ok: true,
@@ -2042,10 +2083,71 @@ deploymentsRouter.post('/deployments/cas-upload', async (req: AuthedRequest, res
   });
 });
 
-// ─── SUB-SECOND INSTANT ROLLBACK ROUTING ENGINE ───────────────────────────
+// ─── IMMUTABLE DEPLOYMENT RELEASE LEDGER & SUB-SECOND ROLLBACK ROUTING ENGINE ───────────
+
+export interface DeploymentReleaseRecord {
+  id: string;
+  deploymentId: string;
+  gitSha: string;
+  commitMessage: string | null;
+  imageTag: string | null;
+  config: any;
+  deployedAt: Date;
+  deployedBy: string | null;
+  isCurrent: boolean;
+  createdAt: Date;
+}
+
+export async function recordDeploymentRelease(params: {
+  deploymentId: string;
+  gitSha: string;
+  commitMessage?: string | null;
+  imageTag?: string | null;
+  config?: any;
+  deployedBy?: string | null;
+}): Promise<Readonly<DeploymentReleaseRecord>> {
+  const { deploymentId, gitSha, commitMessage, imageTag, config, deployedBy } = params;
+
+  // Unset previous current releases
+  await prisma.deploymentRelease.updateMany({
+    where: { deploymentId, isCurrent: true },
+    data: { isCurrent: false },
+  }).catch(() => {});
+
+  // Create immutable ledger release
+  const release = await prisma.deploymentRelease.create({
+    data: {
+      deploymentId,
+      gitSha: gitSha && gitSha.length >= 40 ? gitSha : (gitSha || crypto.randomBytes(20).toString('hex')),
+      commitMessage: commitMessage || null,
+      imageTag: imageTag || `shanutechx/${deploymentId}:${(gitSha || 'latest').slice(0, 7)}`,
+      config: config || {},
+      deployedBy: deployedBy || null,
+      isCurrent: true,
+      deployedAt: new Date(),
+    },
+  });
+
+  return Object.freeze({ ...release });
+}
+
+deploymentsRouter.get('/deployments/:id/releases', async (req: AuthedRequest, res) => {
+  const deployment = await loadOwnedDeployment(req, req.params.id);
+  if (!deployment) return res.status(404).json({ error: 'Deployment not found' });
+
+  const releases = await prisma.deploymentRelease.findMany({
+    where: { deploymentId: deployment.id },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return res.json({ releases });
+});
 
 const rollbackSchema = z.object({
-  targetDeploymentId: z.string().min(1),
+  targetDeploymentId: z.string().min(1).optional(),
+  targetReleaseId: z.string().min(1).optional(),
+  releaseId: z.string().min(1).optional(),
+  gitSha: z.string().min(1).optional(),
 });
 
 deploymentsRouter.post('/deployments/:id/rollback', async (req: AuthedRequest, res) => {
@@ -2056,7 +2158,99 @@ deploymentsRouter.post('/deployments/:id/rollback', async (req: AuthedRequest, r
   const parsed = rollbackSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const targetDeployment = await loadOwnedDeployment(req, parsed.data.targetDeploymentId);
+  const targetReleaseId = parsed.data.releaseId || parsed.data.targetReleaseId;
+  const targetGitSha = parsed.data.gitSha;
+  const targetDeploymentId = parsed.data.targetDeploymentId;
+
+  // Branch 1: Rollback to historical release ledger record
+  if (targetReleaseId || targetGitSha) {
+    const release = await prisma.deploymentRelease.findFirst({
+      where: {
+        deploymentId: currentDeployment.id,
+        ...(targetReleaseId ? { id: targetReleaseId } : { gitSha: targetGitSha }),
+      },
+    });
+
+    if (!release) {
+      return res.status(404).json({ error: 'Target release not found in deployment release ledger' });
+    }
+
+    try {
+      if (currentDeployment.subdomain) {
+        await prisma.deploymentPointer.upsert({
+          where: { subdomain: currentDeployment.subdomain },
+          create: {
+            projectId: currentDeployment.id,
+            subdomain: currentDeployment.subdomain,
+            deploymentId: currentDeployment.id,
+            targetIp: currentDeployment.node.ip,
+            targetPort: currentDeployment.internalPort || 3000,
+            isProduction: true,
+          },
+          update: {
+            targetIp: currentDeployment.node.ip,
+            targetPort: currentDeployment.internalPort || 3000,
+            updatedAt: new Date(),
+          },
+        }).catch(() => {});
+      }
+
+      await prisma.deployment.update({
+        where: { id: currentDeployment.id },
+        data: {
+          status: 'running',
+          gitCommitHash: release.gitSha,
+          gitCommitMessage: release.commitMessage,
+          lastDeployAt: new Date(),
+        },
+      });
+
+      await prisma.deploymentRelease.updateMany({
+        where: { deploymentId: currentDeployment.id, isCurrent: true },
+        data: { isCurrent: false },
+      }).catch(() => {});
+
+      await prisma.deploymentRelease.update({
+        where: { id: release.id },
+        data: { isCurrent: true },
+      }).catch(() => {});
+
+      await prisma.auditLog.create({
+        data: {
+          adminId: req.user!.id,
+          action: 'deployment.rollback',
+          target: currentDeployment.id,
+        },
+      }).catch(() => {});
+
+      const rollbackDurationMs = Date.now() - startTime;
+
+      logger.info({
+        currentDeploymentId: currentDeployment.id,
+        releaseId: release.id,
+        gitSha: release.gitSha,
+        rollbackDurationMs,
+      }, 'Instant deployment rollback from release ledger executed');
+
+      return res.json({
+        ok: true,
+        subdomain: currentDeployment.subdomain,
+        activeRelease: release.id,
+        gitSha: release.gitSha,
+        rollbackDurationMs,
+      });
+    } catch (err: any) {
+      logger.error({ err, currentId: currentDeployment.id, releaseId: release.id }, 'Rollback execution failed');
+      return res.status(500).json({ error: err.message || 'Rollback execution failed' });
+    }
+  }
+
+  // Branch 2: Target Deployment container pointer swap
+  if (!targetDeploymentId) {
+    return res.status(400).json({ error: 'Either releaseId, gitSha, or targetDeploymentId must be provided for rollback' });
+  }
+
+  const targetDeployment = await loadOwnedDeployment(req, targetDeploymentId);
   if (!targetDeployment) return res.status(404).json({ error: 'Target rollback deployment not found' });
 
   if (!targetDeployment.containerId || targetDeployment.status !== 'running') {
@@ -2101,6 +2295,15 @@ deploymentsRouter.post('/deployments/:id/rollback', async (req: AuthedRequest, r
         lastDeployAt: new Date(),
       },
     });
+
+    // Record audit log
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        action: 'deployment.rollback',
+        target: currentDeployment.id,
+      },
+    }).catch(() => {});
 
     const rollbackDurationMs = Date.now() - startTime;
 

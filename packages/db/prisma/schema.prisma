@@ -147,6 +147,7 @@ enum ManagedDatabaseType {
   mysql
   redis
   mongodb
+  mariadb
 }
 
 enum ManagedDatabaseStatus {
@@ -652,6 +653,7 @@ model Deployment {
   volumes       DeploymentVolume[]
   backups       DeploymentBackup[]
   backupPolicy  DeploymentBackupPolicy?
+  releases      DeploymentRelease[]
 
   @@index([userId])
   @@index([teamId])
@@ -2229,6 +2231,24 @@ model DeploymentPointer {
 
   @@index([projectId])
   @@index([subdomain])
+}
+
+// Immutable Release Ledger (Git commit history, image tags, config snapshots)
+model DeploymentRelease {
+  id            String     @id @default(cuid())
+  deploymentId  String
+  deployment    Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  gitSha        String
+  commitMessage String?
+  imageTag      String?
+  config        Json?
+  deployedAt    DateTime   @default(now())
+  deployedBy    String?
+  isCurrent     Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+
+  @@index([deploymentId, isCurrent])
+  @@index([deploymentId, createdAt])
 }
 
 // Preview Toolbar Visual Comments & Feedback

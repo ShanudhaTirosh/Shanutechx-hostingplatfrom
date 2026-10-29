@@ -5,6 +5,8 @@
  * host port (or back to HTTP routing). buildAndRun fills whatever the caller left out from the deployment record.
  */
 
+import { prisma } from './prisma';
+
 export interface StoredExposure {
   exposureMode: string | null;
   publishedPort: number | null;
@@ -35,7 +37,6 @@ export async function resolveExposureForBuild(
 
 const defaultDeps: ExposureDeps = {
   async load(deploymentId) {
-    const { prisma } = await import('./prisma');
     const row = await prisma.deployment.findUnique({ where: { id: deploymentId }, select: { exposureMode: true, publishedPort: true } });
     return row ? { exposureMode: row.exposureMode ?? null, publishedPort: row.publishedPort ?? null } : null;
   },

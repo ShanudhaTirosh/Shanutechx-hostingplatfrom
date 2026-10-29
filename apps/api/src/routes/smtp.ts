@@ -17,6 +17,7 @@ import { logger } from '../lib/logger';
 import dns from 'dns';
 import { wildduckClient } from '../lib/wildduckClient';
 import { getServerIp, buildSpfRecord } from '../lib/mailAuth';
+import { dispatchJob } from '../lib/jobQueue';
 
 import { useForOwnRoutes } from '../lib/routerGuard';
 export const smtpRouter = Router();
@@ -392,6 +393,22 @@ smtpRouter.post('/smtp-accounts', requireDev, async (req: AuthedRequest, res) =>
 
   await prisma.auditLog.create({
     data: { adminId: req.user!.id, action: 'smtp.create', target: account.id },
+  });
+
+  // Dispatch mailbox provisioning job to configure WildDuck cluster
+  void dispatchJob({
+    type: 'mailbox_provision',
+    payload: {
+      mailboxId: account.id,
+      email: account.smtpUsername,
+      password: smtpPassword,
+      storageQuotaMb: account.storageQuotaMb,
+    },
+    userId: account.userId,
+    resourceType: 'smtpAccount',
+    resourceId: account.id,
+  }).catch((err: any) => {
+    logger.warn({ err: err?.message, accountId: account.id }, 'Mailbox provision job dispatch notice');
   });
 
   // Automatically dispatch Release Email to client

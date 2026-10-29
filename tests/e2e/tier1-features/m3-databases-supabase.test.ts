@@ -236,10 +236,13 @@ describe('Tier 1: Milestone 3 — Self-Hosted Supabase & Managed Databases', () 
       assert.equal(typeof managedDb.scaleDatabase, 'function');
     });
 
-    it('16.2: Supported database engine images define postgres, mysql, redis, and mongodb', async () => {
+    it('16.2: Supported database engine images define postgres, mysql, redis, mongodb, and mariadb', async () => {
       const managedDb = await import('../../../services/node-agent/src/managedDb.js');
-      // Verify image constants exist
-      assert.ok(managedDb.provisionDatabase);
+      assert.ok(managedDb.IMAGES.postgres);
+      assert.ok(managedDb.IMAGES.mysql);
+      assert.ok(managedDb.IMAGES.redis);
+      assert.ok(managedDb.IMAGES.mongodb);
+      assert.equal(managedDb.IMAGES.mariadb, 'mariadb:11');
     });
 
     it('16.3: Database container naming convention uses db-${databaseId} prefix', () => {
@@ -248,17 +251,13 @@ describe('Tier 1: Milestone 3 — Self-Hosted Supabase & Managed Databases', () 
       assert.equal(containerName, 'db-mdb_test_123');
     });
 
-    it('16.4: Volume persistence contract maps engine-specific data directories', () => {
-      const mappings: Record<string, string> = {
-        postgres: '/var/lib/postgresql/data',
-        mysql: '/var/lib/mysql',
-        redis: '/data',
-        mongodb: '/data/db',
-        mariadb: '/var/lib/mysql',
-      };
-      for (const [engine, expectedDir] of Object.entries(mappings)) {
-        assert.ok(expectedDir.startsWith('/'), `${engine} path must be absolute`);
-      }
+    it('16.4: Volume persistence contract maps engine-specific data directories', async () => {
+      const managedDb = await import('../../../services/node-agent/src/managedDb.js');
+      assert.equal(managedDb.DATA_DIRS.postgres, '/var/lib/postgresql/data');
+      assert.equal(managedDb.DATA_DIRS.mysql, '/var/lib/mysql');
+      assert.equal(managedDb.DATA_DIRS.redis, '/data');
+      assert.equal(managedDb.DATA_DIRS.mongodb, '/data/db');
+      assert.equal(managedDb.DATA_DIRS.mariadb, '/var/lib/mysql');
     });
 
     it('16.5: Volume bind format specifies hostPath:containerPath:rw', () => {
@@ -287,9 +286,10 @@ describe('Tier 1: Milestone 3 — Self-Hosted Supabase & Managed Databases', () 
       assert.equal(defaultPort, 3306);
     });
 
-    it('17.3: MariaDB engine uses mariadb:11 Docker image tag contract', () => {
-      const image = 'mariadb:11';
-      assert.ok(image.startsWith('mariadb:'));
+    it('17.3: MariaDB engine uses mariadb:11 Docker image tag contract', async () => {
+      const managedDb = await import('../../../services/node-agent/src/managedDb.js');
+      assert.equal(managedDb.IMAGES.mariadb, 'mariadb:11');
+      assert.equal(managedDb.DEFAULT_PORTS.mariadb, 3306);
     });
 
     it('17.4: Managed database provisioning requires user authorization', async () => {
@@ -352,11 +352,15 @@ describe('Tier 1: Milestone 3 — Self-Hosted Supabase & Managed Databases', () 
   });
 
   describe('Feature 19: Supabase Backup & Restore Handlers', () => {
-    it('19.1: Infrastructure job payload schema supports supabase_backup job type', () => {
-      const jobTypes = ['supabase_provision', 'supabase_deprovision', 'supabase_backup', 'supabase_restore'];
-      for (const t of jobTypes) {
-        assert.ok(typeof t === 'string');
-      }
+    it('19.1: Infrastructure job processor exports real supabase_backup, restore, and deprovision handlers', async () => {
+      const {
+        processSupabaseBackup,
+        processSupabaseRestore,
+        processSupabaseDeprovision,
+      } = await import('../../../apps/api/src/jobs/infrastructure-job-processor');
+      assert.equal(typeof processSupabaseBackup, 'function');
+      assert.equal(typeof processSupabaseRestore, 'function');
+      assert.equal(typeof processSupabaseDeprovision, 'function');
     });
 
     it('19.2: Backup job payload requires projectId and target snapshot storage', () => {

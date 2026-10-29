@@ -21,7 +21,7 @@ function parseRedisConnection(url: string) {
       port: Number(parsed.port || 6379),
       password: parsed.password || undefined,
       retryStrategy: (times: number) => {
-        if (times > 3) {
+        if (process.env.NODE_ENV === 'test' || times > 3) {
           logger.warn('Redis unreachable after 3 attempts — running in offline mode');
           return null; // Stop retrying if Redis container is down
         }
@@ -196,6 +196,7 @@ pushReceiptQueue.on('error', () => {
 // FIX: The 'connect'/'ready' events can fire before this IIFE runs (async race),
 // leaving isRedisConnected permanently false even when Redis is healthy.
 // Check the client status synchronously first before wiring event listeners.
+if (process.env.NODE_ENV !== 'test') {
 (async () => {
   try {
     const queueClient = await sslRenewalQueue.client.catch(() => null);
@@ -223,3 +224,20 @@ pushReceiptQueue.on('error', () => {
     isRedisConnected = false;
   }
 })();
+}
+
+
+export async function closeAllQueues(): Promise<void> {
+  const allQueues = [
+    sslRenewalQueue,
+    billingSweepQueue,
+    announcementSweepQueue,
+    webmailSweepQueue,
+    uptimeSweepQueue,
+    workspaceCleanupQueue,
+    nodeFailoverQueue,
+    backupSweepQueue,
+    pushReceiptQueue,
+  ];
+  await Promise.allSettled(allQueues.map((q) => q.close()));
+}

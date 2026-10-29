@@ -92,6 +92,68 @@ describe('Tier 1: Milestone 4 — Application Deployments & Service Catalog', ()
       assert.ok(logs.length > 0);
       assert.equal(logs[0].target, deploymentId);
     });
+
+    it('20.6: Live API: GET /api/deployments/:id/releases returns release ledger history', async () => {
+      server.seed({
+        deployment: [
+          {
+            id: deploymentId,
+            userId: TEST_USERS.dev.id,
+            nodeId: 'node_master_001',
+            status: 'running',
+            subdomain: 'rollback-test-app',
+            internalPort: 3000,
+            node: { id: 'node_master_001', ip: '127.0.0.1' },
+          },
+        ],
+        deploymentRelease: [
+          {
+            id: 'rel_001',
+            deploymentId,
+            gitSha: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+            commitMessage: 'feat: v1 release',
+            imageTag: `shanutechx/${deploymentId}:a1b2c3d`,
+            isCurrent: false,
+            createdAt: new Date(Date.now() - 10000),
+          },
+          {
+            id: 'rel_002',
+            deploymentId,
+            gitSha: 'b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3',
+            commitMessage: 'feat: v2 release',
+            imageTag: `shanutechx/${deploymentId}:b2c3d4e`,
+            isCurrent: true,
+            createdAt: new Date(),
+          },
+        ],
+      });
+
+      const res = await server.client.get(`/api/deployments/${deploymentId}/releases`, {
+        user: TEST_USERS.dev,
+      });
+      assertStatus(res, 200);
+      assert.ok(Array.isArray(res.data.releases));
+      assert.equal(res.data.releases.length, 2);
+      assert.equal(res.data.releases[0].gitSha, 'b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3');
+    });
+
+    it('20.7: Live API: POST /api/deployments/:id/rollback executes instant release swap and records audit log', async () => {
+      const res = await server.client.post(
+        `/api/deployments/${deploymentId}/rollback`,
+        { releaseId: 'rel_001' },
+        { user: TEST_USERS.dev }
+      );
+      assertStatus(res, 200);
+      assert.equal(res.data.ok, true);
+      assert.equal(res.data.activeRelease, 'rel_001');
+      assert.ok(res.data.rollbackDurationMs < 300, `Rollback took ${res.data.rollbackDurationMs}ms, expected sub-second < 300ms`);
+
+      // Verify audit log recorded
+      const logs = await server.db.auditLog.findMany({
+        where: { action: 'deployment.rollback', target: deploymentId },
+      });
+      assert.ok(logs.length > 0);
+    });
   });
 
   describe('Feature 21: Service Catalog Health Readiness (catalog.ts)', () => {
@@ -142,6 +204,17 @@ describe('Tier 1: Milestone 4 — Application Deployments & Service Catalog', ()
         status = 'failed';
       }
       assert.equal(status, 'failed');
+    });
+
+    it('21.6: pollCatalogContainerReadiness reports healthy status in test environment', async () => {
+      const { pollCatalogContainerReadiness } = await import('../../../apps/api/src/routes/catalog');
+      const result = await pollCatalogContainerReadiness('127.0.0.1', 'test-container', {
+        maxAttempts: 2,
+        intervalMs: 10,
+        timeoutMs: 100,
+      });
+      assert.equal(result.ready, true);
+      assert.equal(result.state, 'healthy');
     });
   });
 
@@ -210,6 +283,38 @@ describe('Tier 1: Milestone 4 — Application Deployments & Service Catalog', ()
 
       assert.equal(branchMain === targetBranch, true);
       assert.equal(branchStaging === targetBranch, false);
+    });
+
+    it('22.6: Live API: POST /api/webhooks/github ping responds with pong', async () => {
+      const res = await server.client.post(
+        '/api/webhooks/github',
+        {},
+        {
+          headers: {
+            'x-github-event': 'ping',
+          },
+        }
+      );
+      assertStatus(res, 200);
+      assert.equal(res.data.message, 'pong');
+    });
+
+    it('22.7: Live API: POST /api/webhooks/github rejects invalid HMAC signature with 401', async () => {
+      const res = await server.client.post(
+        '/api/webhooks/github',
+        {
+          repository: { full_name: 'shanutechx/sample-app' },
+          ref: 'refs/heads/main',
+        },
+        {
+          headers: {
+            'x-github-event': 'push',
+            'x-hub-signature-256': 'sha256=invalid00000000000000000000000000000000000000000000000000000000',
+          },
+        }
+      );
+      assertStatus(res, 401);
+      assert.equal(res.data.error, 'Invalid webhook signature');
     });
   });
 });

@@ -13,6 +13,7 @@ import {
   backupDatabaseOnNode,
   listDatabaseBackupsOnNode,
   restoreDatabaseOnNode,
+  callNodeAgent,
 } from '../lib/nodeAgentClient';
 import { encryptSecret, decryptSecret } from '../lib/secretsVault';
 import { env } from '../env';
@@ -28,7 +29,7 @@ const createDbSchema = z.object({
   projectId: z.string().optional(),
   nodeId: z.string().optional(),
   name: z.string().optional(),
-  type: z.enum(['postgres', 'mysql', 'redis', 'mongodb']),
+  type: z.enum(['postgres', 'mysql', 'redis', 'mongodb', 'mariadb']),
   dbName: z.string().optional(),
   masterUsername: z.string().optional(),
   masterPassword: z.string().optional(),
@@ -93,7 +94,7 @@ managedDatabasesRouter.post('/managed-databases', async (req: AuthedRequest, res
   const rawPassword = parsed.data.masterPassword || crypto.randomBytes(16).toString('hex');
   const credentialRef = encryptSecret(rawPassword, env.secretsEncryptionKey);
   const masterUsername = parsed.data.masterUsername || (parsed.data.type === 'redis' ? 'default' : parsed.data.type === 'postgres' ? 'postgres' : 'root');
-  const customDbName = parsed.data.dbName || (parsed.data.type === 'postgres' ? 'postgres' : parsed.data.type === 'mysql' ? 'mysql' : 'admin');
+  const customDbName = parsed.data.dbName || (parsed.data.type === 'postgres' ? 'postgres' : (parsed.data.type === 'mysql' || parsed.data.type === 'mariadb') ? 'mysql' : 'admin');
 
   const db = await prisma.managedDatabase.create({
     data: {
@@ -212,9 +213,9 @@ managedDatabasesRouter.get('/managed-databases/:id/connection', async (req: Auth
 
   const password = decryptSecret(db.credentialRef, env.secretsEncryptionKey);
   const host = db.internalHost || 'localhost';
-  const port = db.internalPort || (db.type === 'redis' ? 6379 : db.type === 'postgres' ? 5432 : db.type === 'mysql' ? 3306 : 27017);
+  const port = db.internalPort || (db.type === 'redis' ? 6379 : db.type === 'postgres' ? 5432 : (db.type === 'mysql' || db.type === 'mariadb') ? 3306 : 27017);
   const poolerPort = db.poolerPort || 6543;
-  const dbName = db.dbName || (db.type === 'postgres' ? 'postgres' : db.type === 'mysql' ? 'mysql' : 'admin');
+  const dbName = db.dbName || (db.type === 'postgres' ? 'postgres' : (db.type === 'mysql' || db.type === 'mariadb') ? 'mysql' : 'admin');
   const username = db.type === 'redis' ? 'default' : db.type === 'postgres' ? 'postgres' : 'root';
   const sslMode = db.sslMode || 'require';
 
@@ -238,10 +239,11 @@ managedDatabasesRouter.get('/managed-databases/:id/connection', async (req: Auth
     prismaSnippet = `datasource db {\n  provider = "postgresql"\n  url      = "${uri}"\n}`;
     laravelSnippet = `DB_CONNECTION=pgsql\nDB_HOST=${host}\nDB_PORT=${port}\nDB_DATABASE=${dbName}\nDB_USERNAME=${username}\nDB_PASSWORD=${password}`;
     jdbcSnippet = `jdbc:postgresql://${host}:${port}/${dbName}?user=${username}&password=${password}&sslmode=${sslMode}`;
-  } else if (db.type === 'mysql') {
+  } else if (db.type === 'mysql' || db.type === 'mariadb') {
     uri = `mysql://${username}:${passEnc}@${host}:${port}/${dbName}`;
     pooledUri = uri;
-    psqlCommand = `mysql -h ${host} -P ${port} -u ${username} -p${password} ${dbName}`;
+    const clientBin = db.type === 'mariadb' ? 'mariadb' : 'mysql';
+    psqlCommand = `${clientBin} -h ${host} -P ${port} -u ${username} -p${password} ${dbName}`;
     nodeSnippet = `const mysql = require('mysql2/promise');\nconst conn = await mysql.createConnection("${uri}");`;
     pythonSnippet = `import mysql.connector\nconn = mysql.connector.connect(host="${host}", user="${username}", password="${password}", database="${dbName}")`;
     prismaSnippet = `datasource db {\n  provider = "mysql"\n  url      = "${uri}"\n}`;
@@ -1556,8 +1558,23 @@ managedDatabasesRouter.get('/managed-databases/:id/metrics', async (req: AuthedR
     } catch {}
   }
 
-  const cpuPct = Math.round((Math.random() * 25 + 10) * 10) / 10;
-  const ramMb = Math.round(120 + Math.random() * 80);
+  let cpuPct = 0;
+  let ramMb = 0;
+  if (db.status === 'running' && db.containerId && db.node) {
+    try {
+      const stats = await callNodeAgent(
+        db.node,
+        `/agent/containers/${encodeURIComponent(db.containerId)}/stats`,
+        'GET',
+        undefined,
+        2000
+      );
+      if (stats) {
+        cpuPct = Math.round((stats.cpuPercent ?? stats.cpuUsagePercent ?? 0) * 10) / 10;
+        ramMb = stats.memoryUsedMb ?? (stats.memoryUsageBytes ? Math.round(stats.memoryUsageBytes / (1024 * 1024)) : 0);
+      }
+    } catch {}
+  }
   const maxRamMb = db.memoryLimitMb || 512;
   const ramPct = Math.round((ramMb / maxRamMb) * 100);
   const storageGb = Math.round((databaseSizeBytes / (1024 * 1024 * 1024)) * 100) / 100;

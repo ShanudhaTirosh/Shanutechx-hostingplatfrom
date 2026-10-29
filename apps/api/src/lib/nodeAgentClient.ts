@@ -2,6 +2,7 @@ import { env } from '../env';
 import { logger } from './logger';
 import { resolveRepoUrlForBuild } from './gitAuth';
 import { resolveExposureForBuild } from './exposureDefaults';
+import { prisma } from './prisma';
 
 interface Node {
   id: string;
@@ -95,7 +96,6 @@ export async function buildAndRun(
   let volumes = params.volumes;
   if (!volumes) {
     try {
-      const { prisma } = await import('./prisma');
       const dbVolumes = await prisma.deploymentVolume.findMany({
         where: { deploymentId: params.deploymentId },
       });
@@ -310,10 +310,12 @@ export async function removeCustomDomainRoute(node: Node, deploymentId: string, 
   }
 }
 
+export type ManagedDbType = 'postgres' | 'mysql' | 'redis' | 'mongodb' | 'mariadb';
+
 /** Provisions a standalone database container on the node — see services/node-agent/src/managedDb.js. */
 export async function provisionDatabaseContainer(
   node: Node,
-  params: { databaseId: string; type: 'postgres' | 'mysql' | 'redis' | 'mongodb'; password: string }
+  params: { databaseId: string; type: ManagedDbType; password: string }
 ): Promise<{ containerId: string; containerName: string; internalPort: number }> {
   const res = await fetch(agentUrl(node, '/agent/managed-databases'), {
     method: 'POST',
@@ -348,7 +350,7 @@ export async function rotateDatabasePasswordOnNode(
   node: Node,
   containerId: string,
   params: {
-    type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+    type: ManagedDbType;
     oldPassword?: string;
     newPassword: string;
     masterUsername?: string;
@@ -371,7 +373,7 @@ export async function manageDatabaseUserOnNode(
   node: Node,
   containerId: string,
   params: {
-    type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+    type: ManagedDbType;
     action: 'create' | 'delete' | 'update';
     username: string;
     password?: string;
@@ -396,7 +398,7 @@ export async function executeDatabaseQueryOnNode(
   node: Node,
   containerId: string,
   params: {
-    type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+    type: ManagedDbType;
     query: string;
     masterPassword?: string;
   }
@@ -418,7 +420,7 @@ export async function backupDatabaseOnNode(
   node: Node,
   containerId: string,
   params: {
-    type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+    type: ManagedDbType;
     databaseId: string;
     masterPassword?: string;
   }
@@ -455,7 +457,7 @@ export async function restoreDatabaseOnNode(
   node: Node,
   containerId: string,
   params: {
-    type: 'postgres' | 'mysql' | 'redis' | 'mongodb';
+    type: ManagedDbType;
     databaseId: string;
     backupId: string;
     masterPassword?: string;

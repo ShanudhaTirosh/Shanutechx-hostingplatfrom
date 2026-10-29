@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import net from 'net';
 import { requireAuth, requireDev, requireAdminOrDev, AuthedRequest } from '../middleware/auth';
 import { canAccessResource, accessActionForRequest } from '../middleware/rbac';
 import { logger } from '../lib/logger';
@@ -15,6 +16,36 @@ import { INFRASTRUCTURE_PORTS } from '../lib/portExposure';
 import { dispatchJob } from '../lib/jobQueue';
 
 export const supabaseRouter = Router();
+
+function tcpPing(host: string, port: number, timeoutMs = 1500): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+    socket.setTimeout(timeoutMs);
+    socket.on('connect', () => {
+      if (!settled) {
+        settled = true;
+        socket.destroy();
+        resolve(true);
+      }
+    });
+    socket.on('timeout', () => {
+      if (!settled) {
+        settled = true;
+        socket.destroy();
+        resolve(false);
+      }
+    });
+    socket.on('error', () => {
+      if (!settled) {
+        settled = true;
+        socket.destroy();
+        resolve(false);
+      }
+    });
+    socket.connect(port, host);
+  });
+}
 
 const SUPABASE_KONG_URL = process.env.SUPABASE_KONG_URL || 'http://localhost:8001';
 const SUPABASE_META_URL = process.env.SUPABASE_META_URL || 'http://localhost:8080';
@@ -73,7 +104,7 @@ function serializeProject(p: any, liveStats?: { cpuPct: number; ramMb: number; d
   const centralStudioBase = isLocalHost ? `http://localhost:${studioPort}` : `https://studio.${rootDomain}`;
   const studioUrl = `${centralStudioBase}/project/${p.id}`;
   const apiUrl = isLocalHost ? `http://localhost:${apiPort}` : `https://${hostSubdomain}`;
-  const metaUrl = isLocalHost ? `http://localhost:${metaPort}` : `http://${hostSubdomain}:${metaPort}`;
+  const metaUrl = process.env.SUPABASE_META_URL || (isLocalHost ? `${apiUrl}/pg` : `https://${hostSubdomain}/pg`);
   const dbUrl = `postgresql://postgres:postgres@${isLocalHost ? '127.0.0.1' : `supabase-${cleanSlug}-db.${rootDomain}`}:${dbPort}/${p.dbName || 'postgres'}`;
 
   // Live telemetry if supplied, otherwise clean zero metrics (no synthetic Math.random)
@@ -235,8 +266,8 @@ async function resolveProjectContext(req: AuthedRequest, optional = false): Prom
   const hostSubdomain = `supabase-${cleanSlug}.${rootDomain}`;
   const isLocalHost = !nodeIp || nodeIp === '127.0.0.1' || nodeIp === 'localhost';
 
-  const metaUrl = isLocalHost ? `http://localhost:8080` : `http://${nodeIp || hostSubdomain}:8080`;
   const kongUrl = isLocalHost ? `http://localhost:${project?.apiPort || 8001}` : `http://${nodeIp || hostSubdomain}:${project?.apiPort || 8001}`;
+  const metaUrl = process.env.SUPABASE_META_URL || `${kongUrl}/pg`;
   const serviceKey = project?.serviceKey || SUPABASE_SERVICE_ROLE_KEY;
 
   return { project, metaUrl, kongUrl, serviceKey };
@@ -270,60 +301,70 @@ async function fetchJson(url: string, options: RequestInit = {}, serviceKeyOverr
 
 // 1. Service Health & Status
 supabaseRouter.get('/supabase/health', requireAuth, async (req: AuthedRequest, res: Response) => {
-  const ctx = await resolveProjectContext(req, true);
-  if (!ctx || !ctx.project) {
-    return res.json({
-      status: 'healthy',
-      empty: true,
-      services: {
-        kong: 'healthy',
-        gotrue: 'healthy',
-        postgrest: 'healthy',
-        postgres: 'healthy',
-        storage: 'healthy',
-        realtime: 'healthy',
-        functions: 'healthy',
-        studio: 'healthy',
-      },
+  try {
+    const ctx = await resolveProjectContext(req, true);
+    if (!ctx || !ctx.project) {
+      return res.json({
+        status: 'healthy',
+        empty: true,
+        services: {
+          kong: 'healthy',
+          gotrue: 'healthy',
+          postgrest: 'healthy',
+          postgres: 'healthy',
+          storage: 'healthy',
+          realtime: 'healthy',
+          functions: 'healthy',
+          studio: 'healthy',
+        },
+        urls: {
+          kong: SUPABASE_KONG_URL,
+          studioUrl: process.env.SUPABASE_STUDIO_URL || 'http://localhost:8000',
+          meta: SUPABASE_META_URL,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const nodeIp = ctx.project.nodeIp;
+    const isLocalHost = !nodeIp || nodeIp === '127.0.0.1' || nodeIp === 'localhost';
+    const dbHost = isLocalHost ? '127.0.0.1' : (nodeIp || '127.0.0.1');
+    const dbPort = ctx.project.dbPort || 5432;
+
+    const [kongRes, metaRes, realtimeRes, gotrueRes, postgrestRes, storageRes, pgTcpOk] = await Promise.all([
+      fetchJson(`${ctx.kongUrl}/health`, {}, ctx.serviceKey),
+      fetchJson(`${ctx.metaUrl}/health`, {}, ctx.serviceKey),
+      fetchJson(`${ctx.kongUrl}/realtime/v1/health`, {}, ctx.serviceKey),
+      fetchJson(`${ctx.kongUrl}/auth/v1/health`, {}, ctx.serviceKey),
+      fetchJson(`${ctx.kongUrl}/rest/v1/`, {}, ctx.serviceKey),
+      fetchJson(`${ctx.kongUrl}/storage/v1/status`, {}, ctx.serviceKey),
+      tcpPing(dbHost, dbPort, 1500),
+    ]);
+
+    const services = {
+      kong: kongRes.ok ? 'healthy' : 'degraded',
+      gotrue: gotrueRes.ok ? 'healthy' : 'degraded',
+      postgrest: postgrestRes.ok ? 'healthy' : 'degraded',
+      postgres: (metaRes.ok || pgTcpOk) ? 'healthy' : 'unreachable',
+      storage: storageRes.ok ? 'healthy' : 'degraded',
+      realtime: realtimeRes.ok ? 'healthy' : 'degraded',
+      functions: 'healthy',
+      studio: 'healthy',
+    };
+
+    res.json({
+      status: Object.values(services).every((s) => s === 'healthy') ? 'healthy' : 'degraded',
+      services,
       urls: {
-        kong: SUPABASE_KONG_URL,
-        studioUrl: process.env.SUPABASE_STUDIO_URL || 'http://localhost:8000',
-        meta: SUPABASE_META_URL,
+        kong: ctx.kongUrl || SUPABASE_KONG_URL,
+        studioUrl: serializeProject(ctx.project).studioUrl || process.env.SUPABASE_STUDIO_URL || 'http://localhost:8000',
+        meta: ctx.metaUrl || SUPABASE_META_URL,
       },
       timestamp: new Date().toISOString(),
     });
+  } catch (err: any) {
+    res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
   }
-
-  const [kongRes, metaRes, realtimeRes, gotrueRes, postgrestRes, storageRes] = await Promise.all([
-    fetchJson(`${ctx.kongUrl}/health`, {}, ctx.serviceKey),
-    fetchJson(`${ctx.metaUrl}/health`, {}, ctx.serviceKey),
-    fetchJson(`${ctx.kongUrl}/realtime/v1/health`, {}, ctx.serviceKey),
-    fetchJson(`${ctx.kongUrl}/auth/v1/health`, {}, ctx.serviceKey),
-    fetchJson(`${ctx.kongUrl}/rest/v1/`, {}, ctx.serviceKey),
-    fetchJson(`${ctx.kongUrl}/storage/v1/status`, {}, ctx.serviceKey),
-  ]);
-
-  const services = {
-    kong: kongRes.ok ? 'healthy' : 'degraded',
-    gotrue: gotrueRes.ok ? 'healthy' : 'degraded',
-    postgrest: postgrestRes.ok ? 'healthy' : 'degraded',
-    postgres: metaRes.ok ? 'healthy' : 'unreachable',
-    storage: storageRes.ok ? 'healthy' : 'degraded',
-    realtime: realtimeRes.ok ? 'healthy' : 'degraded',
-    functions: 'healthy',
-    studio: 'healthy',
-  };
-
-  res.json({
-    status: Object.values(services).every((s) => s === 'healthy') ? 'healthy' : 'degraded',
-    services,
-    urls: {
-      kong: ctx.kongUrl || SUPABASE_KONG_URL,
-      studioUrl: serializeProject(ctx.project).studioUrl || process.env.SUPABASE_STUDIO_URL || 'http://localhost:8000',
-      meta: ctx.metaUrl || SUPABASE_META_URL,
-    },
-    timestamp: new Date().toISOString(),
-  });
 });
 
 // 2. Multi-Project Management API
@@ -425,6 +466,10 @@ services:
         strip_path: true
         paths:
           - /rest/v1/
+    plugins:
+      - name: key-auth
+        config:
+          hide_credentials: true
   - name: storage-v1
     url: http://supabase-storage:5000
     routes:
@@ -446,6 +491,10 @@ services:
         strip_path: true
         paths:
           - /pg/
+    plugins:
+      - name: key-auth
+        config:
+          hide_credentials: true
   - name: functions-v1
     url: http://supabase-edge-runtime:9000
     routes:
@@ -460,6 +509,14 @@ services:
         strip_path: true
         paths:
           - /render/v1/
+
+consumers:
+  - username: anon
+    keyauth_credentials:
+      - key: ${anonKey}
+  - username: service_role
+    keyauth_credentials:
+      - key: ${serviceKey}
 `;
 }
 
@@ -2014,6 +2071,42 @@ supabaseRouter.get('/supabase/observability', requireAuth, async (_req: AuthedRe
 // 13. System & API Log Stream Endpoint
 supabaseRouter.get('/supabase/logs', requireAuth, async (req: AuthedRequest, res: Response) => {
   const service = (req.query.service as string) || 'all';
+
+  try {
+    const ctx = await resolveProjectContext(req, true);
+    if (ctx?.project?.nodeId) {
+      const node = await prisma.node.findUnique({ where: { id: ctx.project.nodeId } });
+      if (node && node.isActive) {
+        const cleanSlug = ctx.project.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/^-+|-+$/g, '');
+        const resData = await callNodeAgent(node, `/agent/compose/supa-${cleanSlug}/logs?tail=50`, 'GET').catch(() => null);
+        if (resData?.logs && typeof resData.logs === 'string') {
+          const rawLines = resData.logs.split('\n').filter(Boolean);
+          const parsedLogs = rawLines.map((line: string, idx: number) => {
+            let lineService = 'docker';
+            const lower = line.toLowerCase();
+            if (lower.includes('kong')) lineService = 'kong';
+            else if (lower.includes('gotrue') || lower.includes('auth')) lineService = 'gotrue';
+            else if (lower.includes('rest') || lower.includes('postgrest')) lineService = 'postgrest';
+            else if (lower.includes('db') || lower.includes('postgres')) lineService = 'postgres';
+            else if (lower.includes('storage')) lineService = 'storage';
+            else if (lower.includes('realtime')) lineService = 'realtime';
+
+            return {
+              id: `log_live_${idx}`,
+              timestamp: new Date().toISOString(),
+              service: lineService,
+              level: lower.includes('err') ? 'ERROR' : lower.includes('warn') ? 'WARN' : 'INFO',
+              message: line,
+            };
+          }).filter((l) => service === 'all' || l.service === service);
+
+          if (parsedLogs.length > 0) {
+            return res.json({ logs: parsedLogs, isFallback: false });
+          }
+        }
+      }
+    }
+  } catch {}
 
   const logs = [
     { id: 'log_01', timestamp: new Date(Date.now() - 30000).toISOString(), service: 'kong', level: 'INFO', message: 'GET /rest/v1/users 200 OK 12ms' },
