@@ -4,10 +4,11 @@ const path = require('path');
 
 function run(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
+    const { onProcess, onData, signal, ...execOpts } = opts;
     const child = execFile(
       cmd,
       args,
-      { ...opts, maxBuffer: 1024 * 1024 * 50 },
+      { maxBuffer: 1024 * 1024 * 50, signal, ...execOpts },
       (err, stdout, stderr) => {
         if (err) {
           err.stdout = stdout;
@@ -17,9 +18,12 @@ function run(cmd, args, opts = {}) {
         resolve({ stdout, stderr });
       }
     );
-    if (opts.onData) {
-      child.stdout?.on('data', opts.onData);
-      child.stderr?.on('data', opts.onData);
+    if (typeof onProcess === 'function') {
+      onProcess(child);
+    }
+    if (onData) {
+      child.stdout?.on('data', onData);
+      child.stderr?.on('data', onData);
     }
   });
 }
@@ -219,15 +223,20 @@ function generateNixpacksToml(config) {
 }
 
 /**
- * Helper to build with native Docker / Smart Dockerfile
+ * Helper to build with native Docker / Smart Dockerfile.
+ * Hardened to prevent leaking runtime secrets into image layers.
  */
 async function executeDockerBuild({
   workspaceDir,
   imageTag,
   envVars = {},
+  buildArgs = {},
   startCommand,
   entryFile,
   frameworkPreset,
+  signal,
+  onProcess,
+  onFileCreated,
   log,
   onData,
 }) {
@@ -235,16 +244,33 @@ async function executeDockerBuild({
 
   if (dockerfileInfo.isGenerated) {
     log(`Auto-generated Dockerfile for detected runtime (${dockerfileInfo.runtime}).`);
+    if (typeof onFileCreated === 'function') {
+      onFileCreated(path.join(workspaceDir, 'Dockerfile'));
+    }
   } else {
     log('Using custom Dockerfile from repository root.');
   }
 
   const dockerArgs = ['build', '-t', imageTag, '.'];
-  for (const [key, value] of Object.entries(envVars)) {
+
+  // Feature 9 Fix: ONLY pass explicit buildArgs to docker build.
+  // Runtime environment variables (envVars) must NEVER be passed as --build-arg,
+  // as they become permanently baked into image layer history (docker history).
+  const effectiveBuildArgs = { ...(buildArgs || {}) };
+
+  // Allow explicit opt-in via BUILD_ARG_ prefix from envVars
+  for (const [key, value] of Object.entries(envVars || {})) {
+    if (key.startsWith('BUILD_ARG_')) {
+      const cleanKey = key.slice('BUILD_ARG_'.length);
+      effectiveBuildArgs[cleanKey] = value;
+    }
+  }
+
+  for (const [key, value] of Object.entries(effectiveBuildArgs)) {
     dockerArgs.push('--build-arg', `${key}=${value}`);
   }
 
-  await run('docker', dockerArgs, { cwd: workspaceDir, onData });
+  await run('docker', dockerArgs, { cwd: workspaceDir, onData, signal, onProcess });
   log('Docker Engine build succeeded!');
   return { imageTag, builder: dockerfileInfo.isGenerated ? 'smart-dockerfile' : 'dockerfile' };
 }
@@ -267,11 +293,16 @@ async function buildImage({
   workspaceDir,
   imageTag,
   envVars = {},
+  buildArgs = {},
   startCommand,
   entryFile,
   frameworkPreset,
   builder,
   nixpacksConfig,
+  signal,
+  onProcess,
+  onFileCreated,
+  onRunnerContainer,
   onData,
 }) {
   const log = (msg) => {
@@ -289,6 +320,9 @@ async function buildImage({
         const tomlContent = generateNixpacksToml(nixpacksConfig);
         fs.writeFileSync(nixpacksTomlPath, tomlContent, 'utf8');
         log('Generated nixpacks.toml from deployment configuration.');
+        if (typeof onFileCreated === 'function') {
+          onFileCreated(nixpacksTomlPath);
+        }
       } catch (err) {
         log(`Warning: Failed to generate nixpacks.toml: ${err.message}`);
       }
@@ -304,9 +338,13 @@ async function buildImage({
       workspaceDir,
       imageTag,
       envVars,
+      buildArgs,
       startCommand,
       entryFile,
       frameworkPreset,
+      signal,
+      onProcess,
+      onFileCreated,
       log,
       onData,
     });
@@ -317,13 +355,13 @@ async function buildImage({
     try {
       log('Attempting build with Railpack CLI...');
       const railpackArgs = ['build', workspaceDir, '--name', imageTag];
-      for (const [key, value] of Object.entries(envVars)) {
+      for (const [key, value] of Object.entries(buildArgs || {})) {
         railpackArgs.push('--env', `${key}=${value}`);
       }
       if (startCommand) {
         railpackArgs.push('--start-command', startCommand);
       }
-      await run('railpack', railpackArgs, { onData });
+      await run('railpack', railpackArgs, { onData, signal, onProcess });
       log('Railpack build succeeded!');
       return { imageTag, builder: 'railpack' };
     } catch (errRailpack) {
@@ -336,13 +374,13 @@ async function buildImage({
     try {
       log('Attempting build with Nixpacks CLI...');
       const nixpacksArgs = ['build', workspaceDir, '--name', imageTag];
-      for (const [key, value] of Object.entries(envVars)) {
+      for (const [key, value] of Object.entries(buildArgs || {})) {
         nixpacksArgs.push('--env', `${key}=${value}`);
       }
       if (startCommand) {
         nixpacksArgs.push('--start-cmd', startCommand);
       }
-      await run('nixpacks', nixpacksArgs, { onData });
+      await run('nixpacks', nixpacksArgs, { onData, signal, onProcess });
       log('Nixpacks build succeeded!');
       return { imageTag, builder: 'nixpacks' };
     } catch (errNixpacks) {
@@ -355,20 +393,24 @@ async function buildImage({
     try {
       log('Attempting containerized Nixpacks builder (ghcr.io/railwayapp/nixpacks:latest)...');
       const dockerSock = process.platform === 'win32' ? '//var/run/docker.sock' : '/var/run/docker.sock';
+      const runnerContainerName = `nixpacks-runner-${Date.now()}`;
+      if (typeof onRunnerContainer === 'function') {
+        onRunnerContainer(runnerContainerName);
+      }
       const containerArgs = [
-        'run', '--rm',
+        'run', '--rm', '--name', runnerContainerName,
         '-v', `${dockerSock}:/var/run/docker.sock`,
         '-v', `${path.resolve(workspaceDir)}:/app`,
         '-w', '/app',
       ];
-      for (const [key, value] of Object.entries(envVars)) {
+      for (const [key, value] of Object.entries(buildArgs || {})) {
         containerArgs.push('-e', `${key}=${value}`);
       }
       containerArgs.push('ghcr.io/railwayapp/nixpacks:latest', 'build', '/app', '--name', imageTag);
       if (startCommand) {
         containerArgs.push('--start-cmd', startCommand);
       }
-      await run('docker', containerArgs, { onData });
+      await run('docker', containerArgs, { onData, signal, onProcess });
       log('Containerized Nixpacks build succeeded!');
       return { imageTag, builder: 'nixpacks-container' };
     } catch (errContainerNixpacks) {
@@ -382,9 +424,13 @@ async function buildImage({
     workspaceDir,
     imageTag,
     envVars,
+    buildArgs,
     startCommand,
     entryFile,
     frameworkPreset,
+    signal,
+    onProcess,
+    onFileCreated,
     log,
     onData,
   });

@@ -262,8 +262,8 @@ export function requireDev(
   res: Response,
   next: NextFunction
 ) {
-  if (req.user?.role !== 'dev' && req.user?.role !== 'admin') {
-    return res.status(403).json({ error: 'Dev or Admin access required' });
+  if (req.user?.role !== 'dev') {
+    return res.status(403).json({ error: 'Dev access required' });
   }
   next();
 }

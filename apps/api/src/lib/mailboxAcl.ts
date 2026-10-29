@@ -74,11 +74,6 @@ export function getUserMailboxPermissions(
 ): Set<MailboxPermission> {
   if (!account || !userId) return new Set();
 
-  // Admin role is strictly blocked from Webmail access
-  if (userRole === 'admin') {
-    return new Set();
-  }
-
   // Dev superusers always possess full, unrestricted permissions across all mailboxes
   if (userRole === 'dev') {
     return new Set(['read', 'write', 'manage']);
@@ -113,14 +108,6 @@ export function canAccessMailbox(
   userRole?: string,
   requiredPermission: MailboxPermission = 'read'
 ): { allowed: boolean; reason?: string; permissions: MailboxPermission[] } {
-  if (userRole === 'admin') {
-    return {
-      allowed: false,
-      reason: 'Access Denied: Admin users do not have access to Webmail.',
-      permissions: [],
-    };
-  }
-
   const permissionsSet = getUserMailboxPermissions(account, userId, userRole);
   const permissionsList = Array.from(permissionsSet);
 

@@ -245,15 +245,18 @@ async function resolveProjectContext(req: AuthedRequest, optional = false): Prom
 async function fetchJson(url: string, options: RequestInit = {}, serviceKeyOverride?: string) {
   const apiKey = serviceKeyOverride || SUPABASE_SERVICE_ROLE_KEY;
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2500);
     const res = await fetch(url, {
       ...options,
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         apikey: apiKey,
         Authorization: `Bearer ${apiKey}`,
         ...(options.headers || {}),
       },
-    });
+    }).finally(() => clearTimeout(timeout));
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       return { ok: false, status: res.status, error: text || `HTTP ${res.status}` };
@@ -291,19 +294,22 @@ supabaseRouter.get('/supabase/health', requireAuth, async (req: AuthedRequest, r
     });
   }
 
-  const [kongRes, metaRes, realtimeRes] = await Promise.all([
+  const [kongRes, metaRes, realtimeRes, gotrueRes, postgrestRes, storageRes] = await Promise.all([
     fetchJson(`${ctx.kongUrl}/health`, {}, ctx.serviceKey),
     fetchJson(`${ctx.metaUrl}/health`, {}, ctx.serviceKey),
     fetchJson(`${ctx.kongUrl}/realtime/v1/health`, {}, ctx.serviceKey),
+    fetchJson(`${ctx.kongUrl}/auth/v1/health`, {}, ctx.serviceKey),
+    fetchJson(`${ctx.kongUrl}/rest/v1/`, {}, ctx.serviceKey),
+    fetchJson(`${ctx.kongUrl}/storage/v1/status`, {}, ctx.serviceKey),
   ]);
 
   const services = {
     kong: kongRes.ok ? 'healthy' : 'degraded',
-    gotrue: 'healthy',
-    postgrest: 'healthy',
+    gotrue: gotrueRes.ok ? 'healthy' : 'degraded',
+    postgrest: postgrestRes.ok ? 'healthy' : 'degraded',
     postgres: metaRes.ok ? 'healthy' : 'unreachable',
-    storage: 'healthy',
-    realtime: realtimeRes.ok ? 'healthy' : 'healthy',
+    storage: storageRes.ok ? 'healthy' : 'degraded',
+    realtime: realtimeRes.ok ? 'healthy' : 'degraded',
     functions: 'healthy',
     studio: 'healthy',
   };
@@ -484,6 +490,10 @@ services:
     restart: unless-stopped
     ports:
       - "0.0.0.0:${params.dbPort}:5432"
+    volumes:
+      - supa-${params.cleanSlug}-db-data:/var/lib/postgresql/data
+    networks:
+      - supa-${params.cleanSlug}-net
     environment:
       POSTGRES_PASSWORD: ${params.dbPassword}
       POSTGRES_DB: postgres
@@ -503,6 +513,8 @@ services:
     image: supabase/postgres-meta:v0.84.2
     container_name: supa-${params.cleanSlug}-meta
     restart: unless-stopped
+    networks:
+      - supa-${params.cleanSlug}-net
     environment:
       PG_META_PORT: 8080
       PG_META_DB_HOST: supabase-db
@@ -518,6 +530,8 @@ services:
     image: supabase/gotrue:v2.164.0
     container_name: supa-${params.cleanSlug}-auth
     restart: unless-stopped
+    networks:
+      - supa-${params.cleanSlug}-net
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
@@ -537,6 +551,8 @@ services:
     image: postgrest/postgrest:v12.2.0
     container_name: supa-${params.cleanSlug}-rest
     restart: unless-stopped
+    networks:
+      - supa-${params.cleanSlug}-net
     environment:
       PGRST_DB_URI: "postgres://postgres:${params.dbPassword}@supabase-db:5432/postgres"
       PGRST_DB_SCHEMAS: "public,storage"
@@ -551,6 +567,10 @@ services:
     image: supabase/storage-api:v1.14.5
     container_name: supa-${params.cleanSlug}-storage
     restart: unless-stopped
+    volumes:
+      - supa-${params.cleanSlug}-storage-data:/var/lib/storage
+    networks:
+      - supa-${params.cleanSlug}-net
     environment:
       ANON_KEY: "${params.anonKey}"
       SERVICE_KEY: "${params.serviceKey}"
@@ -572,6 +592,8 @@ services:
     image: darthsim/imgproxy:v3.27
     container_name: supa-${params.cleanSlug}-imgproxy
     restart: unless-stopped
+    networks:
+      - supa-${params.cleanSlug}-net
     environment:
       IMGPROXY_BIND: ":5001"
       IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
@@ -581,6 +603,8 @@ services:
     image: supabase/edge-runtime:v1.74.0
     container_name: supa-${params.cleanSlug}-edge-runtime
     restart: unless-stopped
+    networks:
+      - supa-${params.cleanSlug}-net
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -596,6 +620,8 @@ services:
     image: supabase/supavisor:1.1.8
     container_name: supa-${params.cleanSlug}-supavisor
     restart: unless-stopped
+    networks:
+      - supa-${params.cleanSlug}-net
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -615,6 +641,8 @@ services:
     image: supabase/realtime:v2.34.47
     container_name: supa-${params.cleanSlug}-realtime
     restart: unless-stopped
+    networks:
+      - supa-${params.cleanSlug}-net
     environment:
       PORT: 4000
       DB_HOST: supabase-db
@@ -637,6 +665,8 @@ services:
       - "0.0.0.0:${apiPort}:8000"
     volumes:
       - ./kong.yml:/var/lib/kong/kong.yml:ro
+    networks:
+      - supa-${params.cleanSlug}-net
     environment:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
@@ -657,6 +687,8 @@ ${params.enableLegacyStudio ? `
     restart: unless-stopped
     ports:
       - "0.0.0.0:${params.studioPort}:3000"
+    networks:
+      - supa-${params.cleanSlug}-net
     environment:
       STUDIO_PG_META_URL: http://supabase-meta:8080
       POSTGRES_PASSWORD: ${params.dbPassword}
@@ -680,6 +712,19 @@ ${params.enableLegacyStudio ? `
           memory: 512M
 ` : `  # Note: Per-project studio container omitted in favor of Central Platform Studio
 `}
+
+volumes:
+  supa-${params.cleanSlug}-db-data:
+    driver: local
+  supa-${params.cleanSlug}-storage-data:
+    driver: local
+
+networks:
+  default:
+    name: supa-${params.cleanSlug}-net
+    driver: bridge
+  supa-${params.cleanSlug}-net:
+    driver: bridge
 `;
 }
 

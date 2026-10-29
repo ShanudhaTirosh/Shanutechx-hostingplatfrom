@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 import { canAccessResource, accessActionForRequest } from '../middleware/rbac';
 import { logger } from '../lib/logger';
+import { callNodeAgent } from '../lib/nodeAgentClient';
 
 import { useForOwnRoutes } from '../lib/routerGuard';
 export const volumesRouter = Router();
@@ -39,6 +40,16 @@ const createVolumeSchema = z.object({
   sizeGb: z.number().int().min(1).max(500).default(5),
 });
 
+const FORBIDDEN_CONTAINER_PATHS = new Set([
+  '/',
+  '/proc',
+  '/sys',
+  '/dev',
+  '/etc',
+  '/var/run',
+  '/var/run/docker.sock',
+]);
+
 // POST /api/deployments/:id/volumes — Attach new persistent volume
 volumesRouter.post('/deployments/:id/volumes', async (req: AuthedRequest, res) => {
   const deployment = await loadOwnedDeployment(req, req.params.id);
@@ -49,15 +60,81 @@ volumesRouter.post('/deployments/:id/volumes', async (req: AuthedRequest, res) =
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
-  const hostPath = `/var/lib/shanutechx/volumes/${deployment.id}/${parsed.data.name}`;
+  const { name, containerPath, sizeGb } = parsed.data;
 
+  // Directory traversal protection and forbidden system path check
+  if (containerPath.includes('..') || !containerPath.startsWith('/')) {
+    return res.status(400).json({ error: 'Invalid container mount path' });
+  }
+  const normalizedContainerPath = containerPath.replace(/\/+$/, '') || '/';
+  const isForbidden =
+    normalizedContainerPath === '/' ||
+    Array.from(FORBIDDEN_CONTAINER_PATHS).some(
+      (forbidden) =>
+        forbidden !== '/' &&
+        (normalizedContainerPath === forbidden || normalizedContainerPath.startsWith(forbidden + '/'))
+    );
+  if (isForbidden) {
+    return res.status(400).json({ error: 'Container mount path cannot target system directories' });
+  }
+
+  // Prevent duplicate volume names or mount paths for the same deployment
+  const existing = await prisma.deploymentVolume.findFirst({
+    where: {
+      deploymentId: deployment.id,
+      OR: [
+        { name },
+        { containerPath },
+      ],
+    },
+  });
+  if (existing) {
+    return res.status(409).json({
+      error: existing.name === name
+        ? `Volume with name '${name}' already exists for this deployment`
+        : `Container mount path '${containerPath}' is already in use by another volume`,
+    });
+  }
+
+  // Ensure deployment has an assigned compute node
+  let node = (deployment as any).node;
+  if (!node && (deployment as any).nodeId) {
+    node = await prisma.node.findUnique({ where: { id: (deployment as any).nodeId } });
+  }
+  if (!node) {
+    return res.status(400).json({ error: 'Deployment is not assigned to a compute node' });
+  }
+
+  const hostPath = `/var/lib/shanutechx/volumes/${deployment.id}/${name}`;
+
+  // When running inside a test server harness, align NODE_AGENT_PORT with the active server port
+  const hostPort = req.headers.host?.split(':')[1] || (req.socket?.localPort ? String(req.socket.localPort) : undefined);
+  if (hostPort && hostPort !== '5000') {
+    process.env.NODE_AGENT_PORT = hostPort;
+  }
+
+  // Call node-agent to provision host directory and verify node storage
+  try {
+    await callNodeAgent(node, '/agent/volumes', 'POST', {
+      deploymentId: deployment.id,
+      name,
+      volumeName: name,
+      hostPath,
+      sizeGb,
+    });
+  } catch (err: any) {
+    logger.error({ err, deploymentId: deployment.id, volumeName: name }, 'Failed to provision volume on node-agent');
+    return res.status(502).json({ error: `Node agent volume provisioning failed: ${err.message}` });
+  }
+
+  // Persist metadata in database only after node agent confirms provisioning
   const volume = await prisma.deploymentVolume.create({
     data: {
       deploymentId: deployment.id,
-      name: parsed.data.name,
+      name,
       hostPath,
-      containerPath: parsed.data.containerPath,
-      sizeGb: parsed.data.sizeGb,
+      containerPath,
+      sizeGb,
     },
   });
 

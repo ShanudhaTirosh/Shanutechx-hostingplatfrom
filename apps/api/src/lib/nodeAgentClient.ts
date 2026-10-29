@@ -64,6 +64,7 @@ export interface BuildAndRunParams {
   builder?: string;       // NIXPACKS | RAILWAYPACK | DOCKERFILE | AUTO
   rootDir?: string | null;
   nixpacksConfig?: any;
+  volumes?: Array<{ hostPath: string; containerPath: string; mode?: 'ro' | 'rw' }>;
 }
 
 export interface BuildEvent {
@@ -89,6 +90,25 @@ export async function buildAndRun(
   const repoUrl = await resolveRepoUrlForBuild(params.deploymentId, params.repoUrl);
   // Likewise for exposure: rebuilds that do not pass publishedPort/exposureMode must keep what the deployment has.
   const exposure = await resolveExposureForBuild(params.deploymentId, { exposureMode: params.exposureMode, publishedPort: params.publishedPort });
+
+  // Load persistent volumes for this deployment if not provided
+  let volumes = params.volumes;
+  if (!volumes) {
+    try {
+      const { prisma } = await import('./prisma');
+      const dbVolumes = await prisma.deploymentVolume.findMany({
+        where: { deploymentId: params.deploymentId },
+      });
+      volumes = dbVolumes.map((v: any) => ({
+        hostPath: v.hostPath,
+        containerPath: v.containerPath,
+        mode: 'rw' as const,
+      }));
+    } catch {
+      volumes = [];
+    }
+  }
+
   const payload = {
     ...params,
     repoUrl,
@@ -96,6 +116,7 @@ export async function buildAndRun(
     publishedPort: exposure.publishedPort,
     deploymentsRootDomain: params.deploymentsRootDomain || env.deploymentsRootDomain,
     rootDomain: params.rootDomain || env.rootDomain,
+    volumes,
   };
   const res = await fetch(
     agentUrl(node, `/agent/deployments/${params.deploymentId}/build-and-run`),

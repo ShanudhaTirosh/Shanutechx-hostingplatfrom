@@ -118,27 +118,38 @@ dockerDeploymentsRouter.post('/deployments/docker-image', async (req: AuthedRequ
       include: { node: true },
     });
 
+    // Load any configured persistent volumes for this deployment
+    const dbVolumes = await prisma.deploymentVolume.findMany({
+      where: { deploymentId: deployment.id },
+    });
+    const volumes = dbVolumes.map((v) => ({
+      hostPath: v.hostPath,
+      containerPath: v.containerPath,
+      mode: 'rw' as const,
+    }));
+
     // Run container via node-agent
-    const result = await callNodeAgent(selectedNode, `/agent/deployments/${deployment.id}/run-image`, 'POST', {
-      image,
-      deploymentId: deployment.id,
-      subdomain,
-      internalPort,
-      envVars: envVars || {},
-      exposureMode: effectiveExposureMode,
-      cpuLimit,
-      memLimitMb: memoryLimit,
-    }).catch(async (err) => {
-      logger.warn({ err, deploymentId: deployment.id }, 'run-image node-agent endpoint failed, trying buildAndRun fallback');
-      return buildAndRun(selectedNode, {
+    let result: any;
+    try {
+      result = await callNodeAgent(selectedNode, `/agent/deployments/${deployment.id}/run-image`, 'POST', {
+        image,
         deploymentId: deployment.id,
-        repoUrl: `image://${image}`,
         subdomain,
         internalPort,
-        envVars,
+        envVars: envVars || {},
+        volumes,
         exposureMode: effectiveExposureMode,
-      }, () => {});
-    });
+        cpuLimit,
+        memLimitMb: memoryLimit,
+      });
+    } catch (err: any) {
+      logger.error({ err, deploymentId: deployment.id }, 'run-image node-agent endpoint failed');
+      await prisma.deployment.update({
+        where: { id: deployment.id },
+        data: { status: 'failed' },
+      });
+      return res.status(502).json({ error: `Image deployment failed: ${err.message}` });
+    }
 
     if (effectiveExposureMode !== 'internal_only' && subdomain && selectedNode.ip) {
       try {

@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const Docker = require('dockerode');
 const { resolveExposure } = require('./exposure');
 
@@ -30,6 +32,8 @@ async function runContainer({
   agentSecret = undefined,
   privateNetworkName = undefined,
   containerAlias = undefined,
+  volumes = [],
+  ports = [],
 }) {
   const containerName = `deploy-${deploymentId}`;
 
@@ -61,6 +65,17 @@ async function runContainer({
     networks.push(PUBLIC_NETWORK);
   }
 
+  // Handle explicit port array
+  if (Array.isArray(ports) && ports.length > 0) {
+    for (const p of ports) {
+      const internal = p.internal ?? p.containerPort;
+      const published = p.published ?? p.hostPort;
+      if (internal != null) {
+        portBindings[`${internal}/tcp`] = published != null ? [{ HostPort: String(published) }] : [];
+      }
+    }
+  }
+
   // Private project environment network
   if (privateNetworkName && typeof privateNetworkName === 'string') {
     try {
@@ -72,13 +87,58 @@ async function runContainer({
     } catch (_err) {}
   }
 
+  // Persistent volume bind mounts
+  const RESTRICTED_HOST_PATHS = [
+    '/var/run/docker.sock',
+    '/proc',
+    '/sys',
+    '/etc',
+    '/dev',
+    '/root',
+    '/',
+  ];
+
+  const binds = [];
+  if (Array.isArray(volumes)) {
+    for (const vol of volumes) {
+      if (!vol) continue;
+      const hostPath = typeof vol === 'string' ? vol.split(':')[0] : vol.hostPath;
+      const containerPath = typeof vol === 'string' ? vol.split(':')[1] : vol.containerPath;
+      const mode = (typeof vol === 'string' ? vol.split(':')[2] : (vol.mode || (vol.readOnly ? 'ro' : 'rw'))) || 'rw';
+
+      if (!hostPath || !containerPath) continue;
+
+      const normalizedHost = path.normalize(hostPath).replace(/\\/g, '/');
+      const lowerHost = normalizedHost.toLowerCase();
+
+      const isRestricted = RESTRICTED_HOST_PATHS.some((p) => lowerHost === p || lowerHost.startsWith(p + '/'));
+      if (isRestricted) {
+        continue;
+      }
+
+      try {
+        fs.mkdirSync(hostPath, { recursive: true, mode: 0o777 });
+        try { fs.chmodSync(hostPath, 0o777); } catch (_) {}
+      } catch (_) {}
+
+      binds.push(`${hostPath}:${containerPath}:${mode}`);
+    }
+  }
+
+  const exposedPorts = {};
+  for (const portKey of Object.keys(portBindings)) {
+    exposedPorts[portKey] = {};
+  }
+
   const containerConfig = {
     name: containerName,
     Image: imageTag,
     Env: Object.entries(envVars).map(([k, v]) => `${k}=${v}`),
     Labels: labels,
+    ExposedPorts: exposedPorts,
     HostConfig: {
       PortBindings: portBindings,
+      Binds: binds.length > 0 ? binds : undefined,
       NanoCpus: cpuLimit * 1e9,
       Memory: memLimitMb * 1024 * 1024,
       RestartPolicy: { Name: 'unless-stopped' },
@@ -232,27 +292,52 @@ async function getContainerMetrics(containerId) {
   const cpuDelta = (stats.cpu_stats?.cpu_usage?.total_usage || 0) - (stats.precpu_stats?.cpu_usage?.total_usage || 0);
   const systemDelta = (stats.cpu_stats?.system_cpu_usage || 0) - (stats.precpu_stats?.system_cpu_usage || 0);
   const onlineCpus = stats.cpu_stats?.online_cpus || (stats.cpu_stats?.cpu_usage?.percpu_usage || []).length || 1;
-  const cpuUsagePercent =
+  const cpuPercent =
     systemDelta > 0 && cpuDelta > 0 ? Math.round((cpuDelta / systemDelta) * onlineCpus * 100 * 100) / 100 : 0;
 
   const memoryStats = stats.memory_stats || {};
-  const memoryUsedMb = Math.round((memoryStats.usage || 0) / (1024 * 1024));
-  const rawMemLimit = memoryStats.limit || 0;
-  // Docker reports an effectively "no limit" value as the host's total
-  // memory when the container wasn't given an explicit --memory; treat
-  // limits above 1 TB as "no configured limit" rather than a real number.
-  const memoryLimitMb = rawMemLimit > 0 && rawMemLimit < 1024 * 1024 * 1024 * 1024
-    ? Math.round(rawMemLimit / (1024 * 1024))
+  const cache = memoryStats.stats?.inactive_file || memoryStats.stats?.total_inactive_file || 0;
+  const rawUsage = memoryStats.usage || 0;
+  const memoryUsageBytes = Math.max(0, rawUsage - cache) || rawUsage;
+  const memoryLimitBytes = memoryStats.limit || 0;
+
+  const memoryUsedMb = Math.round(memoryUsageBytes / (1024 * 1024));
+  const memoryLimitMb = memoryLimitBytes > 0 && memoryLimitBytes < 1024 * 1024 * 1024 * 1024
+    ? Math.round(memoryLimitBytes / (1024 * 1024))
     : null;
   const memoryUsagePercent = memoryLimitMb ? Math.round((memoryUsedMb / memoryLimitMb) * 100 * 100) / 100 : 0;
+
+  const nets = stats.networks || {};
+  let networkRxBytes = 0, networkTxBytes = 0;
+  for (const iface of Object.values(nets)) {
+    networkRxBytes += iface.rx_bytes || 0;
+    networkTxBytes += iface.tx_bytes || 0;
+  }
+
+  const blkStats = stats.blkio_stats?.io_service_bytes_recursive || [];
+  let blockReadBytes = 0, blockWriteBytes = 0;
+  for (const entry of blkStats) {
+    if (entry.op === 'read' || entry.op === 'Read') blockReadBytes += entry.value || 0;
+    if (entry.op === 'write' || entry.op === 'Write') blockWriteBytes += entry.value || 0;
+  }
 
   const storageUsedGb = info.SizeRw != null ? Math.round((info.SizeRw / (1024 * 1024 * 1024)) * 100) / 100 : 0;
 
   return {
-    cpuUsagePercent,
+    containerId,
+    cpuPercent,
+    cpuUsagePercent: cpuPercent,
+    memoryUsageBytes,
+    memoryLimitBytes,
     memoryUsedMb,
     memoryLimitMb,
+    memoryPercent: memoryUsagePercent,
     memoryUsagePercent,
+    networkRxBytes,
+    networkTxBytes,
+    blockReadBytes,
+    blockWriteBytes,
+    pids: stats.pids_stats?.current || 0,
     storageUsedGb,
     storageLimitGb: null, // no per-container disk quota mechanism configured on this node
     storageUsagePercent: 0,
@@ -314,7 +399,7 @@ async function streamContainerStats(containerId) {
           const raw = JSON.parse(line);
           const cpuDelta = (raw.cpu_stats?.cpu_usage?.total_usage || 0) - (raw.precpu_stats?.cpu_usage?.total_usage || 0);
           const sysDelta = (raw.cpu_stats?.system_cpu_usage || 0) - (raw.precpu_stats?.system_cpu_usage || 0);
-          const cpus = raw.cpu_stats?.online_cpus || 1;
+          const cpus = raw.cpu_stats?.online_cpus || (raw.cpu_stats?.cpu_usage?.percpu_usage || []).length || 1;
           const cpuPercent = sysDelta > 0 && cpuDelta > 0 ? Math.round((cpuDelta / sysDelta) * cpus * 100 * 100) / 100 : 0;
 
           const memUsed = Math.round((raw.memory_stats?.usage || 0) / (1024 * 1024));
@@ -389,7 +474,13 @@ async function listImages() {
 }
 
 async function pullImage(imageName, tag = 'latest') {
-  const fullName = `${imageName}:${tag}`;
+  let fullName = imageName;
+  const lastColon = imageName.lastIndexOf(':');
+  const lastSlash = imageName.lastIndexOf('/');
+  const hasTag = (lastColon > lastSlash) || imageName.includes('@');
+  if (!hasTag) {
+    fullName = `${imageName}:${tag || 'latest'}`;
+  }
   return new Promise((resolve, reject) => {
     docker.pull(fullName, (err, stream) => {
       if (err) return reject(err);
@@ -574,6 +665,7 @@ module.exports = {
   getContainerLogs,
   getLogs,
   streamLogs,
+  streamContainerLogs: streamLogs,
   listContainers,
   getContainerMetrics,
   inspectContainer,

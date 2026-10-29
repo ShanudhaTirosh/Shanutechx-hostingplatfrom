@@ -63,19 +63,20 @@ function redact(text, secrets = []) {
 }
 
 function run(cmd, args, opts = {}) {
-  const { auth, ...execOpts } = opts;
+  const { auth, onProcess, signal, ...execOpts } = opts;
   const secrets = auth ? [auth.username, auth.password, Buffer.from(`${auth.username}:${auth.password}`).toString('base64')] : [];
   return new Promise((resolve, reject) => {
-    execFile(
+    const child = execFile(
       cmd,
       args,
-      { ...execOpts, env: { ...process.env, ...authEnv(auth) }, maxBuffer: 1024 * 1024 * 20 },
+      { ...execOpts, signal, env: { ...process.env, ...authEnv(auth) }, maxBuffer: 1024 * 1024 * 20 },
       (err, stdout, stderr) => {
         if (err) {
           // execFile's default message embeds the full command line (including any URL credentials), so build our own.
           const detail = redact(String(stderr || err.message || '').trim().split('\n').slice(-4).join(' | '), secrets);
           const safe = new Error(`git ${args[0]} failed: ${detail}`);
           safe.code = err.code;
+          safe.name = err.name;
           safe.stdout = redact(stdout, secrets);
           safe.stderr = redact(stderr, secrets);
           return reject(safe);
@@ -83,6 +84,9 @@ function run(cmd, args, opts = {}) {
         resolve({ stdout, stderr });
       }
     );
+    if (typeof onProcess === 'function') {
+      onProcess(child);
+    }
   });
 }
 
@@ -92,7 +96,9 @@ function run(cmd, args, opts = {}) {
  * Workspace is intentionally keyed by deploymentId, not repo URL, so two
  * customers can't collide even if they point at forks of the same repo.
  */
-async function prepareWorkspace(deploymentId, repoUrl, branch = 'main', remoteBackupUrl = null) {
+async function prepareWorkspace(deploymentId, repoUrl, branch = 'main', remoteBackupUrl = null, opts = {}) {
+  const { signal, onProcess } = opts || {};
+  const runOpts = { signal, onProcess };
   const dir = path.join(WORKSPACES_DIR, deploymentId);
 
   if (!fs.existsSync(dir)) {
@@ -106,7 +112,7 @@ async function prepareWorkspace(deploymentId, repoUrl, branch = 'main', remoteBa
   if (isEmpty && remoteBackupUrl) {
     try {
       const { cleanUrl, auth } = splitCredentials(remoteBackupUrl);
-      await run('git', ['clone', '--depth', '1', cleanUrl, dir], { auth });
+      await run('git', ['clone', '--depth', '1', cleanUrl, dir], { ...runOpts, auth });
       return dir;
     } catch (err) {
       // err.message is already redacted by run().
@@ -143,22 +149,22 @@ async function prepareWorkspace(deploymentId, repoUrl, branch = 'main', remoteBa
       const { cleanUrl, auth } = splitCredentials(repoUrl);
       // Always point origin at the credential-free URL. This also scrubs a token that an older agent version
       // wrote into .git/config.
-      await run('git', ['remote', 'set-url', 'origin', cleanUrl], { cwd: dir }).catch(() => run('git', ['remote', 'add', 'origin', cleanUrl], { cwd: dir }));
+      await run('git', ['remote', 'set-url', 'origin', cleanUrl], { ...runOpts, cwd: dir }).catch(() => run('git', ['remote', 'add', 'origin', cleanUrl], { ...runOpts, cwd: dir }));
       
       let fetchedBranch = branch;
       try {
-        await run('git', ['fetch', '--depth', '1', 'origin', branch], { cwd: dir, auth });
-        await run('git', ['reset', '--hard', `origin/${branch}`], { cwd: dir });
+        await run('git', ['fetch', '--depth', '1', 'origin', branch], { ...runOpts, cwd: dir, auth });
+        await run('git', ['reset', '--hard', `origin/${branch}`], { ...runOpts, cwd: dir });
       } catch (fetchErr) {
         // Fallback for default branch variance (e.g. main vs master)
         if (branch === 'main' || branch === 'master') {
           const altBranch = branch === 'main' ? 'master' : 'main';
           try {
-            await run('git', ['fetch', '--depth', '1', 'origin', altBranch], { cwd: dir, auth });
-            await run('git', ['reset', '--hard', `origin/${altBranch}`], { cwd: dir });
+            await run('git', ['fetch', '--depth', '1', 'origin', altBranch], { ...runOpts, cwd: dir, auth });
+            await run('git', ['reset', '--hard', `origin/${altBranch}`], { ...runOpts, cwd: dir });
             fetchedBranch = altBranch;
           } catch {
-            throw new Error(`Could not fetch branch "${branch}" or "${altBranch}": ${fetchErr.message}`);
+            throw new Error(`Could not fetch the latest code for branch "${branch}" or "${altBranch}": ${fetchErr.message}`);
           }
         } else {
           throw new Error(`Could not fetch the latest code for branch "${branch}", so the deploy was stopped instead of rebuilding old code. ${fetchErr.message}`);
@@ -169,16 +175,16 @@ async function prepareWorkspace(deploymentId, repoUrl, branch = 'main', remoteBa
     const { cleanUrl, auth } = splitCredentials(repoUrl);
     try {
       if (branch) {
-        await run('git', ['clone', '--depth', '1', '--branch', branch, cleanUrl, dir], { auth });
+        await run('git', ['clone', '--depth', '1', '--branch', branch, cleanUrl, dir], { ...runOpts, auth });
       } else {
-        await run('git', ['clone', '--depth', '1', cleanUrl, dir], { auth });
+        await run('git', ['clone', '--depth', '1', cleanUrl, dir], { ...runOpts, auth });
       }
     } catch (cloneErr) {
       // Production resilience: if user supplied default branch name (e.g. 'main' but repo is 'master')
       if (branch === 'main' || branch === 'master') {
         const altBranch = branch === 'main' ? 'master' : 'main';
         try {
-          await run('git', ['clone', '--depth', '1', '--branch', altBranch, cleanUrl, dir], { auth });
+          await run('git', ['clone', '--depth', '1', '--branch', altBranch, cleanUrl, dir], { ...runOpts, auth });
           return dir;
         } catch {
           // fall through to default clone
@@ -186,7 +192,7 @@ async function prepareWorkspace(deploymentId, repoUrl, branch = 'main', remoteBa
       }
       // Fallback: clone remote default HEAD branch without specifying --branch
       try {
-        await run('git', ['clone', '--depth', '1', cleanUrl, dir], { auth });
+        await run('git', ['clone', '--depth', '1', cleanUrl, dir], { ...runOpts, auth });
       } catch {
         throw cloneErr;
       }

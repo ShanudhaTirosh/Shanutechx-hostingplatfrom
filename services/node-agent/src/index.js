@@ -363,15 +363,65 @@ app.get('/agent/volumes/:name', async (req, res) => {
   }
 });
 
+const VOLUMES_ROOT = process.env.AGENT_VOLUMES_DIR || '/var/lib/shanutechx/volumes';
+
 app.post('/agent/volumes', async (req, res) => {
-  const { name, driver, labels } = req.body || {};
-  if (!name) return res.status(400).json({ error: 'name is required' });
+  const { deploymentId, hostPath, driver, labels, sizeGb } = req.body || {};
+  const name = req.body?.name || req.body?.volumeName;
+
+  if (!name || typeof name !== 'string') {
+    return res.status(400).json({ error: 'name is required' });
+  }
+
+  // Sanitize volume name
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(name)) {
+    return res.status(400).json({ error: 'Invalid volume name' });
+  }
+
   try {
+    // Mode 1: Deployment persistent volume (host directory + optional docker registration)
+    if (deploymentId) {
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(deploymentId)) {
+        return res.status(400).json({ error: 'Invalid deploymentId' });
+      }
+
+      const allowedRoot = path.resolve(VOLUMES_ROOT, deploymentId) + path.sep;
+      const targetPath = hostPath ? path.resolve(hostPath) : path.resolve(VOLUMES_ROOT, deploymentId, name);
+
+      // Path traversal security check
+      if (!(targetPath + path.sep).startsWith(allowedRoot) && targetPath !== path.resolve(VOLUMES_ROOT, deploymentId, name)) {
+        logger.warn({ deploymentId, hostPath, targetPath }, 'Volume path traversal attempt rejected');
+        return res.status(400).json({ error: 'Volume path is outside the allowed volumes directory' });
+      }
+
+      // Ensure directory exists on host with 0777 permissions for non-root (1000:1000)
+      await fs.promises.mkdir(targetPath, { recursive: true, mode: 0o777 });
+      try { await fs.promises.chmod(targetPath, 0o777); } catch (_) {}
+      try { await fs.promises.chown(targetPath, 1000, 1000); } catch (_) {}
+
+      try {
+        await createVolume(`vol-${deploymentId}-${name}`, driver || 'local', {
+          deploymentId,
+          volumeName: name,
+          ...(labels || {}),
+        });
+      } catch (_volErr) {}
+
+      logger.info({ deploymentId, name, targetPath }, 'Provisioned persistent volume on compute node');
+      return res.status(201).json({
+        success: true,
+        path: targetPath,
+        name,
+        deploymentId,
+      });
+    }
+
+    // Mode 2: Docker Engine named volume
     const vol = await createVolume(name, driver, labels);
-    logger.info({ name }, 'Volume created');
+    logger.info({ name }, 'Docker volume created');
     res.status(201).json(vol);
   } catch (err) {
-    logger.error({ err }, 'Failed to create volume');
+    logger.error({ err, name, deploymentId }, 'Failed to create volume');
     res.status(500).json({ error: err.message });
   }
 });
@@ -474,9 +524,233 @@ app.get('/agent/system/df', async (_req, res) => {
 });
 
 
+const { execFile: execFileCb } = require('child_process');
+const util = require('util');
+const execFileAsync = util.promisify(execFileCb);
+
+async function terminateProcessTree(pid) {
+  if (!pid) return;
+
+  if (process.platform === 'win32') {
+    // Windows: taskkill /PID <pid> /T /F terminates process and all child processes forcefully
+    try {
+      await execFileAsync('taskkill', ['/PID', String(pid), '/T', '/F']);
+    } catch (_) {}
+  } else {
+    // POSIX: Kill process group with SIGTERM, then escalate to SIGKILL
+    try {
+      process.kill(-pid, 'SIGTERM');
+    } catch (_) {
+      try { process.kill(pid, 'SIGTERM'); } catch (_) {}
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    try {
+      process.kill(-pid, 'SIGKILL');
+    } catch (_) {
+      try { process.kill(pid, 'SIGKILL'); } catch (_) {}
+    }
+  }
+}
+
+class ActiveBuildSession {
+  constructor(deploymentId) {
+    this.deploymentId = deploymentId;
+    this.startTime = Date.now();
+    this.phase = 'init';
+    this.abortController = new AbortController();
+    this.currentProcess = null;
+    this.workspaceDir = null;
+    this.runnerContainerId = null;
+    this.generatedFiles = new Set();
+    this.cancelled = false;
+  }
+
+  get signal() {
+    return this.abortController.signal;
+  }
+
+  setCurrentProcess(proc) {
+    this.currentProcess = proc;
+  }
+
+  trackGeneratedFile(filePath) {
+    if (filePath) this.generatedFiles.add(filePath);
+  }
+
+  async kill() {
+    this.cancelled = true;
+    this.phase = 'cancelled';
+
+    // 1. Trigger AbortController signal
+    this.abortController.abort();
+
+    // 2. Terminate child process tree
+    if (this.currentProcess && this.currentProcess.pid) {
+      await terminateProcessTree(this.currentProcess.pid);
+      this.currentProcess = null;
+    }
+
+    // 3. Clean up containerized runner if running
+    if (this.runnerContainerId) {
+      try {
+        const cnt = docker.getContainer(this.runnerContainerId);
+        await cnt.remove({ force: true, v: true });
+      } catch (_) {}
+      this.runnerContainerId = null;
+    }
+
+    // 4. Clean up temporary filesystem artifacts
+    await this.cleanupArtifacts();
+  }
+
+  async cleanupArtifacts() {
+    // Clean up auto-generated files (Dockerfiles, nixpacks.toml)
+    for (const filePath of this.generatedFiles) {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (_) {}
+    }
+
+    // Remove any stale git lock files in workspace
+    if (this.workspaceDir) {
+      const gitDir = path.join(this.workspaceDir, '.git');
+      if (fs.existsSync(gitDir)) {
+        const lockFiles = ['index.lock', 'HEAD.lock', 'shallow.lock', 'config.lock'];
+        for (const lock of lockFiles) {
+          const lockPath = path.join(gitDir, lock);
+          try {
+            if (fs.existsSync(lockPath)) fs.unlinkSync(lockPath);
+          } catch (_) {}
+        }
+      }
+    }
+  }
+}
+
+const activeBuilds = new Map();
+
+/**
+ * POST /agent/deployments/:id/run-image
+ * Direct Docker Image Deployment (Feature 8)
+ */
+app.post(['/agent/deployments/:id/run-image', '/agent/deployments/:deploymentId/run-image'], async (req, res) => {
+  const deploymentId = req.params.id || req.params.deploymentId;
+
+  // Validation: reject empty body or missing image parameter
+  if (!req.body || !req.body.image || typeof req.body.image !== 'string' || !req.body.image.trim()) {
+    return res.status(400).json({ error: 'image is required' });
+  }
+
+  const {
+    image,
+    envVars = {},
+    ports = [],
+    volumes = [],
+    resources = {},
+    internalPort,
+    publishedPort,
+    subdomain,
+    exposureMode,
+    routingMode,
+    startCommand,
+    cpuLimit,
+    memLimitMb,
+    memoryLimit,
+    rootDomain: reqRootDomain,
+    deploymentsRootDomain: reqDeploymentsRootDomain,
+  } = req.body;
+
+  // Normalize resource limits
+  const effectiveCpuLimit = resources.cpuLimit ?? cpuLimit ?? 1;
+  const effectiveMemLimitMb = resources.memoryLimitMb ?? memLimitMb ?? memoryLimit ?? 512;
+  const normalizedResources = {
+    cpuLimit: effectiveCpuLimit,
+    memoryLimitMb: effectiveMemLimitMb,
+  };
+
+  // Normalize port mappings
+  let effectiveInternalPort = internalPort;
+  let effectivePublishedPort = publishedPort;
+  if (!effectiveInternalPort && Array.isArray(ports) && ports.length > 0) {
+    effectiveInternalPort = ports[0].internal ?? ports[0].containerPort;
+    effectivePublishedPort = effectivePublishedPort ?? ports[0].published ?? ports[0].hostPort;
+  }
+  if (!effectiveInternalPort) {
+    effectiveInternalPort = 80;
+  }
+
+  const effectiveExposureMode = exposureMode || (Array.isArray(ports) && ports.length > 0 && !subdomain ? 'no_ssl' : 'ssl_with_proxy');
+  const effectiveRoutingMode = routingMode || (effectiveExposureMode === 'no_ssl' || effectiveExposureMode === 'raw_tcp' ? 'direct' : 'proxied');
+
+  try {
+    // 1. Ensure image is available locally; pull from registry if not cached
+    let hasImage = false;
+    try {
+      const img = docker.getImage(image);
+      await img.inspect();
+      hasImage = true;
+    } catch (_err) {
+      hasImage = false;
+    }
+
+    if (!hasImage) {
+      logger.info({ deploymentId, image }, 'Image not present in local Docker cache, pulling...');
+      try {
+        await pullImage(image);
+        logger.info({ deploymentId, image }, 'Successfully pulled image');
+      } catch (pullErr) {
+        logger.error({ deploymentId, image, err: pullErr }, 'Failed to pull image');
+        return res.status(500).json({ error: `Failed to pull image "${image}": ${pullErr.message}` });
+      }
+    }
+
+    // 2. Launch container via runContainer
+    const { containerId, containerName } = await runContainer({
+      deploymentId,
+      imageTag: image,
+      internalPort: effectiveInternalPort,
+      publishedPort: effectivePublishedPort,
+      ports: Array.isArray(ports) ? ports : [],
+      volumes: Array.isArray(volumes) ? volumes : [],
+      subdomain,
+      rootDomain: reqRootDomain || ROOT_DOMAIN,
+      deploymentsRootDomain: reqDeploymentsRootDomain,
+      envVars,
+      cpuLimit: effectiveCpuLimit,
+      memLimitMb: effectiveMemLimitMb,
+      routingMode: effectiveRoutingMode,
+      exposureMode: effectiveExposureMode,
+      startCommand: startCommand || null,
+      agentPort: PORT,
+      agentSecret: AGENT_SECRET,
+    });
+
+    logger.info({ deploymentId, containerId, image }, 'Direct image container running successfully');
+
+    // Return 201 Created with complete deployment attributes
+    return res.status(201).json({
+      containerId,
+      containerName,
+      status: 'running',
+      deploymentId,
+      image,
+      ports: Array.isArray(ports) ? ports : [],
+      volumes: Array.isArray(volumes) ? volumes : [],
+      resources: normalizedResources,
+    });
+  } catch (err) {
+    logger.error({ deploymentId, image, err }, 'Failed to run direct image container');
+    return res.status(500).json({ error: `Failed to deploy image: ${err.message}` });
+  }
+});
+
 /**
  * Build and run a deployment. Body:
- *   { deploymentId, repoUrl, branch?, subdomain?, internalPort, envVars? }
+ *   { deploymentId, repoUrl, branch?, subdomain?, internalPort, envVars?, volumes?, buildArgs? }
  * `subdomain` is omitted for non-public services (e.g. Discord bots).
  */
 app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
@@ -489,6 +763,8 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
     deploymentsRootDomain: reqDeploymentsRootDomain,
     internalPort,
     envVars,
+    buildArgs,
+    volumes,
     cpuLimit,
     memoryLimit,
     backupRepoUrl,
@@ -511,10 +787,27 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
 
   const emit = (event) => res.write(JSON.stringify(event) + '\n');
 
+  // Register active build session
+  const session = new ActiveBuildSession(deploymentId);
+  activeBuilds.set(deploymentId, session);
+
   try {
     logger.info({ deploymentId, repoUrl, startCommand, exposureMode, builder, rootDir }, 'Starting build');
+    session.phase = 'fetch';
     emit({ phase: 'fetch', message: 'Fetching repository...' });
-    const baseWorkspaceDir = await prepareWorkspace(deploymentId, repoUrl, branch || 'main', backupRepoUrl);
+    const baseWorkspaceDir = await prepareWorkspace(
+      deploymentId,
+      repoUrl,
+      branch || 'main',
+      backupRepoUrl,
+      {
+        signal: session.signal,
+        onProcess: (proc) => session.setCurrentProcess(proc),
+      }
+    );
+    session.workspaceDir = baseWorkspaceDir;
+
+    if (session.cancelled) throw new Error('Build cancelled by user');
 
     let workspaceDir = baseWorkspaceDir;
     if (rootDir && typeof rootDir === 'string') {
@@ -525,20 +818,29 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
       }
     }
 
+    session.phase = 'build';
     emit({ phase: 'build', message: 'Building container image...' });
     const imageTag = `shanutechx/${deploymentId}:latest`;
     await buildImage({
       workspaceDir,
       imageTag,
       envVars,
+      buildArgs: buildArgs || {},
       startCommand,
       entryFile,
       frameworkPreset,
       builder,
       nixpacksConfig,
+      signal: session.signal,
+      onProcess: (proc) => session.setCurrentProcess(proc),
+      onFileCreated: (filePath) => session.trackGeneratedFile(filePath),
+      onRunnerContainer: (cntId) => { session.runnerContainerId = cntId; },
       onData: (chunk) => emit({ phase: 'build', log: chunk.toString() }),
     });
 
+    if (session.cancelled) throw new Error('Build cancelled by user');
+
+    session.phase = 'run';
     emit({ phase: 'run', message: 'Starting container...' });
     const { containerId, containerName } = await runContainer({
       deploymentId,
@@ -557,35 +859,55 @@ app.post('/agent/deployments/:deploymentId/build-and-run', async (req, res) => {
       publishedPort: publishedPort ?? null,
       agentPort: PORT,
       agentSecret: AGENT_SECRET,
+      volumes: Array.isArray(volumes) ? volumes : [],
     });
-
 
     logger.info({ deploymentId, containerId, subdomain }, 'Deployment complete');
     emit({ phase: 'done', containerId, containerName });
     res.end();
   } catch (err) {
-    logger.error({ deploymentId, err }, 'Build/run failed');
-    emit({ phase: 'error', message: err.message, stderr: err.stderr });
+    if (session.cancelled || err.name === 'AbortError' || err.message?.includes('cancelled')) {
+      logger.info({ deploymentId }, 'Build was cancelled by user');
+      emit({ phase: 'error', message: 'Build cancelled by user', cancelled: true });
+    } else {
+      logger.error({ deploymentId, err }, 'Build/run failed');
+      emit({ phase: 'error', message: err.message, stderr: err.stderr });
+    }
     res.end();
+  } finally {
+    activeBuilds.delete(deploymentId);
   }
 });
 
-const activeBuilds = new Map();
+app.post(['/agent/deployments/:id/cancel-build', '/agent/deployments/:deploymentId/cancel-build'], async (req, res) => {
+  const deploymentId = req.params.id || req.params.deploymentId;
+  const session = activeBuilds.get(deploymentId);
 
-app.post('/agent/deployments/:deploymentId/cancel-build', async (req, res) => {
-  const { deploymentId } = req.params;
-  const build = activeBuilds.get(deploymentId);
-  if (build) {
-    try {
-      if (typeof build.kill === 'function') build.kill();
-      activeBuilds.delete(deploymentId);
-      logger.info({ deploymentId }, 'Build process cancelled');
-      return res.json({ ok: true, message: 'Build cancelled' });
-    } catch (err) {
-      logger.error({ deploymentId, err }, 'Error cancelling build process');
-    }
+  if (!session) {
+    return res.status(404).json({
+      error: 'No active build found to cancel',
+      deploymentId,
+    });
   }
-  res.json({ ok: true, message: 'No active build process found or already stopped' });
+
+  try {
+    logger.info({ deploymentId }, 'Cancelling active build');
+    await session.kill();
+    activeBuilds.delete(deploymentId);
+    return res.json({
+      ok: true,
+      cancelled: true,
+      deploymentId,
+      message: 'Build cancelled successfully',
+    });
+  } catch (err) {
+    logger.error({ deploymentId, err: err.message }, 'Error cancelling build');
+    activeBuilds.delete(deploymentId);
+    return res.status(500).json({
+      error: `Failed to cancel build: ${err.message}`,
+      deploymentId,
+    });
+  }
 });
 
 app.get('/agent/deployments/:containerId/logs', async (req, res) => {
@@ -1692,9 +2014,6 @@ app.delete('/agent/projects/:projectId/tables/:table/rows/:pk', async (req, res)
 
 const os = require('os');
 const { randomBytes } = require('crypto');
-const { execFile } = require('child_process');
-const { promisify } = require('util');
-const execFileAsync = promisify(execFile);
 
 const COMPOSE_DIR = process.env.COMPOSE_DATA_DIR || '/srv/compose';
 
